@@ -30,6 +30,16 @@ cp config/config.example.json config/config.json
 
 2. Edit `config/config.json` with your preferences
 
+## API Keys
+
+For sensitive settings like API keys:
+1. Copy the template: `cp config/config_secrets.template.json config/config_secrets.json`
+
+2. Edit `config/config_secrets.json` with your API keys via `sudo nano config/config_secrets.json`
+
+3. Ctrl + X to exit, Y to overwrite, Enter to save 
+
+
 ## Important: Sound Module Configuration
 
 1. Remove unnecessary services that might interfere with the LED matrix:
@@ -71,15 +81,6 @@ sudo nano /boot/firmware/cmdline.txt
 sudo reboot
 ```
 
-
-## API Keys
-
-For sensitive settings like API keys:
-1. Copy the template: `cp config/config_secrets.template.json config/config_secrets.json`
-
-2. Edit `config/config_secrets.json` with your API keys via `sudo nano config/config_secrets.json`
-
-3. Ctrl + X to exit, Y to save 
 
 ## Running the Display
 
