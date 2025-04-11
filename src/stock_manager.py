@@ -295,34 +295,54 @@ class StockManager:
         height = self.display_manager.matrix.height
         
         # Create a new image with black background
-        display_image = Image.new('RGB', (width, height), (0, 0, 0))
+        display_image = Image.new('RGB', (width * 2, height), (0, 0, 0))  # Double width for scrolling
         draw = ImageDraw.Draw(display_image)
         
         # Get stock color
         color = self._get_stock_color(symbol)
         
-        # Draw stock logo (placeholder for now - we'll use a simple icon)
+        # Draw large stock logo on the left
         logo_text = "📈" if data.get('change', 0) >= 0 else "📉"
-        bbox = draw.textbbox((0, 0), logo_text, font=self.display_manager.small_font)
+        bbox = draw.textbbox((0, 0), logo_text, font=self.display_manager.font)  # Use regular font for larger logo
         logo_width = bbox[2] - bbox[0]
         logo_height = bbox[3] - bbox[1]
         logo_y = (height - logo_height) // 2
-        draw.text((2, logo_y), logo_text, font=self.display_manager.small_font, fill=color)
+        draw.text((10, logo_y), logo_text, font=self.display_manager.font, fill=color)
         
-        # Draw symbol
+        # Calculate center section position (after logo)
+        center_x = logo_width + 20  # Start after logo with some padding
+        
+        # Draw stacked symbol, price, and change in the center
+        # Symbol
         symbol_text = symbol
         bbox = draw.textbbox((0, 0), symbol_text, font=self.display_manager.small_font)
         symbol_width = bbox[2] - bbox[0]
         symbol_height = bbox[3] - bbox[1]
-        symbol_x = (width - symbol_width) // 2
-        symbol_y = (height - symbol_height) // 2
+        symbol_x = center_x + (width // 3 - symbol_width) // 2
+        symbol_y = height // 4
         draw.text((symbol_x, symbol_y), symbol_text, font=self.display_manager.small_font, fill=(255, 255, 255))
         
-        # Draw mini chart
+        # Price
+        price_text = f"${data['price']:.2f}"
+        bbox = draw.textbbox((0, 0), price_text, font=self.display_manager.small_font)
+        price_width = bbox[2] - bbox[0]
+        price_x = center_x + (width // 3 - price_width) // 2
+        price_y = symbol_y + symbol_height + 5
+        draw.text((price_x, price_y), price_text, font=self.display_manager.small_font, fill=color)
+        
+        # Change
+        change_text = f"({data['change']:+.1f}%)"
+        bbox = draw.textbbox((0, 0), change_text, font=self.display_manager.small_font)
+        change_width = bbox[2] - bbox[0]
+        change_x = center_x + (width // 3 - change_width) // 2
+        change_y = price_y + symbol_height + 5
+        draw.text((change_x, change_y), change_text, font=self.display_manager.small_font, fill=color)
+        
+        # Draw mini chart on the right
         if data.get('price_history'):
-            chart_width = width // 4
-            chart_height = height // 3
-            chart_x = width - chart_width - 2
+            chart_width = width // 3
+            chart_height = height // 2
+            chart_x = center_x + width // 3 + 10  # Start after center section
             chart_y = (height - chart_height) // 2
             
             # Get price data for chart
@@ -342,22 +362,6 @@ class StockManager:
                     # Draw lines between points
                     for i in range(len(points) - 1):
                         draw.line([points[i], points[i + 1]], fill=color, width=1)
-        
-        # Draw price and change below
-        price_text = f"${data['price']:.2f}"
-        change_text = f"({data['change']:+.1f}%)"
-        
-        # Draw price
-        bbox = draw.textbbox((0, 0), price_text, font=self.display_manager.small_font)
-        price_width = bbox[2] - bbox[0]
-        price_x = (width - price_width) // 2
-        draw.text((price_x, height - 20), price_text, font=self.display_manager.small_font, fill=color)
-        
-        # Draw change
-        bbox = draw.textbbox((0, 0), change_text, font=self.display_manager.small_font)
-        change_width = bbox[2] - bbox[0]
-        change_x = (width - change_width) // 2
-        draw.text((change_x, height - 10), change_text, font=self.display_manager.small_font, fill=color)
         
         return display_image
 
@@ -411,15 +415,28 @@ class StockManager:
         if self.cached_text_image is None or self.cached_text != current_symbol:
             self.cached_text_image = self._create_stock_display(current_symbol, data)
             self.cached_text = current_symbol
+            self.scroll_position = 0
         
         # Clear the display if requested
         if force_clear:
             self.display_manager.clear()
             self.scroll_position = 0
         
-        # Copy the cached image to the display
-        self.display_manager.image.paste(self.cached_text_image, (0, 0))
+        # Calculate the visible portion of the image
+        width = self.display_manager.matrix.width
+        visible_portion = self.cached_text_image.crop((
+            self.scroll_position, 0,
+            self.scroll_position + width, self.display_manager.matrix.height
+        ))
+        
+        # Copy the visible portion to the display
+        self.display_manager.image.paste(visible_portion, (0, 0))
         self.display_manager.update_display()
+        
+        # Update scroll position
+        self.scroll_position += self.scroll_speed
+        if self.scroll_position >= width:  # Reset when we've scrolled through the whole image
+            self.scroll_position = 0
         
         # Log frame rate
         self._log_frame_rate()
