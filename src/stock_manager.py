@@ -297,6 +297,9 @@ class StockManager:
         image = Image.new('RGB', (scroll_width, height), (0, 0, 0))
         draw = ImageDraw.Draw(image)
         
+        # Get stock color
+        color = self._get_stock_color(symbol)
+        
         # Calculate center position for the main content
         center_x = width // 2
         
@@ -307,19 +310,19 @@ class StockManager:
         logo_height = bbox[3] - bbox[1]
         logo_x = center_x - width // 3 - logo_width // 2
         logo_y = (height - logo_height) // 2
-        draw.text((logo_x, logo_y), logo_text, font=self.display_manager.regular_font, fill=(255, 255, 255))
+        draw.text((logo_x, logo_y), logo_text, font=self.display_manager.regular_font, fill=color)
         
         # Draw stacked symbol, price, and change in the center
-        # Symbol
+        # Symbol (always white)
         symbol_text = symbol
         bbox = draw.textbbox((0, 0), symbol_text, font=self.display_manager.small_font)
         symbol_width = bbox[2] - bbox[0]
         symbol_height = bbox[3] - bbox[1]
         symbol_x = center_x + (width // 3 - symbol_width) // 2
         symbol_y = height // 4 - symbol_height // 2  # Center symbol in top quarter
-        draw.text((symbol_x, symbol_y), symbol_text, font=self.display_manager.small_font, fill=(255, 255, 255))
+        draw.text((symbol_x, symbol_y), symbol_text, font=self.display_manager.small_font, fill=(255, 255, 255))  # White color for symbol
         
-        # Price and change (same size)
+        # Price and change (in stock color)
         price_text = f"${data['price']:.2f}"
         change_text = f"({data['change']:+.1f}%)"
         
