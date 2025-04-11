@@ -365,11 +365,13 @@ class StockManager:
                      outline=color)
         
         # Get price history for chart
-        price_history = data['price_history']
+        price_history = data.get('price_history', [])
         if len(price_history) >= 2:  # Need at least 2 points to draw a line
+            # Extract prices from price history
+            prices = [p['price'] for p in price_history]
             # Calculate price range with padding to avoid flat lines
-            min_price = min(price_history) * 0.99  # 1% padding below
-            max_price = max(price_history) * 1.01  # 1% padding above
+            min_price = min(prices) * 0.99  # 1% padding below
+            max_price = max(prices) * 1.01  # 1% padding above
             price_range = max_price - min_price
             
             if price_range == 0:  # If all prices are the same
@@ -377,7 +379,8 @@ class StockManager:
             
             # Calculate points for the line
             points = []
-            for i, price in enumerate(price_history):
+            for i, price_data in enumerate(price_history):
+                price = price_data['price']
                 # Calculate x position with proper spacing
                 x = chart_x + 1 + (i * (chart_width - 2) // (len(price_history) - 1))
                 # Calculate y position (inverted because y=0 is at top)
