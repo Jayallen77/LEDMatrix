@@ -36,18 +36,18 @@ class DisplayManager:
         options.parallel = hardware_config.get('parallel', 1)
         options.hardware_mapping = hardware_config.get('hardware_mapping', 'adafruit-hat-pwm')
         
-        # Balance performance and stability
+        # Optimize display settings for chained panels
         options.brightness = 100
-        options.pwm_bits = 10  # Increased from 8 for better color depth
-        options.pwm_lsb_nanoseconds = 150  # Increased for better stability
+        options.pwm_bits = 11
+        options.pwm_lsb_nanoseconds = 200  # Increased for better stability
         options.led_rgb_sequence = 'RGB'
         options.pixel_mapper_config = ''
         options.row_address_type = 0
         options.multiplexing = 0
-        options.disable_hardware_pulsing = False  # Re-enable hardware pulsing for stability
+        options.disable_hardware_pulsing = False  # Enable hardware pulsing for better sync
         options.show_refresh_rate = False
-        options.limit_refresh_rate_hz = 90  # Reduced from 120Hz for better stability
-        options.gpio_slowdown = 2  # Increased for better stability
+        options.limit_refresh_rate_hz = 60  # Reduced refresh rate for stability
+        options.gpio_slowdown = 2  # Increased slowdown for better stability
         
         # Initialize the matrix
         self.matrix = RGBMatrix(options=options)
@@ -91,14 +91,17 @@ class DisplayManager:
     def update_display(self):
         """Update the display using double buffering with proper sync."""
         try:
-            # Copy the current image to the offscreen canvas
+            # Copy the current image to the offscreen canvas   
             self.offscreen_canvas.SetImage(self.image)
             
-            # Swap buffers immediately
-            self.matrix.SwapOnVSync(self.offscreen_canvas, False)
+            # Wait for the next vsync before swapping
+            self.matrix.SwapOnVSync(self.offscreen_canvas)
             
             # Swap our canvas references
             self.offscreen_canvas, self.current_canvas = self.current_canvas, self.offscreen_canvas
+            
+            # Small delay to ensure stable refresh
+            time.sleep(0.001)
         except Exception as e:
             logger.error(f"Error updating display: {e}")
 
@@ -119,32 +122,25 @@ class DisplayManager:
             logger.error(f"Error clearing display: {e}")
 
     def _load_fonts(self):
-        """Load fonts optimized for LED matrix display."""
+        """Load fonts with proper error handling."""
         try:
-            # Use Press Start 2P font - perfect for LED matrix displays
-            font_path = "assets/fonts/PressStart2P-Regular.ttf"
+            # Load regular font (Press Start 2P)
+            self.regular_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 10)
+            logger.info("Regular font loaded successfully")
             
-            # For 32px height matrix, optimized sizes for pixel-perfect display
-            large_size = 10  # Large text for time and main info
-            small_size = 8   # Small text for secondary information
+            # Load small font (Press Start 2P at smaller size)
+            self.small_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
+            logger.info("Small font loaded successfully")
             
-            try:
-                self.font = ImageFont.truetype(font_path, large_size)
-                self.small_font = ImageFont.truetype(font_path, small_size)
-                logger.info(f"Loaded Press Start 2P font: {font_path} (large: {large_size}px, small: {small_size}px)")
-            except Exception as e:
-                logger.warning(f"Failed to load Press Start 2P font, falling back to default: {e}")
-                self.font = ImageFont.load_default()
-                self.small_font = ImageFont.load_default()
-                
         except Exception as e:
             logger.error(f"Error in font loading: {e}")
-            self.font = ImageFont.load_default()
-            self.small_font = self.font
+            # Fallback to default font
+            self.regular_font = ImageFont.load_default()
+            self.small_font = self.regular_font
 
     def draw_text(self, text: str, x: int = None, y: int = None, color: Tuple[int, int, int] = (255, 255, 255), small_font: bool = False) -> None:
         """Draw text on the display with improved clarity."""
-        font = self.small_font if small_font else self.font
+        font = self.small_font if small_font else self.regular_font
         
         # Get text dimensions including ascenders and descenders
         bbox = self.draw.textbbox((0, 0), text, font=font)
