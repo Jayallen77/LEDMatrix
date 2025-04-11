@@ -322,18 +322,28 @@ class StockManager:
             # Try Yahoo first
             response = requests.get(yahoo_url, headers=self.headers, timeout=5)
             if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
-                with open(filepath, 'wb') as f:
-                    f.write(response.content)
-                logger.info(f"Downloaded logo for {symbol} from Yahoo")
-                return filepath
+                try:
+                    with open(filepath, 'wb') as f:
+                        f.write(response.content)
+                    logger.info(f"Downloaded logo for {symbol} from Yahoo")
+                    return filepath
+                except PermissionError:
+                    logger.warning(f"Permission denied when saving logo for {symbol}. Using in-memory logo instead.")
+                    # Return a temporary path that won't be used for saving
+                    return f"temp_{symbol.lower()}.png"
                 
             # Try alternative source
             response = requests.get(alt_url, headers=self.headers, timeout=5)
             if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
-                with open(filepath, 'wb') as f:
-                    f.write(response.content)
-                logger.info(f"Downloaded logo for {symbol} from alternative source")
-                return filepath
+                try:
+                    with open(filepath, 'wb') as f:
+                        f.write(response.content)
+                    logger.info(f"Downloaded logo for {symbol} from alternative source")
+                    return filepath
+                except PermissionError:
+                    logger.warning(f"Permission denied when saving logo for {symbol}. Using in-memory logo instead.")
+                    # Return a temporary path that won't be used for saving
+                    return f"temp_{symbol.lower()}.png"
                 
             logger.warning(f"Could not download logo for {symbol}")
             return None
@@ -354,10 +364,34 @@ class StockManager:
         # Try to download the logo if we don't have it
         logo_path = self._download_stock_logo(symbol)
         
-        if logo_path and os.path.exists(logo_path):
+        if logo_path:
             try:
-                # Open and resize the logo
-                logo = Image.open(logo_path)
+                # Check if this is a temporary path (in-memory logo)
+                if logo_path.startswith("temp_"):
+                    # For temporary paths, we need to download the logo again
+                    # since we couldn't save it to disk
+                    symbol_lower = symbol.lower()
+                    yahoo_url = f"https://logo.clearbit.com/{symbol_lower}.com"
+                    alt_url = f"https://storage.googleapis.com/iex/api/logos/{symbol}.png"
+                    
+                    # Try Yahoo first
+                    response = requests.get(yahoo_url, headers=self.headers, timeout=5)
+                    if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
+                        # Create image from response content
+                        from io import BytesIO
+                        logo = Image.open(BytesIO(response.content))
+                    else:
+                        # Try alternative source
+                        response = requests.get(alt_url, headers=self.headers, timeout=5)
+                        if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
+                            # Create image from response content
+                            from io import BytesIO
+                            logo = Image.open(BytesIO(response.content))
+                        else:
+                            return None
+                else:
+                    # Normal case: open the saved logo file
+                    logo = Image.open(logo_path)
                 
                 # Convert to RGBA if not already
                 if logo.mode != 'RGBA':
