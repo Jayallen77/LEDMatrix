@@ -529,9 +529,9 @@ class StockManager:
             image.paste(logo, (logo_x, logo_y), logo)
         
         # Draw symbol, price, and change in the center
-        # Use a regular font for the logo to make it larger
-        regular_font = ImageFont.truetype(self.display_manager.font_path, self.display_manager.font_size)
-        small_font = ImageFont.truetype(self.display_manager.font_path, self.display_manager.font_size - 2)
+        # Use the fonts from display_manager
+        regular_font = self.display_manager.regular_font
+        small_font = self.display_manager.small_font
         
         # Calculate text dimensions for proper spacing
         symbol_text = symbol
@@ -539,9 +539,13 @@ class StockManager:
         change_text = f"{change:+.2f} ({change_percent:+.1f}%)"
         
         # Get the height of each text element
-        symbol_height = regular_font.getsize(symbol_text)[1]
-        price_height = regular_font.getsize(price_text)[1]
-        change_height = small_font.getsize(change_text)[1]
+        symbol_bbox = draw.textbbox((0, 0), symbol_text, font=regular_font)
+        price_bbox = draw.textbbox((0, 0), price_text, font=regular_font)
+        change_bbox = draw.textbbox((0, 0), change_text, font=small_font)
+        
+        symbol_height = symbol_bbox[3] - symbol_bbox[1]
+        price_height = price_bbox[3] - price_bbox[1]
+        change_height = change_bbox[3] - change_bbox[1]
         
         # Calculate total height needed for all text
         total_text_height = symbol_height + price_height + change_height + 4  # 4 pixels for spacing
@@ -550,17 +554,20 @@ class StockManager:
         start_y = (height - total_text_height) // 2
         
         # Draw symbol
-        symbol_x = width // 2 - regular_font.getsize(symbol_text)[0] // 2
+        symbol_width = symbol_bbox[2] - symbol_bbox[0]
+        symbol_x = width // 2 - symbol_width // 2
         symbol_y = start_y
         draw.text((symbol_x, symbol_y), symbol_text, font=regular_font, fill=(255, 255, 255))
         
         # Draw price
-        price_x = width // 2 - regular_font.getsize(price_text)[0] // 2
+        price_width = price_bbox[2] - price_bbox[0]
+        price_x = width // 2 - price_width // 2
         price_y = symbol_y + symbol_height + 2  # 2 pixels spacing
         draw.text((price_x, price_y), price_text, font=regular_font, fill=(255, 255, 255))
         
         # Draw change with color based on value
-        change_x = width // 2 - small_font.getsize(change_text)[0] // 2
+        change_width = change_bbox[2] - change_bbox[0]
+        change_x = width // 2 - change_width // 2
         change_y = price_y + price_height + 2  # 2 pixels spacing
         change_color = (0, 255, 0) if change >= 0 else (255, 0, 0)
         draw.text((change_x, change_y), change_text, font=small_font, fill=change_color)
