@@ -515,7 +515,7 @@ class StockManager:
             PIL Image of the stock display
         """
         # Create a wider image for scrolling
-        width = self.display_manager.matrix.width * 3  # Increased from 2x to 3x for more space
+        width = self.display_manager.matrix.width * 2  # Reduced from 3x to 2x since we'll handle spacing in display_stocks
         height = self.display_manager.matrix.height
         image = Image.new('RGB', (width, height), color=(0, 0, 0))
         draw = ImageDraw.Draw(image)
@@ -523,8 +523,8 @@ class StockManager:
         # Draw large stock logo on the left
         logo = self._get_stock_logo(symbol)
         if logo:
-            # Position logo on the left side with less space before the symbol
-            logo_x = 2  # Reduced from 5 to 2
+            # Position logo on the left side with consistent spacing
+            logo_x = 2
             logo_y = (height - logo.height) // 2
             image.paste(logo, (logo_x, logo_y), logo)
         
@@ -548,7 +548,7 @@ class StockManager:
         change_height = change_bbox[3] - change_bbox[1]
         
         # Calculate total height needed for all text
-        total_text_height = symbol_height + price_height + change_height + 2  # Reduced from 4 to 2 pixels for spacing
+        total_text_height = symbol_height + price_height + change_height + 2  # 2 pixels for spacing
         
         # Calculate starting y position to center the text block
         start_y = (height - total_text_height) // 2
@@ -562,13 +562,13 @@ class StockManager:
         # Draw price
         price_width = price_bbox[2] - price_bbox[0]
         price_x = width // 2 - price_width // 2
-        price_y = symbol_y + symbol_height + 1  # Reduced from 2 to 1 pixel spacing
+        price_y = symbol_y + symbol_height + 1  # 1 pixel spacing
         draw.text((price_x, price_y), price_text, font=regular_font, fill=(255, 255, 255))
         
         # Draw change with color based on value
         change_width = change_bbox[2] - change_bbox[0]
         change_x = width // 2 - change_width // 2
-        change_y = price_y + price_height + 1  # Reduced from 2 to 1 pixel spacing
+        change_y = price_y + price_height + 1  # 1 pixel spacing
         change_color = (0, 255, 0) if change >= 0 else (255, 0, 0)
         draw.text((change_x, change_y), change_text, font=small_font, fill=change_color)
         
@@ -580,9 +580,9 @@ class StockManager:
                 chart_data = [p['price'] for p in price_history]
                 
                 # Calculate chart dimensions
-                chart_width = width // 4
-                chart_height = height // 2
-                chart_x = width - chart_width - 10  # 10 pixels from right edge
+                chart_width = width // 3  # Increased from width//4 to width//3
+                chart_height = height // 1.5  # Increased from height//2 to height//1.5
+                chart_x = width - chart_width - 5  # 5 pixels from right edge
                 chart_y = (height - chart_height) // 2
                 
                 # Find min and max prices for scaling
@@ -595,10 +595,6 @@ class StockManager:
                     min_price -= 0.01
                     max_price += 0.01
                     price_range = 0.02
-                
-                # Draw chart background
-                draw.rectangle([chart_x, chart_y, chart_x + chart_width, chart_y + chart_height], 
-                              outline=(50, 50, 50))
                 
                 # Calculate points for the line
                 points = []
@@ -704,15 +700,16 @@ class StockManager:
             height = self.display_manager.matrix.height
             
             # Calculate total width needed for all stocks
-            # Each stock needs width*2 for scrolling, plus a larger gap between stocks
-            gap = width // 2  # Increased from width//4 to width//2 for more space between stocks
-            total_width = sum(width * 2 for _ in symbols) + gap * (len(symbols) - 1)
+            # Each stock needs width*2 for scrolling, plus consistent gaps between elements
+            stock_gap = width // 3  # Gap between stocks
+            element_gap = width // 6  # Gap between elements within a stock
+            total_width = sum(width * 2 for _ in symbols) + stock_gap * (len(symbols) - 1) + element_gap * (len(symbols) * 2 - 1)
             
             # Create the full image
             full_image = Image.new('RGB', (total_width, height), (0, 0, 0))
             draw = ImageDraw.Draw(full_image)
             
-            # Draw each stock in sequence
+            # Draw each stock in sequence with consistent spacing
             current_x = 0
             for symbol in symbols:
                 data = self.stock_data[symbol]
@@ -723,8 +720,12 @@ class StockManager:
                 # Paste this stock image into the full image
                 full_image.paste(stock_image, (current_x, 0))
                 
-                # Move to next position
-                current_x += width * 2 + gap
+                # Move to next position with consistent spacing
+                current_x += width * 2 + element_gap
+                
+                # Add extra gap between stocks
+                if symbol != symbols[-1]:  # Don't add gap after the last stock
+                    current_x += stock_gap
             
             # Cache the full image
             self.cached_text_image = full_image
