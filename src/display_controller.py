@@ -141,8 +141,8 @@ class DisplayController:
                             self.weather.display_daily_forecast(force_clear=self.force_clear)
                         time.sleep(self.update_interval)
                     elif self.current_display == 'stocks' and self.stocks:
+                        # For stocks, we want to update as fast as possible without delay
                         self.stocks.display_stocks(force_clear=self.force_clear)
-                        time.sleep(self.update_interval)
                     elif self.current_display == 'stock_news' and self.news:
                         # For news, we want to update as fast as possible without delay
                         self.news.display_news()
