@@ -10,6 +10,7 @@ import urllib.parse
 import re
 from PIL import Image, ImageDraw
 import numpy as np
+import hashlib
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -36,6 +37,10 @@ class StockManager:
         self.last_frame_time = time.time()
         self.last_fps_log_time = time.time()
         self.frame_times = []
+        
+        # Create assets/stocks directory if it doesn't exist
+        self.logo_dir = os.path.join('assets', 'stocks')
+        os.makedirs(self.logo_dir, exist_ok=True)
         
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -290,6 +295,87 @@ class StockManager:
         else:
             logger.error("Failed to fetch data for any configured stocks")
 
+    def _download_stock_logo(self, symbol: str) -> str:
+        """Download and save stock logo for a given symbol.
+        
+        Args:
+            symbol: Stock symbol (e.g., 'AAPL', 'MSFT')
+            
+        Returns:
+            Path to the saved logo image, or None if download failed
+        """
+        try:
+            # Create a filename based on the symbol
+            filename = f"{symbol.lower()}.png"
+            filepath = os.path.join(self.logo_dir, filename)
+            
+            # Check if we already have the logo
+            if os.path.exists(filepath):
+                return filepath
+                
+            # Try to find logo from various sources
+            # 1. Yahoo Finance
+            yahoo_url = f"https://logo.clearbit.com/{symbol.lower()}.com"
+            
+            # 2. Alternative source if Yahoo fails
+            alt_url = f"https://storage.googleapis.com/iex/api/logos/{symbol}.png"
+            
+            # Try Yahoo first
+            response = requests.get(yahoo_url, headers=self.headers, timeout=5)
+            if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
+                with open(filepath, 'wb') as f:
+                    f.write(response.content)
+                logger.info(f"Downloaded logo for {symbol} from Yahoo")
+                return filepath
+                
+            # Try alternative source
+            response = requests.get(alt_url, headers=self.headers, timeout=5)
+            if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
+                with open(filepath, 'wb') as f:
+                    f.write(response.content)
+                logger.info(f"Downloaded logo for {symbol} from alternative source")
+                return filepath
+                
+            logger.warning(f"Could not download logo for {symbol}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error downloading logo for {symbol}: {str(e)}")
+            return None
+
+    def _get_stock_logo(self, symbol: str) -> Image.Image:
+        """Get stock logo image, or create a text-based fallback.
+        
+        Args:
+            symbol: Stock symbol (e.g., 'AAPL', 'MSFT')
+            
+        Returns:
+            PIL Image of the logo or text-based fallback
+        """
+        # Try to download the logo if we don't have it
+        logo_path = self._download_stock_logo(symbol)
+        
+        if logo_path and os.path.exists(logo_path):
+            try:
+                # Open and resize the logo
+                logo = Image.open(logo_path)
+                
+                # Convert to RGBA if not already
+                if logo.mode != 'RGBA':
+                    logo = logo.convert('RGBA')
+                
+                # Resize to fit in the display (assuming square logo)
+                max_size = min(self.display_manager.matrix.width // 2, 
+                              self.display_manager.matrix.height // 2)
+                logo = logo.resize((max_size, max_size), Image.LANCZOS)
+                
+                return logo
+            except Exception as e:
+                logger.error(f"Error processing logo for {symbol}: {str(e)}")
+        
+        # Fallback to text-based logo
+        return None
+
     def _create_stock_display(self, symbol: str, data: Dict[str, Any], width: int, height: int, scroll_position: int = 0) -> Image.Image:
         """Create a single stock display with scrolling animation."""
         # Create a wider image for scrolling
@@ -303,14 +389,30 @@ class StockManager:
         # Calculate center position for the main content
         center_x = width // 2
         
-        # Draw large stock logo on the left
-        logo_text = symbol[:1].upper()  # First letter of symbol
-        bbox = draw.textbbox((0, 0), logo_text, font=self.display_manager.regular_font)
-        logo_width = bbox[2] - bbox[0]
-        logo_height = bbox[3] - bbox[1]
-        logo_x = center_x - width // 3 - logo_width // 2
-        logo_y = (height - logo_height) // 2
-        draw.text((logo_x, logo_y), logo_text, font=self.display_manager.regular_font, fill=color)
+        # Try to get stock logo
+        logo = self._get_stock_logo(symbol)
+        
+        if logo:
+            # Draw the logo on the left
+            logo_x = center_x - width // 3 - logo.width // 2
+            logo_y = (height - logo.height) // 2
+            
+            # Create a new image with alpha channel for the logo
+            logo_bg = Image.new('RGBA', (scroll_width, height), (0, 0, 0, 0))
+            logo_bg.paste(logo, (logo_x, logo_y))
+            
+            # Convert to RGB for the main image
+            logo_rgb = logo_bg.convert('RGB')
+            image.paste(logo_rgb, (0, 0))
+        else:
+            # Fallback to text-based logo
+            logo_text = symbol[:1].upper()  # First letter of symbol
+            bbox = draw.textbbox((0, 0), logo_text, font=self.display_manager.regular_font)
+            logo_width = bbox[2] - bbox[0]
+            logo_height = bbox[3] - bbox[1]
+            logo_x = center_x - width // 3 - logo_width // 2
+            logo_y = (height - logo_height) // 2
+            draw.text((logo_x, logo_y), logo_text, font=self.display_manager.regular_font, fill=color)
         
         # Draw stacked symbol, price, and change in the center
         # Symbol (always white)
