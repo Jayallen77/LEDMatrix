@@ -62,7 +62,7 @@ class DisplayManager:
         
         # Initialize font with Press Start 2P
         try:
-            self.font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 10)
+            self.font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)  # Reduced from 10 to 8
             logger.info("Initial font loaded successfully")
         except Exception as e:
             logger.error(f"Failed to load initial font: {e}")
@@ -81,17 +81,17 @@ class DisplayManager:
         # Draw a diagonal line
         self.draw.line([0, 0, self.matrix.width-1, self.matrix.height-1], fill=(0, 255, 0))
         
-        # Draw some text
-        self.draw.text((10, 10), "TEST", font=self.font, fill=(0, 0, 255))
+        # Draw some text - changed from "TEST" to "Initializing" with smaller font
+        self.draw.text((10, 10), "Initializing", font=self.font, fill=(0, 0, 255))
         
         # Update the display once after everything is drawn
         self.update_display()
-        time.sleep(2)
+        time.sleep(0.5)  # Reduced from 1 second to 0.5 seconds for faster animation
 
     def update_display(self):
         """Update the display using double buffering with proper sync."""
         try:
-            # Copy the current image to the offscreen canvas
+            # Copy the current image to the offscreen canvas   
             self.offscreen_canvas.SetImage(self.image)
             
             # Swap buffers immediately
@@ -119,32 +119,25 @@ class DisplayManager:
             logger.error(f"Error clearing display: {e}")
 
     def _load_fonts(self):
-        """Load fonts optimized for LED matrix display."""
+        """Load fonts with proper error handling."""
         try:
-            # Use Press Start 2P font - perfect for LED matrix displays
-            font_path = "assets/fonts/PressStart2P-Regular.ttf"
+            # Load regular font (Press Start 2P)
+            self.regular_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 10)
+            logger.info("Regular font loaded successfully")
             
-            # For 32px height matrix, optimized sizes for pixel-perfect display
-            large_size = 10  # Large text for time and main info
-            small_size = 8   # Small text for secondary information
+            # Load small font (Press Start 2P at smaller size)
+            self.small_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
+            logger.info("Small font loaded successfully")
             
-            try:
-                self.font = ImageFont.truetype(font_path, large_size)
-                self.small_font = ImageFont.truetype(font_path, small_size)
-                logger.info(f"Loaded Press Start 2P font: {font_path} (large: {large_size}px, small: {small_size}px)")
-            except Exception as e:
-                logger.warning(f"Failed to load Press Start 2P font, falling back to default: {e}")
-                self.font = ImageFont.load_default()
-                self.small_font = ImageFont.load_default()
-                
         except Exception as e:
             logger.error(f"Error in font loading: {e}")
-            self.font = ImageFont.load_default()
-            self.small_font = self.font
+            # Fallback to default font
+            self.regular_font = ImageFont.load_default()
+            self.small_font = self.regular_font
 
     def draw_text(self, text: str, x: int = None, y: int = None, color: Tuple[int, int, int] = (255, 255, 255), small_font: bool = False) -> None:
         """Draw text on the display with improved clarity."""
-        font = self.small_font if small_font else self.font
+        font = self.small_font if small_font else self.regular_font
         
         # Get text dimensions including ascenders and descenders
         bbox = self.draw.textbbox((0, 0), text, font=font)
