@@ -62,7 +62,7 @@ class DisplayManager:
         
         # Initialize font with Press Start 2P
         try:
-            self.font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 10)
+            self.font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)  # Reduced from 10 to 8
             logger.info("Initial font loaded successfully")
         except Exception as e:
             logger.error(f"Failed to load initial font: {e}")
@@ -81,12 +81,12 @@ class DisplayManager:
         # Draw a diagonal line
         self.draw.line([0, 0, self.matrix.width-1, self.matrix.height-1], fill=(0, 255, 0))
         
-        # Draw some text
-        self.draw.text((10, 10), "TEST", font=self.font, fill=(0, 0, 255))
+        # Draw some text - changed from "TEST" to "Initializing" with smaller font
+        self.draw.text((10, 10), "Initializing", font=self.font, fill=(0, 0, 255))
         
         # Update the display once after everything is drawn
         self.update_display()
-        time.sleep(2)
+        time.sleep(0.5)  # Reduced from 1 second to 0.5 seconds for faster animation
 
     def update_display(self):
         """Update the display using double buffering with proper sync."""

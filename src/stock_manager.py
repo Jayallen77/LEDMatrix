@@ -533,14 +533,20 @@ class StockManager:
         regular_font = self.display_manager.regular_font
         small_font = self.display_manager.small_font
         
+        # Create smaller versions of the fonts for symbol and price
+        symbol_font = ImageFont.truetype(self.display_manager.regular_font.path, 
+                                       int(self.display_manager.regular_font.size * 0.8))  # 80% of regular size
+        price_font = ImageFont.truetype(self.display_manager.regular_font.path, 
+                                      int(self.display_manager.regular_font.size * 0.8))  # 80% of regular size
+        
         # Calculate text dimensions for proper spacing
         symbol_text = symbol
         price_text = f"${price:.2f}"
         change_text = f"{change:+.2f} ({change_percent:+.1f}%)"
         
         # Get the height of each text element
-        symbol_bbox = draw.textbbox((0, 0), symbol_text, font=regular_font)
-        price_bbox = draw.textbbox((0, 0), price_text, font=regular_font)
+        symbol_bbox = draw.textbbox((0, 0), symbol_text, font=symbol_font)
+        price_bbox = draw.textbbox((0, 0), price_text, font=price_font)
         change_bbox = draw.textbbox((0, 0), change_text, font=small_font)
         
         symbol_height = symbol_bbox[3] - symbol_bbox[1]
@@ -557,13 +563,13 @@ class StockManager:
         symbol_width = symbol_bbox[2] - symbol_bbox[0]
         symbol_x = width // 3  # Moved from width//2 to width//3 to bring text closer to logo
         symbol_y = start_y
-        draw.text((symbol_x, symbol_y), symbol_text, font=regular_font, fill=(255, 255, 255))
+        draw.text((symbol_x, symbol_y), symbol_text, font=symbol_font, fill=(255, 255, 255))
         
         # Draw price - aligned with symbol
         price_width = price_bbox[2] - price_bbox[0]
         price_x = symbol_x + (symbol_width - price_width) // 2  # Center price under symbol
         price_y = symbol_y + symbol_height + 1  # 1 pixel spacing
-        draw.text((price_x, price_y), price_text, font=regular_font, fill=(255, 255, 255))
+        draw.text((price_x, price_y), price_text, font=price_font, fill=(255, 255, 255))
         
         # Draw change with color based on value - aligned with price
         change_width = change_bbox[2] - change_bbox[0]
@@ -579,10 +585,10 @@ class StockManager:
                 # Extract prices from price history
                 chart_data = [p['price'] for p in price_history]
                 
-                # Calculate chart dimensions
-                chart_width = width // 3  # Increased from width//4 to width//3
-                chart_height = height // 1.5  # Increased from height//2 to height//1.5
-                chart_x = width - chart_width + 5  # Moved 10 columns to the right (from width - chart_width - 5)
+                # Calculate chart dimensions - 50% wider
+                chart_width = int(width // 2)  # Increased from width//3 to width//2 (50% wider)
+                chart_height = height // 1.5
+                chart_x = width - chart_width + 5  # Keep the same right margin
                 chart_y = (height - chart_height) // 2
                 
                 # Find min and max prices for scaling
