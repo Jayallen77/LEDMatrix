@@ -7,11 +7,9 @@ class ConfigManager:
         # Use current working directory as base
         self.config_path = config_path or "config/config.json"
         self.secrets_path = secrets_path or "config/config_secrets.json"
-        
         self.config: Dict[str, Any] = {}
-        self.load_config()
 
-    def load_config(self) -> None:
+    def load_config(self) -> Dict[str, Any]:
         """Load configuration from JSON files."""
         try:
             # Load main config
@@ -26,10 +24,13 @@ class ConfigManager:
                     # Deep merge secrets into config
                     self._deep_merge(self.config, secrets)
             
+            return self.config
+            
         except FileNotFoundError as e:
             if str(e).find('config_secrets.json') == -1:  # Only raise if main config is missing
                 print(f"Configuration file not found at {os.path.abspath(self.config_path)}")
                 raise
+            return self.config
         except json.JSONDecodeError:
             print("Error parsing configuration file")
             raise

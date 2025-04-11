@@ -89,15 +89,17 @@ class Clock:
         # Get AM/PM
         ampm = current.strftime('%p')
         
-        # Format date with ordinal suffix
+        # Format date with ordinal suffix - split into two lines
         day_suffix = self._get_ordinal_suffix(current.day)
-        date_str = current.strftime(f'%A, %B %-d{day_suffix}')
+        # Full weekday on first line, full month and day on second line
+        weekday = current.strftime('%A')
+        date_str = current.strftime(f'%B %-d{day_suffix}')
         
-        return time_str, ampm, date_str
+        return time_str, ampm, weekday, date_str
 
     def display_time(self, force_clear: bool = False) -> None:
         """Display the current time and date."""
-        time_str, ampm, date_str = self.get_current_time()
+        time_str, ampm, weekday, date_str = self.get_current_time()
         
         # Only update if something has changed
         if time_str != self.last_time or date_str != self.last_date or force_clear:
@@ -111,7 +113,7 @@ class Clock:
             # Draw time (large, centered, near top)
             self.display_manager.draw_text(
                 time_str,
-                y=3,  # Move down slightly from top
+                y=2,  # Move up slightly to make room for two lines of date
                 color=self.COLORS['time'],
                 small_font=False
             )
@@ -122,15 +124,23 @@ class Clock:
             self.display_manager.draw_text(
                 ampm,
                 x=ampm_x,
-                y=5,  # Align with time
+                y=4,  # Align with time
                 color=self.COLORS['ampm'],
                 small_font=True
             )
             
-            # Draw date (small, centered below time)
+            # Draw weekday on first line (small font)
+            self.display_manager.draw_text(
+                weekday,
+                y=display_height - 18,  # First line of date
+                color=self.COLORS['date'],
+                small_font=True
+            )
+            
+            # Draw month and day on second line (small font)
             self.display_manager.draw_text(
                 date_str,
-                y=display_height - 9,  # Move up more from bottom
+                y=display_height - 9,  # Second line of date
                 color=self.COLORS['date'],
                 small_font=True
             )

@@ -16,8 +16,8 @@
             "scan_mode": "progressive",
             "pwm_bits": 8,
             "pwm_dither_bits": 1,
-            "pwm_lsb_nanoseconds": 130,
-            "disable_hardware_pulsing": true,
+            "pwm_lsb_nanoseconds": 50,
+            "disable_hardware_pulsing": false,
             "inverse_colors": false,
             "show_refresh_rate": true,
             "limit_refresh_rate_hz": 100
@@ -25,15 +25,40 @@
         "runtime": {
             "gpio_slowdown": 2
         },
-        "rotation_interval": 15
+        "display_durations": {
+            "clock": 15,
+            "weather": 15,
+            "stocks": 45,
+            "hourly_forecast": 15,
+            "daily_forecast": 15,
+            "stock_news": 30
+        }
     },
     "clock": {
+        "enabled": true,
         "format": "%H:%M:%S",
         "update_interval": 1
     },
     "weather": {
+        "enabled": true,
         "update_interval": 300,
         "units": "imperial",
         "display_format": "{temp}°F\n{condition}"
+    },
+    "stocks": {
+        "enabled": true,
+        "update_interval": 60,
+        "symbols": [
+            "ASTS", "SCHD", "INTC", "NVDA", "T", "VOO", "SPYG", "SMCI"
+        ],
+        "display_format": "{symbol}: ${price} ({change}%)"
+    },
+    "stock_news": {
+        "enabled": true,
+        "update_interval": 300,
+        "scroll_speed": 1,
+        "scroll_delay": 0.0001,
+        "max_headlines_per_symbol": 1,
+        "headlines_per_rotation": 2
     }
 } 
