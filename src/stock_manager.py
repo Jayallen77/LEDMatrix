@@ -357,7 +357,7 @@ class StockManager:
         # Draw mini chart on the right
         chart_width = 30  # Increased from 20 to 30
         chart_height = 32  # Increased from 32 to match text height
-        chart_x = width - chart_width - 5  # 5px padding from right edge
+        chart_x = scroll_width - chart_width - 5  # Shift one width to the right (using scroll_width instead of width)
         chart_y = 0  # Align with top of display
         
         # Draw chart background
