@@ -39,7 +39,7 @@ class WeatherManager:
         self.PADDING = 1
         self.ICON_SIZE = {
             'large': 10,
-            'medium': 8,
+            'medium': 14,  # Increased for hourly forecast icons
             'small': 6
         }
         self.COLORS = {
@@ -48,7 +48,8 @@ class WeatherManager:
             'separator': (64, 64, 64),
             'temp_high': (255, 100, 100),
             'temp_low': (100, 100, 255),
-            'dim': (180, 180, 180)
+            'dim': (180, 180, 180),
+            'extra_dim': (120, 120, 120)  # Even dimmer for smallest text
         }
         # Add caching for last drawn states
         self.last_weather_state = None
@@ -334,16 +335,18 @@ class WeatherManager:
                 x = i * section_width
                 center_x = x + section_width // 2
                 
-                # Draw hour at top
+                # Draw hour at top - using extra small font
                 hour_text = forecast['hour']
+                # Simplify time format
+                hour_text = hour_text.replace(":00 ", "").replace("PM", "p").replace("AM", "a")
                 hour_width = draw.textlength(hour_text, font=self.display_manager.small_font)
-                draw.text((center_x - hour_width // 2, 2),
+                draw.text((center_x - hour_width // 2, 1),  # Moved up slightly
                          hour_text,
                          font=self.display_manager.small_font,
-                         fill=self.COLORS['text'])
+                         fill=self.COLORS['extra_dim'])  # Using extra dim color
                 
-                # Draw weather icon in middle
-                icon_y = 12
+                # Draw weather icon in middle - made larger and centered
+                icon_y = 8  # Adjusted to be more centered
                 self.display_manager.draw_weather_icon(
                     forecast['condition'],
                     x=center_x - self.ICON_SIZE['medium'] // 2,
@@ -351,13 +354,13 @@ class WeatherManager:
                     size=self.ICON_SIZE['medium']
                 )
                 
-                # Draw temperature at bottom
+                # Draw temperature at bottom - using extra small font
                 temp_text = f"{forecast['temp']}°"
                 temp_width = draw.textlength(temp_text, font=self.display_manager.small_font)
-                draw.text((center_x - temp_width // 2, 24),
+                draw.text((center_x - temp_width // 2, 25),  # Moved down slightly
                          temp_text,
                          font=self.display_manager.small_font,
-                         fill=self.COLORS['highlight'])
+                         fill=self.COLORS['extra_dim'])  # Using extra dim color
             
             # Update the display
             self.display_manager.image = image
