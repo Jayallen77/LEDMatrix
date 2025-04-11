@@ -38,20 +38,36 @@ class StockManager:
         self.last_fps_log_time = time.time()
         self.frame_times = []
         
-        # Use the assets/stocks directory from the repository
+        # Try to use the assets/stocks directory from the repository
         self.logo_dir = os.path.join('assets', 'stocks')
+        self.use_temp_dir = False
         
-        # Create logo directory with proper permissions if it doesn't exist
+        # Check if we can write to the logo directory
         try:
             if not os.path.exists(self.logo_dir):
-                os.makedirs(self.logo_dir, mode=0o755, exist_ok=True)
-                logger.info(f"Created logo directory: {self.logo_dir}")
+                try:
+                    os.makedirs(self.logo_dir, mode=0o755, exist_ok=True)
+                    logger.info(f"Created logo directory: {self.logo_dir}")
+                except (PermissionError, OSError) as e:
+                    logger.warning(f"Cannot create logo directory: {str(e)}. Using temporary directory instead.")
+                    self.use_temp_dir = True
             elif not os.access(self.logo_dir, os.W_OK):
-                # Try to fix permissions if directory exists but is not writable
-                os.chmod(self.logo_dir, 0o755)
-                logger.info(f"Fixed permissions for logo directory: {self.logo_dir}")
+                logger.warning(f"Cannot write to logo directory: {self.logo_dir}. Using temporary directory instead.")
+                self.use_temp_dir = True
+                
+            # If we need to use a temporary directory, create it
+            if self.use_temp_dir:
+                import tempfile
+                self.logo_dir = tempfile.mkdtemp(prefix='stock_logos_')
+                logger.info(f"Using temporary directory for logos: {self.logo_dir}")
+                
         except Exception as e:
             logger.error(f"Error setting up logo directory: {str(e)}")
+            # Fall back to using a temporary directory
+            import tempfile
+            self.logo_dir = tempfile.mkdtemp(prefix='stock_logos_')
+            self.use_temp_dir = True
+            logger.info(f"Using temporary directory for logos: {self.logo_dir}")
         
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
