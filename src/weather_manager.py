@@ -396,42 +396,65 @@ class WeatherManager:
             # Clear once at the start
             self.display_manager.clear()
             
-            # Display 3 days
-            days_to_show = min(3, len(self.daily_forecast))
+            # Create a new image for drawing
+            image = Image.new('RGB', (self.display_manager.matrix.width, self.display_manager.matrix.height))
+            draw = ImageDraw.Draw(image)
+            
+            # Display 5 days
+            days_to_show = min(5, len(self.daily_forecast))
             section_width = self.display_manager.matrix.width // days_to_show
             
             for i in range(days_to_show):
-                forecast = current_state[i]
+                forecast = self.daily_forecast[i]
                 x = i * section_width
+                center_x = x + section_width // 2
                 
-                # Draw day name
-                self.display_manager.draw_text(
-                    forecast['date'].upper(),
-                    x=x + 2,
-                    y=2,
-                    color=self.COLORS['text'],
-                    small_font=True
-                )
+                # Draw day name at top - using small font
+                day_text = forecast['date']  # Already in "Fri" format
+                day_width = draw.textlength(day_text, font=self.display_manager.small_font)
+                draw.text((center_x - day_width // 2, 1),
+                         day_text,
+                         font=self.display_manager.small_font,
+                         fill=self.COLORS['extra_dim'])
                 
-                # Draw weather icon
-                self.display_manager.draw_weather_icon(
-                    forecast['condition'],
-                    x=x + (section_width - self.ICON_SIZE['medium']) // 2,
-                    y=12,
-                    size=self.ICON_SIZE['medium']
-                )
+                # Draw weather icon in middle - made larger and centered
+                icon_size = self.ICON_SIZE['medium']
+                icon_y = 8  # Adjusted for better spacing
+                icon_x = center_x - icon_size // 2
                 
-                # Draw temperature range
-                temp = f"{forecast['temp_low']}/{forecast['temp_high']}°"  # Swapped order: low/high
-                self.display_manager.draw_text(
-                    temp,
-                    x=x + (section_width - len(temp) * 4) // 2,
-                    y=24,
-                    color=self.COLORS['highlight'],
-                    small_font=True
-                )
+                # Map weather condition to icon and draw it
+                condition = forecast['condition']
+                if condition in ['Clear', 'Sunny']:
+                    self.display_manager.draw_sun(icon_x, icon_y, icon_size)
+                elif condition in ['Clouds', 'Cloudy', 'Partly Cloudy']:
+                    self.display_manager.draw_cloud(icon_x, icon_y, icon_size)
+                elif condition in ['Rain', 'Drizzle', 'Shower']:
+                    self.display_manager.draw_rain(icon_x, icon_y, icon_size)
+                elif condition in ['Snow', 'Sleet', 'Hail']:
+                    self.display_manager.draw_snow(icon_x, icon_y, icon_size)
+                elif condition in ['Thunderstorm', 'Storm']:
+                    self.display_manager.draw_storm(icon_x, icon_y, icon_size)
+                else:
+                    self.display_manager.draw_sun(icon_x, icon_y, icon_size)  # Default to sun
+                
+                # Draw high temperature - using small font
+                high_text = f"{forecast['temp_high']}°"
+                high_width = draw.textlength(high_text, font=self.display_manager.small_font)
+                draw.text((center_x - high_width // 2, 24),
+                         high_text,
+                         font=self.display_manager.small_font,
+                         fill=self.COLORS['text'])
+                
+                # Draw low temperature below high - using small font and dimmer color
+                low_text = f"{forecast['temp_low']}°"
+                low_width = draw.textlength(low_text, font=self.display_manager.small_font)
+                draw.text((center_x - low_width // 2, 26),
+                         low_text,
+                         font=self.display_manager.small_font,
+                         fill=self.COLORS['extra_dim'])
             
-            # Update display once after all elements are drawn
+            # Update the display
+            self.display_manager.image = image
             self.display_manager.update_display()
             self.last_daily_state = current_state
 
