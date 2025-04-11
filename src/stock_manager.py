@@ -356,10 +356,10 @@ class StockManager:
         
         # Draw mini chart on the right
         if 'price_history' in data and data['price_history']:
-            chart_width = width // 2  # Increased from width // 3 to width // 2
-            chart_height = height // 1.5  # Increased from height // 2 to height // 1.5
-            chart_x = center_x + width // 3 - chart_width // 2
-            chart_y = height // 2 - chart_height // 2  # Center the chart vertically
+            chart_width = width // 1.8  # Increased from width // 2 to width // 1.8 for longer chart
+            chart_height = height // 1.5
+            chart_x = center_x + width // 2  # Moved further right from width // 3 to width // 2
+            chart_y = height // 2 - chart_height // 2  # Keep vertical centering
             
             # Get price data for chart
             prices = [p['price'] for p in data['price_history']]
@@ -377,7 +377,7 @@ class StockManager:
                     
                     # Draw lines between points with slightly thicker lines
                     for i in range(len(points) - 1):
-                        draw.line([points[i], points[i + 1]], fill=color, width=2)  # Increased line width from 1 to 2
+                        draw.line([points[i], points[i + 1]], fill=color, width=2)
         
         # Crop to show only the visible portion based on scroll position
         visible_image = image.crop((scroll_position, 0, scroll_position + width, height))
