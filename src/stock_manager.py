@@ -559,9 +559,9 @@ class StockManager:
         # Calculate starting y position to center the text block
         start_y = (height - total_text_height) // 2
         
-        # Draw symbol - moved closer to the logo
+        # Draw symbol - moved even closer to the logo
         symbol_width = symbol_bbox[2] - symbol_bbox[0]
-        symbol_x = width // 3  # Moved from width//2 to width//3 to bring text closer to logo
+        symbol_x = width // 4  # Moved from width//3 to width//4 to bring text even closer to logo
         symbol_y = start_y
         draw.text((symbol_x, symbol_y), symbol_text, font=symbol_font, fill=(255, 255, 255))
         
@@ -586,7 +586,7 @@ class StockManager:
                 chart_data = [p['price'] for p in price_history]
                 
                 # Calculate chart dimensions - 50% wider
-                chart_width = int(width // 2)  # Increased from width//3 to width//2 (50% wider)
+                chart_width = int(width // 2.5)  # Reduced from width//2 to width//2.5 (20% smaller)
                 chart_height = height // 1.5
                 chart_x = width - chart_width + 5  # Keep the same right margin
                 chart_y = (height - chart_height) // 2
