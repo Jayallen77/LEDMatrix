@@ -39,7 +39,7 @@ class WeatherManager:
         self.PADDING = 1
         self.ICON_SIZE = {
             'large': 10,
-            'medium': 14,  # Increased for hourly forecast icons
+            'medium': 16,  # Increased for better visibility
             'small': 6
         }
         self.COLORS = {
@@ -340,27 +340,38 @@ class WeatherManager:
                 # Simplify time format
                 hour_text = hour_text.replace(":00 ", "").replace("PM", "p").replace("AM", "a")
                 hour_width = draw.textlength(hour_text, font=self.display_manager.small_font)
-                draw.text((center_x - hour_width // 2, 0),  # Moved up to top
+                draw.text((center_x - hour_width // 2, 1),  # Moved down slightly from 0
                          hour_text,
                          font=self.display_manager.small_font,
-                         fill=self.COLORS['extra_dim'])  # Using extra dim color
+                         fill=self.COLORS['extra_dim'])
                 
                 # Draw weather icon in middle - made larger and centered
-                icon_y = 10  # Adjusted to be more centered vertically
-                self.display_manager.draw_weather_icon(
-                    forecast['condition'],
-                    x=center_x - self.ICON_SIZE['medium'] // 2,
-                    y=icon_y,
-                    size=self.ICON_SIZE['medium']
-                )
+                icon_size = self.ICON_SIZE['medium']
+                icon_y = 8  # Adjusted for better spacing
+                icon_x = center_x - icon_size // 2
+                
+                # Map weather condition to icon and draw it
+                condition = forecast['condition']
+                if condition in ['Clear', 'Sunny']:
+                    self.display_manager.draw_sun(icon_x, icon_y, icon_size)
+                elif condition in ['Clouds', 'Cloudy', 'Partly Cloudy']:
+                    self.display_manager.draw_cloud(icon_x, icon_y, icon_size)
+                elif condition in ['Rain', 'Drizzle', 'Shower']:
+                    self.display_manager.draw_rain(icon_x, icon_y, icon_size)
+                elif condition in ['Snow', 'Sleet', 'Hail']:
+                    self.display_manager.draw_snow(icon_x, icon_y, icon_size)
+                elif condition in ['Thunderstorm', 'Storm']:
+                    self.display_manager.draw_storm(icon_x, icon_y, icon_size)
+                else:
+                    self.display_manager.draw_sun(icon_x, icon_y, icon_size)  # Default to sun
                 
                 # Draw temperature at bottom - using extra small font
                 temp_text = f"{forecast['temp']}°"
                 temp_width = draw.textlength(temp_text, font=self.display_manager.small_font)
-                draw.text((center_x - temp_width // 2, 26),  # Moved down slightly
+                draw.text((center_x - temp_width // 2, 24),  # Moved up from 26
                          temp_text,
                          font=self.display_manager.small_font,
-                         fill=self.COLORS['extra_dim'])  # Using extra dim color
+                         fill=self.COLORS['extra_dim'])
             
             # Update the display
             self.display_manager.image = image
