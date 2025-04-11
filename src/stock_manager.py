@@ -418,7 +418,7 @@ class StockManager:
         self.frame_count += 1
 
     def display_stocks(self, force_clear: bool = False):
-        """Display stock information with scrolling animation."""
+        """Display stock information with continuous scrolling animation."""
         if not self.stocks_config.get('enabled', False):
             return
             
@@ -430,19 +430,44 @@ class StockManager:
             logger.warning("No stock data available to display")
             return
             
-        # Get the current stock to display
+        # Get all symbols
         symbols = list(self.stock_data.keys())
         if not symbols:
             return
             
-        current_symbol = symbols[self.current_stock_index]
-        data = self.stock_data[current_symbol]
-        
-        # Create the display image if needed
-        if self.cached_text_image is None or self.cached_text != current_symbol:
-            self.cached_text_image = self._create_stock_display(current_symbol, data, self.display_manager.matrix.width, self.display_manager.matrix.height)
-            self.cached_text = current_symbol
+        # Create a continuous scrolling image if needed
+        if self.cached_text_image is None or force_clear:
+            # Create a very wide image that contains all stocks in sequence
+            width = self.display_manager.matrix.width
+            height = self.display_manager.matrix.height
+            
+            # Calculate total width needed for all stocks
+            # Each stock needs width*2 for scrolling, plus a small gap between stocks
+            gap = width // 4  # Gap between stocks
+            total_width = sum(width * 2 for _ in symbols) + gap * (len(symbols) - 1)
+            
+            # Create the full image
+            full_image = Image.new('RGB', (total_width, height), (0, 0, 0))
+            draw = ImageDraw.Draw(full_image)
+            
+            # Draw each stock in sequence
+            current_x = 0
+            for symbol in symbols:
+                data = self.stock_data[symbol]
+                
+                # Create stock display for this symbol
+                stock_image = self._create_stock_display(symbol, data, width, height, 0)
+                
+                # Paste this stock image into the full image
+                full_image.paste(stock_image, (current_x, 0))
+                
+                # Move to next position
+                current_x += width * 2 + gap
+            
+            # Cache the full image
+            self.cached_text_image = full_image
             self.scroll_position = 0
+            self.last_update = time.time()
         
         # Clear the display if requested
         if force_clear:
@@ -451,10 +476,10 @@ class StockManager:
         
         # Calculate the visible portion of the image
         width = self.display_manager.matrix.width
-        scroll_width = width * 2  # Double width for smooth scrolling
+        total_width = self.cached_text_image.width
         
         # Update scroll position with small increments
-        self.scroll_position = (self.scroll_position + self.scroll_speed) % scroll_width
+        self.scroll_position = (self.scroll_position + self.scroll_speed) % total_width
         
         # Calculate the visible portion
         visible_portion = self.cached_text_image.crop((
@@ -472,11 +497,8 @@ class StockManager:
         # Add a small delay between frames
         time.sleep(self.scroll_delay)
         
-        # Move to next stock after a delay
-        if time.time() - self.last_update > 5:  # Show each stock for 5 seconds
-            self.current_stock_index = (self.current_stock_index + 1) % len(symbols)
-            self.last_update = time.time()
-            self.cached_text_image = None  # Force recreation of display for next stock
-        
-        # If we've shown all stocks, signal completion by returning True
-        return self.current_stock_index == 0 
+        # If we've scrolled through the entire image, reset
+        if self.scroll_position == 0:
+            return True
+            
+        return False 
