@@ -437,19 +437,11 @@ class WeatherManager:
                 else:
                     self.display_manager.draw_sun(icon_x, icon_y, icon_size)  # Default to sun
                 
-                # Draw high temperature - using small font
-                high_text = f"{forecast['temp_high']}°"
-                high_width = draw.textlength(high_text, font=self.display_manager.small_font)
-                draw.text((center_x - high_width // 2, 24),
-                         high_text,
-                         font=self.display_manager.small_font,
-                         fill=self.COLORS['text'])
-                
-                # Draw low temperature below high - using small font and dimmer color
-                low_text = f"{forecast['temp_low']}°"
-                low_width = draw.textlength(low_text, font=self.display_manager.small_font)
-                draw.text((center_x - low_width // 2, 26),
-                         low_text,
+                # Draw temperatures side by side at the bottom
+                temp_text = f"{forecast['temp_low']}°/{forecast['temp_high']}°"
+                temp_width = draw.textlength(temp_text, font=self.display_manager.small_font)
+                draw.text((center_x - temp_width // 2, 25),  # Centered at the bottom
+                         temp_text,
                          font=self.display_manager.small_font,
                          fill=self.COLORS['extra_dim'])
             
