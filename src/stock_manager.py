@@ -515,7 +515,7 @@ class StockManager:
             PIL Image of the stock display
         """
         # Create a wider image for scrolling
-        width = self.display_manager.matrix.width * 2
+        width = self.display_manager.matrix.width * 3  # Increased from 2x to 3x for more space
         height = self.display_manager.matrix.height
         image = Image.new('RGB', (width, height), color=(0, 0, 0))
         draw = ImageDraw.Draw(image)
@@ -573,9 +573,12 @@ class StockManager:
         draw.text((change_x, change_y), change_text, font=small_font, fill=change_color)
         
         # Draw mini chart on the right
-        if symbol in self.stock_data and 'chart_data' in self.stock_data[symbol]:
-            chart_data = self.stock_data[symbol]['chart_data']
-            if len(chart_data) >= 2:  # Need at least 2 points to draw a line
+        if symbol in self.stock_data and 'price_history' in self.stock_data[symbol]:
+            price_history = self.stock_data[symbol]['price_history']
+            if len(price_history) >= 2:  # Need at least 2 points to draw a line
+                # Extract prices from price history
+                chart_data = [p['price'] for p in price_history]
+                
                 # Calculate chart dimensions
                 chart_width = width // 4
                 chart_height = height // 2
