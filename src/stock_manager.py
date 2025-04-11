@@ -377,21 +377,60 @@ class StockManager:
                     # Try Yahoo first
                     response = requests.get(yahoo_url, headers=self.headers, timeout=5)
                     if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
-                        # Create image from response content
-                        from io import BytesIO
-                        logo = Image.open(BytesIO(response.content))
+                        try:
+                            # Create image from response content
+                            from io import BytesIO
+                            logo = Image.open(BytesIO(response.content))
+                            # Verify it's a valid image
+                            logo.verify()
+                            # Reopen after verify
+                            logo = Image.open(BytesIO(response.content))
+                        except Exception as e:
+                            logger.warning(f"Invalid image data from Yahoo for {symbol}: {str(e)}")
+                            # Try alternative source
+                            response = requests.get(alt_url, headers=self.headers, timeout=5)
+                            if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
+                                try:
+                                    # Create image from response content
+                                    from io import BytesIO
+                                    logo = Image.open(BytesIO(response.content))
+                                    # Verify it's a valid image
+                                    logo.verify()
+                                    # Reopen after verify
+                                    logo = Image.open(BytesIO(response.content))
+                                except Exception as e:
+                                    logger.warning(f"Invalid image data from alternative source for {symbol}: {str(e)}")
+                                    return None
+                            else:
+                                return None
                     else:
                         # Try alternative source
                         response = requests.get(alt_url, headers=self.headers, timeout=5)
                         if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
-                            # Create image from response content
-                            from io import BytesIO
-                            logo = Image.open(BytesIO(response.content))
+                            try:
+                                # Create image from response content
+                                from io import BytesIO
+                                logo = Image.open(BytesIO(response.content))
+                                # Verify it's a valid image
+                                logo.verify()
+                                # Reopen after verify
+                                logo = Image.open(BytesIO(response.content))
+                            except Exception as e:
+                                logger.warning(f"Invalid image data from alternative source for {symbol}: {str(e)}")
+                                return None
                         else:
                             return None
                 else:
                     # Normal case: open the saved logo file
-                    logo = Image.open(logo_path)
+                    try:
+                        logo = Image.open(logo_path)
+                        # Verify it's a valid image
+                        logo.verify()
+                        # Reopen after verify
+                        logo = Image.open(logo_path)
+                    except Exception as e:
+                        logger.warning(f"Invalid image file for {symbol}: {str(e)}")
+                        return None
                 
                 # Convert to RGBA if not already
                 if logo.mode != 'RGBA':
