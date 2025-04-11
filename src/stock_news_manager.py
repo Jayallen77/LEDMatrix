@@ -28,6 +28,7 @@ class StockNewsManager:
         self.scroll_position = 0
         self.cached_text_image = None  # Cache for the text image
         self.cached_text = None  # Cache for the text string
+
         
         # Get scroll settings from config with faster defaults
         self.scroll_speed = self.stock_news_config.get('scroll_speed', 1)
@@ -218,12 +219,13 @@ class StockNewsManager:
             
         text_width = self.cached_text_image.width
         text_height = self.cached_text_image.height
+
         display_width = self.display_manager.matrix.width
         total_width = text_width + display_width
         
         # Update scroll position
         self.scroll_position = (self.scroll_position + self.scroll_speed) % total_width
-        
+
         # Calculate the visible portion of the text
         visible_width = min(display_width, text_width - self.scroll_position)
         if visible_width > 0:
