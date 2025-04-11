@@ -617,12 +617,8 @@ class StockManager:
                         draw.ellipse([point[0]-2, point[1]-2, point[0]+2, point[1]+2], 
                                     fill=(0, 255, 0) if change >= 0 else (255, 0, 0))
         
-        # Crop to the visible portion based on scroll position
-        visible_width = self.display_manager.matrix.width
-        visible_image = image.crop((self.scroll_position, 0, 
-                                   self.scroll_position + visible_width, height))
-        
-        return visible_image
+        # Return the full image without cropping
+        return image
 
     def _update_stock_display(self, symbol: str, data: Dict[str, Any], width: int, height: int) -> None:
         """Update the stock display with smooth scrolling animation."""
