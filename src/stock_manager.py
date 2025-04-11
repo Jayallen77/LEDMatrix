@@ -355,36 +355,38 @@ class StockManager:
         draw.text((change_x, change_y), change_text, font=self.display_manager.small_font, fill=color)
         
         # Draw mini chart on the right
-        if 'price_history' in data and data['price_history']:
-            chart_width = width // 1.8
-            chart_height = height // 1.5
-            chart_x = center_x + width // 2
-            chart_y = height // 2 - chart_height // 2
+        chart_width = 30  # Increased from 20 to 30
+        chart_height = 32  # Increased from 32 to match text height
+        chart_x = width - chart_width - 5  # 5px padding from right edge
+        chart_y = 0  # Align with top of display
+        
+        # Draw chart background
+        draw.rectangle([(chart_x, chart_y), (chart_x + chart_width - 1, chart_y + chart_height - 1)], 
+                     outline=color)
+        
+        # Get price history for chart
+        price_history = data['price_history']
+        if len(price_history) >= 2:  # Need at least 2 points to draw a line
+            # Calculate price range with padding to avoid flat lines
+            min_price = min(price_history) * 0.99  # 1% padding below
+            max_price = max(price_history) * 1.01  # 1% padding above
+            price_range = max_price - min_price
             
-            # Get price data for chart
-            prices = [p['price'] for p in data['price_history']]
-            if len(prices) > 1:  # Need at least 2 points to draw a line
-                min_price = min(prices)
-                max_price = max(prices)
-                price_range = max_price - min_price
-                
-                # Add padding to price range to prevent flat lines
-                if price_range == 0:
-                    price_range = min_price * 0.01  # 1% padding if all prices are the same
-                    min_price = min_price - price_range/2
-                    max_price = max_price + price_range/2
-                
-                points = []
-                for i, price in enumerate(prices):
-                    # Calculate x position with proper spacing
-                    x = chart_x + int((i / (len(prices) - 1)) * chart_width)
-                    # Calculate y position with padding
-                    y = chart_y + chart_height - int(((price - min_price) / price_range) * chart_height)
-                    points.append((x, y))
-                
-                # Draw lines between points with slightly thicker lines
-                for i in range(len(points) - 1):
-                    draw.line([points[i], points[i + 1]], fill=color, width=2)
+            if price_range == 0:  # If all prices are the same
+                price_range = min_price * 0.01  # Use 1% of price as range
+            
+            # Calculate points for the line
+            points = []
+            for i, price in enumerate(price_history):
+                # Calculate x position with proper spacing
+                x = chart_x + 1 + (i * (chart_width - 2) // (len(price_history) - 1))
+                # Calculate y position (inverted because y=0 is at top)
+                y = chart_y + chart_height - 1 - int((price - min_price) * (chart_height - 2) / price_range)
+                points.append((x, y))
+            
+            # Draw the line
+            if len(points) >= 2:
+                draw.line(points, fill=color, width=1)
         
         # Crop to show only the visible portion based on scroll position
         visible_image = image.crop((scroll_position, 0, scroll_position + width, height))
