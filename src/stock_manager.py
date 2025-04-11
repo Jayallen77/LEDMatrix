@@ -523,8 +523,8 @@ class StockManager:
         # Draw large stock logo on the left
         logo = self._get_stock_logo(symbol)
         if logo:
-            # Position logo on the left side with consistent spacing
-            logo_x = 2
+            # Position logo on the left side with minimal spacing
+            logo_x = 0  # Reduced from 2 to 0
             logo_y = (height - logo.height) // 2
             image.paste(logo, (logo_x, logo_y), logo)
         
@@ -553,21 +553,21 @@ class StockManager:
         # Calculate starting y position to center the text block
         start_y = (height - total_text_height) // 2
         
-        # Draw symbol
+        # Draw symbol - moved closer to the logo
         symbol_width = symbol_bbox[2] - symbol_bbox[0]
-        symbol_x = width // 2 - symbol_width // 2
+        symbol_x = width // 3  # Moved from width//2 to width//3 to bring text closer to logo
         symbol_y = start_y
         draw.text((symbol_x, symbol_y), symbol_text, font=regular_font, fill=(255, 255, 255))
         
-        # Draw price
+        # Draw price - aligned with symbol
         price_width = price_bbox[2] - price_bbox[0]
-        price_x = width // 2 - price_width // 2
+        price_x = symbol_x + (symbol_width - price_width) // 2  # Center price under symbol
         price_y = symbol_y + symbol_height + 1  # 1 pixel spacing
         draw.text((price_x, price_y), price_text, font=regular_font, fill=(255, 255, 255))
         
-        # Draw change with color based on value
+        # Draw change with color based on value - aligned with price
         change_width = change_bbox[2] - change_bbox[0]
-        change_x = width // 2 - change_width // 2
+        change_x = price_x + (price_width - change_width) // 2  # Center change under price
         change_y = price_y + price_height + 1  # 1 pixel spacing
         change_color = (0, 255, 0) if change >= 0 else (255, 0, 0)
         draw.text((change_x, change_y), change_text, font=small_font, fill=change_color)
@@ -582,7 +582,7 @@ class StockManager:
                 # Calculate chart dimensions
                 chart_width = width // 3  # Increased from width//4 to width//3
                 chart_height = height // 1.5  # Increased from height//2 to height//1.5
-                chart_x = width - chart_width - 5  # 5 pixels from right edge
+                chart_x = width - chart_width + 5  # Moved 10 columns to the right (from width - chart_width - 5)
                 chart_y = (height - chart_height) // 2
                 
                 # Find min and max prices for scaling
