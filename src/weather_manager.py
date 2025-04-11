@@ -127,7 +127,7 @@ class WeatherManager:
                 'condition': condition
             })
 
-        # Process daily forecast (next 3 days)
+        # Process daily forecast
         daily_data = {}
         for item in hourly_list:
             date = datetime.fromtimestamp(item['dt']).strftime('%Y-%m-%d')
@@ -142,7 +142,7 @@ class WeatherManager:
 
         # Calculate daily summaries
         self.daily_forecast = []
-        for date, data in list(daily_data.items())[:3]:  # First 3 days
+        for date, data in list(daily_data.items())[:4]:  # Changed to 4 days for better spacing
             temps = data['temps']
             temp_high = round(max(temps))
             temp_low = round(min(temps))
@@ -194,7 +194,7 @@ class WeatherManager:
                 'temp_low': round(f['temp_low']),
                 'condition': f['condition']
             }
-            for f in self.daily_forecast[:3]
+            for f in self.daily_forecast[:4]  # Changed to 4 days
         ]
 
     def display_weather(self, force_clear: bool = False) -> None:
@@ -382,7 +382,7 @@ class WeatherManager:
             print(f"Error displaying hourly forecast: {e}")
 
     def display_daily_forecast(self, force_clear: bool = False):
-        """Display the 3-day weather forecast."""
+        """Display the daily weather forecast."""
         try:
             if not self.daily_forecast:
                 print("No daily forecast data available")
@@ -400,9 +400,9 @@ class WeatherManager:
             image = Image.new('RGB', (self.display_manager.matrix.width, self.display_manager.matrix.height))
             draw = ImageDraw.Draw(image)
             
-            # Display 5 days
-            days_to_show = min(5, len(self.daily_forecast))
-            section_width = self.display_manager.matrix.width // days_to_show
+            # Display 4 days
+            days_to_show = min(4, len(self.daily_forecast))  # Changed to 4 days
+            section_width = self.display_manager.matrix.width // days_to_show  # Now 16 pixels per section
             
             for i in range(days_to_show):
                 forecast = self.daily_forecast[i]
