@@ -41,6 +41,18 @@ class StockManager:
         # Use the assets/stocks directory from the repository
         self.logo_dir = os.path.join('assets', 'stocks')
         
+        # Create logo directory with proper permissions if it doesn't exist
+        try:
+            if not os.path.exists(self.logo_dir):
+                os.makedirs(self.logo_dir, mode=0o755, exist_ok=True)
+                logger.info(f"Created logo directory: {self.logo_dir}")
+            elif not os.access(self.logo_dir, os.W_OK):
+                # Try to fix permissions if directory exists but is not writable
+                os.chmod(self.logo_dir, 0o755)
+                logger.info(f"Fixed permissions for logo directory: {self.logo_dir}")
+        except Exception as e:
+            logger.error(f"Error setting up logo directory: {str(e)}")
+        
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
@@ -323,27 +335,69 @@ class StockManager:
             response = requests.get(yahoo_url, headers=self.headers, timeout=5)
             if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
                 try:
-                    with open(filepath, 'wb') as f:
-                        f.write(response.content)
-                    logger.info(f"Downloaded logo for {symbol} from Yahoo")
-                    return filepath
-                except PermissionError:
-                    logger.warning(f"Permission denied when saving logo for {symbol}. Using in-memory logo instead.")
-                    # Return a temporary path that won't be used for saving
-                    return f"temp_{symbol.lower()}.png"
+                    # Verify it's a valid image before saving
+                    from io import BytesIO
+                    img = Image.open(BytesIO(response.content))
+                    img.verify()  # Verify it's a valid image
+                    
+                    # Try to save the file
+                    try:
+                        with open(filepath, 'wb') as f:
+                            f.write(response.content)
+                        logger.info(f"Downloaded logo for {symbol} from Yahoo")
+                        return filepath
+                    except PermissionError:
+                        logger.warning(f"Permission denied when saving logo for {symbol}. Using in-memory logo instead.")
+                        # Return a temporary path that won't be used for saving
+                        return f"temp_{symbol.lower()}.png"
+                except Exception as e:
+                    logger.warning(f"Invalid image data from Yahoo for {symbol}: {str(e)}")
                 
             # Try alternative source
             response = requests.get(alt_url, headers=self.headers, timeout=5)
             if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
                 try:
-                    with open(filepath, 'wb') as f:
-                        f.write(response.content)
-                    logger.info(f"Downloaded logo for {symbol} from alternative source")
-                    return filepath
-                except PermissionError:
-                    logger.warning(f"Permission denied when saving logo for {symbol}. Using in-memory logo instead.")
-                    # Return a temporary path that won't be used for saving
-                    return f"temp_{symbol.lower()}.png"
+                    # Verify it's a valid image before saving
+                    from io import BytesIO
+                    img = Image.open(BytesIO(response.content))
+                    img.verify()  # Verify it's a valid image
+                    
+                    # Try to save the file
+                    try:
+                        with open(filepath, 'wb') as f:
+                            f.write(response.content)
+                        logger.info(f"Downloaded logo for {symbol} from alternative source")
+                        return filepath
+                    except PermissionError:
+                        logger.warning(f"Permission denied when saving logo for {symbol}. Using in-memory logo instead.")
+                        # Return a temporary path that won't be used for saving
+                        return f"temp_{symbol.lower()}.png"
+                except Exception as e:
+                    logger.warning(f"Invalid image data from alternative source for {symbol}: {str(e)}")
+                
+            # Try a third source - company.com domain
+            company_url = f"https://logo.clearbit.com/{symbol.lower()}.com"
+            if company_url != yahoo_url:  # Avoid duplicate request
+                response = requests.get(company_url, headers=self.headers, timeout=5)
+                if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
+                    try:
+                        # Verify it's a valid image before saving
+                        from io import BytesIO
+                        img = Image.open(BytesIO(response.content))
+                        img.verify()  # Verify it's a valid image
+                        
+                        # Try to save the file
+                        try:
+                            with open(filepath, 'wb') as f:
+                                f.write(response.content)
+                            logger.info(f"Downloaded logo for {symbol} from company domain")
+                            return filepath
+                        except PermissionError:
+                            logger.warning(f"Permission denied when saving logo for {symbol}. Using in-memory logo instead.")
+                            # Return a temporary path that won't be used for saving
+                            return f"temp_{symbol.lower()}.png"
+                    except Exception as e:
+                        logger.warning(f"Invalid image data from company domain for {symbol}: {str(e)}")
                 
             logger.warning(f"Could not download logo for {symbol}")
             return None
@@ -373,22 +427,12 @@ class StockManager:
                     symbol_lower = symbol.lower()
                     yahoo_url = f"https://logo.clearbit.com/{symbol_lower}.com"
                     alt_url = f"https://storage.googleapis.com/iex/api/logos/{symbol}.png"
+                    company_url = f"https://logo.clearbit.com/{symbol_lower}.com"
                     
-                    # Try Yahoo first
-                    response = requests.get(yahoo_url, headers=self.headers, timeout=5)
-                    if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
+                    # Try all sources
+                    for url in [yahoo_url, alt_url, company_url]:
                         try:
-                            # Create image from response content
-                            from io import BytesIO
-                            logo = Image.open(BytesIO(response.content))
-                            # Verify it's a valid image
-                            logo.verify()
-                            # Reopen after verify
-                            logo = Image.open(BytesIO(response.content))
-                        except Exception as e:
-                            logger.warning(f"Invalid image data from Yahoo for {symbol}: {str(e)}")
-                            # Try alternative source
-                            response = requests.get(alt_url, headers=self.headers, timeout=5)
+                            response = requests.get(url, headers=self.headers, timeout=5)
                             if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
                                 try:
                                     # Create image from response content
@@ -398,28 +442,23 @@ class StockManager:
                                     logo.verify()
                                     # Reopen after verify
                                     logo = Image.open(BytesIO(response.content))
+                                    
+                                    # Convert to RGBA if not already
+                                    if logo.mode != 'RGBA':
+                                        logo = logo.convert('RGBA')
+                                    
+                                    # Resize to fit in the display (assuming square logo)
+                                    max_size = min(self.display_manager.matrix.width // 2, 
+                                                  self.display_manager.matrix.height // 2)
+                                    logo = logo.resize((max_size, max_size), Image.LANCZOS)
+                                    
+                                    return logo
                                 except Exception as e:
-                                    logger.warning(f"Invalid image data from alternative source for {symbol}: {str(e)}")
-                                    return None
-                            else:
-                                return None
-                    else:
-                        # Try alternative source
-                        response = requests.get(alt_url, headers=self.headers, timeout=5)
-                        if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
-                            try:
-                                # Create image from response content
-                                from io import BytesIO
-                                logo = Image.open(BytesIO(response.content))
-                                # Verify it's a valid image
-                                logo.verify()
-                                # Reopen after verify
-                                logo = Image.open(BytesIO(response.content))
-                            except Exception as e:
-                                logger.warning(f"Invalid image data from alternative source for {symbol}: {str(e)}")
-                                return None
-                        else:
-                            return None
+                                    logger.warning(f"Invalid image data from {url} for {symbol}: {str(e)}")
+                                    continue
+                        except Exception as e:
+                            logger.warning(f"Error downloading from {url} for {symbol}: {str(e)}")
+                            continue
                 else:
                     # Normal case: open the saved logo file
                     try:
@@ -428,20 +467,19 @@ class StockManager:
                         logo.verify()
                         # Reopen after verify
                         logo = Image.open(logo_path)
+                        
+                        # Convert to RGBA if not already
+                        if logo.mode != 'RGBA':
+                            logo = logo.convert('RGBA')
+                        
+                        # Resize to fit in the display (assuming square logo)
+                        max_size = min(self.display_manager.matrix.width // 2, 
+                                      self.display_manager.matrix.height // 2)
+                        logo = logo.resize((max_size, max_size), Image.LANCZOS)
+                        
+                        return logo
                     except Exception as e:
                         logger.warning(f"Invalid image file for {symbol}: {str(e)}")
-                        return None
-                
-                # Convert to RGBA if not already
-                if logo.mode != 'RGBA':
-                    logo = logo.convert('RGBA')
-                
-                # Resize to fit in the display (assuming square logo)
-                max_size = min(self.display_manager.matrix.width // 2, 
-                              self.display_manager.matrix.height // 2)
-                logo = logo.resize((max_size, max_size), Image.LANCZOS)
-                
-                return logo
             except Exception as e:
                 logger.error(f"Error processing logo for {symbol}: {str(e)}")
         
