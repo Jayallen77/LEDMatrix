@@ -9,6 +9,7 @@ import os
 import urllib.parse
 import re
 from PIL import Image, ImageDraw
+import numpy as np
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -289,28 +290,24 @@ class StockManager:
         else:
             logger.error("Failed to fetch data for any configured stocks")
 
-    def _create_stock_display(self, symbol: str, data: Dict[str, Any]) -> Image.Image:
-        """Create an image containing the stock information for efficient scrolling."""
-        width = self.display_manager.matrix.width
-        height = self.display_manager.matrix.height
+    def _create_stock_display(self, symbol: str, data: Dict[str, Any], width: int, height: int, scroll_position: int = 0) -> Image.Image:
+        """Create a single stock display with scrolling animation."""
+        # Create a wider image for scrolling
+        scroll_width = width * 2  # Double width for smooth scrolling
+        image = Image.new('RGB', (scroll_width, height), (0, 0, 0))
+        draw = ImageDraw.Draw(image)
         
-        # Create a new image with black background
-        display_image = Image.new('RGB', (width * 2, height), (0, 0, 0))  # Double width for scrolling
-        draw = ImageDraw.Draw(display_image)
-        
-        # Get stock color
-        color = self._get_stock_color(symbol)
+        # Calculate center position for the main content
+        center_x = width // 2
         
         # Draw large stock logo on the left
-        logo_text = "📈" if data.get('change', 0) >= 0 else "📉"
-        bbox = draw.textbbox((0, 0), logo_text, font=self.display_manager.font)  # Use regular font for larger logo
+        logo_text = symbol[:1].upper()  # First letter of symbol
+        bbox = draw.textbbox((0, 0), logo_text, font=self.display_manager.regular_font)
         logo_width = bbox[2] - bbox[0]
         logo_height = bbox[3] - bbox[1]
+        logo_x = center_x - width // 3 - logo_width // 2
         logo_y = (height - logo_height) // 2
-        draw.text((10, logo_y), logo_text, font=self.display_manager.font, fill=color)
-        
-        # Calculate center section position (after logo)
-        center_x = logo_width + 20  # Start after logo with some padding
+        draw.text((logo_x, logo_y), logo_text, font=self.display_manager.regular_font, fill=(255, 255, 255))
         
         # Draw stacked symbol, price, and change in the center
         # Symbol
@@ -319,14 +316,14 @@ class StockManager:
         symbol_width = bbox[2] - bbox[0]
         symbol_height = bbox[3] - bbox[1]
         symbol_x = center_x + (width // 3 - symbol_width) // 2
-        symbol_y = height // 4
+        symbol_y = height // 4 - symbol_height // 2  # Center symbol in top quarter
         draw.text((symbol_x, symbol_y), symbol_text, font=self.display_manager.small_font, fill=(255, 255, 255))
         
         # Price and change (same size)
         price_text = f"${data['price']:.2f}"
         change_text = f"({data['change']:+.1f}%)"
         
-        # Calculate widths for both texts to ensure proper alignment
+        # Calculate widths and heights for both texts to ensure proper alignment
         price_bbox = draw.textbbox((0, 0), price_text, font=self.display_manager.small_font)
         change_bbox = draw.textbbox((0, 0), change_text, font=self.display_manager.small_font)
         price_width = price_bbox[2] - price_bbox[0]
@@ -338,40 +335,67 @@ class StockManager:
         price_x = center_x + (width // 3 - max_width) // 2
         change_x = center_x + (width // 3 - max_width) // 2
         
-        # Position texts vertically
-        price_y = symbol_y + symbol_height + 2
-        change_y = price_y + text_height + 1
+        # Calculate total height needed for all three elements
+        total_text_height = symbol_height + text_height * 2  # Two lines of text
+        spacing = 1  # Minimal spacing between elements
+        total_height = total_text_height + spacing * 2  # Spacing between all elements
+        
+        # Start from the top with proper centering
+        start_y = (height - total_height) // 2
+        
+        # Position texts vertically with minimal spacing
+        price_y = start_y + symbol_height + spacing
+        change_y = price_y + text_height + spacing
         
         # Draw both texts
         draw.text((price_x, price_y), price_text, font=self.display_manager.small_font, fill=color)
         draw.text((change_x, change_y), change_text, font=self.display_manager.small_font, fill=color)
         
         # Draw mini chart on the right
-        if data.get('price_history'):
+        if 'chart' in data and data['chart']:
             chart_width = width // 3
             chart_height = height // 2
-            chart_x = center_x + width // 3 + 10  # Start after center section
-            chart_y = (height - chart_height) // 2
-            
-            # Get price data for chart
-            prices = [p['price'] for p in data['price_history']]
-            if prices:
-                min_price = min(prices)
-                max_price = max(prices)
-                price_range = max_price - min_price
-                
-                if price_range > 0:
-                    points = []
-                    for i, price in enumerate(prices):
-                        x = chart_x + int((i / len(prices)) * chart_width)
-                        y = chart_y + chart_height - int(((price - min_price) / price_range) * chart_height)
-                        points.append((x, y))
-                    
-                    # Draw lines between points
-                    for i in range(len(points) - 1):
-                        draw.line([points[i], points[i + 1]], fill=color, width=1)
+            chart_x = center_x + width // 3 - chart_width // 2
+            chart_y = height // 2
+            self._draw_mini_chart(draw, data['chart'], chart_x, chart_y, chart_width, chart_height)
         
-        return display_image
+        # Crop to show only the visible portion based on scroll position
+        visible_image = image.crop((scroll_position, 0, scroll_position + width, height))
+        return visible_image
+
+    def _update_stock_display(self, symbol: str, data: Dict[str, Any], width: int, height: int) -> None:
+        """Update the stock display with smooth scrolling animation."""
+        try:
+            # Create the full scrolling image
+            full_image = self._create_stock_display(symbol, data, width, height)
+            scroll_width = width * 2  # Double width for smooth scrolling
+            
+            # Scroll the image smoothly
+            for scroll_pos in range(0, scroll_width - width, 15):  # Increased scroll speed to match news ticker
+                # Create visible portion
+                visible_image = full_image.crop((scroll_pos, 0, scroll_pos + width, height))
+                
+                # Convert to RGB and create numpy array
+                rgb_image = visible_image.convert('RGB')
+                image_array = np.array(rgb_image)
+                
+                # Update display
+                self.display_manager.update_display(image_array)
+                
+                # Small delay for smooth animation
+                time.sleep(0.01)  # Reduced delay to 10ms for smoother scrolling
+            
+            # Show final position briefly
+            final_image = full_image.crop((scroll_width - width, 0, scroll_width, height))
+            rgb_image = final_image.convert('RGB')
+            image_array = np.array(rgb_image)
+            self.display_manager.update_display(image_array)
+            time.sleep(0.5)  # Brief pause at the end
+            
+        except Exception as e:
+            logger.error(f"Error updating stock display for {symbol}: {str(e)}")
+            # Show error state
+            self._show_error_state(width, height)
 
     def _log_frame_rate(self):
         """Log frame rate statistics."""
@@ -421,7 +445,7 @@ class StockManager:
         
         # Create the display image if needed
         if self.cached_text_image is None or self.cached_text != current_symbol:
-            self.cached_text_image = self._create_stock_display(current_symbol, data)
+            self.cached_text_image = self._create_stock_display(current_symbol, data, self.display_manager.matrix.width, self.display_manager.matrix.height)
             self.cached_text = current_symbol
             self.scroll_position = 0
         
@@ -432,6 +456,12 @@ class StockManager:
         
         # Calculate the visible portion of the image
         width = self.display_manager.matrix.width
+        scroll_width = width * 2  # Double width for smooth scrolling
+        
+        # Update scroll position with small increments
+        self.scroll_position = (self.scroll_position + self.scroll_speed) % scroll_width
+        
+        # Calculate the visible portion
         visible_portion = self.cached_text_image.crop((
             self.scroll_position, 0,
             self.scroll_position + width, self.display_manager.matrix.height
@@ -440,11 +470,6 @@ class StockManager:
         # Copy the visible portion to the display
         self.display_manager.image.paste(visible_portion, (0, 0))
         self.display_manager.update_display()
-        
-        # Update scroll position
-        self.scroll_position += self.scroll_speed
-        if self.scroll_position >= width:  # Reset when we've scrolled through the whole image
-            self.scroll_position = 0
         
         # Log frame rate
         self._log_frame_rate()
