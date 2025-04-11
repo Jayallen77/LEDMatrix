@@ -322,20 +322,22 @@ class StockManager:
         symbol_y = height // 4
         draw.text((symbol_x, symbol_y), symbol_text, font=self.display_manager.small_font, fill=(255, 255, 255))
         
-        # Price
+        # Price (smaller)
         price_text = f"${data['price']:.2f}"
         bbox = draw.textbbox((0, 0), price_text, font=self.display_manager.small_font)
         price_width = bbox[2] - bbox[0]
+        price_height = bbox[3] - bbox[1]
         price_x = center_x + (width // 3 - price_width) // 2
-        price_y = symbol_y + symbol_height + 5
+        price_y = symbol_y + symbol_height + 2  # Reduced spacing
         draw.text((price_x, price_y), price_text, font=self.display_manager.small_font, fill=color)
         
-        # Change
+        # Change (smaller)
         change_text = f"({data['change']:+.1f}%)"
         bbox = draw.textbbox((0, 0), change_text, font=self.display_manager.small_font)
         change_width = bbox[2] - bbox[0]
+        change_height = bbox[3] - bbox[1]
         change_x = center_x + (width // 3 - change_width) // 2
-        change_y = price_y + symbol_height + 5
+        change_y = price_y + price_height + 1  # Reduced spacing
         draw.text((change_x, change_y), change_text, font=self.display_manager.small_font, fill=color)
         
         # Draw mini chart on the right

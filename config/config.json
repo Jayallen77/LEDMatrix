@@ -54,7 +54,7 @@
         "display_format": "{symbol}: ${price} ({change}%)"
     },
     "stock_news": {
-        "enabled": true,
+        "enabled": false,
         "update_interval": 300,
         "scroll_speed": 1,
         "scroll_delay": 0.001,
