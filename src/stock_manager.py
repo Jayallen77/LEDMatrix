@@ -8,7 +8,7 @@ from datetime import datetime
 import os
 import urllib.parse
 import re
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import hashlib
 
@@ -502,95 +502,123 @@ class StockManager:
         # Fallback to text-based logo
         return None
 
-    def _create_stock_display(self, symbol: str, data: Dict[str, Any], width: int, height: int, scroll_position: int = 0) -> Image.Image:
-        """Create a single stock display with scrolling animation."""
+    def _create_stock_display(self, symbol: str, price: float, change: float, change_percent: float) -> Image.Image:
+        """Create a display image for a stock with logo, symbol, price, and change.
+        
+        Args:
+            symbol: Stock symbol (e.g., 'AAPL', 'MSFT')
+            price: Current stock price
+            change: Price change
+            change_percent: Percentage change
+            
+        Returns:
+            PIL Image of the stock display
+        """
         # Create a wider image for scrolling
-        scroll_width = width * 2  # Double width for smooth scrolling
-        image = Image.new('RGB', (scroll_width, height), (0, 0, 0))
+        width = self.display_manager.matrix.width * 2
+        height = self.display_manager.matrix.height
+        image = Image.new('RGB', (width, height), color=(0, 0, 0))
         draw = ImageDraw.Draw(image)
         
-        # Get stock color
-        color = self._get_stock_color(symbol)
-        
-        # Calculate center position for the main content
-        center_x = width // 2
-        
-        # Try to get stock logo
+        # Draw large stock logo on the left
         logo = self._get_stock_logo(symbol)
-        
         if logo:
-            # Draw the logo on the left
-            logo_x = center_x - width // 3 - logo.width // 2
+            # Position logo on the left side
+            logo_x = 5
             logo_y = (height - logo.height) // 2
-            
-            # Create a new image with alpha channel for the logo
-            logo_bg = Image.new('RGBA', (scroll_width, height), (0, 0, 0, 0))
-            logo_bg.paste(logo, (logo_x, logo_y))
-            
-            # Convert to RGB for the main image
-            logo_rgb = logo_bg.convert('RGB')
-            image.paste(logo_rgb, (0, 0))
-        else:
-            # Fallback to text-based logo
-            logo_text = symbol[:1].upper()  # First letter of symbol
-            bbox = draw.textbbox((0, 0), logo_text, font=self.display_manager.regular_font)
-            logo_width = bbox[2] - bbox[0]
-            logo_height = bbox[3] - bbox[1]
-            logo_x = center_x - width // 3 - logo_width // 2
-            logo_y = (height - logo_height) // 2
-            draw.text((logo_x, logo_y), logo_text, font=self.display_manager.regular_font, fill=color)
+            image.paste(logo, (logo_x, logo_y), logo)
         
-        # Draw stacked symbol, price, and change in the center
-        # Symbol (always white)
+        # Draw symbol, price, and change in the center
+        # Use a regular font for the logo to make it larger
+        regular_font = ImageFont.truetype(self.display_manager.font_path, self.display_manager.font_size)
+        small_font = ImageFont.truetype(self.display_manager.font_path, self.display_manager.font_size - 2)
+        
+        # Calculate text dimensions for proper spacing
         symbol_text = symbol
-        bbox = draw.textbbox((0, 0), symbol_text, font=self.display_manager.small_font)
-        symbol_width = bbox[2] - bbox[0]
-        symbol_height = bbox[3] - bbox[1]
-        symbol_x = center_x + (width // 3 - symbol_width) // 2
-        symbol_y = height // 4 - symbol_height // 2  # Center symbol in top quarter
-        draw.text((symbol_x, symbol_y), symbol_text, font=self.display_manager.small_font, fill=(255, 255, 255))  # White color for symbol
+        price_text = f"${price:.2f}"
+        change_text = f"{change:+.2f} ({change_percent:+.1f}%)"
         
-        # Price and change (in stock color)
-        price_text = f"${data['price']:.2f}"
-        change_text = f"({data['change']:+.1f}%)"
+        # Get the height of each text element
+        symbol_height = regular_font.getsize(symbol_text)[1]
+        price_height = regular_font.getsize(price_text)[1]
+        change_height = small_font.getsize(change_text)[1]
         
-        # Calculate widths and heights for both texts to ensure proper alignment
-        price_bbox = draw.textbbox((0, 0), price_text, font=self.display_manager.small_font)
-        change_bbox = draw.textbbox((0, 0), change_text, font=self.display_manager.small_font)
-        price_width = price_bbox[2] - price_bbox[0]
-        change_width = change_bbox[2] - change_bbox[0]
-        text_height = price_bbox[3] - price_bbox[1]
+        # Calculate total height needed for all text
+        total_text_height = symbol_height + price_height + change_height + 4  # 4 pixels for spacing
         
-        # Center both texts based on the wider of the two
-        max_width = max(price_width, change_width)
-        price_x = center_x + (width // 3 - max_width) // 2
-        change_x = center_x + (width // 3 - max_width) // 2
+        # Calculate starting y position to center the text block
+        start_y = (height - total_text_height) // 2
         
-        # Calculate total height needed for all three elements
-        total_text_height = symbol_height + text_height * 2  # Two lines of text
-        spacing = 1  # Minimal spacing between elements
-        total_height = total_text_height + spacing * 2  # Spacing between all elements
+        # Draw symbol
+        symbol_x = width // 2 - regular_font.getsize(symbol_text)[0] // 2
+        symbol_y = start_y
+        draw.text((symbol_x, symbol_y), symbol_text, font=regular_font, fill=(255, 255, 255))
         
-        # Start from the top with proper centering
-        start_y = (height - total_height) // 2
+        # Draw price
+        price_x = width // 2 - regular_font.getsize(price_text)[0] // 2
+        price_y = symbol_y + symbol_height + 2  # 2 pixels spacing
+        draw.text((price_x, price_y), price_text, font=regular_font, fill=(255, 255, 255))
         
-        # Position texts vertically with minimal spacing
-        price_y = start_y + symbol_height + spacing
-        change_y = price_y + text_height + spacing
+        # Draw change with color based on value
+        change_x = width // 2 - small_font.getsize(change_text)[0] // 2
+        change_y = price_y + price_height + 2  # 2 pixels spacing
+        change_color = (0, 255, 0) if change >= 0 else (255, 0, 0)
+        draw.text((change_x, change_y), change_text, font=small_font, fill=change_color)
         
-        # Draw both texts
-        draw.text((price_x, price_y), price_text, font=self.display_manager.small_font, fill=color)
-        draw.text((change_x, change_y), change_text, font=self.display_manager.small_font, fill=color)
+        # Draw mini chart on the right
+        if symbol in self.stock_data and 'chart_data' in self.stock_data[symbol]:
+            chart_data = self.stock_data[symbol]['chart_data']
+            if len(chart_data) >= 2:  # Need at least 2 points to draw a line
+                # Calculate chart dimensions
+                chart_width = width // 4
+                chart_height = height // 2
+                chart_x = width - chart_width - 10  # 10 pixels from right edge
+                chart_y = (height - chart_height) // 2
+                
+                # Find min and max prices for scaling
+                min_price = min(chart_data)
+                max_price = max(chart_data)
+                
+                # Add padding to avoid flat lines when prices are very close
+                price_range = max_price - min_price
+                if price_range < 0.01:  # If prices are very close
+                    min_price -= 0.01
+                    max_price += 0.01
+                    price_range = 0.02
+                
+                # Draw chart background
+                draw.rectangle([chart_x, chart_y, chart_x + chart_width, chart_y + chart_height], 
+                              outline=(50, 50, 50))
+                
+                # Calculate points for the line
+                points = []
+                for i, price in enumerate(chart_data):
+                    x = chart_x + (i * chart_width) // (len(chart_data) - 1)
+                    # Invert y-axis (higher price = lower y value)
+                    y = chart_y + chart_height - ((price - min_price) / price_range * chart_height)
+                    points.append((x, y))
+                
+                # Draw the line
+                if len(points) >= 2:
+                    draw.line(points, fill=(0, 255, 0) if change >= 0 else (255, 0, 0), width=2)
+                    
+                    # Draw dots at each point
+                    for point in points:
+                        draw.ellipse([point[0]-2, point[1]-2, point[0]+2, point[1]+2], 
+                                    fill=(0, 255, 0) if change >= 0 else (255, 0, 0))
         
-        # Crop to show only the visible portion based on scroll position
-        visible_image = image.crop((scroll_position, 0, scroll_position + width, height))
+        # Crop to the visible portion based on scroll position
+        visible_width = self.display_manager.matrix.width
+        visible_image = image.crop((self.scroll_position, 0, 
+                                   self.scroll_position + visible_width, height))
+        
         return visible_image
 
     def _update_stock_display(self, symbol: str, data: Dict[str, Any], width: int, height: int) -> None:
         """Update the stock display with smooth scrolling animation."""
         try:
             # Create the full scrolling image
-            full_image = self._create_stock_display(symbol, data, width, height)
+            full_image = self._create_stock_display(symbol, data['price'], data['change'], data['change'] / data['open'] * 100)
             scroll_width = width * 2  # Double width for smooth scrolling
             
             # Scroll the image smoothly
@@ -684,7 +712,7 @@ class StockManager:
                 data = self.stock_data[symbol]
                 
                 # Create stock display for this symbol
-                stock_image = self._create_stock_display(symbol, data, width, height, 0)
+                stock_image = self._create_stock_display(symbol, data['price'], data['change'], data['change'] / data['open'] * 100)
                 
                 # Paste this stock image into the full image
                 full_image.paste(stock_image, (current_x, 0))
