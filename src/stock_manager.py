@@ -322,22 +322,28 @@ class StockManager:
         symbol_y = height // 4
         draw.text((symbol_x, symbol_y), symbol_text, font=self.display_manager.small_font, fill=(255, 255, 255))
         
-        # Price (smaller)
+        # Price and change (same size)
         price_text = f"${data['price']:.2f}"
-        bbox = draw.textbbox((0, 0), price_text, font=self.display_manager.small_font)
-        price_width = bbox[2] - bbox[0]
-        price_height = bbox[3] - bbox[1]
-        price_x = center_x + (width // 3 - price_width) // 2
-        price_y = symbol_y + symbol_height + 2  # Reduced spacing
-        draw.text((price_x, price_y), price_text, font=self.display_manager.small_font, fill=color)
-        
-        # Change (smaller)
         change_text = f"({data['change']:+.1f}%)"
-        bbox = draw.textbbox((0, 0), change_text, font=self.display_manager.small_font)
-        change_width = bbox[2] - bbox[0]
-        change_height = bbox[3] - bbox[1]
-        change_x = center_x + (width // 3 - change_width) // 2
-        change_y = price_y + price_height + 1  # Reduced spacing
+        
+        # Calculate widths for both texts to ensure proper alignment
+        price_bbox = draw.textbbox((0, 0), price_text, font=self.display_manager.small_font)
+        change_bbox = draw.textbbox((0, 0), change_text, font=self.display_manager.small_font)
+        price_width = price_bbox[2] - price_bbox[0]
+        change_width = change_bbox[2] - change_bbox[0]
+        text_height = price_bbox[3] - price_bbox[1]
+        
+        # Center both texts based on the wider of the two
+        max_width = max(price_width, change_width)
+        price_x = center_x + (width // 3 - max_width) // 2
+        change_x = center_x + (width // 3 - max_width) // 2
+        
+        # Position texts vertically
+        price_y = symbol_y + symbol_height + 2
+        change_y = price_y + text_height + 1
+        
+        # Draw both texts
+        draw.text((price_x, price_y), price_text, font=self.display_manager.small_font, fill=color)
         draw.text((change_x, change_y), change_text, font=self.display_manager.small_font, fill=color)
         
         # Draw mini chart on the right
