@@ -17,11 +17,23 @@ class DisplayController:
         self.config_manager = ConfigManager()
         self.config = self.config_manager.load_config()
         self.display_manager = DisplayManager(self.config.get('display', {}))
-        self.clock = Clock(display_manager=self.display_manager)
-        self.weather = WeatherManager(self.config, self.display_manager)
-        self.stocks = StockManager(self.config, self.display_manager)
-        self.news = StockNewsManager(self.config, self.display_manager)
-        self.current_display = 'clock'
+        
+        # Only initialize enabled modules
+        self.clock = Clock(display_manager=self.display_manager) if self.config.get('clock', {}).get('enabled', False) else None
+        self.weather = WeatherManager(self.config, self.display_manager) if self.config.get('weather', {}).get('enabled', False) else None
+        self.stocks = StockManager(self.config, self.display_manager) if self.config.get('stocks', {}).get('enabled', False) else None
+        self.news = StockNewsManager(self.config, self.display_manager) if self.config.get('stock_news', {}).get('enabled', False) else None
+        
+        # Set initial display to first enabled module
+        self.current_display = 'clock'  # Default
+        if not self.clock:
+            if self.weather:
+                self.current_display = 'weather'
+            elif self.stocks:
+                self.current_display = 'stocks'
+            elif self.news:
+                self.current_display = 'stock_news'
+                
         self.weather_mode = 'current'  # current, hourly, or daily
         self.last_switch = time.time()
         self.force_clear = True  # Start with a clear screen
@@ -58,12 +70,12 @@ class DisplayController:
                     next_display = None
                     
                     if self.current_display == 'clock':
-                        if self.config.get('weather', {}).get('enabled', False):
+                        if self.weather:
                             next_display = 'weather'
                             self.weather_mode = 'current'
-                        elif self.config.get('stocks', {}).get('enabled', False):
+                        elif self.stocks:
                             next_display = 'stocks'
-                        elif self.config.get('stock_news', {}).get('enabled', False):
+                        elif self.news:
                             next_display = 'stock_news'
                         else:
                             next_display = 'clock'
@@ -76,34 +88,34 @@ class DisplayController:
                             next_display = 'weather'
                             self.weather_mode = 'daily'
                         else:  # daily
-                            if self.config.get('stocks', {}).get('enabled', False):
+                            if self.stocks:
                                 next_display = 'stocks'
-                            elif self.config.get('stock_news', {}).get('enabled', False):
+                            elif self.news:
                                 next_display = 'stock_news'
-                            elif self.config.get('clock', {}).get('enabled', False):
+                            elif self.clock:
                                 next_display = 'clock'
                             else:
                                 next_display = 'weather'
                                 self.weather_mode = 'current'
                                 
                     elif self.current_display == 'stocks':
-                        if self.config.get('stock_news', {}).get('enabled', False):
+                        if self.news:
                             next_display = 'stock_news'
-                        elif self.config.get('clock', {}).get('enabled', False):
+                        elif self.clock:
                             next_display = 'clock'
-                        elif self.config.get('weather', {}).get('enabled', False):
+                        elif self.weather:
                             next_display = 'weather'
                             self.weather_mode = 'current'
                         else:
                             next_display = 'stocks'
                             
                     else:  # stock_news
-                        if self.config.get('clock', {}).get('enabled', False):
+                        if self.clock:
                             next_display = 'clock'
-                        elif self.config.get('weather', {}).get('enabled', False):
+                        elif self.weather:
                             next_display = 'weather'
                             self.weather_mode = 'current'
-                        elif self.config.get('stocks', {}).get('enabled', False):
+                        elif self.stocks:
                             next_display = 'stocks'
                         else:
                             next_display = 'stock_news'
@@ -117,10 +129,10 @@ class DisplayController:
 
                 # Display current screen
                 try:
-                    if self.current_display == 'clock' and self.config.get('clock', {}).get('enabled', False):
+                    if self.current_display == 'clock' and self.clock:
                         self.clock.display_time(force_clear=self.force_clear)
                         time.sleep(self.update_interval)
-                    elif self.current_display == 'weather' and self.config.get('weather', {}).get('enabled', False):
+                    elif self.current_display == 'weather' and self.weather:
                         if self.weather_mode == 'current':
                             self.weather.display_weather(force_clear=self.force_clear)
                         elif self.weather_mode == 'hourly':
@@ -128,10 +140,10 @@ class DisplayController:
                         else:  # daily
                             self.weather.display_daily_forecast(force_clear=self.force_clear)
                         time.sleep(self.update_interval)
-                    elif self.current_display == 'stocks' and self.config.get('stocks', {}).get('enabled', False):
+                    elif self.current_display == 'stocks' and self.stocks:
                         self.stocks.display_stocks(force_clear=self.force_clear)
                         time.sleep(self.update_interval)
-                    elif self.current_display == 'stock_news' and self.config.get('stock_news', {}).get('enabled', False):
+                    elif self.current_display == 'stock_news' and self.news:
                         # For news, we want to update as fast as possible without delay
                         self.news.display_news()
                 except Exception as e:
