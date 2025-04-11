@@ -36,10 +36,10 @@ class WeatherManager:
         self.daily_forecast = None
         self.last_draw_time = 0
         # Layout constants
-        self.PADDING = 2
+        self.PADDING = 1
         self.ICON_SIZE = {
-            'large': 16,
-            'medium': 12,
+            'large': 12,
+            'medium': 10,
             'small': 8
         }
         self.COLORS = {
@@ -217,8 +217,8 @@ class WeatherManager:
             
             # Draw weather condition icon and text at the top
             condition = weather_data['weather'][0]['main']
-            icon_x = 2
-            icon_y = 2
+            icon_x = 1
+            icon_y = 1
             self.display_manager.draw_weather_icon(
                 condition,
                 icon_x,
@@ -226,64 +226,66 @@ class WeatherManager:
                 size=self.ICON_SIZE['large']
             )
             
-            # Draw condition text next to icon
+            # Draw condition text next to icon (using small font)
             condition_text = condition
-            draw.text((icon_x + self.ICON_SIZE['large'] + 2, icon_y), 
+            draw.text((icon_x + self.ICON_SIZE['large'] + 1, icon_y), 
                      condition_text, 
-                     font=self.display_manager.regular_font, 
+                     font=self.display_manager.small_font, 
                      fill=self.COLORS['text'])
             
-            # Draw "time ago" text below condition
+            # Draw "time ago" text below condition (using small font)
             time_since_update = int((time.time() - self.last_update) / 3600)  # hours
-            time_text = f"{time_since_update} hours ago"
-            draw.text((icon_x + self.ICON_SIZE['large'] + 2, icon_y + 10),
+            time_text = f"{time_since_update}h ago"  # Shortened text
+            draw.text((icon_x + self.ICON_SIZE['large'] + 1, icon_y + 8),
                      time_text,
                      font=self.display_manager.small_font,
                      fill=self.COLORS['text'])
             
-            # Draw current temperature on the right
+            # Draw current temperature on the right (using regular font)
             temp = round(weather_data['main']['temp'])
-            temp_text = f"{temp}°F"
-            temp_x = self.display_manager.matrix.width - 30  # Adjust position as needed
-            draw.text((temp_x, 2),
+            temp_text = f"{temp}°"  # Shortened to just degrees
+            temp_width = draw.textlength(temp_text, font=self.display_manager.regular_font)
+            temp_x = self.display_manager.matrix.width - temp_width - 2
+            draw.text((temp_x, 1),
                      temp_text,
                      font=self.display_manager.regular_font,
                      fill=self.COLORS['highlight'])
             
-            # Draw high/low temperatures below current temp
+            # Draw high/low temperatures below current temp (using small font)
             temp_max = round(weather_data['main']['temp_max'])
             temp_min = round(weather_data['main']['temp_min'])
-            high_low_text = f"{temp_max}°F / {temp_min}°F"
-            draw.text((temp_x - 5, 12),
+            high_low_text = f"{temp_max}°/{temp_min}°"  # Shortened format
+            high_low_width = draw.textlength(high_low_text, font=self.display_manager.small_font)
+            draw.text((self.display_manager.matrix.width - high_low_width - 2, 11),
                      high_low_text,
                      font=self.display_manager.small_font,
                      fill=self.COLORS['text'])
             
-            # Draw additional weather metrics
-            y_start = self.display_manager.matrix.height - 24
-            spacing = 8
+            # Draw additional weather metrics in bottom half
+            y_start = 18  # Start metrics lower
+            spacing = 7  # Reduced spacing
             
-            # Air pressure
+            # Air pressure (shortened format)
             pressure = weather_data['main']['pressure'] * 0.02953  # Convert hPa to inHg
-            pressure_text = f"Air pressure    {pressure:.2f} inHg"
+            pressure_text = f"Press: {pressure:.1f}in"  # Shortened format
             draw.text((2, y_start),
                      pressure_text,
                      font=self.display_manager.small_font,
                      fill=self.COLORS['text'])
             
-            # Humidity
+            # Humidity (shortened format)
             humidity = weather_data['main']['humidity']
-            humidity_text = f"Humidity        {humidity}%"
+            humidity_text = f"Hum: {humidity}%"  # Shortened format
             draw.text((2, y_start + spacing),
                      humidity_text,
                      font=self.display_manager.small_font,
                      fill=self.COLORS['text'])
             
-            # Wind speed and direction
+            # Wind speed and direction (shortened format)
             wind_speed = weather_data['wind']['speed']
             wind_deg = weather_data.get('wind', {}).get('deg', 0)
             wind_dir = self._get_wind_direction(wind_deg)
-            wind_text = f"Wind speed      {wind_speed:.2f} mph ({wind_dir})"
+            wind_text = f"Wind: {wind_speed:.1f}mph {wind_dir}"  # Shortened format
             draw.text((2, y_start + spacing * 2),
                      wind_text,
                      font=self.display_manager.small_font,
