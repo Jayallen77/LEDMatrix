@@ -356,28 +356,35 @@ class StockManager:
         
         # Draw mini chart on the right
         if 'price_history' in data and data['price_history']:
-            chart_width = width // 1.8  # Increased from width // 2 to width // 1.8 for longer chart
+            chart_width = width // 1.8
             chart_height = height // 1.5
-            chart_x = center_x + width // 2  # Moved further right from width // 3 to width // 2
-            chart_y = height // 2 - chart_height // 2  # Keep vertical centering
+            chart_x = center_x + width // 2
+            chart_y = height // 2 - chart_height // 2
             
             # Get price data for chart
             prices = [p['price'] for p in data['price_history']]
-            if prices:
+            if len(prices) > 1:  # Need at least 2 points to draw a line
                 min_price = min(prices)
                 max_price = max(prices)
                 price_range = max_price - min_price
                 
-                if price_range > 0:
-                    points = []
-                    for i, price in enumerate(prices):
-                        x = chart_x + int((i / (len(prices) - 1)) * chart_width)
-                        y = chart_y + chart_height - int(((price - min_price) / price_range) * chart_height)
-                        points.append((x, y))
-                    
-                    # Draw lines between points with slightly thicker lines
-                    for i in range(len(points) - 1):
-                        draw.line([points[i], points[i + 1]], fill=color, width=2)
+                # Add padding to price range to prevent flat lines
+                if price_range == 0:
+                    price_range = min_price * 0.01  # 1% padding if all prices are the same
+                    min_price = min_price - price_range/2
+                    max_price = max_price + price_range/2
+                
+                points = []
+                for i, price in enumerate(prices):
+                    # Calculate x position with proper spacing
+                    x = chart_x + int((i / (len(prices) - 1)) * chart_width)
+                    # Calculate y position with padding
+                    y = chart_y + chart_height - int(((price - min_price) / price_range) * chart_height)
+                    points.append((x, y))
+                
+                # Draw lines between points with slightly thicker lines
+                for i in range(len(points) - 1):
+                    draw.line([points[i], points[i + 1]], fill=color, width=2)
         
         # Crop to show only the visible portion based on scroll position
         visible_image = image.crop((scroll_position, 0, scroll_position + width, height))
