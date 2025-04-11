@@ -196,7 +196,7 @@ class WeatherManager:
         ]
 
     def display_weather(self, force_clear: bool = False) -> None:
-        """Display current weather information using a static layout."""
+        """Display current weather information using a modern layout."""
         try:
             weather_data = self.get_weather()
             if not weather_data:
@@ -211,40 +211,97 @@ class WeatherManager:
             # Clear the display once at the start
             self.display_manager.clear()
             
-            # Draw temperature (large, centered)
-            temp_text = f"{current_state['temp']}°F"
-            self.display_manager.draw_text(
-                temp_text,
-                y=2,
-                color=self.COLORS['highlight'],
-                small_font=False
-            )
+            # Create a new image for drawing
+            image = Image.new('RGB', (self.display_manager.matrix.width, self.display_manager.matrix.height))
+            draw = ImageDraw.Draw(image)
             
-            # Draw weather icon below temperature
-            icon_x = (self.display_manager.matrix.width - self.ICON_SIZE['large']) // 2
-            icon_y = self.display_manager.matrix.height // 2 - 4
+            # Draw weather condition icon and text at the top
+            condition = weather_data['weather'][0]['main']
+            icon_x = 2
+            icon_y = 2
             self.display_manager.draw_weather_icon(
-                current_state['condition'],
+                condition,
                 icon_x,
                 icon_y,
                 size=self.ICON_SIZE['large']
             )
             
-            # Draw humidity at bottom
-            humidity_text = f"Humidity: {current_state['humidity']}%"
-            self.display_manager.draw_text(
-                humidity_text,
-                y=self.display_manager.matrix.height - 8,
-                color=self.COLORS['text'],
-                small_font=True
-            )
+            # Draw condition text next to icon
+            condition_text = condition
+            draw.text((icon_x + self.ICON_SIZE['large'] + 2, icon_y), 
+                     condition_text, 
+                     font=self.display_manager.regular_font, 
+                     fill=self.COLORS['text'])
             
-            # Update display once after all elements are drawn
+            # Draw "time ago" text below condition
+            time_since_update = int((time.time() - self.last_update) / 3600)  # hours
+            time_text = f"{time_since_update} hours ago"
+            draw.text((icon_x + self.ICON_SIZE['large'] + 2, icon_y + 10),
+                     time_text,
+                     font=self.display_manager.small_font,
+                     fill=self.COLORS['text'])
+            
+            # Draw current temperature on the right
+            temp = round(weather_data['main']['temp'])
+            temp_text = f"{temp}°F"
+            temp_x = self.display_manager.matrix.width - 30  # Adjust position as needed
+            draw.text((temp_x, 2),
+                     temp_text,
+                     font=self.display_manager.regular_font,
+                     fill=self.COLORS['highlight'])
+            
+            # Draw high/low temperatures below current temp
+            temp_max = round(weather_data['main']['temp_max'])
+            temp_min = round(weather_data['main']['temp_min'])
+            high_low_text = f"{temp_max}°F / {temp_min}°F"
+            draw.text((temp_x - 5, 12),
+                     high_low_text,
+                     font=self.display_manager.small_font,
+                     fill=self.COLORS['text'])
+            
+            # Draw additional weather metrics
+            y_start = self.display_manager.matrix.height - 24
+            spacing = 8
+            
+            # Air pressure
+            pressure = weather_data['main']['pressure'] * 0.02953  # Convert hPa to inHg
+            pressure_text = f"Air pressure    {pressure:.2f} inHg"
+            draw.text((2, y_start),
+                     pressure_text,
+                     font=self.display_manager.small_font,
+                     fill=self.COLORS['text'])
+            
+            # Humidity
+            humidity = weather_data['main']['humidity']
+            humidity_text = f"Humidity        {humidity}%"
+            draw.text((2, y_start + spacing),
+                     humidity_text,
+                     font=self.display_manager.small_font,
+                     fill=self.COLORS['text'])
+            
+            # Wind speed and direction
+            wind_speed = weather_data['wind']['speed']
+            wind_deg = weather_data.get('wind', {}).get('deg', 0)
+            wind_dir = self._get_wind_direction(wind_deg)
+            wind_text = f"Wind speed      {wind_speed:.2f} mph ({wind_dir})"
+            draw.text((2, y_start + spacing * 2),
+                     wind_text,
+                     font=self.display_manager.small_font,
+                     fill=self.COLORS['text'])
+            
+            # Update the display
+            self.display_manager.image = image
             self.display_manager.update_display()
             self.last_weather_state = current_state
 
         except Exception as e:
             print(f"Error displaying weather: {e}")
+
+    def _get_wind_direction(self, degrees: float) -> str:
+        """Convert wind degrees to cardinal direction."""
+        directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
+        index = round(degrees / 45) % 8
+        return directions[index]
 
     def display_hourly_forecast(self, force_clear: bool = False):
         """Display the next few hours of weather forecast."""
