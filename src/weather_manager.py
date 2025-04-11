@@ -112,8 +112,8 @@ class WeatherManager:
         if not forecast_data:
             return
 
-        # Process hourly forecast (next 6 hours)
-        hourly_list = forecast_data.get('list', [])[:6]  # Get next 6 3-hour forecasts
+        # Process hourly forecast (next 5 hours)
+        hourly_list = forecast_data.get('list', [])[:5]  # Changed from 6 to 5 to match image
         self.hourly_forecast = []
         
         for hour_data in hourly_list:
@@ -121,7 +121,7 @@ class WeatherManager:
             temp = round(hour_data['main']['temp'])
             condition = hour_data['weather'][0]['main']
             self.hourly_forecast.append({
-                'hour': dt.strftime('%I%p').lstrip('0'),  # Remove leading 0
+                'hour': dt.strftime('%I:00 %p').lstrip('0'),  # Format as "2:00 PM"
                 'temp': temp,
                 'condition': condition
             })
@@ -321,42 +321,46 @@ class WeatherManager:
             # Clear once at the start
             self.display_manager.clear()
             
-            # Display next 3 hours
-            hours_to_show = min(3, len(self.hourly_forecast))
+            # Create a new image for drawing
+            image = Image.new('RGB', (self.display_manager.matrix.width, self.display_manager.matrix.height))
+            draw = ImageDraw.Draw(image)
+            
+            # Display next 5 hours
+            hours_to_show = min(5, len(self.hourly_forecast))
             section_width = self.display_manager.matrix.width // hours_to_show
             
             for i in range(hours_to_show):
-                forecast = current_state[i]
+                forecast = self.hourly_forecast[i]
                 x = i * section_width
+                center_x = x + section_width // 2
                 
-                # Draw hour
-                self.display_manager.draw_text(
-                    forecast['hour'],
-                    x=x + 2,
-                    y=2,
-                    color=self.COLORS['text'],
-                    small_font=True
-                )
+                # Draw hour at top
+                hour_text = forecast['hour']
+                hour_width = draw.textlength(hour_text, font=self.display_manager.small_font)
+                draw.text((center_x - hour_width // 2, 2),
+                         hour_text,
+                         font=self.display_manager.small_font,
+                         fill=self.COLORS['text'])
                 
-                # Draw weather icon
+                # Draw weather icon in middle
+                icon_y = 12
                 self.display_manager.draw_weather_icon(
                     forecast['condition'],
-                    x=x + (section_width - self.ICON_SIZE['medium']) // 2,
-                    y=12,
+                    x=center_x - self.ICON_SIZE['medium'] // 2,
+                    y=icon_y,
                     size=self.ICON_SIZE['medium']
                 )
                 
-                # Draw temperature
-                temp = f"{forecast['temp']}°"
-                self.display_manager.draw_text(
-                    temp,
-                    x=x + (section_width - len(temp) * 4) // 2,
-                    y=24,
-                    color=self.COLORS['highlight'],
-                    small_font=True
-                )
+                # Draw temperature at bottom
+                temp_text = f"{forecast['temp']}°"
+                temp_width = draw.textlength(temp_text, font=self.display_manager.small_font)
+                draw.text((center_x - temp_width // 2, 24),
+                         temp_text,
+                         font=self.display_manager.small_font,
+                         fill=self.COLORS['highlight'])
             
-            # Update display once after all elements are drawn
+            # Update the display
+            self.display_manager.image = image
             self.display_manager.update_display()
             self.last_hourly_state = current_state
 
