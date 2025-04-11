@@ -340,13 +340,13 @@ class WeatherManager:
                 # Simplify time format
                 hour_text = hour_text.replace(":00 ", "").replace("PM", "p").replace("AM", "a")
                 hour_width = draw.textlength(hour_text, font=self.display_manager.small_font)
-                draw.text((center_x - hour_width // 2, 1),  # Moved up slightly
+                draw.text((center_x - hour_width // 2, 0),  # Moved up to top
                          hour_text,
                          font=self.display_manager.small_font,
                          fill=self.COLORS['extra_dim'])  # Using extra dim color
                 
                 # Draw weather icon in middle - made larger and centered
-                icon_y = 8  # Adjusted to be more centered
+                icon_y = 10  # Adjusted to be more centered vertically
                 self.display_manager.draw_weather_icon(
                     forecast['condition'],
                     x=center_x - self.ICON_SIZE['medium'] // 2,
@@ -357,7 +357,7 @@ class WeatherManager:
                 # Draw temperature at bottom - using extra small font
                 temp_text = f"{forecast['temp']}°"
                 temp_width = draw.textlength(temp_text, font=self.display_manager.small_font)
-                draw.text((center_x - temp_width // 2, 25),  # Moved down slightly
+                draw.text((center_x - temp_width // 2, 26),  # Moved down slightly
                          temp_text,
                          font=self.display_manager.small_font,
                          fill=self.COLORS['extra_dim'])  # Using extra dim color
