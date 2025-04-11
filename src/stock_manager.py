@@ -38,9 +38,8 @@ class StockManager:
         self.last_fps_log_time = time.time()
         self.frame_times = []
         
-        # Create assets/stocks directory if it doesn't exist
+        # Use the assets/stocks directory from the repository
         self.logo_dir = os.path.join('assets', 'stocks')
-        os.makedirs(self.logo_dir, exist_ok=True)
         
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
