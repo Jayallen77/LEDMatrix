@@ -38,16 +38,17 @@ class WeatherManager:
         # Layout constants
         self.PADDING = 1
         self.ICON_SIZE = {
-            'large': 12,
-            'medium': 10,
-            'small': 8
+            'large': 10,
+            'medium': 8,
+            'small': 6
         }
         self.COLORS = {
             'text': (255, 255, 255),
             'highlight': (255, 200, 0),
             'separator': (64, 64, 64),
             'temp_high': (255, 100, 100),
-            'temp_low': (100, 100, 255)
+            'temp_low': (100, 100, 255),
+            'dim': (180, 180, 180)
         }
         # Add caching for last drawn states
         self.last_weather_state = None
@@ -235,20 +236,20 @@ class WeatherManager:
             
             # Draw "time ago" text below condition (using small font)
             time_since_update = int((time.time() - self.last_update) / 3600)  # hours
-            time_text = f"{time_since_update}h ago"  # Shortened text
-            draw.text((icon_x + self.ICON_SIZE['large'] + 1, icon_y + 8),
+            time_text = f"{time_since_update}h"  # Even shorter text
+            draw.text((icon_x + self.ICON_SIZE['large'] + 1, icon_y + 7),  # Reduced from 8
                      time_text,
                      font=self.display_manager.small_font,
-                     fill=self.COLORS['text'])
+                     fill=self.COLORS['dim'])  # Using dimmer color
             
-            # Draw current temperature on the right (using regular font)
+            # Draw current temperature on the right (using small font instead of regular)
             temp = round(weather_data['main']['temp'])
             temp_text = f"{temp}°"  # Shortened to just degrees
-            temp_width = draw.textlength(temp_text, font=self.display_manager.regular_font)
-            temp_x = self.display_manager.matrix.width - temp_width - 2
+            temp_width = draw.textlength(temp_text, font=self.display_manager.small_font)
+            temp_x = self.display_manager.matrix.width - temp_width - 1  # Reduced right margin
             draw.text((temp_x, 1),
                      temp_text,
-                     font=self.display_manager.regular_font,
+                     font=self.display_manager.small_font,  # Changed from regular to small
                      fill=self.COLORS['highlight'])
             
             # Draw high/low temperatures below current temp (using small font)
@@ -256,40 +257,40 @@ class WeatherManager:
             temp_min = round(weather_data['main']['temp_min'])
             high_low_text = f"{temp_max}°/{temp_min}°"  # Shortened format
             high_low_width = draw.textlength(high_low_text, font=self.display_manager.small_font)
-            draw.text((self.display_manager.matrix.width - high_low_width - 2, 11),
+            draw.text((self.display_manager.matrix.width - high_low_width - 1, 9),  # Reduced from 11
                      high_low_text,
                      font=self.display_manager.small_font,
-                     fill=self.COLORS['text'])
+                     fill=self.COLORS['dim'])  # Using dimmer color
             
             # Draw additional weather metrics in bottom half
-            y_start = 18  # Start metrics lower
-            spacing = 7  # Reduced spacing
+            y_start = 16  # Start metrics lower (reduced from 18)
+            spacing = 6   # Reduced spacing from 7
             
             # Air pressure (shortened format)
             pressure = weather_data['main']['pressure'] * 0.02953  # Convert hPa to inHg
-            pressure_text = f"Press: {pressure:.1f}in"  # Shortened format
+            pressure_text = f"P:{pressure:.1f}in"  # Even shorter format
             draw.text((2, y_start),
                      pressure_text,
                      font=self.display_manager.small_font,
-                     fill=self.COLORS['text'])
+                     fill=self.COLORS['dim'])  # Using dimmer color
             
             # Humidity (shortened format)
             humidity = weather_data['main']['humidity']
-            humidity_text = f"Hum: {humidity}%"  # Shortened format
+            humidity_text = f"H:{humidity}%"  # Even shorter format
             draw.text((2, y_start + spacing),
                      humidity_text,
                      font=self.display_manager.small_font,
-                     fill=self.COLORS['text'])
+                     fill=self.COLORS['dim'])  # Using dimmer color
             
             # Wind speed and direction (shortened format)
             wind_speed = weather_data['wind']['speed']
             wind_deg = weather_data.get('wind', {}).get('deg', 0)
             wind_dir = self._get_wind_direction(wind_deg)
-            wind_text = f"Wind: {wind_speed:.1f}mph {wind_dir}"  # Shortened format
+            wind_text = f"W:{wind_speed:.0f}{wind_dir}"  # Even shorter format, removed decimal
             draw.text((2, y_start + spacing * 2),
                      wind_text,
                      font=self.display_manager.small_font,
-                     fill=self.COLORS['text'])
+                     fill=self.COLORS['dim'])  # Using dimmer color
             
             # Update the display
             self.display_manager.image = image
