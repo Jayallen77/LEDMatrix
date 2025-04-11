@@ -355,12 +355,29 @@ class StockManager:
         draw.text((change_x, change_y), change_text, font=self.display_manager.small_font, fill=color)
         
         # Draw mini chart on the right
-        if 'chart' in data and data['chart']:
-            chart_width = width // 3
-            chart_height = height // 2
+        if 'price_history' in data and data['price_history']:
+            chart_width = width // 2  # Increased from width // 3 to width // 2
+            chart_height = height // 1.5  # Increased from height // 2 to height // 1.5
             chart_x = center_x + width // 3 - chart_width // 2
-            chart_y = height // 2
-            self._draw_mini_chart(draw, data['chart'], chart_x, chart_y, chart_width, chart_height)
+            chart_y = height // 2 - chart_height // 2  # Center the chart vertically
+            
+            # Get price data for chart
+            prices = [p['price'] for p in data['price_history']]
+            if prices:
+                min_price = min(prices)
+                max_price = max(prices)
+                price_range = max_price - min_price
+                
+                if price_range > 0:
+                    points = []
+                    for i, price in enumerate(prices):
+                        x = chart_x + int((i / (len(prices) - 1)) * chart_width)
+                        y = chart_y + chart_height - int(((price - min_price) / price_range) * chart_height)
+                        points.append((x, y))
+                    
+                    # Draw lines between points with slightly thicker lines
+                    for i in range(len(points) - 1):
+                        draw.line([points[i], points[i + 1]], fill=color, width=2)  # Increased line width from 1 to 2
         
         # Crop to show only the visible portion based on scroll position
         visible_image = image.crop((scroll_position, 0, scroll_position + width, height))
