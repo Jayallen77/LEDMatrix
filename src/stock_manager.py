@@ -523,8 +523,8 @@ class StockManager:
         # Draw large stock logo on the left
         logo = self._get_stock_logo(symbol)
         if logo:
-            # Position logo on the left side
-            logo_x = 5
+            # Position logo on the left side with less space before the symbol
+            logo_x = 2  # Reduced from 5 to 2
             logo_y = (height - logo.height) // 2
             image.paste(logo, (logo_x, logo_y), logo)
         
@@ -548,7 +548,7 @@ class StockManager:
         change_height = change_bbox[3] - change_bbox[1]
         
         # Calculate total height needed for all text
-        total_text_height = symbol_height + price_height + change_height + 4  # 4 pixels for spacing
+        total_text_height = symbol_height + price_height + change_height + 2  # Reduced from 4 to 2 pixels for spacing
         
         # Calculate starting y position to center the text block
         start_y = (height - total_text_height) // 2
@@ -562,13 +562,13 @@ class StockManager:
         # Draw price
         price_width = price_bbox[2] - price_bbox[0]
         price_x = width // 2 - price_width // 2
-        price_y = symbol_y + symbol_height + 2  # 2 pixels spacing
+        price_y = symbol_y + symbol_height + 1  # Reduced from 2 to 1 pixel spacing
         draw.text((price_x, price_y), price_text, font=regular_font, fill=(255, 255, 255))
         
         # Draw change with color based on value
         change_width = change_bbox[2] - change_bbox[0]
         change_x = width // 2 - change_width // 2
-        change_y = price_y + price_height + 2  # 2 pixels spacing
+        change_y = price_y + price_height + 1  # Reduced from 2 to 1 pixel spacing
         change_color = (0, 255, 0) if change >= 0 else (255, 0, 0)
         draw.text((change_x, change_y), change_text, font=small_font, fill=change_color)
         
@@ -704,8 +704,8 @@ class StockManager:
             height = self.display_manager.matrix.height
             
             # Calculate total width needed for all stocks
-            # Each stock needs width*2 for scrolling, plus a small gap between stocks
-            gap = width // 4  # Gap between stocks
+            # Each stock needs width*2 for scrolling, plus a larger gap between stocks
+            gap = width // 2  # Increased from width//4 to width//2 for more space between stocks
             total_width = sum(width * 2 for _ in symbols) + gap * (len(symbols) - 1)
             
             # Create the full image
