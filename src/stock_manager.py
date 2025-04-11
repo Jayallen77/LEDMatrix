@@ -354,44 +354,6 @@ class StockManager:
         draw.text((price_x, price_y), price_text, font=self.display_manager.small_font, fill=color)
         draw.text((change_x, change_y), change_text, font=self.display_manager.small_font, fill=color)
         
-        # Draw mini chart on the right
-        chart_width = 30  # Increased from 20 to 30
-        chart_height = 32  # Increased from 32 to match text height
-        chart_x = scroll_width - chart_width - 5  # Shift one width to the right
-        chart_y = 0  # Align with top of display
-        
-        # Draw chart background
-        draw.rectangle([(chart_x, chart_y), (chart_x + chart_width - 1, chart_y + chart_height - 1)], 
-                     outline=color)
-        
-        # Get price history for chart
-        price_history = data.get('price_history', [])
-        if price_history and len(price_history) >= 2:  # Need at least 2 points to draw a line
-            # Extract prices from price history
-            prices = [p['price'] for p in price_history]
-            if prices:  # Make sure we have prices
-                # Calculate price range with padding to avoid flat lines
-                min_price = min(prices) * 0.99  # 1% padding below
-                max_price = max(prices) * 1.01  # 1% padding above
-                price_range = max_price - min_price
-                
-                if price_range == 0:  # If all prices are the same
-                    price_range = min_price * 0.01  # Use 1% of price as range
-                
-                # Calculate points for the line
-                points = []
-                for i, price_data in enumerate(price_history):
-                    price = price_data['price']
-                    # Calculate x position with proper spacing
-                    x = chart_x + 1 + (i * (chart_width - 2) // (len(price_history) - 1))
-                    # Calculate y position (inverted because y=0 is at top)
-                    y = chart_y + chart_height - 1 - int((price - min_price) * (chart_height - 2) / price_range)
-                    points.append((x, y))
-                
-                # Draw the line with increased width for visibility
-                if len(points) >= 2:
-                    draw.line(points, fill=color, width=2)  # Increased line width
-        
         # Crop to show only the visible portion based on scroll position
         visible_image = image.crop((scroll_position, 0, scroll_position + width, height))
         return visible_image
