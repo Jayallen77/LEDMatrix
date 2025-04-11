@@ -10,6 +10,9 @@ print(f"Current working directory: {os.getcwd()}")
 
 def main():
     """Test the StockNewsManager class directly."""
+
+    display_manager = None
+
     try:
         # Load configuration
         config_manager = ConfigManager()
@@ -27,6 +30,13 @@ def main():
         # Initialize display manager
         display_manager = DisplayManager(display_config)
         
+
+        # Clear the display and show a test pattern
+        display_manager.clear()
+        display_manager.update_display()
+        time.sleep(1)  # Give time to see the test pattern
+        
+
         # Initialize news manager with the loaded config
         news_manager = StockNewsManager(config, display_manager)
         
@@ -43,6 +53,12 @@ def main():
         import traceback
         traceback.print_exc()
     finally:
+        if display_manager:
+            # Clear the display before exiting
+            display_manager.clear()
+            display_manager.update_display()
+            display_manager.cleanup()
+
         print("Test completed")
 
 if __name__ == "__main__":

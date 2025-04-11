@@ -113,12 +113,13 @@ class DisplayController:
                     logger.info(f"Switching display to: {self.current_display} {self.weather_mode if self.current_display == 'weather' else ''}")
                     self.last_switch = current_time
                     self.force_clear = True
-                    self.display_manager.clear()  # Ensure clean transition
+                    self.display_manager.clear()
 
                 # Display current screen
                 try:
                     if self.current_display == 'clock' and self.config.get('clock', {}).get('enabled', False):
                         self.clock.display_time(force_clear=self.force_clear)
+                        time.sleep(self.update_interval)
                     elif self.current_display == 'weather' and self.config.get('weather', {}).get('enabled', False):
                         if self.weather_mode == 'current':
                             self.weather.display_weather(force_clear=self.force_clear)
@@ -126,9 +127,12 @@ class DisplayController:
                             self.weather.display_hourly_forecast(force_clear=self.force_clear)
                         else:  # daily
                             self.weather.display_daily_forecast(force_clear=self.force_clear)
+                        time.sleep(self.update_interval)
                     elif self.current_display == 'stocks' and self.config.get('stocks', {}).get('enabled', False):
                         self.stocks.display_stocks(force_clear=self.force_clear)
+                        time.sleep(self.update_interval)
                     elif self.current_display == 'stock_news' and self.config.get('stock_news', {}).get('enabled', False):
+                        # For news, we want to update as fast as possible without delay
                         self.news.display_news()
                 except Exception as e:
                     logger.error(f"Error updating display: {e}")
@@ -137,9 +141,6 @@ class DisplayController:
 
                 # Reset force clear flag after use
                 self.force_clear = False
-
-                # Sleep between updates
-                time.sleep(self.update_interval)
 
         except KeyboardInterrupt:
             print("\nDisplay stopped by user")

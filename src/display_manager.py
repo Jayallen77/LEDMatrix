@@ -36,18 +36,18 @@ class DisplayManager:
         options.parallel = hardware_config.get('parallel', 1)
         options.hardware_mapping = hardware_config.get('hardware_mapping', 'adafruit-hat-pwm')
         
-        # Optimize display settings for chained panels
+        # Balance performance and stability
         options.brightness = 100
-        options.pwm_bits = 11
-        options.pwm_lsb_nanoseconds = 200  # Increased for better stability
+        options.pwm_bits = 10  # Increased from 8 for better color depth
+        options.pwm_lsb_nanoseconds = 150  # Increased for better stability
         options.led_rgb_sequence = 'RGB'
         options.pixel_mapper_config = ''
         options.row_address_type = 0
         options.multiplexing = 0
-        options.disable_hardware_pulsing = False  # Enable hardware pulsing for better sync
+        options.disable_hardware_pulsing = False  # Re-enable hardware pulsing for stability
         options.show_refresh_rate = False
-        options.limit_refresh_rate_hz = 60  # Reduced refresh rate for stability
-        options.gpio_slowdown = 2  # Increased slowdown for better stability
+        options.limit_refresh_rate_hz = 90  # Reduced from 120Hz for better stability
+        options.gpio_slowdown = 2  # Increased for better stability
         
         # Initialize the matrix
         self.matrix = RGBMatrix(options=options)
@@ -94,14 +94,11 @@ class DisplayManager:
             # Copy the current image to the offscreen canvas
             self.offscreen_canvas.SetImage(self.image)
             
-            # Wait for the next vsync before swapping
-            self.matrix.SwapOnVSync(self.offscreen_canvas)
+            # Swap buffers immediately
+            self.matrix.SwapOnVSync(self.offscreen_canvas, False)
             
             # Swap our canvas references
             self.offscreen_canvas, self.current_canvas = self.current_canvas, self.offscreen_canvas
-            
-            # Small delay to ensure stable refresh
-            time.sleep(0.001)
         except Exception as e:
             logger.error(f"Error updating display: {e}")
 
