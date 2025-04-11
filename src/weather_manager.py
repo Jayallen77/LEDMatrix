@@ -255,12 +255,12 @@ class WeatherManager:
             # Draw high/low temperatures below current temp (using small font)
             temp_max = round(weather_data['main']['temp_max'])
             temp_min = round(weather_data['main']['temp_min'])
-            high_low_text = f"{temp_max}°/{temp_min}°"  # Shortened format
+            high_low_text = f"{temp_min}°/{temp_max}°"  # Swapped order: low/high
             high_low_width = draw.textlength(high_low_text, font=self.display_manager.small_font)
-            draw.text((self.display_manager.matrix.width - high_low_width - 1, 9),  # Reduced from 11
+            draw.text((self.display_manager.matrix.width - high_low_width - 1, 9),
                      high_low_text,
                      font=self.display_manager.small_font,
-                     fill=self.COLORS['dim'])  # Using dimmer color
+                     fill=self.COLORS['dim'])
             
             # Draw additional weather metrics in bottom half
             y_start = 16  # Start metrics lower (reduced from 18)
@@ -404,7 +404,7 @@ class WeatherManager:
                 )
                 
                 # Draw temperature range
-                temp = f"{forecast['temp_low']}/{forecast['temp_high']}°"
+                temp = f"{forecast['temp_low']}/{forecast['temp_high']}°"  # Swapped order: low/high
                 self.display_manager.draw_text(
                     temp,
                     x=x + (section_width - len(temp) * 4) // 2,
