@@ -190,79 +190,69 @@ class StockNewsManager:
         if not all_news:
             return
 
-        # Get the number of headlines to show per rotation
-        headlines_per_rotation = self.stock_news_config.get('headlines_per_rotation', 2)
-        total_headlines = len(all_news)
-        
-        # Calculate the starting index for the current group
-        start_idx = (self.current_news_group * headlines_per_rotation) % total_headlines
-        
-        # Build the text for all headlines in this group
-        news_texts = []
-        for i in range(headlines_per_rotation):
-            idx = (start_idx + i) % total_headlines
-            news = all_news[idx]
-            news_texts.append(f"{news['symbol']}: {news['title']}")
-        
-        # Join all headlines with a separator
-        separator = "   -   "  # Visual separator between news items
-        news_text = separator.join(news_texts)
-        
-        # Only create new text image if the text has changed
-        if news_text != self.cached_text:
-            self.cached_text = news_text
-            self.cached_text_image = self._create_text_image(news_text)
-            self.scroll_position = 0  # Reset scroll position for new text
-        
-        if not self.cached_text_image:
-            return
+        # Create a continuous scrolling image if needed
+        if self.cached_text_image is None:
+            # Shuffle the news items for random order
+            random.shuffle(all_news)
             
-        text_width = self.cached_text_image.width
-        text_height = self.cached_text_image.height
-
-        display_width = self.display_manager.matrix.width
-        total_width = text_width + display_width
+            # Create a very wide image that contains all news items in sequence
+            width = self.display_manager.matrix.width
+            height = self.display_manager.matrix.height
+            
+            # Calculate total width needed for all news items
+            # Each news item needs width*2 for scrolling, plus consistent gaps between items
+            news_gap = width // 3  # Gap between news items
+            total_width = sum(width * 2 for _ in all_news) + news_gap * (len(all_news) - 1)
+            
+            # Create the full image
+            full_image = Image.new('RGB', (total_width, height), (0, 0, 0))
+            draw = ImageDraw.Draw(full_image)
+            
+            # Draw each news item in sequence with consistent spacing
+            current_x = 0
+            separator = "   -   "  # Visual separator between news items
+            
+            for news in all_news:
+                news_text = f"{news['symbol']}: {news['title']}"
+                # Create news text image for this item
+                news_image = self._create_text_image(news_text)
+                
+                # Paste this news image into the full image
+                full_image.paste(news_image, (current_x, 0))
+                
+                # Move to next position with consistent spacing
+                current_x += width * 2
+                
+                # Add separator between news items
+                if news != all_news[-1]:  # Don't add separator after the last news
+                    current_x += news_gap
+            
+            # Cache the full image
+            self.cached_text_image = full_image
+            self.scroll_position = 0
+            self.last_update = time.time()
         
-        # Update scroll position
+        # Calculate the visible portion of the image
+        width = self.display_manager.matrix.width
+        total_width = self.cached_text_image.width
+        
+        # Update scroll position with small increments
         self.scroll_position = (self.scroll_position + self.scroll_speed) % total_width
-
-        # Calculate the visible portion of the text
-        visible_width = min(display_width, text_width - self.scroll_position)
-        if visible_width > 0:
-            # Create a new blank image for this frame
-            frame_image = Image.new('RGB', (display_width, text_height), (0, 0, 0))
-            
-            # Crop and paste in one operation
-            if self.scroll_position + visible_width <= text_width:
-                # Normal case - text is still scrolling in
-                visible_portion = self.cached_text_image.crop((
-                    self.scroll_position, 0,
-                    self.scroll_position + visible_width, text_height
-                ))
-                frame_image.paste(visible_portion, (0, 0))
-            else:
-                # Wrapping case - text is wrapping around
-                first_part_width = text_width - self.scroll_position
-                first_part = self.cached_text_image.crop((
-                    self.scroll_position, 0,
-                    text_width, text_height
-                ))
-                second_part = self.cached_text_image.crop((
-                    0, 0,
-                    visible_width - first_part_width, text_height
-                ))
-                frame_image.paste(first_part, (0, 0))
-                frame_image.paste(second_part, (first_part_width, 0))
-            
-            # Update the display with the new frame
-            self.display_manager.image = frame_image
-            self.display_manager.update_display()
         
-        # If we've completed a full scroll, move to the next group
-        if self.scroll_position == 0:
-            self.current_news_group = (self.current_news_group + 1) % ((total_headlines + headlines_per_rotation - 1) // headlines_per_rotation)
+        # Calculate the visible portion
+        visible_portion = self.cached_text_image.crop((
+            self.scroll_position, 0,
+            self.scroll_position + width, self.display_manager.matrix.height
+        ))
+        
+        # Copy the visible portion to the display
+        self.display_manager.image.paste(visible_portion, (0, 0))
+        self.display_manager.update_display()
         
         # Log frame rate
         self._log_frame_rate()
+        
+        # Add a small delay between frames
+        time.sleep(self.scroll_delay)
         
         return True 
