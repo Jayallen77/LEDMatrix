@@ -313,7 +313,7 @@ class WeatherManager:
             # Check if state has changed
             current_state = self._get_hourly_state()
             if not force_clear and current_state == self.last_hourly_state:
-                return  # No need to redraw if nothing changed
+                return
             
             # Clear the display
             self.display_manager.clear()
@@ -322,18 +322,19 @@ class WeatherManager:
             image = Image.new('RGB', (self.display_manager.matrix.width, self.display_manager.matrix.height))
             draw = ImageDraw.Draw(image)
             
-            # Calculate layout
-            hours_to_show = min(4, len(self.hourly_forecast))  # Show up to 4 hours
-            section_width = self.display_manager.matrix.width // hours_to_show
+            # Calculate layout based on matrix dimensions
+            hours_to_show = min(4, len(self.hourly_forecast))
+            total_width = self.display_manager.matrix.width
+            section_width = total_width // hours_to_show
+            padding = max(2, section_width // 6)  # Increased padding for more space
             
             for i in range(hours_to_show):
                 forecast = self.hourly_forecast[i]
-                x = i * section_width
-                center_x = x + section_width // 2
+                x = i * section_width + padding
+                center_x = x + (section_width - 2 * padding) // 2
                 
-                # Draw hour at top - using extra small font
+                # Draw hour at top
                 hour_text = forecast['hour']
-                # Simplify time format
                 hour_text = hour_text.replace(":00 ", "").replace("PM", "p").replace("AM", "a")
                 hour_width = draw.textlength(hour_text, font=self.display_manager.small_font)
                 draw.text((center_x - hour_width // 2, 1),
@@ -341,18 +342,17 @@ class WeatherManager:
                          font=self.display_manager.small_font,
                          fill=self.COLORS['extra_dim'])
                 
-                # Draw weather icon in middle - made smaller and centered
+                # Draw weather icon in middle
                 icon_size = self.ICON_SIZE['medium']
-                icon_y = 6  # Adjusted for better spacing with temperature below
+                icon_y = self.display_manager.matrix.height // 3  # Position icon in upper third
                 icon_x = center_x - icon_size // 2
-                
-                # Draw weather icon using WeatherIcons class
                 WeatherIcons.draw_weather_icon(draw, forecast['condition'], icon_x, icon_y, icon_size)
                 
-                # Draw temperature below icon
+                # Draw temperature at bottom
                 temp_text = f"{forecast['temp']}°"
                 temp_width = draw.textlength(temp_text, font=self.display_manager.small_font)
-                draw.text((center_x - temp_width // 2, icon_y + icon_size + 1),
+                temp_y = self.display_manager.matrix.height - 8  # Position at bottom with small margin
+                draw.text((center_x - temp_width // 2, temp_y),
                          temp_text,
                          font=self.display_manager.small_font,
                          fill=self.COLORS['text'])
@@ -375,7 +375,7 @@ class WeatherManager:
             # Check if state has changed
             current_state = self._get_daily_state()
             if not force_clear and current_state == self.last_daily_state:
-                return  # No need to redraw if nothing changed
+                return
             
             # Clear the display
             self.display_manager.clear()
@@ -384,35 +384,36 @@ class WeatherManager:
             image = Image.new('RGB', (self.display_manager.matrix.width, self.display_manager.matrix.height))
             draw = ImageDraw.Draw(image)
             
-            # Calculate layout
-            days_to_show = min(4, len(self.daily_forecast))  # Show up to 4 days
-            section_width = self.display_manager.matrix.width // days_to_show
+            # Calculate layout based on matrix dimensions
+            days_to_show = min(4, len(self.daily_forecast))
+            total_width = self.display_manager.matrix.width
+            section_width = total_width // days_to_show
+            padding = max(2, section_width // 6)  # Increased padding for more space
             
             for i in range(days_to_show):
                 forecast = self.daily_forecast[i]
-                x = i * section_width
-                center_x = x + section_width // 2
+                x = i * section_width + padding
+                center_x = x + (section_width - 2 * padding) // 2
                 
-                # Draw day name at top - using small font
-                day_text = forecast['date']  # Already in "Fri" format
+                # Draw day name at top
+                day_text = forecast['date']
                 day_width = draw.textlength(day_text, font=self.display_manager.small_font)
                 draw.text((center_x - day_width // 2, 1),
                          day_text,
                          font=self.display_manager.small_font,
                          fill=self.COLORS['extra_dim'])
                 
-                # Draw weather icon in middle - made smaller and centered
+                # Draw weather icon in middle
                 icon_size = self.ICON_SIZE['medium']
-                icon_y = 6  # Adjusted for better spacing with temperature below
+                icon_y = self.display_manager.matrix.height // 3  # Position icon in upper third
                 icon_x = center_x - icon_size // 2
-                
-                # Draw weather icon using WeatherIcons class
                 WeatherIcons.draw_weather_icon(draw, forecast['condition'], icon_x, icon_y, icon_size)
                 
-                # Draw high/low temperatures below icon
+                # Draw high/low temperatures at bottom
                 temp_text = f"{forecast['temp_low']}°/{forecast['temp_high']}°"
                 temp_width = draw.textlength(temp_text, font=self.display_manager.small_font)
-                draw.text((center_x - temp_width // 2, icon_y + icon_size + 1),
+                temp_y = self.display_manager.matrix.height - 8  # Position at bottom with small margin
+                draw.text((center_x - temp_width // 2, temp_y),
                          temp_text,
                          font=self.display_manager.small_font,
                          fill=self.COLORS['text'])
