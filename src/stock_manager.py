@@ -464,8 +464,8 @@ class StockManager:
                                         logo = logo.convert('RGBA')
                                     
                                     # Resize to fit in the display (assuming square logo)
-                                    max_size = min(self.display_manager.matrix.width // 2, 
-                                                  self.display_manager.matrix.height // 2)
+                                    max_size = min(self.display_manager.matrix.width // 1.5, 
+                                                  self.display_manager.matrix.height // 1.5)
                                     logo = logo.resize((max_size, max_size), Image.LANCZOS)
                                     
                                     return logo
@@ -489,8 +489,8 @@ class StockManager:
                             logo = logo.convert('RGBA')
                         
                         # Resize to fit in the display (assuming square logo)
-                        max_size = min(self.display_manager.matrix.width // 2, 
-                                      self.display_manager.matrix.height // 2)
+                        max_size = min(self.display_manager.matrix.width // 1.5, 
+                                      self.display_manager.matrix.height // 1.5)
                         logo = logo.resize((max_size, max_size), Image.LANCZOS)
                         
                         return logo
