@@ -40,7 +40,7 @@ class WeatherManager:
         self.PADDING = 1
         self.ICON_SIZE = {
             'large': 10,
-            'medium': 12,  # Reduced from 16 for better spacing
+            'medium': 10,  # Reduced from 12 to ensure fit
             'small': 6
         }
         self.COLORS = {
@@ -322,9 +322,9 @@ class WeatherManager:
             image = Image.new('RGB', (self.display_manager.matrix.width, self.display_manager.matrix.height))
             draw = ImageDraw.Draw(image)
             
-            # Calculate layout
+            # Calculate layout for 64x32 matrix
             hours_to_show = min(4, len(self.hourly_forecast))  # Show up to 4 hours
-            section_width = self.display_manager.matrix.width // hours_to_show
+            section_width = 16  # 64/4 = 16 pixels per section
             
             for i in range(hours_to_show):
                 forecast = self.hourly_forecast[i]
@@ -343,7 +343,7 @@ class WeatherManager:
                 
                 # Draw weather icon in middle - made smaller and centered
                 icon_size = self.ICON_SIZE['medium']
-                icon_y = 6  # Adjusted for better spacing with temperature below
+                icon_y = 5  # Adjusted for better spacing with temperature below
                 icon_x = center_x - icon_size // 2
                 
                 # Draw weather icon using WeatherIcons class
@@ -384,9 +384,9 @@ class WeatherManager:
             image = Image.new('RGB', (self.display_manager.matrix.width, self.display_manager.matrix.height))
             draw = ImageDraw.Draw(image)
             
-            # Calculate layout
+            # Calculate layout for 64x32 matrix
             days_to_show = min(4, len(self.daily_forecast))  # Show up to 4 days
-            section_width = self.display_manager.matrix.width // days_to_show
+            section_width = 16  # 64/4 = 16 pixels per section
             
             for i in range(days_to_show):
                 forecast = self.daily_forecast[i]
@@ -403,7 +403,7 @@ class WeatherManager:
                 
                 # Draw weather icon in middle - made smaller and centered
                 icon_size = self.ICON_SIZE['medium']
-                icon_y = 6  # Adjusted for better spacing with temperature below
+                icon_y = 5  # Adjusted for better spacing with temperature below
                 icon_x = center_x - icon_size // 2
                 
                 # Draw weather icon using WeatherIcons class
