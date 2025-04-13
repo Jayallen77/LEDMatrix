@@ -325,11 +325,12 @@ class WeatherManager:
             # Calculate layout for 64x32 matrix
             hours_to_show = min(4, len(self.hourly_forecast))  # Show up to 4 hours
             section_width = 16  # 64/4 = 16 pixels per section
+            padding = 1  # Add small padding between sections
             
             for i in range(hours_to_show):
                 forecast = self.hourly_forecast[i]
-                x = i * section_width
-                center_x = x + section_width // 2
+                x = i * section_width + padding
+                center_x = x + (section_width - 2 * padding) // 2
                 
                 # Draw hour at top - using extra small font
                 hour_text = forecast['hour']
@@ -387,11 +388,12 @@ class WeatherManager:
             # Calculate layout for 64x32 matrix
             days_to_show = min(4, len(self.daily_forecast))  # Show up to 4 days
             section_width = 16  # 64/4 = 16 pixels per section
+            padding = 1  # Add small padding between sections
             
             for i in range(days_to_show):
                 forecast = self.daily_forecast[i]
-                x = i * section_width
-                center_x = x + section_width // 2
+                x = i * section_width + padding
+                center_x = x + (section_width - 2 * padding) // 2
                 
                 # Draw day name at top - using small font
                 day_text = forecast['date']  # Already in "Fri" format
