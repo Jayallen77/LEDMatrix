@@ -36,13 +36,21 @@ class WeatherManager:
         self.hourly_forecast = None
         self.daily_forecast = None
         self.last_draw_time = 0
-        # Layout constants
-        self.PADDING = 1
+        
+        # Get matrix dimensions from config
+        display_config = config.get('display', {}).get('hardware', {})
+        self.matrix_width = display_config.get('cols', 64)
+        self.matrix_height = display_config.get('rows', 32)
+        
+        # Calculate icon sizes based on matrix dimensions
         self.ICON_SIZE = {
-            'large': 10,
-            'medium': 10,  # Reduced from 12 to ensure fit
-            'small': 6
+            'large': min(10, self.matrix_height // 3),
+            'medium': min(10, self.matrix_height // 3),
+            'small': min(6, self.matrix_height // 5)
         }
+        
+        # Layout constants
+        self.PADDING = max(1, self.matrix_width // 64)  # Scale padding with width
         self.COLORS = {
             'text': (255, 255, 255),
             'highlight': (255, 200, 0),
@@ -215,7 +223,7 @@ class WeatherManager:
             self.display_manager.clear()
             
             # Create a new image for drawing
-            image = Image.new('RGB', (self.display_manager.matrix.width, self.display_manager.matrix.height))
+            image = Image.new('RGB', (self.matrix_width, self.matrix_height))
             draw = ImageDraw.Draw(image)
             
             # Draw weather condition icon and text at the top
@@ -243,7 +251,7 @@ class WeatherManager:
             temp = round(weather_data['main']['temp'])
             temp_text = f"{temp}°"  # Shortened to just degrees
             temp_width = draw.textlength(temp_text, font=self.display_manager.small_font)
-            temp_x = self.display_manager.matrix.width - temp_width - 1  # Reduced right margin
+            temp_x = self.matrix_width - temp_width - 1  # Reduced right margin
             draw.text((temp_x, 1),
                      temp_text,
                      font=self.display_manager.small_font,  # Changed from regular to small
@@ -254,7 +262,7 @@ class WeatherManager:
             temp_min = round(weather_data['main']['temp_min'])
             high_low_text = f"{temp_min}°/{temp_max}°"  # Swapped order: low/high
             high_low_width = draw.textlength(high_low_text, font=self.display_manager.small_font)
-            draw.text((self.display_manager.matrix.width - high_low_width - 1, 9),
+            draw.text((self.matrix_width - high_low_width - 1, 9),
                      high_low_text,
                      font=self.display_manager.small_font,
                      fill=self.COLORS['dim'])
@@ -319,17 +327,20 @@ class WeatherManager:
             self.display_manager.clear()
             
             # Create a new image for drawing
-            image = Image.new('RGB', (self.display_manager.matrix.width, self.display_manager.matrix.height))
+            image = Image.new('RGB', (self.matrix_width, self.matrix_height))
             draw = ImageDraw.Draw(image)
             
-            # Calculate layout for 64x32 matrix
+            # Calculate layout based on matrix dimensions
             hours_to_show = min(4, len(self.hourly_forecast))  # Show up to 4 hours
-            section_width = 16  # 64/4 = 16 pixels per section
-            padding = 1  # Add small padding between sections
+            total_width = self.matrix_width
+            section_width = total_width // hours_to_show
+            padding = max(1, section_width // 8)  # Scale padding with section width
             
             for i in range(hours_to_show):
                 forecast = self.hourly_forecast[i]
+                # Calculate x position with proper spacing
                 x = i * section_width + padding
+                # Calculate center within the section, accounting for padding
                 center_x = x + (section_width - 2 * padding) // 2
                 
                 # Draw hour at top - using extra small font
@@ -344,7 +355,7 @@ class WeatherManager:
                 
                 # Draw weather icon in middle - made smaller and centered
                 icon_size = self.ICON_SIZE['medium']
-                icon_y = 5  # Adjusted for better spacing with temperature below
+                icon_y = max(5, self.matrix_height // 6)  # Scale vertical position
                 icon_x = center_x - icon_size // 2
                 
                 # Draw weather icon using WeatherIcons class
@@ -382,17 +393,20 @@ class WeatherManager:
             self.display_manager.clear()
             
             # Create a new image for drawing
-            image = Image.new('RGB', (self.display_manager.matrix.width, self.display_manager.matrix.height))
+            image = Image.new('RGB', (self.matrix_width, self.matrix_height))
             draw = ImageDraw.Draw(image)
             
-            # Calculate layout for 64x32 matrix
+            # Calculate layout based on matrix dimensions
             days_to_show = min(4, len(self.daily_forecast))  # Show up to 4 days
-            section_width = 16  # 64/4 = 16 pixels per section
-            padding = 1  # Add small padding between sections
+            total_width = self.matrix_width
+            section_width = total_width // days_to_show
+            padding = max(1, section_width // 8)  # Scale padding with section width
             
             for i in range(days_to_show):
                 forecast = self.daily_forecast[i]
+                # Calculate x position with proper spacing
                 x = i * section_width + padding
+                # Calculate center within the section, accounting for padding
                 center_x = x + (section_width - 2 * padding) // 2
                 
                 # Draw day name at top - using small font
@@ -405,7 +419,7 @@ class WeatherManager:
                 
                 # Draw weather icon in middle - made smaller and centered
                 icon_size = self.ICON_SIZE['medium']
-                icon_y = 5  # Adjusted for better spacing with temperature below
+                icon_y = max(5, self.matrix_height // 6)  # Scale vertical position
                 icon_x = center_x - icon_size // 2
                 
                 # Draw weather icon using WeatherIcons class
