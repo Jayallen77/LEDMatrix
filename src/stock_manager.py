@@ -612,11 +612,11 @@ class StockManager:
                 
                 # Draw the line
                 if len(points) >= 2:
-                    draw.line(points, fill=(0, 255, 0) if change >= 0 else (255, 0, 0), width=2)
+                    draw.line(points, fill=(0, 255, 0) if change >= 0 else (255, 0, 0), width=1)
                     
                     # Draw dots at each point
                     for point in points:
-                        draw.ellipse([point[0]-2, point[1]-2, point[0]+2, point[1]+2], 
+                        draw.ellipse([point[0]-1, point[1]-1, point[0]+1, point[1]+1], 
                                     fill=(0, 255, 0) if change >= 0 else (255, 0, 0))
         
         # Return the full image without cropping
