@@ -3,6 +3,7 @@ import time
 from datetime import datetime
 from typing import Dict, Any, List
 from PIL import Image, ImageDraw
+from .weather_icons import WeatherIcons
 
 class WeatherManager:
     # Weather condition to larger colored icons (we'll use these as placeholders until you provide custom ones)
@@ -221,12 +222,7 @@ class WeatherManager:
             condition = weather_data['weather'][0]['main']
             icon_x = 1
             icon_y = 1
-            self.display_manager.draw_weather_icon(
-                condition,
-                icon_x,
-                icon_y,
-                size=self.ICON_SIZE['large']
-            )
+            WeatherIcons.draw_weather_icon(draw, condition, icon_x, icon_y, size=self.ICON_SIZE['large'])
             
             # Draw condition text next to icon (using small font)
             condition_text = condition
@@ -319,15 +315,15 @@ class WeatherManager:
             if not force_clear and current_state == self.last_hourly_state:
                 return  # No need to redraw if nothing changed
             
-            # Clear once at the start
+            # Clear the display
             self.display_manager.clear()
             
             # Create a new image for drawing
             image = Image.new('RGB', (self.display_manager.matrix.width, self.display_manager.matrix.height))
             draw = ImageDraw.Draw(image)
             
-            # Display next 5 hours
-            hours_to_show = min(5, len(self.hourly_forecast))
+            # Calculate layout
+            hours_to_show = min(4, len(self.hourly_forecast))  # Show up to 4 hours
             section_width = self.display_manager.matrix.width // hours_to_show
             
             for i in range(hours_to_show):
@@ -350,28 +346,8 @@ class WeatherManager:
                 icon_y = 8  # Adjusted for better spacing
                 icon_x = center_x - icon_size // 2
                 
-                # Map weather condition to icon and draw it
-                condition = forecast['condition']
-                if condition in ['Clear', 'Sunny']:
-                    self.display_manager.draw_sun(icon_x, icon_y, icon_size)
-                elif condition in ['Clouds', 'Cloudy', 'Partly Cloudy']:
-                    self.display_manager.draw_cloud(icon_x, icon_y, icon_size)
-                elif condition in ['Rain', 'Drizzle', 'Shower']:
-                    self.display_manager.draw_rain(icon_x, icon_y, icon_size)
-                elif condition in ['Snow', 'Sleet', 'Hail']:
-                    self.display_manager.draw_snow(icon_x, icon_y, icon_size)
-                elif condition in ['Thunderstorm', 'Storm']:
-                    self.display_manager.draw_storm(icon_x, icon_y, icon_size)
-                else:
-                    self.display_manager.draw_sun(icon_x, icon_y, icon_size)  # Default to sun
-                
-                # Draw temperature at bottom - using extra small font
-                temp_text = f"{forecast['temp']}°"
-                temp_width = draw.textlength(temp_text, font=self.display_manager.small_font)
-                draw.text((center_x - temp_width // 2, 24),  # Moved up from 26
-                         temp_text,
-                         font=self.display_manager.small_font,
-                         fill=self.COLORS['extra_dim'])
+                # Draw weather icon using WeatherIcons class
+                WeatherIcons.draw_weather_icon(draw, forecast['condition'], icon_x, icon_y, icon_size)
             
             # Update the display
             self.display_manager.image = image
@@ -393,16 +369,16 @@ class WeatherManager:
             if not force_clear and current_state == self.last_daily_state:
                 return  # No need to redraw if nothing changed
             
-            # Clear once at the start
+            # Clear the display
             self.display_manager.clear()
             
             # Create a new image for drawing
             image = Image.new('RGB', (self.display_manager.matrix.width, self.display_manager.matrix.height))
             draw = ImageDraw.Draw(image)
             
-            # Display 4 days
-            days_to_show = min(4, len(self.daily_forecast))  # Changed to 4 days
-            section_width = self.display_manager.matrix.width // days_to_show  # Now 16 pixels per section
+            # Calculate layout
+            days_to_show = min(4, len(self.daily_forecast))  # Show up to 4 days
+            section_width = self.display_manager.matrix.width // days_to_show
             
             for i in range(days_to_show):
                 forecast = self.daily_forecast[i]
@@ -422,28 +398,8 @@ class WeatherManager:
                 icon_y = 8  # Adjusted for better spacing
                 icon_x = center_x - icon_size // 2
                 
-                # Map weather condition to icon and draw it
-                condition = forecast['condition']
-                if condition in ['Clear', 'Sunny']:
-                    self.display_manager.draw_sun(icon_x, icon_y, icon_size)
-                elif condition in ['Clouds', 'Cloudy', 'Partly Cloudy']:
-                    self.display_manager.draw_cloud(icon_x, icon_y, icon_size)
-                elif condition in ['Rain', 'Drizzle', 'Shower']:
-                    self.display_manager.draw_rain(icon_x, icon_y, icon_size)
-                elif condition in ['Snow', 'Sleet', 'Hail']:
-                    self.display_manager.draw_snow(icon_x, icon_y, icon_size)
-                elif condition in ['Thunderstorm', 'Storm']:
-                    self.display_manager.draw_storm(icon_x, icon_y, icon_size)
-                else:
-                    self.display_manager.draw_sun(icon_x, icon_y, icon_size)  # Default to sun
-                
-                # Draw temperatures side by side at the bottom
-                temp_text = f"{forecast['temp_low']}°/{forecast['temp_high']}°"
-                temp_width = draw.textlength(temp_text, font=self.display_manager.small_font)
-                draw.text((center_x - temp_width // 2, 25),  # Centered at the bottom
-                         temp_text,
-                         font=self.display_manager.small_font,
-                         fill=self.COLORS['extra_dim'])
+                # Draw weather icon using WeatherIcons class
+                WeatherIcons.draw_weather_icon(draw, forecast['condition'], icon_x, icon_y, icon_size)
             
             # Update the display
             self.display_manager.image = image
