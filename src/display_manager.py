@@ -60,10 +60,10 @@ class DisplayManager:
         self.image = Image.new('RGB', (self.matrix.width, self.matrix.height))
         self.draw = ImageDraw.Draw(self.image)
         
-        # Initialize font with Press Start 2P
+        # Initialize font with 6x10.bdf
         try:
-            self.font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)  # Reduced from 10 to 8
-            logger.info("Initial font loaded successfully")
+            self.font = ImageFont.truetype("rpi-rgb-led-matrix-master/fonts/6x10.bdf", 8)
+            logger.info("Initial 6x10.bdf font loaded successfully")
         except Exception as e:
             logger.error(f"Failed to load initial font: {e}")
             self.font = ImageFont.load_default()
@@ -121,13 +121,13 @@ class DisplayManager:
     def _load_fonts(self):
         """Load fonts with proper error handling."""
         try:
-            # Load regular font (Press Start 2P)
-            self.regular_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 10)
-            logger.info("Regular font loaded successfully")
+            # Load 6x10.bdf font from rpi-rgb-led-matrix-master
+            self.regular_font = ImageFont.truetype("rpi-rgb-led-matrix-master/fonts/6x10.bdf", 10)
+            logger.info("6x10.bdf font loaded successfully")
             
-            # Load small font (Press Start 2P at smaller size)
-            self.small_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
-            logger.info("Small font loaded successfully")
+            # Use the same font for small text, just at a smaller size
+            self.small_font = ImageFont.truetype("rpi-rgb-led-matrix-master/fonts/6x10.bdf", 8)
+            logger.info("6x10.bdf small font loaded successfully")
             
         except Exception as e:
             logger.error(f"Error in font loading: {e}")
