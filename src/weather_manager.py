@@ -40,7 +40,7 @@ class WeatherManager:
         self.PADDING = 1
         self.ICON_SIZE = {
             'large': 10,
-            'medium': 16,  # Increased for better visibility
+            'medium': 12,  # Reduced from 16 for better spacing
             'small': 6
         }
         self.COLORS = {
@@ -336,18 +336,26 @@ class WeatherManager:
                 # Simplify time format
                 hour_text = hour_text.replace(":00 ", "").replace("PM", "p").replace("AM", "a")
                 hour_width = draw.textlength(hour_text, font=self.display_manager.small_font)
-                draw.text((center_x - hour_width // 2, 1),  # Moved down slightly from 0
+                draw.text((center_x - hour_width // 2, 1),
                          hour_text,
                          font=self.display_manager.small_font,
                          fill=self.COLORS['extra_dim'])
                 
-                # Draw weather icon in middle - made larger and centered
+                # Draw weather icon in middle - made smaller and centered
                 icon_size = self.ICON_SIZE['medium']
-                icon_y = 8  # Adjusted for better spacing
+                icon_y = 6  # Adjusted for better spacing with temperature below
                 icon_x = center_x - icon_size // 2
                 
                 # Draw weather icon using WeatherIcons class
                 WeatherIcons.draw_weather_icon(draw, forecast['condition'], icon_x, icon_y, icon_size)
+                
+                # Draw temperature below icon
+                temp_text = f"{forecast['temp']}°"
+                temp_width = draw.textlength(temp_text, font=self.display_manager.small_font)
+                draw.text((center_x - temp_width // 2, icon_y + icon_size + 1),
+                         temp_text,
+                         font=self.display_manager.small_font,
+                         fill=self.COLORS['text'])
             
             # Update the display
             self.display_manager.image = image
@@ -393,13 +401,21 @@ class WeatherManager:
                          font=self.display_manager.small_font,
                          fill=self.COLORS['extra_dim'])
                 
-                # Draw weather icon in middle - made larger and centered
+                # Draw weather icon in middle - made smaller and centered
                 icon_size = self.ICON_SIZE['medium']
-                icon_y = 8  # Adjusted for better spacing
+                icon_y = 6  # Adjusted for better spacing with temperature below
                 icon_x = center_x - icon_size // 2
                 
                 # Draw weather icon using WeatherIcons class
                 WeatherIcons.draw_weather_icon(draw, forecast['condition'], icon_x, icon_y, icon_size)
+                
+                # Draw high/low temperatures below icon
+                temp_text = f"{forecast['temp_low']}°/{forecast['temp_high']}°"
+                temp_width = draw.textlength(temp_text, font=self.display_manager.small_font)
+                draw.text((center_x - temp_width // 2, icon_y + icon_size + 1),
+                         temp_text,
+                         font=self.display_manager.small_font,
+                         fill=self.COLORS['text'])
             
             # Update the display
             self.display_manager.image = image
