@@ -232,12 +232,12 @@ class WeatherManager:
                      fill=self.COLORS['text'])
             
             # Draw "time ago" text below condition (using small font)
-            time_since_update = int((time.time() - self.last_update) / 3600)  # hours
-            time_text = f"{time_since_update}h"  # Even shorter text
-            draw.text((icon_x + self.ICON_SIZE['large'] + 1, icon_y + 7),  # Reduced from 8
-                     time_text,
-                     font=self.display_manager.small_font,
-                     fill=self.COLORS['dim'])  # Using dimmer color
+            # time_since_update = int((time.time() - self.last_update) / 3600)  # hours
+            # time_text = f"{time_since_update}h"  # Even shorter text
+            # draw.text((icon_x + self.ICON_SIZE['large'] + 1, icon_y + 7),  # Reduced from 8
+            #          time_text,
+            #          font=self.display_manager.small_font,
+            #          fill=self.COLORS['dim'])  # Using dimmer color
             
             # Draw current temperature on the right (using small font instead of regular)
             temp = round(weather_data['main']['temp'])
