@@ -129,9 +129,9 @@ class DisplayManager:
             self.small_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
             logger.info("Press Start 2P small font loaded successfully")
 
-            # Add an even smaller font
-            self.extra_small_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 6)
-            logger.info("Press Start 2P extra small font loaded successfully")
+            # Add an even smaller font using 4x6.bdf
+            self.extra_small_font = ImageFont.load("assets/fonts/4x6.bdf")
+            logger.info("4x6.bdf extra small font loaded successfully")
             
         except Exception as e:
             logger.error(f"Error in font loading: {e}")
