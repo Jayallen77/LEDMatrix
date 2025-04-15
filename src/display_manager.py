@@ -130,10 +130,11 @@ class DisplayManager:
             self.small_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
             logger.info("Press Start 2P small font loaded successfully")
 
-            # Add an even smaller font using 4x6.bdf relative to script location
+            # Add an even smaller font using 4x6.bdf assuming script runs from project root
             try:
-                script_dir = os.path.dirname(os.path.abspath(__file__))
-                font_path = os.path.join(script_dir, "../assets/fonts/4x6.bdf")
+                # Hardcoded relative path from project root
+                font_path = "assets/fonts/4x6.bdf"
+                print(f"Attempting to load font from (hardcoded relative): {font_path}") # DEBUG PRINT
                 self.extra_small_font = ImageFont.load(font_path)
                 logger.info(f"4x6.bdf extra small font loaded successfully from {font_path}")
             except Exception as font_err:
