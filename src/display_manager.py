@@ -128,12 +128,17 @@ class DisplayManager:
             # Use the same font for small text, just at a smaller size
             self.small_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
             logger.info("Press Start 2P small font loaded successfully")
+
+            # Add an even smaller font
+            self.extra_small_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 6)
+            logger.info("Press Start 2P extra small font loaded successfully")
             
         except Exception as e:
             logger.error(f"Error in font loading: {e}")
             # Fallback to default font
             self.regular_font = ImageFont.load_default()
             self.small_font = self.regular_font
+            self.extra_small_font = self.regular_font # Fallback for extra small
 
     def draw_text(self, text: str, x: int = None, y: int = None, color: Tuple[int, int, int] = (255, 255, 255), small_font: bool = False) -> None:
         """Draw text on the display with improved clarity."""

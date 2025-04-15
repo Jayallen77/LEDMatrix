@@ -268,7 +268,7 @@ class WeatherManager:
             pressure_text = f"P:{pressure:.1f}in"  # Even shorter format
             draw.text((2, y_start),
                      pressure_text,
-                     font=self.display_manager.small_font,
+                     font=self.display_manager.extra_small_font,
                      fill=self.COLORS['dim'])  # Using dimmer color
             
             # Humidity (shortened format)
@@ -276,7 +276,7 @@ class WeatherManager:
             humidity_text = f"H:{humidity}%"  # Even shorter format
             draw.text((2, y_start + spacing),
                      humidity_text,
-                     font=self.display_manager.small_font,
+                     font=self.display_manager.extra_small_font,
                      fill=self.COLORS['dim'])  # Using dimmer color
             
             # Wind speed and direction (shortened format)
@@ -286,7 +286,7 @@ class WeatherManager:
             wind_text = f"W:{wind_speed:.0f}{wind_dir}"  # Even shorter format, removed decimal
             draw.text((2, y_start + spacing * 2),
                      wind_text,
-                     font=self.display_manager.small_font,
+                     font=self.display_manager.extra_small_font,
                      fill=self.COLORS['dim'])  # Using dimmer color
             
             # Update the display
