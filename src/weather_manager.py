@@ -226,7 +226,7 @@ class WeatherManager:
             
             # Draw condition text next to icon (using small font)
             condition_text = condition
-            draw.text((icon_x + self.ICON_SIZE['large'] + 1, icon_y), 
+            draw.text((icon_x + self.ICON_SIZE['large'] + 3, icon_y), # Increased padding from 1 to 3
                      condition_text, 
                      font=self.display_manager.small_font, 
                      fill=self.COLORS['text'])
@@ -261,7 +261,7 @@ class WeatherManager:
             
             # Draw additional weather metrics in bottom half
             y_start = 16  # Start metrics lower (reduced from 18)
-            spacing = 6   # Reduced spacing from 7
+            spacing = 7   # Increased spacing from 6 to 7 for 4x6 font
             
             # Air pressure (shortened format)
             pressure = weather_data['main']['pressure'] * 0.02953  # Convert hPa to inHg

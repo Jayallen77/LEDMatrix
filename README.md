@@ -15,6 +15,7 @@ git clone https://github.com/ChuckBuilds/LEDMatrix.git
 cd LEDMatrix
 ```
 
+
 2. Install dependencies:
 ```bash
 pip3 install --break-system-packages -r requirements.txt
@@ -118,3 +119,7 @@ LEDSportsMatrix/
 - `config/`
   - `config.json` - Configuration settings
   - `config_secrets.json` - Private settings (not in git) 
+
+
+## Fonts
+You can add any font to the assets/fonts/ folder but they need to be .ttf and updated in display_manager.py

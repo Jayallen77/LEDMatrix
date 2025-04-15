@@ -120,7 +120,7 @@ class Clock:
             
             # Draw AM/PM (small, next to time)
             time_width = self.display_manager.font.getlength(time_str)
-            ampm_x = (display_width + time_width) // 2 + 2
+            ampm_x = (display_width + time_width) // 2 + 4
             self.display_manager.draw_text(
                 ampm,
                 x=ampm_x,
