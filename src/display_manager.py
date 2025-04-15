@@ -130,12 +130,12 @@ class DisplayManager:
             self.small_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
             logger.info("Press Start 2P small font loaded successfully")
 
-            # Add an even smaller font using 4x6.bdf
+            # Add an even smaller font using 4x6.bdf from the rpi-rgb-led-matrix library fonts
             try:
                 # Get directory containing this script
                 script_dir = os.path.dirname(os.path.abspath(__file__))
-                # Construct path relative to this script
-                relative_font_path = os.path.join(script_dir, "../assets/fonts/4x6.bdf")
+                # Construct path relative to this script to the library's font
+                relative_font_path = os.path.join(script_dir, "../rpi-rgb-led-matrix-master/fonts/4x6.bdf")
                 # Normalize to absolute path
                 font_path = os.path.abspath(relative_font_path)
                 print(f"Attempting to load font from (normalized absolute): {font_path}") # DEBUG PRINT
