@@ -5,6 +5,7 @@ from typing import Dict, Any, List, Tuple
 import logging
 import math
 from .weather_icons import WeatherIcons
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -129,9 +130,11 @@ class DisplayManager:
             self.small_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
             logger.info("Press Start 2P small font loaded successfully")
 
-            # Add an even smaller font using 4x6.bdf
-            self.extra_small_font = ImageFont.load("assets/fonts/4x6.bdf")
-            logger.info("4x6.bdf extra small font loaded successfully")
+            # Add an even smaller font using 4x6.bdf relative to script location
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            font_path = os.path.join(script_dir, "../assets/fonts/4x6.bdf")
+            self.extra_small_font = ImageFont.load(font_path)
+            logger.info(f"4x6.bdf extra small font loaded successfully from {font_path}")
             
         except Exception as e:
             logger.error(f"Error in font loading: {e}")
