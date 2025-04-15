@@ -130,20 +130,19 @@ class DisplayManager:
             self.small_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
             logger.info("Press Start 2P small font loaded successfully")
 
-            # Add an even smaller font using PressStart2P TTF at size 6 as a test
+            # Load 4x6 font as extra_small_font
             try:
-                # Get directory containing this script
                 script_dir = os.path.dirname(os.path.abspath(__file__))
-                # Construct path relative to this script to the TTF font
-                relative_font_path = os.path.join(script_dir, "../assets/fonts/PressStart2P-Regular.ttf")
-                # Normalize to absolute path
+                # Construct path relative to this script to the 4x6 TTF font
+                relative_font_path = os.path.join(script_dir, "../assets/fonts/4x6-font.ttf")
                 font_path = os.path.abspath(relative_font_path)
-                print(f"Attempting to load TTF font from (normalized absolute): {font_path} at size 6") # DEBUG PRINT
-                self.extra_small_font = ImageFont.truetype(font_path, 6)
-                logger.info(f"PressStart2P TTF extra small font loaded successfully from {font_path}")
+                logger.info(f"Attempting to load 4x6 TTF font from: {font_path} at size 6")
+                self.extra_small_font = ImageFont.truetype(font_path, 6) # Assuming size 6 is appropriate
+                logger.info(f"4x6 TTF extra small font loaded successfully from {font_path}")
             except Exception as font_err:
-                logger.error(f"Failed to load PressStart2P TTF font: {font_err}. Falling back.")
-                self.extra_small_font = self.regular_font # Use regular as fallback
+                logger.error(f"Failed to load 4x6 TTF font: {font_err}. Falling back.")
+                # Fallback to the small font if 4x6 fails
+                self.extra_small_font = self.small_font 
 
         except Exception as e:
             logger.error(f"Error in font loading: {e}")
