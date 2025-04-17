@@ -638,6 +638,60 @@ class NHLScoreboardManager:
             fonts['default'] = ImageFont.load_default()
         return fonts
 
+    def _extract_game_details(self, game_event):
+        """Extracts relevant details for the score bug display."""
+        if not game_event:
+            return None
+
+        details = {}
+        try:
+            competition = game_event["competitions"][0]
+            status = competition["status"]
+            competitors = competition["competitors"]
+            game_date_str = game_event["date"] # ISO 8601 format (UTC)
+
+            # Parse game date/time
+            try:
+                details["start_time_utc"] = datetime.fromisoformat(game_date_str.replace("Z", "+00:00"))
+            except ValueError:
+                logging.warning(f"[NHL] Could not parse game date: {game_date_str}")
+                details["start_time_utc"] = None
+
+            home_team = next(c for c in competitors if c.get("homeAway") == "home")
+            away_team = next(c for c in competitors if c.get("homeAway") == "away")
+
+            # Extract status name if possible for better logic later
+            details["status_type_name"] = status.get("type", {}).get("name") # e.g., STATUS_IN_PROGRESS
+
+            details["status_text"] = status["type"]["shortDetail"] # e.g., "7:30 - 1st" or "Final"
+            details["period"] = status.get("period", 0)
+            details["clock"] = status.get("displayClock", "0:00")
+            details["is_live"] = status["type"]["state"] in ("in", "halftime") # 'in' for ongoing
+            details["is_final"] = status["type"]["state"] == "post"
+            details["is_upcoming"] = status["type"]["state"] == "pre"
+
+            details["home_abbr"] = home_team["team"]["abbreviation"]
+            details["home_score"] = home_team.get("score", "0")
+            details["home_logo_path"] = self.logo_dir / f"{details['home_abbr']}.png" # Use self.logo_dir
+
+            details["away_abbr"] = away_team["team"]["abbreviation"]
+            details["away_score"] = away_team.get("score", "0")
+            details["away_logo_path"] = self.logo_dir / f"{details['away_abbr']}.png" # Use self.logo_dir
+
+            # Check if logo files exist
+            if not details["home_logo_path"].is_file():
+                logging.warning(f"[NHL] Home logo not found: {details['home_logo_path']}")
+                details["home_logo_path"] = None
+            if not details["away_logo_path"].is_file():
+                logging.warning(f"[NHL] Away logo not found: {details['away_logo_path']}")
+                details["away_logo_path"] = None
+
+            return details
+
+        except (KeyError, IndexError, StopIteration, TypeError) as e: # Added TypeError
+            logging.error(f"[NHL] Error parsing game details: {e} - Data: {game_event}")
+            return None
+
     def _fetch_data_for_dates(self, dates):
         """Fetches and combines data for a list of dates (YYYYMMDD)."""
         combined_events = []
