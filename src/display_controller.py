@@ -9,7 +9,7 @@ from src.stock_manager import StockManager
 from src.stock_news_manager import StockNewsManager
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG, force=True)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class DisplayController:
