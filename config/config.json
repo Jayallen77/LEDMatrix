@@ -42,7 +42,7 @@
     },
     "weather": {
         "enabled": true,
-        "update_interval": 300,
+        "update_interval": 600,
         "units": "imperial",
         "display_format": "{temp}°F\n{condition}"
     },
@@ -70,7 +70,7 @@
         ],
         "test_mode": true,
         "update_interval_seconds": 15,
-        "idle_update_interval_seconds": 300,
+        "idle_update_interval_seconds": 600,
         "show_only_favorites": true,
         "cycle_game_duration_seconds": 10
     }
