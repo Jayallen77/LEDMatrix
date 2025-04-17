@@ -5,7 +5,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 try:
     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 except ImportError:
