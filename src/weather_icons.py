@@ -159,19 +159,28 @@ class WeatherIcons:
          """Loads the appropriate weather icon and pastes it onto the target PIL Image object."""
          icon_to_draw = WeatherIcons.load_weather_icon(condition, size)
          if icon_to_draw:
-             # Paste the icon using its alpha channel as the mask for transparency
-             # This ensures transparent parts of the PNG are handled correctly.
+             # Create a thresholded mask from the icon's alpha channel
+             # to remove faint anti-aliasing pixels when pasting on black bg.
+             # Pixels with alpha > 200 will be fully opaque, others fully transparent.
              try:
-                 image.paste(icon_to_draw, (x, y), icon_to_draw)
+                 alpha = icon_to_draw.getchannel('A')
+                 # Apply threshold: lambda function returns 255 if input > 200, else 0
+                 threshold_mask = alpha.point(lambda p: 255 if p > 200 else 0)
+                 
+                 # Paste the icon using the thresholded mask
+                 image.paste(icon_to_draw, (x, y), threshold_mask)
              except Exception as e:
-                 print(f"Error pasting icon for condition '{condition}' at ({x},{y}): {e}")
+                 print(f"Error processing or pasting icon for condition '{condition}' at ({x},{y}): {e}")
+                 # Fallback or alternative handling if needed
+                 # try:
+                 #    # Fallback: Try pasting with original alpha if thresholding fails
+                 #    image.paste(icon_to_draw, (x, y), icon_to_draw)
+                 # except Exception as e2:
+                 #    print(f"Error during fallback paste: {e2}")
+                 pass
          else:
              # Optional: Draw a placeholder if icon loading fails completely
              print(f"Could not load icon for condition '{condition}' to draw at ({x},{y})")
-             # Example placeholder: draw a small magenta square
-             # placeholder_draw = ImageDraw.Draw(image)
-             # placeholder_draw.rectangle([x, y, x + size, y + size], fill=(255, 0, 255))
-             pass # Default: do nothing if icon cannot be loaded
 
     @staticmethod
     def draw_sun(draw: ImageDraw, x: int, y: int, size: int = 16, color: tuple = (255, 200, 0)):
