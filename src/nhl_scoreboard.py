@@ -327,13 +327,10 @@ def create_scorebug_image(game_details):
             away_logo = Image.open(game_details["away_logo_path"]).convert("RGBA")
             away_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
             away_mask = away_logo.split()[-1] # Extract alpha channel as mask
-            # Calculate box explicitly
-            left = away_logo_pos[0]
-            upper = (DISPLAY_HEIGHT - away_logo.height) // 2
-            right = left + away_logo.width
-            lower = upper + away_logo.height
-            box = (left, upper, right, lower)
-            img.paste(away_logo, box, away_mask.im) # Use mask.im
+            # Calculate top-left corner
+            pos_x = away_logo_pos[0]
+            pos_y = (DISPLAY_HEIGHT - away_logo.height) // 2
+            img.paste(away_logo, (pos_x, pos_y), away_mask) # Use 2-tuple pos and image mask
         except Exception as e:
             logging.error(f"Error loading/pasting away logo {game_details['away_logo_path']}: {e}")
             # Draw placeholder text if logo fails
@@ -350,13 +347,10 @@ def create_scorebug_image(game_details):
             home_logo = Image.open(game_details["home_logo_path"]).convert("RGBA")
             home_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
             home_mask = home_logo.split()[-1] # Extract alpha channel as mask
-            # Calculate box explicitly
-            left = home_logo_pos[0]
-            upper = (DISPLAY_HEIGHT - home_logo.height) // 2
-            right = left + home_logo.width
-            lower = upper + home_logo.height
-            box = (left, upper, right, lower)
-            img.paste(home_logo, box, home_mask.im) # Use mask.im
+            # Calculate top-left corner
+            pos_x = home_logo_pos[0]
+            pos_y = (DISPLAY_HEIGHT - home_logo.height) // 2
+            img.paste(home_logo, (pos_x, pos_y), home_mask) # Use 2-tuple pos and image mask
          except Exception as e:
             logging.error(f"Error loading/pasting home logo {game_details['home_logo_path']}: {e}")
             draw.text(home_logo_pos, game_details["home_abbr"], font=team_font, fill="white")
@@ -1070,13 +1064,10 @@ class NHLScoreboardManager:
                 away_logo = Image.open(game_details["away_logo_path"]).convert("RGBA")
                 away_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
                 away_mask = away_logo.split()[-1] # Extract alpha channel as mask
-                # Calculate box explicitly
-                left = away_logo_x
-                upper = (self.display_height - away_logo.height) // 2
-                right = left + away_logo.width
-                lower = upper + away_logo.height
-                box = (left, upper, right, lower)
-                img.paste(away_logo, box, away_mask.im) # Use mask.im
+                # Calculate top-left corner
+                pos_x = away_logo_x
+                pos_y = (self.display_height - away_logo.height) // 2
+                img.paste(away_logo, (pos_x, pos_y), away_mask) # Use 2-tuple pos and image mask
             except Exception as e:
                 logging.error(f"[NHL] Error rendering upcoming away logo {game_details['away_logo_path']}: {e}")
                 draw.text((away_logo_x, 5), game_details.get("away_abbr", "?"), font=font_team, fill="white")
@@ -1089,13 +1080,10 @@ class NHLScoreboardManager:
                 home_logo = Image.open(game_details["home_logo_path"]).convert("RGBA")
                 home_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
                 home_mask = home_logo.split()[-1] # Extract alpha channel as mask
-                # Calculate box explicitly
-                left = home_logo_x
-                upper = (self.display_height - home_logo.height) // 2
-                right = left + home_logo.width
-                lower = upper + home_logo.height
-                box = (left, upper, right, lower)
-                img.paste(home_logo, box, home_mask.im) # Use mask.im
+                # Calculate top-left corner
+                pos_x = home_logo_x
+                pos_y = (self.display_height - home_logo.height) // 2
+                img.paste(home_logo, (pos_x, pos_y), home_mask) # Use 2-tuple pos and image mask
              except Exception as e:
                 logging.error(f"[NHL] Error rendering upcoming home logo {game_details['home_logo_path']}: {e}")
                 draw.text((home_logo_x, 5), game_details.get("home_abbr", "?"), font=font_team, fill="white")
@@ -1169,13 +1157,10 @@ class NHLScoreboardManager:
                 away_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
                 away_logo_drawn_size = away_logo.size # Keep track of size
                 away_mask = away_logo.split()[-1] # Extract alpha channel as mask
-                # Calculate box explicitly
-                left = away_logo_x
-                upper = (self.display_height - away_logo.height) // 2
-                right = left + away_logo.width
-                lower = upper + away_logo.height
-                box = (left, upper, right, lower)
-                img.paste(away_logo, box, away_mask.im) # Use mask.im
+                # Calculate top-left corner
+                pos_x = away_logo_x
+                pos_y = (self.display_height - away_logo.height) // 2
+                img.paste(away_logo, (pos_x, pos_y), away_mask) # Use 2-tuple pos and image mask
             except Exception as e:
                 logging.error(f"[NHL] Error rendering away logo {game_details['away_logo_path']}: {e}")
                 draw.text((away_logo_x + 2, 5), game_details.get("away_abbr", "?"), font=font_team, fill="white")
@@ -1193,13 +1178,10 @@ class NHLScoreboardManager:
                 home_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
                 home_logo_drawn_size = home_logo.size # Keep track of size
                 home_mask = home_logo.split()[-1] # Extract alpha channel as mask
-                # Calculate box explicitly
-                left = home_logo_x
-                upper = (self.display_height - home_logo.height) // 2
-                right = left + home_logo.width
-                lower = upper + home_logo.height
-                box = (left, upper, right, lower)
-                img.paste(home_logo, box, home_mask.im) # Use mask.im
+                # Calculate top-left corner
+                pos_x = home_logo_x
+                pos_y = (self.display_height - home_logo.height) // 2
+                img.paste(home_logo, (pos_x, pos_y), home_mask) # Use 2-tuple pos and image mask
              except Exception as e:
                 logging.error(f"[NHL] Error rendering home logo {game_details['home_logo_path']}: {e}")
                 draw.text((home_logo_x + 2, 5), game_details.get("home_abbr", "?"), font=font_team, fill="white")
