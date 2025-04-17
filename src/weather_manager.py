@@ -130,7 +130,8 @@ class WeatherManager:
 
         # Process daily forecast
         daily_data = {}
-        for item in hourly_list:
+        full_forecast_list = forecast_data.get('list', []) # Use the full list
+        for item in full_forecast_list: # Iterate over the full list
             date = datetime.fromtimestamp(item['dt']).strftime('%Y-%m-%d')
             if date not in daily_data:
                 daily_data[date] = {
@@ -141,9 +142,17 @@ class WeatherManager:
             daily_data[date]['temps'].append(item['main']['temp'])
             daily_data[date]['conditions'].append(item['weather'][0]['main'])
 
-        # Calculate daily summaries
+        # Calculate daily summaries, excluding today
         self.daily_forecast = []
-        for date, data in list(daily_data.items())[:4]:  # Changed to 4 days for better spacing
+        today_str = datetime.now().strftime('%Y-%m-%d')
+        
+        # Sort data by date to ensure chronological order
+        sorted_daily_items = sorted(daily_data.items(), key=lambda item: item[1]['date'])
+        
+        # Filter out today's data and take the next 4 days
+        future_days_data = [item for item in sorted_daily_items if item[0] != today_str][:4]
+
+        for date_str, data in future_days_data:
             temps = data['temps']
             temp_high = round(max(temps))
             temp_low = round(min(temps))
