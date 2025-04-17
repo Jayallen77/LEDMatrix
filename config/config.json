@@ -69,6 +69,7 @@
         ],
         "test_mode": true,
         "update_interval_seconds": 15,
+        "idle_update_interval_seconds": 300,
         "show_only_favorites": true
     }
 } 

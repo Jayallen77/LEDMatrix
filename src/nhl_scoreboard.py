@@ -25,6 +25,7 @@ DEFAULT_NHL_ENABLED = False
 DEFAULT_FAVORITE_TEAMS = []
 DEFAULT_NHL_TEST_MODE = False
 DEFAULT_UPDATE_INTERVAL = 60
+DEFAULT_IDLE_UPDATE_INTERVAL = 300 # Default 5 minutes
 DEFAULT_LOGO_DIR = PROJECT_ROOT / "assets" / "sports" / "nhl_logos" # Absolute path
 DEFAULT_TEST_DATA_FILE = PROJECT_ROOT / "test_nhl_data.json" # Absolute path
 DEFAULT_OUTPUT_IMAGE_FILE = PROJECT_ROOT / "nhl_scorebug_output.png" # Absolute path
@@ -42,6 +43,7 @@ NHL_ENABLED = DEFAULT_NHL_ENABLED
 FAVORITE_TEAMS = DEFAULT_FAVORITE_TEAMS
 TEST_MODE = DEFAULT_NHL_TEST_MODE
 UPDATE_INTERVAL_SECONDS = DEFAULT_UPDATE_INTERVAL
+IDLE_UPDATE_INTERVAL_SECONDS = DEFAULT_IDLE_UPDATE_INTERVAL
 LOGO_DIR = DEFAULT_LOGO_DIR
 TEST_DATA_FILE = DEFAULT_TEST_DATA_FILE
 OUTPUT_IMAGE_FILE = DEFAULT_OUTPUT_IMAGE_FILE
@@ -54,7 +56,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # --- Configuration Loading ---
 def load_config():
     """Loads configuration from config.json."""
-    global DISPLAY_WIDTH, DISPLAY_HEIGHT, NHL_ENABLED, FAVORITE_TEAMS, TEST_MODE, UPDATE_INTERVAL_SECONDS, LOGO_DIR, TEST_DATA_FILE, OUTPUT_IMAGE_FILE, LOCAL_TIMEZONE, SHOW_ONLY_FAVORITES
+    global DISPLAY_WIDTH, DISPLAY_HEIGHT, NHL_ENABLED, FAVORITE_TEAMS, TEST_MODE, UPDATE_INTERVAL_SECONDS, IDLE_UPDATE_INTERVAL_SECONDS, LOGO_DIR, TEST_DATA_FILE, OUTPUT_IMAGE_FILE, LOCAL_TIMEZONE, SHOW_ONLY_FAVORITES
 
     try:
         with open(CONFIG_FILE, 'r') as f:
@@ -83,6 +85,7 @@ def load_config():
         FAVORITE_TEAMS = nhl_config.get("favorite_teams", DEFAULT_FAVORITE_TEAMS)
         TEST_MODE = nhl_config.get("test_mode", DEFAULT_NHL_TEST_MODE)
         UPDATE_INTERVAL_SECONDS = nhl_config.get("update_interval_seconds", DEFAULT_UPDATE_INTERVAL)
+        IDLE_UPDATE_INTERVAL_SECONDS = nhl_config.get("idle_update_interval_seconds", DEFAULT_IDLE_UPDATE_INTERVAL)
         SHOW_ONLY_FAVORITES = nhl_config.get("show_only_favorites", DEFAULT_NHL_SHOW_ONLY_FAVORITES)
 
         logging.info("Configuration loaded successfully.")
@@ -90,7 +93,7 @@ def load_config():
         logging.info(f"NHL Enabled: {NHL_ENABLED}")
         logging.info(f"Favorite Teams: {FAVORITE_TEAMS}")
         logging.info(f"Test Mode: {TEST_MODE}")
-        logging.info(f"Update Interval: {UPDATE_INTERVAL_SECONDS}s")
+        logging.info(f"Update Interval: {UPDATE_INTERVAL_SECONDS}s (Active), {IDLE_UPDATE_INTERVAL_SECONDS}s (Idle)")
         logging.info(f"Show Only Favorites: {SHOW_ONLY_FAVORITES}")
 
     except FileNotFoundError:
@@ -567,6 +570,7 @@ class NHLScoreboardManager:
         self.favorite_teams = self.nhl_config.get("favorite_teams", DEFAULT_FAVORITE_TEAMS)
         self.test_mode = self.nhl_config.get("test_mode", DEFAULT_NHL_TEST_MODE)
         self.update_interval = self.nhl_config.get("update_interval_seconds", DEFAULT_UPDATE_INTERVAL)
+        self.idle_update_interval = self.nhl_config.get("idle_update_interval_seconds", DEFAULT_IDLE_UPDATE_INTERVAL)
         self.show_only_favorites = self.nhl_config.get("show_only_favorites", DEFAULT_NHL_SHOW_ONLY_FAVORITES)
         self.logo_dir = DEFAULT_LOGO_DIR # Use constant for now, could be made configurable
         self.test_data_file = DEFAULT_TEST_DATA_FILE # Use constant for now
@@ -605,7 +609,7 @@ class NHLScoreboardManager:
         logging.info(f"[NHL] Favorite Teams: {self.favorite_teams}")
         logging.info(f"[NHL] Test Mode: {self.test_mode}")
         logging.info(f"[NHL] Show Only Favorites: {self.show_only_favorites}")
-        logging.info(f"[NHL] Update Interval: {self.update_interval}s")
+        logging.info(f"[NHL] Update Interval: {self.update_interval}s (Active), {self.idle_update_interval}s (Idle)")
         logging.info(f"[NHL] Display Size: {self.display_width}x{self.display_height}")
 
     def _load_fonts(self):
@@ -901,7 +905,8 @@ class NHLScoreboardManager:
 
     def update(self):
         """
-        Checks if an update is needed, fetches data, finds relevant event, and updates state.
+        Checks if an update is needed based on state (active vs idle interval), 
+        fetches data, finds relevant event, and updates state.
         Called periodically by the main display controller.
         Sets self.needs_update if the relevant game details change.
         """
@@ -914,17 +919,26 @@ class NHLScoreboardManager:
         now = time.time()
         force_check = False
 
-        # Check if upcoming game might have started
+        # Determine which update interval to use for this check
+        # Use short interval if a game is live or upcoming relatively soon, otherwise use idle interval
+        # Simple check: Use active interval if we currently have *any* game details selected
+        current_interval = self.update_interval if self.current_game_details else self.idle_update_interval
+
+        # Check if upcoming game might have started (still needs a check regardless of interval)
         if self.current_game_details and self.current_game_details.get('is_upcoming'):
             start_time = self.current_game_details.get('start_time_utc')
-            if start_time and datetime.now(timezone.utc) > start_time:
-                logging.debug("[NHL] Upcoming game may have started, forcing update check.")
-                force_check = True
+            # Check if start time is within the *next* active interval period to force check early
+            if start_time and (start_time - timedelta(seconds=self.update_interval)) < datetime.now(timezone.utc):
+                logging.debug("[NHL] Upcoming game is starting soon, ensuring frequent checks.")
+                current_interval = self.update_interval # Ensure we use the short interval
+                if datetime.now(timezone.utc) > start_time:
+                     logging.debug("[NHL] Upcoming game may have started, forcing update check.")
+                     force_check = True
 
         # Check interval or if forced
-        if force_check or (now - self.last_update_time > self.update_interval):
-            logging.debug(f"[NHL] Checking for updates (Force: {force_check}).")
-            all_data = self._fetch_data() # This updates self.last_update_time on success
+        if force_check or (now - self.last_update_time > current_interval):
+            logging.debug(f"[NHL] Checking for updates (Force: {force_check}, Interval: {current_interval}s). Triggered at {now:.2f}, Last update: {self.last_update_time:.2f}")
+            all_data = self._fetch_data() 
             new_event_data = None
             if all_data:
                 new_event_data = self._find_relevant_favorite_event(all_data)
@@ -953,7 +967,7 @@ class NHLScoreboardManager:
                  logging.debug("[NHL] No change detected in event or details.")
                  # self.needs_update remains unchanged (likely False)
 
-        # else: Update interval not elapsed
+        # No else needed here, if interval hasn't passed, we do nothing
 
     def display(self, force_clear: bool = False):
         """
