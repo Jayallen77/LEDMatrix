@@ -26,12 +26,13 @@ DEFAULT_FAVORITE_TEAMS = []
 DEFAULT_NHL_TEST_MODE = False
 DEFAULT_UPDATE_INTERVAL = 60
 DEFAULT_IDLE_UPDATE_INTERVAL = 300 # Default 5 minutes
+DEFAULT_CYCLE_GAME_DURATION = 10 # Cycle duration for multiple live games
 DEFAULT_LOGO_DIR = PROJECT_ROOT / "assets" / "sports" / "nhl_logos" # Absolute path
 DEFAULT_TEST_DATA_FILE = PROJECT_ROOT / "test_nhl_data.json" # Absolute path
 DEFAULT_OUTPUT_IMAGE_FILE = PROJECT_ROOT / "nhl_scorebug_output.png" # Absolute path
 DEFAULT_TIMEZONE = "UTC"
 DEFAULT_NHL_SHOW_ONLY_FAVORITES = False
-RECENT_GAME_HOURS = 24 # How many hours back to check for recent finals
+RECENT_GAME_HOURS = 48 # Updated lookback window
 
 ESPN_NHL_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard"
 
@@ -553,14 +554,7 @@ if __name__ == "__main__":
 
 class NHLScoreboardManager:
     def __init__(self, config: dict, display_manager):
-        """
-        Initializes the NHLScoreboardManager.
-
-        Args:
-            config (dict): The main configuration dictionary.
-            display_manager: The central display manager object 
-                             (used for dimensions, potentially fonts/drawing later).
-        """
+        """Initializes the NHLScoreboardManager."""
         self.display_manager = display_manager
         self.config = config
         self.nhl_config = config.get("nhl_scoreboard", {})
@@ -571,11 +565,12 @@ class NHLScoreboardManager:
         self.test_mode = self.nhl_config.get("test_mode", DEFAULT_NHL_TEST_MODE)
         self.update_interval = self.nhl_config.get("update_interval_seconds", DEFAULT_UPDATE_INTERVAL)
         self.idle_update_interval = self.nhl_config.get("idle_update_interval_seconds", DEFAULT_IDLE_UPDATE_INTERVAL)
+        self.cycle_duration = self.nhl_config.get("cycle_game_duration_seconds", DEFAULT_CYCLE_GAME_DURATION)
         self.show_only_favorites = self.nhl_config.get("show_only_favorites", DEFAULT_NHL_SHOW_ONLY_FAVORITES)
-        self.logo_dir = DEFAULT_LOGO_DIR # Use constant for now, could be made configurable
-        self.test_data_file = DEFAULT_TEST_DATA_FILE # Use constant for now
+        self.logo_dir = DEFAULT_LOGO_DIR
+        self.test_data_file = DEFAULT_TEST_DATA_FILE
 
-        # Timezone handling (uses timezone from main config)
+        # Timezone handling
         tz_string = config.get("timezone", DEFAULT_TIMEZONE)
         try:
             self.local_timezone = ZoneInfo(tz_string)
@@ -584,72 +579,113 @@ class NHLScoreboardManager:
             self.local_timezone = ZoneInfo(DEFAULT_TIMEZONE)
 
         # State variables
-        self.last_update_time = 0
-        self.current_event_data = None # Raw data for the event being displayed
-        self.current_game_details = None # Processed details for the event
-        self.needs_update = True # Flag to indicate frame needs regeneration
+        self.last_data_fetch_time = 0 # When API was last called
+        self.last_logic_update_time = 0 # When selection logic was last run
+        self.relevant_events = [] # Events matching current display criteria
+        self.current_event_index = 0 # Index for cycling through relevant_events
+        self.last_cycle_time = 0 # Timestamp for cycling live games
+        self.display_mode = 'none' # 'live', 'upcoming', 'recent_final', 'none', 'error'
+        self.current_display_details = None # Details for the currently shown game in cycle
+        self.needs_redraw = True # Flag to force redraw in display()
 
-        # Get display dimensions (from display_manager if possible, else config)
+        # Get display dimensions
         if hasattr(display_manager, 'width') and hasattr(display_manager, 'height'):
             self.display_width = display_manager.width
             self.display_height = display_manager.height
-        else: # Fallback to reading from config
+        else: # Fallback
             display_config = config.get("display", {})
             hardware_config = display_config.get("hardware", {})
             cols = hardware_config.get("cols", 64)
             chain = hardware_config.get("chain_length", 1)
             self.display_width = int(cols * chain)
             self.display_height = hardware_config.get("rows", 32)
-        
-        # Preload fonts (optional, but good practice)
-        self.fonts = self._load_fonts()
 
+        self.fonts = self._load_fonts()
+        self._log_initial_settings()
+
+    def _log_initial_settings(self):
         logging.info("[NHL] NHLScoreboardManager Initialized.")
         logging.info(f"[NHL] Enabled: {self.is_enabled}")
         logging.info(f"[NHL] Favorite Teams: {self.favorite_teams}")
         logging.info(f"[NHL] Test Mode: {self.test_mode}")
         logging.info(f"[NHL] Show Only Favorites: {self.show_only_favorites}")
         logging.info(f"[NHL] Update Interval: {self.update_interval}s (Active), {self.idle_update_interval}s (Idle)")
+        logging.info(f"[NHL] Live Game Cycle Duration: {self.cycle_duration}s")
         logging.info(f"[NHL] Display Size: {self.display_width}x{self.display_height}")
 
     def _load_fonts(self):
         """Loads fonts used by the scoreboard."""
         fonts = {}
+        # Basic font loading, adjust paths/sizes as needed
         try:
-            # Adjust sizes as needed
-            fonts['score'] = ImageFont.truetype("arial.ttf", 12) 
+            fonts['score'] = ImageFont.truetype("arial.ttf", 12)
             fonts['time'] = ImageFont.truetype("arial.ttf", 10)
             fonts['team'] = ImageFont.truetype("arial.ttf", 8)
             fonts['status'] = ImageFont.truetype("arial.ttf", 9)
-            fonts['default'] = fonts['time'] # Default if specific not found
+            fonts['upcoming_main'] = ImageFont.truetype("arial.ttf", 10) # Font for TODAY/TIME
+            fonts['upcoming_vs'] = ImageFont.truetype("arial.ttf", 9) # Font for VS
+            fonts['placeholder'] = ImageFont.truetype("arial.ttf", 10) # Font for No Game msg
+            fonts['default'] = fonts['time']
         except IOError:
             logging.warning("[NHL] Arial font not found, using default PIL font.")
             fonts['score'] = ImageFont.load_default()
             fonts['time'] = ImageFont.load_default()
             fonts['team'] = ImageFont.load_default()
             fonts['status'] = ImageFont.load_default()
+            fonts['upcoming_main'] = ImageFont.load_default()
+            fonts['upcoming_vs'] = ImageFont.load_default()
+            fonts['placeholder'] = ImageFont.load_default()
             fonts['default'] = ImageFont.load_default()
         return fonts
 
-    def _fetch_data(self, date_str: str = None):
-        """Fetches scoreboard data from ESPN API for a specific date or default (today)."""
+    def _fetch_data_for_dates(self, dates):
+        """Fetches and combines data for a list of dates (YYYYMMDD)."""
+        combined_events = []
+        event_ids = set()
+        success = False
+
+        for date_str in dates:
+            data = self._fetch_data(date_str=date_str)
+            if data and "events" in data:
+                success = True # Mark success if at least one fetch works
+                for event in data["events"]:
+                    if event["id"] not in event_ids:
+                        combined_events.append(event)
+                        event_ids.add(event["id"])
+            time.sleep(0.1) # Small delay between API calls
+
+        if success:
+            self.last_data_fetch_time = time.time() # Update time only if some data was fetched
+
+        # Sort combined events by date just in case
+        try:
+            combined_events.sort(key=lambda x: datetime.fromisoformat(x["date"].replace("Z", "+00:00")))
+        except (KeyError, ValueError):
+            logging.warning("[NHL] Could not sort combined events by date during fetch.")
+
+        logging.debug(f"[NHL] Fetched and combined {len(combined_events)} events for dates: {dates}")
+        return combined_events
+
+    def _fetch_data(self, date_str: str = None) -> dict:
+        """Internal helper to fetch scoreboard data for one specific date or default."""
         url = ESPN_NHL_SCOREBOARD_URL
         params = {}
         log_prefix = "[NHL]"
+        fetch_description = "default (today's)"
         if date_str:
             params['dates'] = date_str
             log_prefix = f"[NHL {date_str}]"
-            logging.info(f"{log_prefix} Fetching data for specific date.")
-        else:
-            logging.info(f"{log_prefix} Fetching default (today's) data.")
-            
+            fetch_description = f"date {date_str}"
+
+        logging.info(f"{log_prefix} Fetching data for {fetch_description}.")
+
         try:
-            response = requests.get(url, params=params) # Pass params dict
+            response = requests.get(url, params=params, timeout=10) # Added timeout
             response.raise_for_status()
             data = response.json()
             logging.info(f"{log_prefix} Successfully fetched data.")
-            
-            # Only save test data when fetching default/today's view
+
+            # Save test data only when fetching default/today's view successfully
             if not date_str and self.test_mode:
                 try:
                     with open(self.test_data_file, 'w') as f:
@@ -657,25 +693,20 @@ class NHLScoreboardManager:
                     logging.info(f"[NHL] Saved today's live data to {self.test_data_file.name}")
                 except Exception as e:
                     logging.error(f"[NHL] Failed to save test data: {e}")
-            
-            # Don't update last_update_time here, let the caller handle it after successful fetches
+
             return data
         except requests.exceptions.RequestException as e:
             logging.error(f"{log_prefix} Error fetching data from ESPN: {e}")
-            # Only try test data if fetching default view failed
+            # Try loading test data only if fetching today's default failed
             if not date_str and self.test_mode:
                 logging.warning("[NHL] Fetching default failed, attempting to load test data.")
                 try:
                     with open(self.test_data_file, 'r') as f:
-                        data = json.load(f)
-                        logging.info(f"[NHL] Successfully loaded test data from {self.test_data_file.name}")
-                    return data
-                except FileNotFoundError:
-                    logging.error(f"[NHL] Test data file {self.test_data_file.name} not found.")
-                except json.JSONDecodeError:
-                    logging.error(f"[NHL] Error decoding test data file {self.test_data_file.name}.")
-                except Exception as e:
-                    logging.error(f"[NHL] Failed to load test data: {e}")
+                        test_data = json.load(f)
+                    logging.info(f"[NHL] Successfully loaded test data from {self.test_data_file.name}")
+                    return test_data
+                except Exception as load_e:
+                    logging.error(f"[NHL] Failed to load test data: {load_e}")
             return None # Return None if fetch fails
 
     def _extract_game_details(self, game_event):
@@ -692,34 +723,39 @@ class NHLScoreboardManager:
 
             try:
                 details["start_time_utc"] = datetime.fromisoformat(game_date_str.replace("Z", "+00:00"))
-            except ValueError:
+            except (ValueError, KeyError):
                 logging.warning(f"[NHL] Could not parse game date: {game_date_str}")
                 details["start_time_utc"] = None
 
-            home_team = next(c for c in competitors if c.get("homeAway") == "home")
-            away_team = next(c for c in competitors if c.get("homeAway") == "away")
+            home_team = next((c for c in competitors if c.get("homeAway") == "home"), None)
+            away_team = next((c for c in competitors if c.get("homeAway") == "away"), None)
 
-            details["status_text"] = status["type"]["shortDetail"]
-            details["status_type_name"] = status["type"].get("name") 
+            if not home_team or not away_team:
+                 logging.warning(f"[NHL] Missing home or away team data in event: {game_event.get('id')}")
+                 return None # Cannot proceed without both teams
+
+            details["status_text"] = status.get("type", {}).get("shortDetail", "N/A")
+            details["status_type_name"] = status.get("type", {}).get("name")
             details["period"] = status.get("period", 0)
             details["clock"] = status.get("displayClock", "0:00")
-            details["is_live"] = status["type"]["state"] in ("in", "halftime")
-            details["is_final"] = status["type"]["state"] == "post"
-            details["is_upcoming"] = status["type"]["state"] == "pre"
+            state = status.get("type", {}).get("state")
+            details["is_live"] = state in ("in", "halftime")
+            details["is_final"] = state == "post"
+            details["is_upcoming"] = state == "pre"
 
-            details["home_abbr"] = home_team["team"]["abbreviation"]
+            details["home_abbr"] = home_team.get("team", {}).get("abbreviation", "???")
             details["home_score"] = home_team.get("score", "0")
-            details["home_logo_path"] = self.logo_dir / f"{details['home_abbr']}.png"
+            details["home_logo_path"] = self.logo_dir / f"{details['home_abbr']}.png" if details['home_abbr'] != "???" else None
 
-            details["away_abbr"] = away_team["team"]["abbreviation"]
+            details["away_abbr"] = away_team.get("team", {}).get("abbreviation", "???")
             details["away_score"] = away_team.get("score", "0")
-            details["away_logo_path"] = self.logo_dir / f"{details['away_abbr']}.png"
+            details["away_logo_path"] = self.logo_dir / f"{details['away_abbr']}.png" if details['away_abbr'] != "???" else None
 
-            # Check if logo files exist
-            if not details["home_logo_path"].is_file():
+            # Check logo files
+            if details["home_logo_path"] and not details["home_logo_path"].is_file():
                 logging.debug(f"[NHL] Home logo not found: {details['home_logo_path']}")
                 details["home_logo_path"] = None
-            if not details["away_logo_path"].is_file():
+            if details["away_logo_path"] and not details["away_logo_path"].is_file():
                 logging.debug(f"[NHL] Away logo not found: {details['away_logo_path']}")
                 details["away_logo_path"] = None
 
@@ -729,107 +765,355 @@ class NHLScoreboardManager:
             logging.error(f"[NHL] Error parsing game details: {e} - Data snippet: {str(game_event)[:200]}...")
             return None
 
-    def _find_relevant_favorite_event(self, data):
-        """Finds the most relevant game for favorite teams: Live > Recent Final > Next Upcoming."""
-        if not data or "events" not in data:
-            return None
-
-        live_event = None
-        recent_final_event = None
-        next_upcoming_event = None
-
+    def _find_events_by_criteria(self, all_events, is_live=False, is_upcoming_today=False, is_recent_final=False):
+        """Helper to find favorite team events matching specific criteria."""
+        matches = []
         now_utc = datetime.now(timezone.utc)
+        today_local = datetime.now(self.local_timezone).date()
         cutoff_time_utc = now_utc - timedelta(hours=RECENT_GAME_HOURS)
-        
-        favorite_events_details = {}
-        for event in data["events"]:
+
+        for event in all_events:
+            # Check if it's a favorite team's game first
             competitors = event.get("competitions", [{}])[0].get("competitors", [])
             if len(competitors) == 2:
                 team1_abbr = competitors[0].get("team", {}).get("abbreviation")
                 team2_abbr = competitors[1].get("team", {}).get("abbreviation")
                 is_favorite = team1_abbr in self.favorite_teams or team2_abbr in self.favorite_teams
-                if is_favorite:
-                    details = self._extract_game_details(event)
-                    if details and details.get("start_time_utc"): # Ensure details and time parsed
-                        favorite_events_details[event["id"]] = (event, details)
-                    elif details:
-                        logging.debug(f"[NHL] Skipping favorite event {event.get('id')} due to missing start time in details.")
-                    else:
-                        logging.debug(f"[NHL] Skipping favorite event {event.get('id')} due to parsing error.")
+                if not is_favorite and self.show_only_favorites:
+                    continue # Skip if not favorite and only showing favorites
 
-        # --- Prioritize --- 
-        # Store details along with event to avoid re-extracting for comparison
-        potential_recent_final = None
-        potential_upcoming = None
+                # Now check criteria based on flags
+                details = self._extract_game_details(event)
+                if not details: continue # Skip if parsing failed
 
-        for event_id, (event, details) in favorite_events_details.items():
-            # 1. Live Game? Highest priority.
-            if details["is_live"]:
-                logging.debug(f"[NHL] Found live favorite game: {details['away_abbr']} vs {details['home_abbr']}")
-                live_event = event
-                break # Found the highest priority
+                if is_live and details["is_live"]:
+                    matches.append(event)
+                    continue # Found live, no need for further checks for this event
 
-            # 2. Recent Final?
-            if details["is_final"] and details["start_time_utc"] > cutoff_time_utc:
-                if potential_recent_final is None or details["start_time_utc"] > potential_recent_final[1]["start_time_utc"]:
-                     potential_recent_final = (event, details)
+                if is_upcoming_today and details["is_upcoming"] and details["start_time_utc"]:
+                    # Check if start time is today in local timezone
+                    start_local_date = details["start_time_utc"].astimezone(self.local_timezone).date()
+                    if start_local_date == today_local and details["start_time_utc"] > now_utc:
+                         matches.append(event)
+                         continue
 
-            # 3. Upcoming Game?
-            if details["is_upcoming"] and details["start_time_utc"] > now_utc:
-                if potential_upcoming is None or details["start_time_utc"] < potential_upcoming[1]["start_time_utc"]:
-                    potential_upcoming = (event, details)
+                if is_recent_final and details["is_final"] and details["start_time_utc"]:
+                     if details["start_time_utc"] > cutoff_time_utc:
+                         matches.append(event)
+                         continue
+            # Add fallback logic if not showing only favorites? Or handle in update()?
+            # For now, this focuses on finding FAVORITE events based on criteria.
 
-        # --- Select based on priority --- 
-        if live_event:
-            logging.info("[NHL] Selecting live favorite game.")
-            return live_event
-        elif potential_recent_final:
-            logging.info("[NHL] Selecting recent final favorite game.")
-            return potential_recent_final[0] # Return the event part
-        elif potential_upcoming:
-            logging.info("[NHL] Selecting next upcoming favorite game.")
-            return potential_upcoming[0] # Return the event part
+        # Sort results appropriately
+        if is_live:
+             # Maybe sort live games by start time or some other metric?
+             pass # Keep order for now
+        elif is_upcoming_today:
+             matches.sort(key=lambda x: self._extract_game_details(x).get("start_time_utc") or datetime.max.replace(tzinfo=timezone.utc)) # Sort by soonest start time
+        elif is_recent_final:
+             matches.sort(key=lambda x: self._extract_game_details(x).get("start_time_utc") or datetime.min.replace(tzinfo=timezone.utc), reverse=True) # Sort by most recent start time
+
+        return matches
+
+    def update(self):
+        """Determines the correct state and events to display."""
+        if not self.is_enabled:
+            if self.display_mode != 'none':
+                self.display_mode = 'none'
+                self.relevant_events = []
+                self.current_event_index = 0
+                self.needs_redraw = True
+            return
+
+        now = time.time()
+        # Determine required data fetch interval
+        # Always use idle interval check; fetch logic inside handles actual API call timing
+        check_interval = self.idle_update_interval
+        # If currently showing live game, force more frequent logic checks
+        # This ensures we notice quickly if the game ends
+        if self.display_mode == 'live':
+             check_interval = self.update_interval
+
+        if now - self.last_logic_update_time < check_interval:
+            # Ensure live game cycling still happens even if logic doesn't run
+            if self.display_mode == 'live' and len(self.relevant_events) > 1:
+                 if now - self.last_cycle_time > self.cycle_duration:
+                    self.current_event_index = (self.current_event_index + 1) % len(self.relevant_events)
+                    self.current_display_details = self._extract_game_details(self.relevant_events[self.current_event_index])
+                    self.last_cycle_time = now
+                    self.needs_redraw = True
+            return # Interval not elapsed for full logic update
+
+        logging.info(f"[NHL] Running update logic (Check Interval: {check_interval}s)")
+        self.last_logic_update_time = now
+
+        # Decide which dates to fetch based on current time and lookback/lookahead needs
+        today_local = datetime.now(self.local_timezone)
+        dates_to_fetch = {
+             (today_local - timedelta(days=2)).strftime('%Y%m%d'), # Two days ago (for 48h lookback)
+             (today_local - timedelta(days=1)).strftime('%Y%m%d'), # Yesterday
+             today_local.strftime('%Y%m%d'),                 # Today
+             (today_local + timedelta(days=1)).strftime('%Y%m%d')  # Tomorrow (for upcoming today)
+        }
+        # Only fetch if data is stale based on *active* interval (ensures fresh data for live checks)
+        if now - self.last_data_fetch_time > self.update_interval:
+             all_events = self._fetch_data_for_dates(sorted(list(dates_to_fetch)))
         else:
-            logging.info("[NHL] No relevant (live, recent final, or upcoming) favorite games found.")
-            return None
+             # Use potentially stale data if logic check is frequent but data fetch isn't needed yet
+             # Or should we force fetch here? Let's assume stale data is ok for now if fetch interval not met.
+             # This part needs refinement - how to handle stale data vs frequent logic checks?
+             # For simplicity now, let's assume we fetch every logic check for testing.
+             all_events = self._fetch_data_for_dates(sorted(list(dates_to_fetch)))
+
+
+        if not all_events:
+             logging.warning("[NHL] No events found after fetching. Setting mode to error/none.")
+             if self.display_mode != 'error':
+                 self.display_mode = 'error' # Or 'none'?
+                 self.relevant_events = []
+                 self.current_event_index = 0
+                 self.needs_redraw = True
+             return
+
+        # --- Determine State and Relevant Events ---
+        new_mode = 'none'
+        new_relevant_events = []
+
+        # 1. Check for Live Favorite Games
+        live_favorite_games = self._find_events_by_criteria(all_events, is_live=True)
+        if live_favorite_games:
+            new_mode = 'live'
+            new_relevant_events = live_favorite_games
+            logging.info(f"[NHL] Found {len(live_favorite_games)} live favorite game(s).")
+
+        # 2. Check for Upcoming Favorite Games Today (if no live ones)
+        if new_mode == 'none':
+            upcoming_today_games = self._find_events_by_criteria(all_events, is_upcoming_today=True)
+            if upcoming_today_games:
+                new_mode = 'upcoming'
+                new_relevant_events = [upcoming_today_games[0]] # Show only the soonest one
+                logging.info(f"[NHL] No live games. Found upcoming favorite game today.")
+
+        # 3. Check for Recent Favorite Finals (if no live or upcoming today)
+        if new_mode == 'none':
+            recent_finals = self._find_events_by_criteria(all_events, is_recent_final=True)
+            if recent_finals:
+                new_mode = 'recent_final'
+                new_relevant_events = [recent_finals[0]] # Show only the most recent one
+                logging.info(f"[NHL] No live or upcoming games. Found recent favorite final.")
+
+        # 4. Fallback (if not show_only_favorites) - Currently handled by find criteria, maybe refine?
+        # For now, if show_only_favorites is true, and none of above, mode remains 'none'.
+        # If show_only_favorites is false, need to implement fallback search here if desired.
+        if new_mode == 'none' and not self.show_only_favorites:
+             logging.debug("[NHL] No relevant favorite games, show_only_favorites=false, applying fallback.")
+             # Basic fallback: Show first live non-fav, or first upcoming non-fav today, or most recent non-fav final?
+             # Keeping it simple for now: if no favs, mode is 'none'. Refine fallback later if needed.
+             pass
+
+
+        # --- Update State if Changed ---
+        if new_mode != self.display_mode or new_relevant_events != self.relevant_events:
+             logging.info(f"[NHL] Mode change: {self.display_mode} -> {new_mode}")
+             logging.debug(f"[NHL] Relevant Events Change: {len(self.relevant_events)} -> {len(new_relevant_events)}")
+             self.display_mode = new_mode
+             self.relevant_events = new_relevant_events
+             self.current_event_index = 0 # Reset index on mode/list change
+             self.last_cycle_time = time.time() # Reset cycle timer
+             self.current_display_details = self._extract_game_details(self.relevant_events[0] if self.relevant_events else None)
+             self.needs_redraw = True
+        elif self.display_mode == 'live':
+             # If mode is still live, check if *details* of current game changed
+             current_event_in_list = self.relevant_events[self.current_event_index]
+             new_details_for_current = self._extract_game_details(current_event_in_list)
+             if new_details_for_current != self.current_display_details:
+                  logging.debug("[NHL] Live game details updated.")
+                  self.current_display_details = new_details_for_current
+                  self.needs_redraw = True
+        # else: No change in mode, events, or live details
+
+
+    def display(self, force_clear: bool = False):
+        """Generates and displays the current frame based on the determined state."""
+        if not self.is_enabled:
+            return
+
+        now = time.time()
+        redraw_this_frame = force_clear or self.needs_redraw
+
+        # --- Handle Live Game Cycling ---
+        if self.display_mode == 'live' and len(self.relevant_events) > 1:
+             if now - self.last_cycle_time > self.cycle_duration:
+                  self.current_event_index = (self.current_event_index + 1) % len(self.relevant_events)
+                  self.current_display_details = self._extract_game_details(self.relevant_events[self.current_event_index])
+                  self.last_cycle_time = now
+                  redraw_this_frame = True # Force redraw on cycle
+                  logging.debug(f"[NHL] Cycling live game to index {self.current_event_index}")
+             elif self.current_display_details is None: # Ensure details are loaded initially
+                  self.current_display_details = self._extract_game_details(self.relevant_events[self.current_event_index])
+                  redraw_this_frame = True
+        elif self.display_mode != 'live':
+            # Ensure details are loaded if mode is not live (handles initial state or mode change)
+             if self.current_display_details is None and self.relevant_events:
+                   self.current_display_details = self._extract_game_details(self.relevant_events[0])
+                   redraw_this_frame = True
+             elif not self.relevant_events: # No relevant events found
+                   self.current_display_details = None # Ensure details are cleared
+
+
+        # --- Generate and Display Frame ---
+        if not redraw_this_frame:
+            # logging.debug("[NHL] display() called but no redraw needed.")
+            return
+
+        logging.debug(f"[NHL] Generating frame for mode: {self.display_mode} (Index: {self.current_event_index})")
+        # Use self.current_display_details which is updated by cycle logic or initial load
+        frame = self._create_frame(self.current_display_details)
+
+        try:
+            if hasattr(self.display_manager, 'display_image'):
+                 self.display_manager.display_image(frame)
+            elif hasattr(self.display_manager, 'matrix') and hasattr(self.display_manager.matrix, 'SetImage'):
+                 self.display_manager.matrix.SetImage(frame.convert('RGB'))
+            else:
+                 logging.error("[NHL] DisplayManager missing display_image or matrix.SetImage method.")
+
+            self.needs_redraw = False # Reset flag after successful display attempt
+
+        except Exception as e:
+            logging.error(f"[NHL] Error displaying frame via DisplayManager: {e}")
+
 
     def _create_frame(self, game_details):
-        """Creates a Pillow image for the score bug based on game details."""
+        """Creates a Pillow image frame based on game details and current display mode."""
+        # Determine layout based on self.display_mode and game_details
+        # Note: game_details will be None if mode is 'none' or 'error'
+
         img = Image.new('RGB', (self.display_width, self.display_height), color='black')
         draw = ImageDraw.Draw(img)
-        font_default = self.fonts.get('default', ImageFont.load_default())
 
-        if not game_details:
-            msg = "NHL: No Game"
-            bbox = draw.textbbox((0,0), msg, font=font_default)
-            text_width = bbox[2] - bbox[0]
-            text_height = bbox[3] - bbox[1]
-            draw.text(((self.display_width - text_width) // 2, (self.display_height - text_height) // 2),
-                      msg, font=font_default, fill='grey')
-            return img
+        # --- Choose Layout ---
+        if self.display_mode == 'live' and game_details:
+             self._draw_scorebug_layout(draw, game_details)
+        elif self.display_mode == 'upcoming' and game_details:
+             self._draw_upcoming_layout(draw, game_details)
+        elif self.display_mode == 'recent_final' and game_details:
+             self._draw_scorebug_layout(draw, game_details) # Use scorebug for final
+        else: # 'none' or 'error'
+             self._draw_placeholder_layout(draw)
 
-        # Get fonts from preloaded dict
-        score_font = self.fonts.get('score', font_default)
-        time_font = self.fonts.get('time', font_default)
-        team_font = self.fonts.get('team', font_default)
-        status_font = self.fonts.get('status', font_default)
+        return img
 
-        # --- Layout Calculations --- 
-        logo_max_h = self.display_height - 4
-        logo_max_w = int(self.display_width * 0.25) 
+    def _draw_placeholder_layout(self, draw):
+        """Draws the 'No NHL Games' message."""
+        font = self.fonts.get('placeholder', ImageFont.load_default())
+        msg = "No NHL Games"
+        bbox = draw.textbbox((0,0), msg, font=font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+        draw.text(((self.display_width - text_width) // 2, (self.display_height - text_height) // 2),
+                  msg, font=font, fill='grey')
+
+    def _draw_upcoming_layout(self, draw, game_details):
+        """Draws the layout for an upcoming game."""
+        font_team = self.fonts.get('team', ImageFont.load_default())
+        font_main = self.fonts.get('upcoming_main', ImageFont.load_default())
+        font_vs = self.fonts.get('upcoming_vs', ImageFont.load_default())
+        img = draw.im # Get the image object associated with the draw object
+
+        logging.debug("[NHL] Drawing upcoming game layout.")
+
+        logo_padding = 2
+        logo_max_h = self.display_height - (logo_padding * 2)
+        logo_area_width = int(self.display_width * 0.4)
+        logo_max_w = logo_area_width - logo_padding
         logo_size = (logo_max_w, logo_max_h)
 
-        away_logo_x = 2
-        # Reserve space for score next to logo area (adjust width as needed)
-        score_width_approx = 25 
-        away_score_x = away_logo_x + logo_max_w + 4
+        away_logo_x = logo_padding
+        home_logo_x = self.display_width - logo_area_width + logo_padding
 
+        # Draw Away Logo
+        if game_details.get("away_logo_path"):
+            try:
+                away_logo = Image.open(game_details["away_logo_path"]).convert("RGBA")
+                away_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
+                img.paste(away_logo, (away_logo_x, (self.display_height - away_logo.height) // 2), away_logo)
+            except Exception as e:
+                logging.error(f"[NHL] Error rendering upcoming away logo {game_details['away_logo_path']}: {e}")
+                draw.text((away_logo_x, 5), game_details.get("away_abbr", "?"), font=font_team, fill="white")
+        else:
+             draw.text((away_logo_x, 5), game_details.get("away_abbr", "?"), font=font_team, fill="white")
+
+        # Draw Home Logo
+        if game_details.get("home_logo_path"):
+             try:
+                home_logo = Image.open(game_details["home_logo_path"]).convert("RGBA")
+                home_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
+                img.paste(home_logo, (home_logo_x, (self.display_height - home_logo.height) // 2), home_logo)
+             except Exception as e:
+                logging.error(f"[NHL] Error rendering upcoming home logo {game_details['home_logo_path']}: {e}")
+                draw.text((home_logo_x, 5), game_details.get("home_abbr", "?"), font=font_team, fill="white")
+        else:
+            draw.text((home_logo_x, 5), game_details.get("home_abbr", "?"), font=font_team, fill="white")
+
+        # Center Text Area
+        center_start_x = logo_area_width
+        center_end_x = self.display_width - logo_area_width
+        center_x = (center_start_x + center_end_x) // 2
+
+        # Prepare Text
+        start_utc = game_details.get("start_time_utc")
+        date_str = "???"
+        time_str = "??:??"
+        if start_utc:
+            start_local = start_utc.astimezone(self.local_timezone)
+            now_local = datetime.now(self.local_timezone)
+            today_local = now_local.date()
+            start_date_local = start_local.date()
+            if start_date_local == today_local: date_str = "TODAY"
+            elif start_date_local == today_local + timedelta(days=1): date_str = "TOMORROW"
+            else: date_str = start_local.strftime("%a %b %d").upper()
+            time_str = start_local.strftime("%H:%M")
+        vs_str = "VS"
+
+        # Calculate Positions (adjust line_height as needed)
+        line_height_approx = font_main.getbbox("Aj")[3] - font_main.getbbox("Aj")[1] + 2
+        vs_height = font_vs.getbbox("VS")[3] - font_vs.getbbox("VS")[1]
+        total_text_height = (line_height_approx * 2) + vs_height
+        start_y = (self.display_height - total_text_height) // 2
+
+        date_y = start_y
+        time_y = date_y + line_height_approx
+        vs_y = time_y + line_height_approx
+
+        # Draw Text
+        draw.text((center_x, date_y), date_str, font=font_main, fill='white', anchor="mt")
+        draw.text((center_x, time_y), time_str, font=font_main, fill='white', anchor="mt")
+        draw.text((center_x, vs_y), vs_str, font=font_vs, fill='white', anchor="mt")
+
+
+    def _draw_scorebug_layout(self, draw, game_details):
+        """Draws the standard score bug layout for live or final games."""
+        font_score = self.fonts.get('score', ImageFont.load_default())
+        font_time = self.fonts.get('time', ImageFont.load_default())
+        font_team = self.fonts.get('team', ImageFont.load_default())
+        font_status = self.fonts.get('status', ImageFont.load_default())
+        img = draw.im
+
+        logging.debug("[NHL] Drawing live/final game layout.")
+
+        # Layout Calculations
+        logo_max_h = self.display_height - 4
+        logo_max_w = int(self.display_width * 0.25)
+        logo_size = (logo_max_w, logo_max_h)
+        away_logo_x = 2
+        score_width_approx = 25
+        away_score_x = away_logo_x + logo_max_w + 4
         home_logo_x = self.display_width - logo_max_w - 2
         home_score_x = home_logo_x - score_width_approx - 4
-
         center_x = self.display_width // 2
         time_y = 2
-        period_y = 15 
+        period_y = 15
 
         # --- Draw Away Team ---
         away_logo_drawn_size = (0,0)
@@ -841,14 +1125,12 @@ class NHLScoreboardManager:
                 away_logo_drawn_size = away_logo.size
             except Exception as e:
                 logging.error(f"[NHL] Error rendering away logo {game_details['away_logo_path']}: {e}")
-                # Fallback to text if logo fails
-                draw.text((away_logo_x + 2, 5), game_details.get("away_abbr", "?"), font=team_font, fill="white")
+                draw.text((away_logo_x + 2, 5), game_details.get("away_abbr", "?"), font=font_team, fill="white")
         else:
-            draw.text((away_logo_x + 2, 5), game_details.get("away_abbr", "?"), font=team_font, fill="white")
+            draw.text((away_logo_x + 2, 5), game_details.get("away_abbr", "?"), font=font_team, fill="white")
 
-        # Adjust score position dynamically based on drawn logo, if available
         current_away_score_x = (away_logo_x + away_logo_drawn_size[0] + 4) if away_logo_drawn_size[0] > 0 else away_score_x
-        draw.text((current_away_score_x, (self.display_height - 12) // 2), str(game_details.get("away_score", "0")), font=score_font, fill='white')
+        draw.text((current_away_score_x, (self.display_height - 12) // 2), str(game_details.get("away_score", "0")), font=font_score, fill='white')
 
         # --- Draw Home Team ---
         home_logo_drawn_size = (0,0)
@@ -860,17 +1142,14 @@ class NHLScoreboardManager:
                 home_logo_drawn_size = home_logo.size
              except Exception as e:
                 logging.error(f"[NHL] Error rendering home logo {game_details['home_logo_path']}: {e}")
-                draw.text((home_logo_x + 2, 5), game_details.get("home_abbr", "?"), font=team_font, fill="white")
+                draw.text((home_logo_x + 2, 5), game_details.get("home_abbr", "?"), font=font_team, fill="white")
         else:
-            draw.text((home_logo_x + 2, 5), game_details.get("home_abbr", "?"), font=team_font, fill="white")
+            draw.text((home_logo_x + 2, 5), game_details.get("home_abbr", "?"), font=font_team, fill="white")
 
-        # Adjust score position dynamically
-        # Position score to the left of where the logo starts
-        current_home_score_x = home_logo_x - score_width_approx - 4 
-        draw.text((current_home_score_x, (self.display_height - 12) // 2), str(game_details.get("home_score", "0")), font=score_font, fill='white')
+        current_home_score_x = home_logo_x - score_width_approx - 4
+        draw.text((current_home_score_x, (self.display_height - 12) // 2), str(game_details.get("home_score", "0")), font=font_score, fill='white')
 
-        # --- Draw Time and Period / Status --- 
-        center_x = self.display_width // 2
+        # --- Draw Center Info ---
         if game_details.get("is_live"):
             period = game_details.get('period', 0)
             period_str = f"{period}{'st' if period==1 else 'nd' if period==2 else 'rd' if period==3 else 'th'}".upper() if period > 0 and period <= 3 else "OT" if period > 3 else ""
@@ -878,182 +1157,23 @@ class NHLScoreboardManager:
             clock_text = game_details.get("clock", "")
             if status_name == "STATUS_HALFTIME" or "intermission" in game_details.get("status_text", "").lower():
                 period_str = "INTER"
-                clock_text = "" 
-
-            draw.text((center_x, time_y), clock_text, font=time_font, fill='yellow', anchor="mt")
-            draw.text((center_x, period_y), period_str, font=time_font, fill='yellow', anchor="mt")
-
+                clock_text = ""
+            draw.text((center_x, time_y), clock_text, font=font_time, fill='yellow', anchor="mt")
+            draw.text((center_x, period_y), period_str, font=font_time, fill='yellow', anchor="mt")
         elif game_details.get("is_final"):
-            draw.text((center_x, time_y), "FINAL", font=status_font, fill='red', anchor="mt")
+            draw.text((center_x, time_y), "FINAL", font=font_status, fill='red', anchor="mt")
             period = game_details.get('period', 0)
             final_period_str = ""
             if period > 3:
-                 final_period_str = f"OT{period - 3 if period < 7 else ''}" # Basic multi-OT
-            elif game_details.get("status_type_name") == "STATUS_SHOOTOUT": 
+                 final_period_str = f"OT{period - 3 if period < 7 else ''}"
+            elif game_details.get("status_type_name") == "STATUS_SHOOTOUT":
                  final_period_str = "SO"
             if final_period_str:
-                draw.text((center_x, period_y), final_period_str, font=time_font, fill='red', anchor="mt")
+                draw.text((center_x, period_y), final_period_str, font=font_time, fill='red', anchor="mt")
+        else: # Should not happen if logic is correct, but fallback
+             status_text = game_details.get("status_text", "Error")
+             draw.text((center_x, time_y), status_text, font=font_time, fill='grey', anchor="mt")
 
-        elif game_details.get("is_upcoming") and game_details.get("start_time_utc"):
-            start_local = game_details["start_time_utc"].astimezone(self.local_timezone)
-            now_local = datetime.now(self.local_timezone)
-            today_local = now_local.date()
-            start_date_local = start_local.date()
 
-            if start_date_local == today_local: date_str = "Today"
-            elif start_date_local == today_local + timedelta(days=1): date_str = "Tomorrow"
-            else: date_str = start_local.strftime("%a %b %d")
-
-            time_str = start_local.strftime("%I:%M %p").lstrip('0')
-
-            draw.text((center_x, time_y), date_str, font=status_font, fill='cyan', anchor="mt")
-            draw.text((center_x, period_y), time_str, font=time_font, fill='cyan', anchor="mt")
-        else:
-            # Fallback for other statuses
-            status_text = game_details.get("status_text", "Error")
-            draw.text((center_x, time_y), status_text, font=time_font, fill='grey', anchor="mt")
-
-        return img
-
-    # --- Public Methods for Controller ---
-
-    def update(self):
-        """
-        Checks if an update is needed based on state (active vs idle interval), 
-        fetches data, finds relevant event, and updates state.
-        Called periodically by the main display controller.
-        Sets self.needs_update if the relevant game details change.
-        """
-        if not self.is_enabled:
-            if self.current_game_details is not None:
-                 self.current_game_details = None
-                 self.needs_update = True
-            return
-
-        now = time.time()
-        force_check = False
-
-        # Determine which update interval to use for this check
-        # Use short interval if a game is live or upcoming relatively soon, otherwise use idle interval
-        # Simple check: Use active interval if we currently have *any* game details selected
-        current_interval = self.update_interval if self.current_game_details else self.idle_update_interval
-
-        # Check if upcoming game might have started (still needs a check regardless of interval)
-        if self.current_game_details and self.current_game_details.get('is_upcoming'):
-            start_time = self.current_game_details.get('start_time_utc')
-            # Check if start time is within the *next* active interval period to force check early
-            if start_time and (start_time - timedelta(seconds=self.update_interval)) < datetime.now(timezone.utc):
-                logging.debug("[NHL] Upcoming game is starting soon, ensuring frequent checks.")
-                current_interval = self.update_interval # Ensure we use the short interval
-                if datetime.now(timezone.utc) > start_time:
-                     logging.debug("[NHL] Upcoming game may have started, forcing update check.")
-                     force_check = True
-
-        # Check interval or if forced
-        if force_check or (now - self.last_update_time > current_interval):
-            logging.info(f"[NHL] Update triggered (Force: {force_check}, Interval: {current_interval}s).")
-
-            # Fetch data for today and potentially yesterday
-            today_str = datetime.now(self.local_timezone).strftime('%Y%m%d')
-            yesterday_str = (datetime.now(self.local_timezone) - timedelta(days=1)).strftime('%Y%m%d')
-
-            today_data = self._fetch_data() # Fetch today (default)
-            yesterday_data = self._fetch_data(date_str=yesterday_str) # Fetch yesterday
-
-            # If either fetch failed, we might have partial data or None
-            if today_data is None and yesterday_data is None:
-                 logging.warning("[NHL] Failed to fetch data for today and yesterday.")
-                 # Optionally clear current game or keep stale data?
-                 # Keeping stale data for now, just won't update interval timer
-                 return # Skip rest of update if all fetches fail
-
-            # --- Combine Events --- 
-            all_events = [] 
-            event_ids = set() # To handle potential duplicates if API includes overlap
-            
-            if yesterday_data and "events" in yesterday_data:
-                for event in yesterday_data["events"]:
-                    if event["id"] not in event_ids:
-                        all_events.append(event)
-                        event_ids.add(event["id"])
-                        
-            if today_data and "events" in today_data:
-                 for event in today_data["events"]:
-                    if event["id"] not in event_ids:
-                        all_events.append(event)
-                        event_ids.add(event["id"])
-            
-            logging.debug(f"[NHL] Combined {len(all_events)} events from yesterday and today.")
-
-            # Update timestamp only after successful fetches
-            self.last_update_time = now 
-            
-            # --- Find Relevant Event from Combined List --- 
-            new_event_data = self._find_relevant_favorite_event({"events": all_events}) # Pass combined events
-
-            # Fallback logic (applied to combined list)
-            if not new_event_data and not self.show_only_favorites and all_events:
-                logging.debug("[NHL] No relevant favorite game found, fallback active on combined list.")
-                live_games = [e for e in all_events if e.get("competitions", [{}])[0].get("status", {}).get("type", {}).get("state") == "in"]
-                if live_games:
-                    # Prioritize today's live games if multiple exist?
-                    # For now, just take the first one found.
-                    new_event_data = live_games[0]
-                elif all_events: # Show first available (could be yesterday's final or today's upcoming)
-                     # Sort combined events by date/time to show earliest first?
-                     try:
-                          all_events.sort(key=lambda x: datetime.fromisoformat(x["date"].replace("Z", "+00:00")))
-                     except (KeyError, ValueError):
-                          logging.warning("[NHL] Could not sort combined events by date.")
-                     new_event_data = all_events[0]
-
-            # --- Compare and Update State --- 
-            old_event_id = self.current_event_data.get("id") if self.current_event_data else None
-            new_event_id = new_event_data.get("id") if new_event_data else None
-            
-            new_details = self._extract_game_details(new_event_data)
-
-            if new_details != self.current_game_details: 
-                 logging.debug("[NHL] Game details updated or event changed.")
-                 self.current_event_data = new_event_data
-                 self.current_game_details = new_details
-                 self.needs_update = True
-            else:
-                 logging.debug("[NHL] No change detected in event or details.")
-                 # Keep needs_update as is (likely False if details didn't change)
-
-        # No else needed here, if interval hasn't passed, we do nothing
-
-    def display(self, force_clear: bool = False):
-        """
-        Generates the NHL frame and displays it using the display_manager.
-        Called by the main display controller when this module is active.
-        """
-        if not self.is_enabled:
-            # Optionally display a "disabled" message or clear?
-            # For now, just return to let controller handle it.
-            return
-
-        # Only redraw if forced or if data has changed
-        if not force_clear and not self.needs_update:
-            return
-
-        logging.debug(f"[NHL] Generating frame (force_clear={force_clear}, needs_update={self.needs_update})")
-        frame = self._create_frame(self.current_game_details)
-
-        # Use the display_manager to show the frame
-        try:
-            if hasattr(self.display_manager, 'display_image'):
-                 self.display_manager.display_image(frame)
-            elif hasattr(self.display_manager, 'matrix') and hasattr(self.display_manager.matrix, 'SetImage'):
-                 self.display_manager.matrix.SetImage(frame.convert('RGB'))
-            else:
-                 logging.error("[NHL] DisplayManager missing display_image or matrix.SetImage method.")
-            
-            self.needs_update = False # Reset flag after successful display attempt
-
-        except Exception as e:
-            logging.error(f"[NHL] Error displaying frame via DisplayManager: {e}")
-            # Should we set needs_update = True again if display fails?
-
-# ... (rest of the class remains the same) ... 
+if __name__ == "__main__":
+    main() 
