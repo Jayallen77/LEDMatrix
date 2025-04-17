@@ -45,7 +45,7 @@ class DisplayManager:
         options.pixel_mapper_config = ''
         options.row_address_type = 0
         options.multiplexing = 0
-        options.disable_hardware_pulsing = False  # Re-enable hardware pulsing for stability
+        options.disable_hardware_pulsing = True  # Set to True to run without root
         options.show_refresh_rate = False
         options.limit_refresh_rate_hz = 90  # Reduced from 120Hz for better stability
         options.gpio_slowdown = 2  # Increased for better stability
