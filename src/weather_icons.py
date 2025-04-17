@@ -11,45 +11,124 @@ class WeatherIcons:
     @staticmethod
     def _get_icon_filename(condition: str) -> str:
         """Maps a weather condition string to an icon filename."""
+        # Normalize the input condition string
         condition = condition.lower().strip()
+        print(f"[WeatherIcons] Determining icon for condition: '{condition}'")
+        
         filename = WeatherIcons.DEFAULT_ICON # Start with default
+        
+        # --- Severe / Extreme --- (Checked first)
+        if "tornado" in condition: filename = "tornado.png"
+        elif "hurricane" in condition: filename = "hurricane.png"
+        elif "squall" in condition: filename = "wind.png" # Or potentially extreme.png? Using wind for now.
+        elif "extreme" in condition: # Look for combined extreme conditions
+            if "thunderstorm" in condition or "thunder" in condition or "storm" in condition:
+                if "rain" in condition: filename = "thunderstorms-day-extreme-rain.png" # Default day
+                elif "snow" in condition: filename = "thunderstorms-day-extreme-snow.png" # Default day
+                else: filename = "thunderstorms-day-extreme.png" # Default day
+            elif "rain" in condition: filename = "extreme-rain.png"
+            elif "snow" in condition: filename = "extreme-snow.png"
+            elif "sleet" in condition: filename = "extreme-sleet.png"
+            elif "drizzle" in condition: filename = "extreme-drizzle.png"
+            elif "hail" in condition: filename = "extreme-hail.png"
+            elif "fog" in condition: filename = "extreme-day-fog.png" # Default day
+            elif "haze" in condition: filename = "extreme-day-haze.png" # Default day
+            elif "smoke" in condition: filename = "extreme-day-smoke.png" # Default day
+            else: filename = "extreme-day.png" # Default day
 
-        # Prioritize more specific conditions based on keywords (order matters)
-        if "thunderstorm" in condition or "thunder" in condition or "storm" in condition:
-            if "rain" in condition: filename = "thunderstorms-rain.png"
-            elif "snow" in condition: filename = "thunderstorms-snow.png"
-            else: filename = "thunderstorms.png"
-        elif "sleet" in condition: filename = "sleet.png"
-        elif "snow" in condition: filename = "snow.png"
-        elif "rain" in condition: filename = "rain.png"
-        elif "drizzle" in condition: filename = "drizzle.png"
-        elif "hail" in condition: filename = "hail.png"
-        elif "fog" in condition: filename = "fog.png"
+        # --- Thunderstorms --- 
+        elif "thunderstorm" in condition or "thunder" in condition or "storm" in condition:
+            if "overcast" in condition:
+                if "rain" in condition: filename = "thunderstorms-overcast-rain.png"
+                elif "snow" in condition: filename = "thunderstorms-overcast-snow.png"
+                else: filename = "thunderstorms-overcast.png"
+            # Simple thunderstorm conditions
+            elif "rain" in condition: filename = "thunderstorms-day-rain.png" # Default day
+            elif "snow" in condition: filename = "thunderstorms-day-snow.png" # Default day
+            else: filename = "thunderstorms-day.png" # Default day
+
+        # --- Precipitation --- (Excluding thunderstorms covered above)
+        elif "sleet" in condition:
+            if "overcast" in condition: filename = "overcast-day-sleet.png" # Default day
+            elif "partly cloudy" in condition or "scattered" in condition or "few" in condition or "broken" in condition: # Approximating partly cloudy
+                 filename = "partly-cloudy-day-sleet.png" # Default day
+            else: filename = "sleet.png"
+        elif "snow" in condition:
+            if "overcast" in condition: filename = "overcast-day-snow.png" # Default day
+            elif "partly cloudy" in condition or "scattered" in condition or "few" in condition or "broken" in condition:
+                 filename = "partly-cloudy-day-snow.png" # Default day
+            elif "wind" in condition: filename = "wind-snow.png"
+            else: filename = "snow.png"
+        elif "rain" in condition:
+            if "overcast" in condition: filename = "overcast-day-rain.png" # Default day
+            elif "partly cloudy" in condition or "scattered" in condition or "few" in condition or "broken" in condition:
+                 filename = "partly-cloudy-day-rain.png" # Default day
+            else: filename = "rain.png"
+        elif "drizzle" in condition:
+            if "overcast" in condition: filename = "overcast-day-drizzle.png" # Default day
+            elif "partly cloudy" in condition or "scattered" in condition or "few" in condition or "broken" in condition:
+                 filename = "partly-cloudy-day-drizzle.png" # Default day
+            else: filename = "drizzle.png"
+        elif "hail" in condition:
+            if "overcast" in condition: filename = "overcast-day-hail.png" # Default day
+            elif "partly cloudy" in condition or "scattered" in condition or "few" in condition or "broken" in condition:
+                 filename = "partly-cloudy-day-hail.png" # Default day
+            else: filename = "hail.png"
+
+        # --- Obscurations (Fog, Mist, Haze, Smoke, Dust, Sand, Ash) ---
+        elif "fog" in condition:
+            if "overcast" in condition: filename = "overcast-day-fog.png" # Default day
+            elif "partly cloudy" in condition or "scattered" in condition or "few" in condition or "broken" in condition:
+                 filename = "partly-cloudy-day-fog.png" # Default day
+            else: filename = "fog-day.png" # Default day
         elif "mist" in condition: filename = "mist.png"
-        elif "haze" in condition: filename = "haze.png"
-        elif "smoke" in condition: filename = "smoke.png"
-        # General sky conditions
-        elif "partly cloudy" in condition:
-             filename = "partly-cloudy-night.png" if "night" in condition else "partly-cloudy-day.png"
-        elif "overcast" in condition: filename = "overcast.png"
-        elif "cloudy" in condition: # Catches variations like 'mostly cloudy'
-            filename = "cloudy.png"
-        elif "clear" in condition or "sunny" in condition:
-             filename = "clear-night.png" if "night" in condition else "clear-day.png"
+        elif "haze" in condition:
+            if "overcast" in condition: filename = "overcast-day-haze.png" # Default day
+            elif "partly cloudy" in condition or "scattered" in condition or "few" in condition or "broken" in condition:
+                 filename = "partly-cloudy-day-haze.png" # Default day
+            else: filename = "haze-day.png" # Default day
+        elif "smoke" in condition:
+            if "overcast" in condition: filename = "overcast-day-smoke.png" # Default day
+            elif "partly cloudy" in condition or "scattered" in condition or "few" in condition or "broken" in condition:
+                 filename = "partly-cloudy-day-smoke.png" # Default day
+            else: filename = "smoke.png"
+        elif "dust" in condition:
+             filename = "dust-day.png" # Default day
+        elif "sand" in condition: filename = "dust-day.png" # Map sand to dust (day)
+        elif "ash" in condition: filename = "smoke.png" # Map ash to smoke
 
-        # Check if the chosen icon file actually exists
+        # --- Clouds --- (No precipitation, no obscuration)
+        elif "overcast" in condition: # Solid cloud cover
+             filename = "overcast-day.png" # Default day
+        elif "broken clouds" in condition or "scattered clouds" in condition or "partly cloudy" in condition: # Partial cover
+             filename = "partly-cloudy-day.png" # Default day
+        elif "few clouds" in condition: # Minimal clouds
+             filename = "partly-cloudy-day.png" # Use partly cloudy day for few clouds
+        elif "clouds" in condition: # Generic cloudy
+             filename = "cloudy.png"
+
+        # --- Clear --- 
+        elif "clear" in condition or "sunny" in condition:
+             filename = "clear-day.png" # Default day
+
+        # --- Wind (if no other condition matched significantly) ---
+        elif "wind" in condition: filename = "wind.png"
+        
+        # --- Final Check --- 
+        # Check if the determined filename exists, otherwise use default
         potential_path = os.path.join(WeatherIcons.ICON_DIR, filename)
         if not os.path.exists(potential_path):
-            # If the specific icon doesn't exist, print a warning and fall back to the default
+            # If a specific icon was determined but not found, log warning and use default
             if filename != WeatherIcons.DEFAULT_ICON:
-                 print(f"Warning: Specific icon file not found: {potential_path}. Falling back to default.")
-                 filename = WeatherIcons.DEFAULT_ICON
-            # Check if even the default icon exists
+                print(f"Warning: Determined icon '{filename}' not found at '{potential_path}'. Falling back to default.")
+                filename = WeatherIcons.DEFAULT_ICON
+            
+            # Check if default exists
             default_path = os.path.join(WeatherIcons.ICON_DIR, WeatherIcons.DEFAULT_ICON)
             if not os.path.exists(default_path):
-                print(f"Error: Default icon file also not found: {default_path}")
-                # No icon found, return the default name; load_weather_icon will handle the FileNotFoundError
-        
+                 print(f"Error: Default icon file also not found: {default_path}")
+                 # Allow filename to remain DEFAULT_ICON name, load_weather_icon handles FileNotFoundError
+
         return filename
 
     @staticmethod
