@@ -125,7 +125,7 @@ class DisplayController:
                         self.nhl.display(force_clear=self.force_clear)
                         
                     elif self.current_display_mode == 'stock_news' and self.news:
-                        self.news.display_news(force_clear=self.force_clear) # Assuming news has force_clear
+                        self.news.display_news() # Removed force_clear argument
                         
                 except Exception as e:
                     logger.error(f"Error updating display for mode {self.current_display_mode}: {e}", exc_info=True)
@@ -136,8 +136,8 @@ class DisplayController:
                 # Reset force clear flag after the first successful display in a mode
                 self.force_clear = False 
                 
-                # Main loop delay
-                time.sleep(self.update_interval) 
+                # Main loop delay - REMOVED for faster processing/scrolling
+                # time.sleep(self.update_interval) 
 
         except KeyboardInterrupt:
             print("\nDisplay stopped by user")
