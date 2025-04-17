@@ -213,7 +213,7 @@ class StockNewsManager:
             separator = "   -   "  # Visual separator between news items
             
             for news in all_news:
-                news_text = f"{news['symbol']}: {news['title']}"
+                news_text = f"{news['symbol']}: {news['title']}   "
                 # Create news text image for this item
                 news_image = self._create_text_image(news_text)
                 
