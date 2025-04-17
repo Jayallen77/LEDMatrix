@@ -26,7 +26,7 @@ DEFAULT_NHL_ENABLED = False
 DEFAULT_FAVORITE_TEAMS = []
 DEFAULT_NHL_TEST_MODE = False
 DEFAULT_UPDATE_INTERVAL = 60
-DEFAULT_IDLE_UPDATE_INTERVAL = 300 # Default 5 minutes
+DEFAULT_IDLE_UPDATE_INTERVAL = 3600 # Default 1 hour (was 300)
 DEFAULT_CYCLE_GAME_DURATION = 10 # Cycle duration for multiple live games
 DEFAULT_LOGO_DIR = PROJECT_ROOT / "assets" / "sports" / "nhl_logos" # Absolute path
 DEFAULT_TEST_DATA_FILE = PROJECT_ROOT / "test_nhl_data.json" # Absolute path
@@ -823,11 +823,24 @@ class NHLScoreboardManager:
             return
 
         now = time.time()
-        # Use active interval for logic checks if we *might* be showing something, else idle
-        check_interval = self.update_interval if self.relevant_events else self.idle_update_interval
+
+        # Determine check interval: Use faster interval ONLY if a live game is active.
+        is_live_game_active = False
+        if self.relevant_events and self.current_display_details:
+            # Check the currently displayed event first for efficiency
+            if self.current_display_details.get("is_live"):
+                is_live_game_active = True
+            else:
+                # If current isn't live, check the whole list (less common)
+                for event in self.relevant_events:
+                    details = self._extract_game_details(event)
+                    if details and details.get("is_live"):
+                        is_live_game_active = True
+                        break # Found a live game
+
+        check_interval = self.update_interval if is_live_game_active else self.idle_update_interval
 
         if now - self.last_logic_update_time < check_interval:
-            # Live game cycling still needs to happen within display() based on its own timer
             return
 
         logging.info(f"[NHL] Running update logic (Check Interval: {check_interval}s)")
