@@ -362,12 +362,13 @@ class WeatherManager:
                          fill=self.COLORS['extra_dim'])
                 
                 # Draw weather icon centered vertically between top/bottom text
-                icon_size = self.ICON_SIZE['medium'] # 20
+                icon_size = self.ICON_SIZE['large'] # Changed from medium to large (28)
                 top_text_height = 8 # Approx height reservation for top text
                 bottom_text_y = self.display_manager.matrix.height - 8 # Starting Y for bottom text
                 available_height_for_icon = bottom_text_y - top_text_height
                 # Ensure calculated y is not negative if space is very tight
-                icon_y = max(top_text_height, top_text_height + (available_height_for_icon - icon_size) // 2)
+                calculated_y = top_text_height + (available_height_for_icon - icon_size) // 2
+                icon_y = max(top_text_height, calculated_y - 2) # Shift up by 2 pixels
                 icon_x = center_x - icon_size // 2
                 WeatherIcons.draw_weather_icon(image, forecast['condition'], icon_x, icon_y, icon_size)
                 
@@ -431,12 +432,13 @@ class WeatherManager:
                              fill=self.COLORS['extra_dim'])
                     
                     # Draw weather icon centered vertically between top/bottom text
-                    icon_size = self.ICON_SIZE['medium'] # 20
+                    icon_size = self.ICON_SIZE['large'] # Changed from medium to large (28)
                     top_text_height = 8 # Approx height reservation for top text
                     bottom_text_y = self.display_manager.matrix.height - 8 # Starting Y for bottom text
                     available_height_for_icon = bottom_text_y - top_text_height
                     # Ensure calculated y is not negative if space is very tight
-                    icon_y = max(top_text_height, top_text_height + (available_height_for_icon - icon_size) // 2)
+                    calculated_y = top_text_height + (available_height_for_icon - icon_size) // 2
+                    icon_y = max(top_text_height, calculated_y - 2) # Shift up by 2 pixels
                     icon_x = center_x - icon_size // 2
                     WeatherIcons.draw_weather_icon(image, forecast['condition'], icon_x, icon_y, icon_size)
                     
