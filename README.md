@@ -82,8 +82,33 @@ sudo nano /boot/firmware/cmdline.txt
 sudo reboot
 ```
 
+### Running without Sudo (Optional)
+
+To run the display script without `sudo`, the user executing the script needs access to GPIO pins. Add the user to the `gpio` group:
+
+This is required to download the Stock Symbol icons into assets/stocks.
+
+```bash
+sudo usermod -a -G gpio <your_username>
+# Example for user 'ledpi':
+# sudo usermod -a -G gpio ledpi
+```
+
+**Important:** You must **reboot** the Raspberry Pi after adding the user to the group for the change to take effect.
+
+You also need to disable hardware pulsing in the code (see `src/display_manager.py`, set `options.disable_hardware_pulsing = True`). This has already been done in the repository if you are up-to-date.
+
+If configured correctly, you can then run:
+
+```bash
+python3 display_controller.py
+```
+
+```
 
 ## Running the Display
+
+(This is how I used to run the command, I may remove this in the future)
 
 From the project root directory:
 ```bash
@@ -108,8 +133,6 @@ LEDSportsMatrix/
 │   └── weather.py        # Weather display module
 └── display_controller.py  # Main entry point
 ```
-
-
 ## Project Structure
 
 - `src/`
@@ -123,3 +146,4 @@ LEDSportsMatrix/
 
 ## Fonts
 You can add any font to the assets/fonts/ folder but they need to be .ttf and updated in display_manager.py
+
