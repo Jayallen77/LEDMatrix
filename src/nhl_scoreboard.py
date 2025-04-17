@@ -325,7 +325,8 @@ def create_scorebug_image(game_details):
     if game_details["away_logo_path"]:
         try:
             away_logo_rgba = Image.open(game_details["away_logo_path"]).convert("RGBA")
-            away_logo_rgba.thumbnail(logo_size, Image.Resampling.LANCZOS)
+            # Resize and reassign, instead of in-place thumbnail
+            away_logo_rgba = away_logo_rgba.resize(logo_size, Image.Resampling.LANCZOS)
 
             paste_x = away_logo_pos[0]
             paste_y = (DISPLAY_HEIGHT - away_logo_rgba.height) // 2
@@ -355,7 +356,8 @@ def create_scorebug_image(game_details):
     if game_details["home_logo_path"]:
          try:
             home_logo_rgba = Image.open(game_details["home_logo_path"]).convert("RGBA")
-            home_logo_rgba.thumbnail(logo_size, Image.Resampling.LANCZOS)
+            # Resize and reassign, instead of in-place thumbnail
+            home_logo_rgba = home_logo_rgba.resize(logo_size, Image.Resampling.LANCZOS)
 
             paste_x = home_logo_pos[0]
             paste_y = (DISPLAY_HEIGHT - home_logo_rgba.height) // 2
@@ -1082,7 +1084,8 @@ class NHLScoreboardManager:
         if game_details.get("away_logo_path"):
             try:
                 away_logo_rgba = Image.open(game_details["away_logo_path"]).convert("RGBA")
-                away_logo_rgba.thumbnail(logo_size, Image.Resampling.LANCZOS)
+                # Resize and reassign, instead of in-place thumbnail
+                away_logo_rgba = away_logo_rgba.resize(logo_size, Image.Resampling.LANCZOS)
 
                 paste_x = away_logo_x
                 paste_y = (self.display_height - away_logo_rgba.height) // 2
@@ -1108,7 +1111,8 @@ class NHLScoreboardManager:
         if game_details.get("home_logo_path"):
              try:
                 home_logo_rgba = Image.open(game_details["home_logo_path"]).convert("RGBA")
-                home_logo_rgba.thumbnail(logo_size, Image.Resampling.LANCZOS)
+                # Resize and reassign, instead of in-place thumbnail
+                home_logo_rgba = home_logo_rgba.resize(logo_size, Image.Resampling.LANCZOS)
 
                 paste_x = home_logo_x
                 paste_y = (self.display_height - home_logo_rgba.height) // 2
@@ -1194,7 +1198,8 @@ class NHLScoreboardManager:
         if game_details.get("away_logo_path"):
             try:
                 away_logo_rgba = Image.open(game_details["away_logo_path"]).convert("RGBA")
-                away_logo_rgba.thumbnail(logo_size, Image.Resampling.LANCZOS)
+                # Resize and reassign, instead of in-place thumbnail
+                away_logo_rgba = away_logo_rgba.resize(logo_size, Image.Resampling.LANCZOS)
                 away_logo_drawn_size = away_logo_rgba.size # Keep track of size
 
                 paste_x = away_logo_x
@@ -1225,7 +1230,8 @@ class NHLScoreboardManager:
         if game_details.get("home_logo_path"):
              try:
                 home_logo_rgba = Image.open(game_details["home_logo_path"]).convert("RGBA")
-                home_logo_rgba.thumbnail(logo_size, Image.Resampling.LANCZOS)
+                # Resize and reassign, instead of in-place thumbnail
+                home_logo_rgba = home_logo_rgba.resize(logo_size, Image.Resampling.LANCZOS)
                 home_logo_drawn_size = home_logo_rgba.size # Keep track of size
 
                 paste_x = home_logo_x
