@@ -149,8 +149,8 @@ class WeatherManager:
         # Sort data by date to ensure chronological order
         sorted_daily_items = sorted(daily_data.items(), key=lambda item: item[1]['date'])
         
-        # Filter out today's data and take the next 4 days
-        future_days_data = [item for item in sorted_daily_items if item[0] != today_str][:4]
+        # Filter out today's data and take the next 3 days
+        future_days_data = [item for item in sorted_daily_items if item[0] != today_str][:3]
 
         for date_str, data in future_days_data:
             temps = data['temps']
@@ -401,39 +401,43 @@ class WeatherManager:
             image = Image.new('RGB', (self.display_manager.matrix.width, self.display_manager.matrix.height))
             draw = ImageDraw.Draw(image)
             
-            # Calculate layout based on matrix dimensions
-            days_to_show = min(4, len(self.daily_forecast))
-            total_width = self.display_manager.matrix.width
-            section_width = total_width // days_to_show
-            padding = max(2, section_width // 6)  # Increased padding for more space
-            
-            for i in range(days_to_show):
-                forecast = self.daily_forecast[i]
-                x = i * section_width + padding
-                center_x = x + (section_width - 2 * padding) // 2
+            # Calculate layout based on matrix dimensions for 3 days
+            days_to_show = min(3, len(self.daily_forecast)) # Changed from 4 to 3
+            if days_to_show == 0:
+                # Handle case where there's no forecast data after filtering
+                draw.text((2, 2), "No daily forecast", font=self.display_manager.small_font, fill=self.COLORS['dim'])
+            else:
+                total_width = self.display_manager.matrix.width
+                section_width = total_width // days_to_show # Divide by 3 (or fewer if less data)
+                padding = max(2, section_width // 6)
                 
-                # Draw day name at top
-                day_text = forecast['date']
-                day_width = draw.textlength(day_text, font=self.display_manager.small_font)
-                draw.text((center_x - day_width // 2, 1),
-                         day_text,
-                         font=self.display_manager.small_font,
-                         fill=self.COLORS['extra_dim'])
-                
-                # Draw weather icon in middle
-                icon_size = self.ICON_SIZE['medium']
-                icon_y = self.display_manager.matrix.height // 3  # Position icon in upper third
-                icon_x = center_x - icon_size // 2
-                WeatherIcons.draw_weather_icon(draw, forecast['condition'], icon_x, icon_y, icon_size)
-                
-                # Draw high/low temperatures at bottom
-                temp_text = f"{forecast['temp_low']}°/{forecast['temp_high']}°"
-                temp_width = draw.textlength(temp_text, font=self.display_manager.extra_small_font)
-                temp_y = self.display_manager.matrix.height - 8  # Position at bottom with small margin
-                draw.text((center_x - temp_width // 2, temp_y),
-                         temp_text,
-                         font=self.display_manager.extra_small_font,
-                         fill=self.COLORS['text'])
+                for i in range(days_to_show):
+                    forecast = self.daily_forecast[i]
+                    x = i * section_width # No need for padding here, centering handles spacing
+                    center_x = x + section_width // 2 # Center within the section
+                    
+                    # Draw day name at top
+                    day_text = forecast['date']
+                    day_width = draw.textlength(day_text, font=self.display_manager.small_font)
+                    draw.text((center_x - day_width // 2, 1),
+                             day_text,
+                             font=self.display_manager.small_font,
+                             fill=self.COLORS['extra_dim'])
+                    
+                    # Draw weather icon in middle
+                    icon_size = self.ICON_SIZE['medium']
+                    icon_y = self.display_manager.matrix.height // 3  # Position icon in upper third
+                    icon_x = center_x - icon_size // 2
+                    WeatherIcons.draw_weather_icon(draw, forecast['condition'], icon_x, icon_y, icon_size)
+                    
+                    # Draw high/low temperatures at bottom
+                    temp_text = f"{forecast['temp_low']}°/{forecast['temp_high']}°"
+                    temp_width = draw.textlength(temp_text, font=self.display_manager.extra_small_font)
+                    temp_y = self.display_manager.matrix.height - 8  # Position at bottom with small margin
+                    draw.text((center_x - temp_width // 2, temp_y),
+                             temp_text,
+                             font=self.display_manager.extra_small_font,
+                             fill=self.COLORS['text'])
             
             # Update the display
             self.display_manager.image = image
