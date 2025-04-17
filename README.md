@@ -104,8 +104,6 @@ If configured correctly, you can then run:
 python3 display_controller.py
 ```
 
-```
-
 ## Running the Display
 
 (This is how I used to run the command, I may remove this in the future)
@@ -123,22 +121,29 @@ The display will alternate between showing:
 
 The project structure is organized as follows:
 ```
-LEDSportsMatrix/
+LEDMatrix/
 ├── config/                 # Configuration files
-│   ├── config.json        # Main configuration
-│   └── config_secrets.json# API keys and sensitive data
-├── src/                   # Source code
-│   ├── display_manager.py # LED matrix display handling
-│   ├── clock.py          # Clock display module
-│   └── weather.py        # Weather display module
-└── display_controller.py  # Main entry point
+│   ├── config.json         # Main configuration
+│   └── config_secrets.json # API keys and sensitive data
+├── src/                    # Source code
+│   ├── config_manager.py   # Configuration loading
+│   ├── display_manager.py  # LED matrix display handling
+│   ├── clock.py            # Clock display module
+│   ├── weather_manager.py  # Weather display module
+│   ├── stock_manager.py    # Stock ticker display module
+│   └── stock_news_manager.py # Stock news display module
+└── display_controller.py   # Main application controller
 ```
 ## Project Structure
 
 - `src/`
-  - `clock.py` - Main clock application
+  - `display_controller.py` - Main application controller
   - `config_manager.py` - Configuration management
   - `display_manager.py` - LED matrix display handling
+  - `clock.py` - Clock display module
+  - `weather_manager.py` - Weather display module
+  - `stock_manager.py` - Stock ticker display module
+  - `stock_news_manager.py` - Stock news display module
 - `config/`
   - `config.json` - Configuration settings
   - `config_secrets.json` - Private settings (not in git) 
