@@ -327,25 +327,19 @@ def create_scorebug_image(game_details):
             away_logo_rgba = Image.open(game_details["away_logo_path"]).convert("RGBA")
             away_logo_rgba.thumbnail(logo_size, Image.Resampling.LANCZOS)
 
-            # Calculate 4-element box for the target region
-            left = away_logo_pos[0]
-            upper = (DISPLAY_HEIGHT - away_logo_rgba.height) // 2
-            right = left + away_logo_rgba.width
-            lower = upper + away_logo_rgba.height
-            box = (left, upper, right, lower)
+            paste_x = away_logo_pos[0]
+            paste_y = (DISPLAY_HEIGHT - away_logo_rgba.height) // 2
 
-            # Create RGBA background region
-            bg_region_rgba = img.crop(box).convert("RGBA")
-
-            # Ensure images are loaded before compositing (for compatibility)
-            bg_region_rgba.load()
-            away_logo_rgba.load()
-
-            # Alpha composite logo onto background region
-            composite_region = Image.alpha_composite(bg_region_rgba, away_logo_rgba)
-
-            # Paste the composited region back (no mask needed)
-            img.paste(composite_region, (box[0], box[1]))
+            # Manual pixel paste (robust alternative)
+            for x in range(away_logo_rgba.width):
+                for y in range(away_logo_rgba.height):
+                    r, g, b, a = away_logo_rgba.getpixel((x, y))
+                    if a > 128: # Check alpha threshold
+                        target_x = paste_x + x
+                        target_y = paste_y + y
+                        # Ensure target pixel is within image bounds
+                        if 0 <= target_x < img.width and 0 <= target_y < img.height:
+                            img.putpixel((target_x, target_y), (r, g, b))
 
         except Exception as e:
             logging.error(f"Error loading/pasting away logo {game_details['away_logo_path']}: {e}")
@@ -363,25 +357,19 @@ def create_scorebug_image(game_details):
             home_logo_rgba = Image.open(game_details["home_logo_path"]).convert("RGBA")
             home_logo_rgba.thumbnail(logo_size, Image.Resampling.LANCZOS)
 
-            # Calculate 4-element box for the target region
-            left = home_logo_pos[0]
-            upper = (DISPLAY_HEIGHT - home_logo_rgba.height) // 2
-            right = left + home_logo_rgba.width
-            lower = upper + home_logo_rgba.height
-            box = (left, upper, right, lower)
+            paste_x = home_logo_pos[0]
+            paste_y = (DISPLAY_HEIGHT - home_logo_rgba.height) // 2
 
-            # Create RGBA background region
-            bg_region_rgba = img.crop(box).convert("RGBA")
-
-            # Ensure images are loaded before compositing (for compatibility)
-            bg_region_rgba.load()
-            home_logo_rgba.load()
-
-            # Alpha composite logo onto background region
-            composite_region = Image.alpha_composite(bg_region_rgba, home_logo_rgba)
-
-            # Paste the composited region back (no mask needed)
-            img.paste(composite_region, (box[0], box[1]))
+            # Manual pixel paste (robust alternative)
+            for x in range(home_logo_rgba.width):
+                for y in range(home_logo_rgba.height):
+                    r, g, b, a = home_logo_rgba.getpixel((x, y))
+                    if a > 128: # Check alpha threshold
+                        target_x = paste_x + x
+                        target_y = paste_y + y
+                        # Ensure target pixel is within image bounds
+                        if 0 <= target_x < img.width and 0 <= target_y < img.height:
+                            img.putpixel((target_x, target_y), (r, g, b))
 
          except Exception as e:
             logging.error(f"Error loading/pasting home logo {game_details['home_logo_path']}: {e}")
@@ -1096,25 +1084,19 @@ class NHLScoreboardManager:
                 away_logo_rgba = Image.open(game_details["away_logo_path"]).convert("RGBA")
                 away_logo_rgba.thumbnail(logo_size, Image.Resampling.LANCZOS)
 
-                # Calculate 4-element box for the target region
-                left = away_logo_x
-                upper = (self.display_height - away_logo_rgba.height) // 2
-                right = left + away_logo_rgba.width
-                lower = upper + away_logo_rgba.height
-                box = (left, upper, right, lower)
+                paste_x = away_logo_x
+                paste_y = (self.display_height - away_logo_rgba.height) // 2
 
-                # Create RGBA background region
-                bg_region_rgba = img.crop(box).convert("RGBA")
-
-                # Ensure images are loaded before compositing (for compatibility)
-                bg_region_rgba.load()
-                away_logo_rgba.load()
-
-                # Alpha composite logo onto background region
-                composite_region = Image.alpha_composite(bg_region_rgba, away_logo_rgba)
-
-                # Paste the composited region back (no mask needed)
-                img.paste(composite_region, (box[0], box[1]))
+                # Manual pixel paste (robust alternative)
+                for x in range(away_logo_rgba.width):
+                    for y in range(away_logo_rgba.height):
+                        r, g, b, a = away_logo_rgba.getpixel((x, y))
+                        if a > 128: # Check alpha threshold
+                            target_x = paste_x + x
+                            target_y = paste_y + y
+                            # Ensure target pixel is within image bounds
+                            if 0 <= target_x < img.width and 0 <= target_y < img.height:
+                                img.putpixel((target_x, target_y), (r, g, b))
 
             except Exception as e:
                 logging.error(f"[NHL] Error rendering upcoming away logo {game_details['away_logo_path']}: {e}")
@@ -1128,25 +1110,19 @@ class NHLScoreboardManager:
                 home_logo_rgba = Image.open(game_details["home_logo_path"]).convert("RGBA")
                 home_logo_rgba.thumbnail(logo_size, Image.Resampling.LANCZOS)
 
-                # Calculate 4-element box for the target region
-                left = home_logo_x
-                upper = (self.display_height - home_logo_rgba.height) // 2
-                right = left + home_logo_rgba.width
-                lower = upper + home_logo_rgba.height
-                box = (left, upper, right, lower)
+                paste_x = home_logo_x
+                paste_y = (self.display_height - home_logo_rgba.height) // 2
 
-                # Create RGBA background region
-                bg_region_rgba = img.crop(box).convert("RGBA")
-
-                # Ensure images are loaded before compositing (for compatibility)
-                bg_region_rgba.load()
-                home_logo_rgba.load()
-
-                # Alpha composite logo onto background region
-                composite_region = Image.alpha_composite(bg_region_rgba, home_logo_rgba)
-
-                # Paste the composited region back (no mask needed)
-                img.paste(composite_region, (box[0], box[1]))
+                # Manual pixel paste (robust alternative)
+                for x in range(home_logo_rgba.width):
+                    for y in range(home_logo_rgba.height):
+                        r, g, b, a = home_logo_rgba.getpixel((x, y))
+                        if a > 128: # Check alpha threshold
+                            target_x = paste_x + x
+                            target_y = paste_y + y
+                            # Ensure target pixel is within image bounds
+                            if 0 <= target_x < img.width and 0 <= target_y < img.height:
+                                img.putpixel((target_x, target_y), (r, g, b))
 
              except Exception as e:
                 logging.error(f"[NHL] Error rendering upcoming home logo {game_details['home_logo_path']}: {e}")
@@ -1221,25 +1197,19 @@ class NHLScoreboardManager:
                 away_logo_rgba.thumbnail(logo_size, Image.Resampling.LANCZOS)
                 away_logo_drawn_size = away_logo_rgba.size # Keep track of size
 
-                # Calculate 4-element box for the target region
-                left = away_logo_x
-                upper = (self.display_height - away_logo_rgba.height) // 2
-                right = left + away_logo_rgba.width
-                lower = upper + away_logo_rgba.height
-                box = (left, upper, right, lower)
+                paste_x = away_logo_x
+                paste_y = (self.display_height - away_logo_rgba.height) // 2
 
-                # Create RGBA background region
-                bg_region_rgba = img.crop(box).convert("RGBA")
-
-                # Ensure images are loaded before compositing (for compatibility)
-                bg_region_rgba.load()
-                away_logo_rgba.load()
-
-                # Alpha composite logo onto background region
-                composite_region = Image.alpha_composite(bg_region_rgba, away_logo_rgba)
-
-                # Paste the composited region back (no mask needed)
-                img.paste(composite_region, (box[0], box[1]))
+                # Manual pixel paste (robust alternative)
+                for x in range(away_logo_rgba.width):
+                    for y in range(away_logo_rgba.height):
+                        r, g, b, a = away_logo_rgba.getpixel((x, y))
+                        if a > 128: # Check alpha threshold
+                            target_x = paste_x + x
+                            target_y = paste_y + y
+                            # Ensure target pixel is within image bounds
+                            if 0 <= target_x < img.width and 0 <= target_y < img.height:
+                                img.putpixel((target_x, target_y), (r, g, b))
 
             except Exception as e:
                 logging.error(f"[NHL] Error rendering away logo {game_details['away_logo_path']}: {e}")
@@ -1258,25 +1228,19 @@ class NHLScoreboardManager:
                 home_logo_rgba.thumbnail(logo_size, Image.Resampling.LANCZOS)
                 home_logo_drawn_size = home_logo_rgba.size # Keep track of size
 
-                # Calculate 4-element box for the target region
-                left = home_logo_x
-                upper = (self.display_height - home_logo_rgba.height) // 2
-                right = left + home_logo_rgba.width
-                lower = upper + home_logo_rgba.height
-                box = (left, upper, right, lower)
+                paste_x = home_logo_x
+                paste_y = (self.display_height - home_logo_rgba.height) // 2
 
-                # Create RGBA background region
-                bg_region_rgba = img.crop(box).convert("RGBA")
-
-                # Ensure images are loaded before compositing (for compatibility)
-                bg_region_rgba.load()
-                home_logo_rgba.load()
-
-                # Alpha composite logo onto background region
-                composite_region = Image.alpha_composite(bg_region_rgba, home_logo_rgba)
-
-                # Paste the composited region back (no mask needed)
-                img.paste(composite_region, (box[0], box[1]))
+                # Manual pixel paste (robust alternative)
+                for x in range(home_logo_rgba.width):
+                    for y in range(home_logo_rgba.height):
+                        r, g, b, a = home_logo_rgba.getpixel((x, y))
+                        if a > 128: # Check alpha threshold
+                            target_x = paste_x + x
+                            target_y = paste_y + y
+                            # Ensure target pixel is within image bounds
+                            if 0 <= target_x < img.width and 0 <= target_y < img.height:
+                                img.putpixel((target_x, target_y), (r, g, b))
 
              except Exception as e:
                 logging.error(f"[NHL] Error rendering home logo {game_details['home_logo_path']}: {e}")
