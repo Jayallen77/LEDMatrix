@@ -259,34 +259,42 @@ class WeatherManager:
                      font=self.display_manager.small_font,
                      fill=self.COLORS['dim'])
             
-            # Draw additional weather metrics in bottom half
-            y_start = 16  # Start metrics lower (reduced from 18)
-            spacing = 7   # Increased spacing from 6 to 7 for 4x6 font
-            
-            # Air pressure (shortened format)
-            pressure = weather_data['main']['pressure'] * 0.02953  # Convert hPa to inHg
-            pressure_text = f"P:{pressure:.1f}in"  # Even shorter format
-            draw.text((2, y_start),
+            # Draw additional weather metrics spaced evenly in thirds at the bottom
+            display_width = self.display_manager.matrix.width
+            section_width = display_width // 3
+            y_pos = self.display_manager.matrix.height - 7 # Position near bottom for 6px font
+            font = self.display_manager.extra_small_font # The 4x6 font
+
+            # --- Pressure (Section 1) ---
+            pressure = weather_data['main']['pressure'] * 0.02953
+            pressure_text = f"P:{pressure:.1f}in"
+            pressure_width = draw.textlength(pressure_text, font=font)
+            pressure_x = (section_width - pressure_width) // 2 # Center in first third
+            draw.text((pressure_x, y_pos),
                      pressure_text,
-                     font=self.display_manager.extra_small_font,
+                     font=font,
                      fill=self.COLORS['dim'])
             
-            # Humidity (shortened format)
+            # --- Humidity (Section 2) ---
             humidity = weather_data['main']['humidity']
-            humidity_text = f"H:{humidity}%"  # Even shorter format
-            draw.text((2, y_start + spacing),
+            humidity_text = f"H:{humidity}%"
+            humidity_width = draw.textlength(humidity_text, font=font)
+            humidity_x = section_width + (section_width - humidity_width) // 2 # Center in second third
+            draw.text((humidity_x, y_pos),
                      humidity_text,
-                     font=self.display_manager.extra_small_font,
+                     font=font,
                      fill=self.COLORS['dim'])
-            
-            # Wind speed and direction (shortened format)
+
+            # --- Wind (Section 3) ---
             wind_speed = weather_data['wind']['speed']
             wind_deg = weather_data.get('wind', {}).get('deg', 0)
             wind_dir = self._get_wind_direction(wind_deg)
-            wind_text = f"W:{wind_speed:.0f}{wind_dir}"  # Even shorter format, removed decimal
-            draw.text((2, y_start + spacing * 2),
+            wind_text = f"W:{wind_speed:.0f}{wind_dir}"
+            wind_width = draw.textlength(wind_text, font=font)
+            wind_x = (2 * section_width) + (section_width - wind_width) // 2 # Center in third third
+            draw.text((wind_x, y_pos),
                      wind_text,
-                     font=self.display_manager.extra_small_font,
+                     font=font,
                      fill=self.COLORS['dim'])
             
             # Update the display
