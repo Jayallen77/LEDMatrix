@@ -115,7 +115,7 @@ class Clock:
                 time_str,
                 y=2,  # Move up slightly to make room for two lines of date
                 color=self.COLORS['time'],
-                small_font=False
+                small_font=True
             )
             
             # Draw AM/PM (small, next to time)
