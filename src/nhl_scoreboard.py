@@ -404,6 +404,63 @@ def main():
         logging.info("NHL Scoreboard is disabled in the configuration. Exiting.")
         return
 
+    # --- Matrix Initialization ---
+    # options = RGBMatrixOptions()
+
+    # Load options from config (with fallbacks just in case)
+    # Note: These need to match the attributes of RGBMatrixOptions
+    # try:
+    #     # Reload config data here specifically for matrix options
+    #     with open(CONFIG_FILE, 'r') as f:
+    #         config_data = json.load(f)
+    #     display_config = config_data.get("display", {})
+    #     hardware_config = display_config.get("hardware", {})
+    #     runtime_config = display_config.get("runtime", {})
+
+    #     options.rows = hardware_config.get("rows", 32)
+    #     options.cols = hardware_config.get("cols", 64) # Use single panel width
+    #     options.chain_length = hardware_config.get("chain_length", 1)
+    #     options.parallel = hardware_config.get("parallel", 1)
+    #     options.brightness = hardware_config.get("brightness", 60)
+    #     options.hardware_mapping = hardware_config.get("hardware_mapping", "adafruit-hat-pwm")
+    #     options.scan_mode = 1 if hardware_config.get("scan_mode", "progressive").lower() == "progressive" else 0 # 0 for interlaced
+    #     options.pwm_bits = hardware_config.get("pwm_bits", 11)
+    #     options.pwm_dither_bits = hardware_config.get("pwm_dither_bits", 0)
+    #     options.pwm_lsb_nanoseconds = hardware_config.get("pwm_lsb_nanoseconds", 130)
+    #     options.disable_hardware_pulsing = hardware_config.get("disable_hardware_pulsing", False)
+    #     options.inverse_colors = hardware_config.get("inverse_colors", False)
+    #     options.show_refresh_rate = hardware_config.get("show_refresh_rate", False)
+    #     options.limit_refresh_rate_hz = hardware_config.get("limit_refresh_rate_hz", 0) # 0 for no limit
+
+    #     # From runtime config
+    #     options.gpio_slowdown = runtime_config.get("gpio_slowdown", 2)
+
+    #     # Set other options if they exist in your config (e.g., led_rgb_sequence, pixel_mapper_config, row_addr_type, multiplexing, panel_type)
+    #     if "led_rgb_sequence" in hardware_config:
+    #         options.led_rgb_sequence = hardware_config["led_rgb_sequence"]
+    #     # Add other specific options as needed
+
+    #     logging.info("RGBMatrix Options configured from config file.")
+
+    # except Exception as e:
+    #     logging.error(f"Error reading matrix options from config: {e}. Using default options.")
+    #     # Use some safe defaults if config loading fails badly
+    #     options.rows = 32
+    #     options.cols = 64
+    #     options.chain_length = 1
+    #     options.parallel = 1
+    #     options.hardware_mapping = 'adafruit-hat-pwm'
+    #     options.gpio_slowdown = 2
+
+    # # Create matrix instance
+    # try:
+    #     matrix = RGBMatrix(options = options)
+    #     logging.info("RGBMatrix initialized successfully.")
+    # except Exception as e:
+    #     logging.error(f"Failed to initialize RGBMatrix: {e}")
+    #     logging.error("Check hardware connections, configuration, and ensure script is run with sufficient permissions (e.g., sudo or user in gpio group).")
+    #     return # Exit if matrix cannot be initialized
+
     logging.info("Starting NHL Scoreboard...")
     # Logging moved to load_config
     # logging.info(f"Favorite teams: {FAVORITE_TEAMS}")
@@ -450,26 +507,39 @@ def main():
                 # Handle case where no event should be shown (e.g., show_only_favorites is true and none found)
                 scorebug_image = create_scorebug_image(None) # Create the 'No game data' image
 
-            # --- Display Output (Simulation) ---
+            # --- Display Output --- 
             try:
-                # Ensure OUTPUT_IMAGE_FILE is used
+                # Convert Pillow image to RGB format expected by matrix
+                rgb_image = scorebug_image.convert('RGB') 
+                
+                # Send image to matrix
+                # matrix.SetImage(rgb_image)
+                logging.debug("Image sent to matrix.")
+
+                # --- Optional: Using a Canvas for smoother updates --- 
+                # canvas.SetImage(rgb_image)
+                # canvas = matrix.SwapOnVSync(canvas)
+                # logging.debug("Canvas swapped on VSync.")
+                
+            except Exception as e:
+                logging.error(f"Failed to set image on matrix: {e}")
+
+            # Save simulation image (optional now)
+            try:
                 scorebug_image.save(OUTPUT_IMAGE_FILE)
                 logging.info(f"Scorebug image saved to {OUTPUT_IMAGE_FILE.name}")
             except Exception as e:
                 logging.error(f"Failed to save scorebug image: {e}")
 
-            # Add your actual display update logic here
-            # matrix.SetImage(scorebug_image.convert('RGB'))
-
         else:
             logging.warning("No data received, skipping update cycle.")
             # Optionally display an error message on the matrix
-            # You might want to create and display a specific error image here too
             error_image = create_scorebug_image(None) # Or a custom error message
             try:
-                error_image.save(OUTPUT_IMAGE_FILE)
+                # matrix.SetImage(error_image.convert('RGB'))
+                error_image.save(OUTPUT_IMAGE_FILE) # Also save error state to file
             except Exception as e:
-                 logging.error(f"Failed to save error image: {e}")
+                 logging.error(f"Failed to set/save error image: {e}")
 
         logging.debug(f"Sleeping for {UPDATE_INTERVAL_SECONDS} seconds...")
         time.sleep(UPDATE_INTERVAL_SECONDS)
