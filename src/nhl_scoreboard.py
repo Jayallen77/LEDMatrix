@@ -11,8 +11,13 @@ except ImportError:
     # Fallback for Python < 3.9 (requires pytz install: pip install pytz)
     from pytz import timezone as ZoneInfo, UnknownTimeZoneError as ZoneInfoNotFoundError
 
+# --- Get Project Root --- 
+# Assuming the script is in /path/to/project/src/
+SCRIPT_DIR = Path(__file__).parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+
 # --- Constants ---
-CONFIG_FILE = Path("../config/config.json") # Correct path relative to src/
+CONFIG_FILE = PROJECT_ROOT / "config" / "config.json" # Absolute path
 # Default values in case config loading fails
 DEFAULT_DISPLAY_WIDTH = 64
 DEFAULT_DISPLAY_HEIGHT = 32
@@ -20,9 +25,9 @@ DEFAULT_NHL_ENABLED = False
 DEFAULT_FAVORITE_TEAMS = []
 DEFAULT_NHL_TEST_MODE = False
 DEFAULT_UPDATE_INTERVAL = 60
-DEFAULT_LOGO_DIR = Path("../assets/sports/nhl_logos") # Relative to src/
-DEFAULT_TEST_DATA_FILE = Path("../test_nhl_data.json") # Relative to src/
-DEFAULT_OUTPUT_IMAGE_FILE = Path("../nhl_scorebug_output.png") # Relative to src/
+DEFAULT_LOGO_DIR = PROJECT_ROOT / "assets" / "sports" / "nhl_logos" # Absolute path
+DEFAULT_TEST_DATA_FILE = PROJECT_ROOT / "test_nhl_data.json" # Absolute path
+DEFAULT_OUTPUT_IMAGE_FILE = PROJECT_ROOT / "nhl_scorebug_output.png" # Absolute path
 DEFAULT_TIMEZONE = "UTC"
 DEFAULT_NHL_SHOW_ONLY_FAVORITES = False
 RECENT_GAME_HOURS = 24 # How many hours back to check for recent finals
