@@ -326,7 +326,7 @@ def create_scorebug_image(game_details):
         try:
             away_logo = Image.open(game_details["away_logo_path"]).convert("RGBA")
             away_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
-            img.paste(away_logo, away_logo_pos, mask=away_logo)
+            img.paste(away_logo, (away_logo_pos[0], away_logo_pos[1]), away_logo)
         except Exception as e:
             logging.error(f"Error loading/pasting away logo {game_details['away_logo_path']}: {e}")
             # Draw placeholder text if logo fails
@@ -342,7 +342,7 @@ def create_scorebug_image(game_details):
          try:
             home_logo = Image.open(game_details["home_logo_path"]).convert("RGBA")
             home_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
-            img.paste(home_logo, home_logo_pos, mask=home_logo)
+            img.paste(home_logo, (home_logo_pos[0], home_logo_pos[1]), home_logo)
          except Exception as e:
             logging.error(f"Error loading/pasting home logo {game_details['home_logo_path']}: {e}")
             draw.text(home_logo_pos, game_details["home_abbr"], font=team_font, fill="white")
@@ -1055,7 +1055,7 @@ class NHLScoreboardManager:
             try:
                 away_logo = Image.open(game_details["away_logo_path"]).convert("RGBA")
                 away_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
-                img.paste(away_logo, (away_logo_x, (self.display_height - away_logo.height) // 2), mask=away_logo)
+                img.paste(away_logo, (away_logo_x, (self.display_height - away_logo.height) // 2), away_logo)
             except Exception as e:
                 logging.error(f"[NHL] Error rendering upcoming away logo {game_details['away_logo_path']}: {e}")
                 draw.text((away_logo_x, 5), game_details.get("away_abbr", "?"), font=font_team, fill="white")
@@ -1067,7 +1067,7 @@ class NHLScoreboardManager:
              try:
                 home_logo = Image.open(game_details["home_logo_path"]).convert("RGBA")
                 home_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
-                img.paste(home_logo, (home_logo_x, (self.display_height - home_logo.height) // 2), mask=home_logo)
+                img.paste(home_logo, (home_logo_x, (self.display_height - home_logo.height) // 2), home_logo)
              except Exception as e:
                 logging.error(f"[NHL] Error rendering upcoming home logo {game_details['home_logo_path']}: {e}")
                 draw.text((home_logo_x, 5), game_details.get("home_abbr", "?"), font=font_team, fill="white")
@@ -1139,7 +1139,7 @@ class NHLScoreboardManager:
             try:
                 away_logo = Image.open(game_details["away_logo_path"]).convert("RGBA")
                 away_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
-                img.paste(away_logo, (away_logo_x, (self.display_height - away_logo.height) // 2), mask=away_logo)
+                img.paste(away_logo, (away_logo_x, (self.display_height - away_logo.height) // 2), away_logo)
                 away_logo_drawn_size = away_logo.size
             except Exception as e:
                 logging.error(f"[NHL] Error rendering away logo {game_details['away_logo_path']}: {e}")
@@ -1156,7 +1156,7 @@ class NHLScoreboardManager:
              try:
                 home_logo = Image.open(game_details["home_logo_path"]).convert("RGBA")
                 home_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
-                img.paste(home_logo, (home_logo_x, (self.display_height - home_logo.height) // 2), mask=home_logo)
+                img.paste(home_logo, (home_logo_x, (self.display_height - home_logo.height) // 2), home_logo)
                 home_logo_drawn_size = home_logo.size
              except Exception as e:
                 logging.error(f"[NHL] Error rendering home logo {game_details['home_logo_path']}: {e}")
