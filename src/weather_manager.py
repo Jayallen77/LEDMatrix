@@ -39,9 +39,9 @@ class WeatherManager:
         # Layout constants
         self.PADDING = 1
         self.ICON_SIZE = {
-            'large': 10,
-            'medium': 12,  # Reduced from 16 for better spacing
-            'small': 6
+            'large': 24,
+            'medium': 18,
+            'small': 12
         }
         self.COLORS = {
             'text': (255, 255, 255),
