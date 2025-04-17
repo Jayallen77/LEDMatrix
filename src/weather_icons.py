@@ -1,7 +1,99 @@
+import os
 from PIL import Image, ImageDraw
-import math
+# math is no longer needed for drawing, remove if not used elsewhere
+# import math 
 
 class WeatherIcons:
+    ICON_DIR = "assets/weather/"  # Path where PNG icons are stored
+    DEFAULT_ICON = "not-available.png"
+    DEFAULT_SIZE = 64 # Default size, should match icons but can be overridden
+
+    @staticmethod
+    def _get_icon_filename(condition: str) -> str:
+        """Maps a weather condition string to an icon filename."""
+        condition = condition.lower().strip()
+        filename = WeatherIcons.DEFAULT_ICON # Start with default
+
+        # Prioritize more specific conditions based on keywords (order matters)
+        if "thunderstorm" in condition or "thunder" in condition or "storm" in condition:
+            if "rain" in condition: filename = "thunderstorms-rain.png"
+            elif "snow" in condition: filename = "thunderstorms-snow.png"
+            else: filename = "thunderstorms.png"
+        elif "sleet" in condition: filename = "sleet.png"
+        elif "snow" in condition: filename = "snow.png"
+        elif "rain" in condition: filename = "rain.png"
+        elif "drizzle" in condition: filename = "drizzle.png"
+        elif "hail" in condition: filename = "hail.png"
+        elif "fog" in condition: filename = "fog.png"
+        elif "mist" in condition: filename = "mist.png"
+        elif "haze" in condition: filename = "haze.png"
+        elif "smoke" in condition: filename = "smoke.png"
+        # General sky conditions
+        elif "partly cloudy" in condition:
+             filename = "partly-cloudy-night.png" if "night" in condition else "partly-cloudy-day.png"
+        elif "overcast" in condition: filename = "overcast.png"
+        elif "cloudy" in condition: # Catches variations like 'mostly cloudy'
+            filename = "cloudy.png"
+        elif "clear" in condition or "sunny" in condition:
+             filename = "clear-night.png" if "night" in condition else "clear-day.png"
+
+        # Check if the chosen icon file actually exists
+        potential_path = os.path.join(WeatherIcons.ICON_DIR, filename)
+        if not os.path.exists(potential_path):
+            # If the specific icon doesn't exist, print a warning and fall back to the default
+            if filename != WeatherIcons.DEFAULT_ICON:
+                 print(f"Warning: Specific icon file not found: {potential_path}. Falling back to default.")
+                 filename = WeatherIcons.DEFAULT_ICON
+            # Check if even the default icon exists
+            default_path = os.path.join(WeatherIcons.ICON_DIR, WeatherIcons.DEFAULT_ICON)
+            if not os.path.exists(default_path):
+                print(f"Error: Default icon file also not found: {default_path}")
+                # No icon found, return the default name; load_weather_icon will handle the FileNotFoundError
+        
+        return filename
+
+    @staticmethod
+    def load_weather_icon(condition: str, size: int = DEFAULT_SIZE) -> Image.Image | None:
+        """Loads, converts, and resizes the appropriate weather icon. Returns None on failure."""
+        filename = WeatherIcons._get_icon_filename(condition)
+        icon_path = os.path.join(WeatherIcons.ICON_DIR, filename)
+
+        try:
+            # Open image and ensure it's RGBA for transparency handling
+            icon_img = Image.open(icon_path).convert("RGBA")
+
+            # Resize if necessary using high-quality downsampling (LANCZOS/ANTIALIAS)
+            if icon_img.width != size or icon_img.height != size:
+                icon_img = icon_img.resize((size, size), Image.Resampling.LANCZOS)
+
+            return icon_img
+        except FileNotFoundError:
+            print(f"Error: Icon file not found: {icon_path}")
+            # Don't try to load default here, _get_icon_filename already handled fallback logic
+            return None
+        except Exception as e:
+            print(f"Error processing icon {icon_path}: {e}")
+            return None
+
+    @staticmethod
+    def draw_weather_icon(image: Image.Image, condition: str, x: int, y: int, size: int = DEFAULT_SIZE):
+         """Loads the appropriate weather icon and pastes it onto the target PIL Image object."""
+         icon_to_draw = WeatherIcons.load_weather_icon(condition, size)
+         if icon_to_draw:
+             # Paste the icon using its alpha channel as the mask for transparency
+             # This ensures transparent parts of the PNG are handled correctly.
+             try:
+                 image.paste(icon_to_draw, (x, y), icon_to_draw)
+             except Exception as e:
+                 print(f"Error pasting icon for condition '{condition}' at ({x},{y}): {e}")
+         else:
+             # Optional: Draw a placeholder if icon loading fails completely
+             print(f"Could not load icon for condition '{condition}' to draw at ({x},{y})")
+             # Example placeholder: draw a small magenta square
+             # placeholder_draw = ImageDraw.Draw(image)
+             # placeholder_draw.rectangle([x, y, x + size, y + size], fill=(255, 0, 255))
+             pass # Default: do nothing if icon cannot be loaded
+
     @staticmethod
     def draw_sun(draw: ImageDraw, x: int, y: int, size: int = 16, color: tuple = (255, 200, 0)):
         """Draw a sun icon with rays."""
@@ -111,25 +203,4 @@ class WeatherIcons:
             draw.line([
                 x + size//4, wave_y,
                 x + size//4 + size//2, wave_y + wave_height
-            ], fill=mist_color, width=2)
-
-    @staticmethod
-    def draw_weather_icon(draw: ImageDraw, condition: str, x: int, y: int, size: int = 16):
-        """Draw the appropriate weather icon based on the condition."""
-        condition = condition.lower()
-        
-        if 'clear' in condition or 'sunny' in condition:
-            WeatherIcons.draw_sun(draw, x, y, size)
-        elif 'cloud' in condition:
-            WeatherIcons.draw_cloud(draw, x, y, size)
-        elif 'rain' in condition or 'drizzle' in condition:
-            WeatherIcons.draw_rain(draw, x, y, size)
-        elif 'snow' in condition:
-            WeatherIcons.draw_snow(draw, x, y, size)
-        elif 'thunder' in condition or 'storm' in condition:
-            WeatherIcons.draw_thunderstorm(draw, x, y, size)
-        elif 'mist' in condition or 'fog' in condition or 'haze' in condition:
-            WeatherIcons.draw_mist(draw, x, y, size)
-        else:
-            # Default to cloud for unknown conditions
-            WeatherIcons.draw_cloud(draw, x, y, size) 
+            ], fill=mist_color, width=2) 

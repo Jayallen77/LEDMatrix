@@ -229,9 +229,9 @@ class WeatherManager:
             
             # Draw weather condition icon and text at the top
             condition = weather_data['weather'][0]['main']
-            icon_x = 1
-            icon_y = 1
-            WeatherIcons.draw_weather_icon(draw, condition, icon_x, icon_y, size=self.ICON_SIZE['large'])
+            icon_y = 1  # Adjusted y position
+            icon_x = (self.display_manager.matrix.width - self.ICON_SIZE['large']) // 2  # Center horizontally
+            WeatherIcons.draw_weather_icon(image, condition, icon_x, icon_y, size=self.ICON_SIZE['large'])
             
             # Draw condition text next to icon (using small font)
             condition_text = condition
@@ -363,7 +363,7 @@ class WeatherManager:
                 icon_size = self.ICON_SIZE['medium']
                 icon_y = self.display_manager.matrix.height // 3  # Position icon in upper third
                 icon_x = center_x - icon_size // 2
-                WeatherIcons.draw_weather_icon(draw, forecast['condition'], icon_x, icon_y, icon_size)
+                WeatherIcons.draw_weather_icon(image, forecast['condition'], icon_x, icon_y, icon_size)
                 
                 # Draw temperature at bottom
                 temp_text = f"{forecast['temp']}°"
@@ -428,7 +428,7 @@ class WeatherManager:
                     icon_size = self.ICON_SIZE['medium']
                     icon_y = self.display_manager.matrix.height // 3  # Position icon in upper third
                     icon_x = center_x - icon_size // 2
-                    WeatherIcons.draw_weather_icon(draw, forecast['condition'], icon_x, icon_y, icon_size)
+                    WeatherIcons.draw_weather_icon(image, forecast['condition'], icon_x, icon_y, icon_size)
                     
                     # Draw high/low temperatures at bottom (without degree symbol)
                     temp_text = f"{forecast['temp_low']}/{forecast['temp_high']}" # Removed degree symbols
