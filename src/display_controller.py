@@ -31,8 +31,8 @@ class DisplayController:
         if self.clock: self.available_modes.append('clock')
         if self.weather: self.available_modes.extend(['weather_current', 'weather_hourly', 'weather_daily']) # Treat weather modes separately
         if self.stocks: self.available_modes.append('stocks')
-        if self.nhl: self.available_modes.append('nhl') # Add NHL to the rotation
-        if self.news: self.available_modes.append('stock_news')
+        if self.news: self.available_modes.append('stock_news') # News after Stocks
+        if self.nhl: self.available_modes.append('nhl') # NHL after News
         
         # Set initial display to first available mode
         self.current_mode_index = 0
