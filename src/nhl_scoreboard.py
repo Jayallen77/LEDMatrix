@@ -5,6 +5,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 import logging
 from datetime import datetime, timedelta, timezone
+from typing import List, Dict, Optional
 try:
     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 except ImportError:
@@ -325,7 +326,7 @@ def create_scorebug_image(game_details):
         try:
             away_logo = Image.open(game_details["away_logo_path"]).convert("RGBA")
             away_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
-            img.paste(away_logo, away_logo_pos, away_logo) # Use logo as mask for transparency
+            img.paste(away_logo, away_logo_pos, mask=away_logo)
         except Exception as e:
             logging.error(f"Error loading/pasting away logo {game_details['away_logo_path']}: {e}")
             # Draw placeholder text if logo fails
@@ -341,7 +342,7 @@ def create_scorebug_image(game_details):
          try:
             home_logo = Image.open(game_details["home_logo_path"]).convert("RGBA")
             home_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
-            img.paste(home_logo, home_logo_pos, home_logo)
+            img.paste(home_logo, home_logo_pos, mask=home_logo)
          except Exception as e:
             logging.error(f"Error loading/pasting home logo {game_details['home_logo_path']}: {e}")
             draw.text(home_logo_pos, game_details["home_abbr"], font=team_font, fill="white")
@@ -579,14 +580,13 @@ class NHLScoreboardManager:
             self.local_timezone = ZoneInfo(DEFAULT_TIMEZONE)
 
         # State variables
-        self.last_data_fetch_time = 0 # When API was last called
-        self.last_logic_update_time = 0 # When selection logic was last run
-        self.relevant_events = [] # Events matching current display criteria
-        self.current_event_index = 0 # Index for cycling through relevant_events
-        self.last_cycle_time = 0 # Timestamp for cycling live games
-        self.display_mode = 'none' # 'live', 'upcoming', 'recent_final', 'none', 'error'
-        self.current_display_details = None # Details for the currently shown game in cycle
-        self.needs_redraw = True # Flag to force redraw in display()
+        self.last_data_fetch_time = 0
+        self.last_logic_update_time = 0
+        self.relevant_events: List[Dict[str, Any]] = [] # ALL relevant events (live, upcoming today, recent final)
+        self.current_event_index: int = 0
+        self.last_cycle_time: float = 0
+        self.current_display_details: Optional[Dict[str, Any]] = None
+        self.needs_redraw: bool = True
 
         # Get display dimensions
         if hasattr(display_manager, 'width') and hasattr(display_manager, 'height'):
@@ -709,63 +709,9 @@ class NHLScoreboardManager:
                     logging.error(f"[NHL] Failed to load test data: {load_e}")
             return None # Return None if fetch fails
 
-    def _extract_game_details(self, game_event):
-        """Extracts relevant details for the score bug display from raw event data."""
-        if not game_event:
-            return None
-
-        details = {}
-        try:
-            competition = game_event["competitions"][0]
-            status = competition["status"]
-            competitors = competition["competitors"]
-            game_date_str = game_event["date"]
-
-            try:
-                details["start_time_utc"] = datetime.fromisoformat(game_date_str.replace("Z", "+00:00"))
-            except (ValueError, KeyError):
-                logging.warning(f"[NHL] Could not parse game date: {game_date_str}")
-                details["start_time_utc"] = None
-
-            home_team = next((c for c in competitors if c.get("homeAway") == "home"), None)
-            away_team = next((c for c in competitors if c.get("homeAway") == "away"), None)
-
-            if not home_team or not away_team:
-                 logging.warning(f"[NHL] Missing home or away team data in event: {game_event.get('id')}")
-                 return None # Cannot proceed without both teams
-
-            details["status_text"] = status.get("type", {}).get("shortDetail", "N/A")
-            details["status_type_name"] = status.get("type", {}).get("name")
-            details["period"] = status.get("period", 0)
-            details["clock"] = status.get("displayClock", "0:00")
-            state = status.get("type", {}).get("state")
-            details["is_live"] = state in ("in", "halftime")
-            details["is_final"] = state == "post"
-            details["is_upcoming"] = state == "pre"
-
-            details["home_abbr"] = home_team.get("team", {}).get("abbreviation", "???")
-            details["home_score"] = home_team.get("score", "0")
-            details["home_logo_path"] = self.logo_dir / f"{details['home_abbr']}.png" if details['home_abbr'] != "???" else None
-
-            details["away_abbr"] = away_team.get("team", {}).get("abbreviation", "???")
-            details["away_score"] = away_team.get("score", "0")
-            details["away_logo_path"] = self.logo_dir / f"{details['away_abbr']}.png" if details['away_abbr'] != "???" else None
-
-            # Check logo files
-            if details["home_logo_path"] and not details["home_logo_path"].is_file():
-                logging.debug(f"[NHL] Home logo not found: {details['home_logo_path']}")
-                details["home_logo_path"] = None
-            if details["away_logo_path"] and not details["away_logo_path"].is_file():
-                logging.debug(f"[NHL] Away logo not found: {details['away_logo_path']}")
-                details["away_logo_path"] = None
-
-            return details
-
-        except (KeyError, IndexError, StopIteration, TypeError) as e:
-            logging.error(f"[NHL] Error parsing game details: {e} - Data snippet: {str(game_event)[:200]}...")
-            return None
-
-    def _find_events_by_criteria(self, all_events, is_live=False, is_upcoming_today=False, is_recent_final=False):
+    def _find_events_by_criteria(self, all_events: List[Dict[str, Any]],
+                                  is_live: bool = False, is_upcoming_today: bool = False,
+                                  is_recent_final: bool = False) -> List[Dict[str, Any]]:
         """Helper to find favorite team events matching specific criteria."""
         matches = []
         now_utc = datetime.now(timezone.utc)
@@ -773,202 +719,211 @@ class NHLScoreboardManager:
         cutoff_time_utc = now_utc - timedelta(hours=RECENT_GAME_HOURS)
 
         for event in all_events:
-            # Check if it's a favorite team's game first
             competitors = event.get("competitions", [{}])[0].get("competitors", [])
             if len(competitors) == 2:
                 team1_abbr = competitors[0].get("team", {}).get("abbreviation")
                 team2_abbr = competitors[1].get("team", {}).get("abbreviation")
                 is_favorite = team1_abbr in self.favorite_teams or team2_abbr in self.favorite_teams
+                # Skip non-favorites ONLY if show_only_favorites is true
                 if not is_favorite and self.show_only_favorites:
-                    continue # Skip if not favorite and only showing favorites
+                    continue
 
-                # Now check criteria based on flags
-                details = self._extract_game_details(event)
-                if not details: continue # Skip if parsing failed
+                # Apply criteria ONLY if the event involves a favorite team
+                if is_favorite:
+                    details = self._extract_game_details(event)
+                    if not details: continue
 
-                if is_live and details["is_live"]:
-                    matches.append(event)
-                    continue # Found live, no need for further checks for this event
+                    if is_live and details["is_live"]:
+                        matches.append(event)
+                        continue
 
-                if is_upcoming_today and details["is_upcoming"] and details["start_time_utc"]:
-                    # Check if start time is today in local timezone
-                    start_local_date = details["start_time_utc"].astimezone(self.local_timezone).date()
-                    if start_local_date == today_local and details["start_time_utc"] > now_utc:
-                         matches.append(event)
-                         continue
+                    if is_upcoming_today and details["is_upcoming"] and details["start_time_utc"]:
+                        start_local_date = details["start_time_utc"].astimezone(self.local_timezone).date()
+                        if start_local_date == today_local and details["start_time_utc"] > now_utc:
+                             matches.append(event)
+                             continue
 
-                if is_recent_final and details["is_final"] and details["start_time_utc"]:
-                     if details["start_time_utc"] > cutoff_time_utc:
-                         matches.append(event)
-                         continue
-            # Add fallback logic if not showing only favorites? Or handle in update()?
-            # For now, this focuses on finding FAVORITE events based on criteria.
+                    if is_recent_final and details["is_final"] and details["start_time_utc"]:
+                         if details["start_time_utc"] > cutoff_time_utc:
+                             matches.append(event)
+                             continue
+            # --- NOTE: No fallback logic here yet for non-favorites if show_only_favorites is false ---
 
         # Sort results appropriately
         if is_live:
-             # Maybe sort live games by start time or some other metric?
-             pass # Keep order for now
+             pass # Keep API order for now
         elif is_upcoming_today:
-             matches.sort(key=lambda x: self._extract_game_details(x).get("start_time_utc") or datetime.max.replace(tzinfo=timezone.utc)) # Sort by soonest start time
+             matches.sort(key=lambda x: self._extract_game_details(x).get("start_time_utc") or datetime.max.replace(tzinfo=timezone.utc)) # Sort by soonest
         elif is_recent_final:
-             matches.sort(key=lambda x: self._extract_game_details(x).get("start_time_utc") or datetime.min.replace(tzinfo=timezone.utc), reverse=True) # Sort by most recent start time
+             matches.sort(key=lambda x: self._extract_game_details(x).get("start_time_utc") or datetime.min.replace(tzinfo=timezone.utc), reverse=True) # Sort by most recent
 
         return matches
 
     def update(self):
-        """Determines the correct state and events to display."""
+        """Determines the list of events to cycle through based on priority."""
         if not self.is_enabled:
-            if self.display_mode != 'none':
-                self.display_mode = 'none'
+            if self.relevant_events: # Clear if disabled
                 self.relevant_events = []
                 self.current_event_index = 0
                 self.needs_redraw = True
             return
 
         now = time.time()
-        # Determine required data fetch interval
-        # Always use idle interval check; fetch logic inside handles actual API call timing
-        check_interval = self.idle_update_interval
-        # If currently showing live game, force more frequent logic checks
-        # This ensures we notice quickly if the game ends
-        if self.display_mode == 'live':
-             check_interval = self.update_interval
+        # Use active interval for logic checks if we *might* be showing something, else idle
+        check_interval = self.update_interval if self.relevant_events else self.idle_update_interval
 
         if now - self.last_logic_update_time < check_interval:
-            # Ensure live game cycling still happens even if logic doesn't run
-            if self.display_mode == 'live' and len(self.relevant_events) > 1:
-                 if now - self.last_cycle_time > self.cycle_duration:
-                    self.current_event_index = (self.current_event_index + 1) % len(self.relevant_events)
-                    self.current_display_details = self._extract_game_details(self.relevant_events[self.current_event_index])
-                    self.last_cycle_time = now
-                    self.needs_redraw = True
-            return # Interval not elapsed for full logic update
+            # Live game cycling still needs to happen within display() based on its own timer
+            return
 
         logging.info(f"[NHL] Running update logic (Check Interval: {check_interval}s)")
         self.last_logic_update_time = now
 
-        # Decide which dates to fetch based on current time and lookback/lookahead needs
-        today_local = datetime.now(self.local_timezone)
-        dates_to_fetch = {
-             (today_local - timedelta(days=2)).strftime('%Y%m%d'), # Two days ago (for 48h lookback)
-             (today_local - timedelta(days=1)).strftime('%Y%m%d'), # Yesterday
-             today_local.strftime('%Y%m%d'),                 # Today
-             (today_local + timedelta(days=1)).strftime('%Y%m%d')  # Tomorrow (for upcoming today)
-        }
-        # Only fetch if data is stale based on *active* interval (ensures fresh data for live checks)
+        # Fetch data if interval passed
+        all_events: List[Dict] = []
         if now - self.last_data_fetch_time > self.update_interval:
-             all_events = self._fetch_data_for_dates(sorted(list(dates_to_fetch)))
+            today_local = datetime.now(self.local_timezone)
+            dates_to_fetch = {
+                 (today_local - timedelta(days=2)).strftime('%Y%m%d'),
+                 (today_local - timedelta(days=1)).strftime('%Y%m%d'),
+                 today_local.strftime('%Y%m%d'),
+                 (today_local + timedelta(days=1)).strftime('%Y%m%d')
+            }
+            all_events = self._fetch_data_for_dates(sorted(list(dates_to_fetch)))
+            if not all_events:
+                 logging.warning("[NHL] No events found after fetching.")
+                 # Decide how to handle fetch failure - clear existing or keep stale?
+                 # Let's clear for now if fetch fails entirely
+                 if self.relevant_events: # If we previously had events
+                     self.relevant_events = []
+                     self.current_event_index = 0
+                     self.current_display_details = None
+                     self.needs_redraw = True
+                 return # Stop update if fetch failed
         else:
-             # Use potentially stale data if logic check is frequent but data fetch isn't needed yet
-             # Or should we force fetch here? Let's assume stale data is ok for now if fetch interval not met.
-             # This part needs refinement - how to handle stale data vs frequent logic checks?
-             # For simplicity now, let's assume we fetch every logic check for testing.
-             all_events = self._fetch_data_for_dates(sorted(list(dates_to_fetch)))
+            # Data not stale enough for API call, but logic check proceeds.
+            # How do we get all_events? Need to cache it?
+            # --> Problem: Can't re-evaluate criteria without fetching.
+            # --> Solution: Always fetch data when logic runs, but use interval for logic run itself.
+            # --> Let's revert: Fetch data based on fetch interval, run logic based on logic interval.
+            # --> Requires caching the fetched `all_events`. Let's add a cache.
+
+            # --- Let's stick to the previous version's combined logic/fetch interval for now ---
+            # --- and focus on combining the event lists ---
+
+            today_local = datetime.now(self.local_timezone)
+            dates_to_fetch = {
+                 (today_local - timedelta(days=2)).strftime('%Y%m%d'),
+                 (today_local - timedelta(days=1)).strftime('%Y%m%d'),
+                 today_local.strftime('%Y%m%d'),
+                 (today_local + timedelta(days=1)).strftime('%Y%m%d')
+            }
+            all_events = self._fetch_data_for_dates(sorted(list(dates_to_fetch)))
+            if not all_events:
+                 logging.warning("[NHL] No events found after fetching.")
+                 if self.relevant_events:
+                     self.relevant_events = []
+                     self.current_event_index = 0
+                     self.current_display_details = None
+                     self.needs_redraw = True
+                 return
 
 
-        if not all_events:
-             logging.warning("[NHL] No events found after fetching. Setting mode to error/none.")
-             if self.display_mode != 'error':
-                 self.display_mode = 'error' # Or 'none'?
-                 self.relevant_events = []
-                 self.current_event_index = 0
+        # --- Determine Combined List of Relevant Events ---
+        live_events = self._find_events_by_criteria(all_events, is_live=True)
+        upcoming_events = self._find_events_by_criteria(all_events, is_upcoming_today=True)
+        recent_final_events = self._find_events_by_criteria(all_events, is_recent_final=True)
+
+        new_relevant_events_combined = []
+        added_ids = set()
+
+        # Add in order of priority, avoiding duplicates
+        for event in live_events + upcoming_events + recent_final_events:
+            event_id = event.get("id")
+            if event_id and event_id not in added_ids:
+                new_relevant_events_combined.append(event)
+                added_ids.add(event_id)
+
+        # --- TODO: Implement Fallback Logic if show_only_favorites is False ---
+        if not new_relevant_events_combined and not self.show_only_favorites:
+            logging.debug("[NHL] No relevant favorite games, show_only_favorites=false. Fallback needed.")
+            # Add logic here to find non-favorite games based on priority if desired
+            pass # No fallback implemented yet
+
+        # --- Compare and Update State ---
+        old_event_ids = {e.get("id") for e in self.relevant_events if e}
+        new_event_ids = {e.get("id") for e in new_relevant_events_combined if e}
+
+        if old_event_ids != new_event_ids:
+            logging.info(f"[NHL] Relevant events changed. New count: {len(new_relevant_events_combined)}")
+            self.relevant_events = new_relevant_events_combined
+            self.current_event_index = 0
+            self.last_cycle_time = time.time() # Reset cycle timer
+            # Load details for the first item immediately
+            self.current_display_details = self._extract_game_details(self.relevant_events[0] if self.relevant_events else None)
+            self.needs_redraw = True
+        elif self.relevant_events: # List content is same, check if details of *current* item changed
+            current_event_in_list = self.relevant_events[self.current_event_index]
+            new_details_for_current = self._extract_game_details(current_event_in_list)
+            # Compare specifically relevant fields (score, clock, period, status)
+            if self._details_changed_significantly(self.current_display_details, new_details_for_current):
+                 logging.debug(f"[NHL] Details updated for current event index {self.current_event_index}")
+                 self.current_display_details = new_details_for_current
                  self.needs_redraw = True
-             return
-
-        # --- Determine State and Relevant Events ---
-        new_mode = 'none'
-        new_relevant_events = []
-
-        # 1. Check for Live Favorite Games
-        live_favorite_games = self._find_events_by_criteria(all_events, is_live=True)
-        if live_favorite_games:
-            new_mode = 'live'
-            new_relevant_events = live_favorite_games
-            logging.info(f"[NHL] Found {len(live_favorite_games)} live favorite game(s).")
-
-        # 2. Check for Upcoming Favorite Games Today (if no live ones)
-        if new_mode == 'none':
-            upcoming_today_games = self._find_events_by_criteria(all_events, is_upcoming_today=True)
-            if upcoming_today_games:
-                new_mode = 'upcoming'
-                new_relevant_events = [upcoming_today_games[0]] # Show only the soonest one
-                logging.info(f"[NHL] No live games. Found upcoming favorite game today.")
-
-        # 3. Check for Recent Favorite Finals (if no live or upcoming today)
-        if new_mode == 'none':
-            recent_finals = self._find_events_by_criteria(all_events, is_recent_final=True)
-            if recent_finals:
-                new_mode = 'recent_final'
-                new_relevant_events = [recent_finals[0]] # Show only the most recent one
-                logging.info(f"[NHL] No live or upcoming games. Found recent favorite final.")
-
-        # 4. Fallback (if not show_only_favorites) - Currently handled by find criteria, maybe refine?
-        # For now, if show_only_favorites is true, and none of above, mode remains 'none'.
-        # If show_only_favorites is false, need to implement fallback search here if desired.
-        if new_mode == 'none' and not self.show_only_favorites:
-             logging.debug("[NHL] No relevant favorite games, show_only_favorites=false, applying fallback.")
-             # Basic fallback: Show first live non-fav, or first upcoming non-fav today, or most recent non-fav final?
-             # Keeping it simple for now: if no favs, mode is 'none'. Refine fallback later if needed.
-             pass
+            else:
+                 logging.debug("[NHL] No significant change in details for current event.")
+        # else: No relevant events before or after
 
 
-        # --- Update State if Changed ---
-        if new_mode != self.display_mode or new_relevant_events != self.relevant_events:
-             logging.info(f"[NHL] Mode change: {self.display_mode} -> {new_mode}")
-             logging.debug(f"[NHL] Relevant Events Change: {len(self.relevant_events)} -> {len(new_relevant_events)}")
-             self.display_mode = new_mode
-             self.relevant_events = new_relevant_events
-             self.current_event_index = 0 # Reset index on mode/list change
-             self.last_cycle_time = time.time() # Reset cycle timer
-             self.current_display_details = self._extract_game_details(self.relevant_events[0] if self.relevant_events else None)
-             self.needs_redraw = True
-        elif self.display_mode == 'live':
-             # If mode is still live, check if *details* of current game changed
-             current_event_in_list = self.relevant_events[self.current_event_index]
-             new_details_for_current = self._extract_game_details(current_event_in_list)
-             if new_details_for_current != self.current_display_details:
-                  logging.debug("[NHL] Live game details updated.")
-                  self.current_display_details = new_details_for_current
-                  self.needs_redraw = True
-        # else: No change in mode, events, or live details
+    def _details_changed_significantly(self, old_details, new_details) -> bool:
+         """Compare specific fields to see if a redraw is needed."""
+         if old_details is None and new_details is None: return False
+         if old_details is None or new_details is None: return True # Changed from something to nothing or vice-versa
+
+         fields_to_check = ['home_score', 'away_score', 'clock', 'period', 'is_live', 'is_final', 'is_upcoming']
+         for field in fields_to_check:
+              if old_details.get(field) != new_details.get(field):
+                   return True
+         return False
 
 
     def display(self, force_clear: bool = False):
-        """Generates and displays the current frame based on the determined state."""
+        """Generates and displays the current frame, handling cycling."""
         if not self.is_enabled:
             return
 
         now = time.time()
         redraw_this_frame = force_clear or self.needs_redraw
 
-        # --- Handle Live Game Cycling ---
-        if self.display_mode == 'live' and len(self.relevant_events) > 1:
+        # --- Handle Cycling ---
+        if len(self.relevant_events) > 1: # Cycle if more than one relevant event exists
              if now - self.last_cycle_time > self.cycle_duration:
                   self.current_event_index = (self.current_event_index + 1) % len(self.relevant_events)
+                  # Get details for the *new* index
                   self.current_display_details = self._extract_game_details(self.relevant_events[self.current_event_index])
                   self.last_cycle_time = now
                   redraw_this_frame = True # Force redraw on cycle
-                  logging.debug(f"[NHL] Cycling live game to index {self.current_event_index}")
-             elif self.current_display_details is None: # Ensure details are loaded initially
-                  self.current_display_details = self._extract_game_details(self.relevant_events[self.current_event_index])
+                  logging.debug(f"[NHL] Cycling to event index {self.current_event_index}")
+             elif self.current_display_details is None: # Ensure details loaded for index 0 initially
+                  self.current_display_details = self._extract_game_details(self.relevant_events[0])
+                  redraw_this_frame = True # Force redraw if details were missing
+        elif len(self.relevant_events) == 1:
+             # If only one event, make sure its details are loaded
+             if self.current_display_details is None:
+                  self.current_display_details = self._extract_game_details(self.relevant_events[0])
                   redraw_this_frame = True
-        elif self.display_mode != 'live':
-            # Ensure details are loaded if mode is not live (handles initial state or mode change)
-             if self.current_display_details is None and self.relevant_events:
-                   self.current_display_details = self._extract_game_details(self.relevant_events[0])
-                   redraw_this_frame = True
-             elif not self.relevant_events: # No relevant events found
-                   self.current_display_details = None # Ensure details are cleared
+        else: # No relevant events
+             if self.current_display_details is not None: # Clear details if list is empty now
+                  self.current_display_details = None
+                  redraw_this_frame = True
 
 
         # --- Generate and Display Frame ---
         if not redraw_this_frame:
-            # logging.debug("[NHL] display() called but no redraw needed.")
             return
 
-        logging.debug(f"[NHL] Generating frame for mode: {self.display_mode} (Index: {self.current_event_index})")
-        # Use self.current_display_details which is updated by cycle logic or initial load
-        frame = self._create_frame(self.current_display_details)
+        logging.debug(f"[NHL] Generating frame (Index: {self.current_event_index})")
+        frame = self._create_frame(self.current_display_details) # Pass the specific details
 
         try:
             if hasattr(self.display_manager, 'display_image'):
@@ -978,48 +933,44 @@ class NHLScoreboardManager:
             else:
                  logging.error("[NHL] DisplayManager missing display_image or matrix.SetImage method.")
 
-            self.needs_redraw = False # Reset flag after successful display attempt
+            self.needs_redraw = False
 
         except Exception as e:
             logging.error(f"[NHL] Error displaying frame via DisplayManager: {e}")
 
 
-    def _create_frame(self, game_details):
-        """Creates a Pillow image frame based on game details and current display mode."""
-        # Determine layout based on self.display_mode and game_details
-        # Note: game_details will be None if mode is 'none' or 'error'
-
+    def _create_frame(self, game_details: Optional[Dict[str, Any]]) -> Image.Image:
+        """Creates a Pillow image frame based on game details."""
+        # This method now simply renders the layout based on the details passed in
         img = Image.new('RGB', (self.display_width, self.display_height), color='black')
         draw = ImageDraw.Draw(img)
 
-        # --- Choose Layout ---
-        if self.display_mode == 'live' and game_details:
-             self._draw_scorebug_layout(draw, game_details)
-        elif self.display_mode == 'upcoming' and game_details:
-             self._draw_upcoming_layout(draw, game_details)
-        elif self.display_mode == 'recent_final' and game_details:
-             self._draw_scorebug_layout(draw, game_details) # Use scorebug for final
-        else: # 'none' or 'error'
-             self._draw_placeholder_layout(draw)
+        if not game_details:
+            self._draw_placeholder_layout(draw)
+        elif game_details.get("is_upcoming"):
+            self._draw_upcoming_layout(draw, game_details)
+        elif game_details.get("is_live") or game_details.get("is_final"):
+            self._draw_scorebug_layout(draw, game_details)
+        else: # Fallback/Other states
+             self._draw_placeholder_layout(draw, msg=game_details.get("status_text", "NHL Status")) # Show status text
 
         return img
 
-    def _draw_placeholder_layout(self, draw):
-        """Draws the 'No NHL Games' message."""
+    def _draw_placeholder_layout(self, draw: ImageDraw.ImageDraw, msg: str = "No NHL Games"):
+        """Draws the 'No NHL Games' or other placeholder message."""
         font = self.fonts.get('placeholder', ImageFont.load_default())
-        msg = "No NHL Games"
         bbox = draw.textbbox((0,0), msg, font=font)
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
         draw.text(((self.display_width - text_width) // 2, (self.display_height - text_height) // 2),
                   msg, font=font, fill='grey')
 
-    def _draw_upcoming_layout(self, draw, game_details):
+    def _draw_upcoming_layout(self, draw: ImageDraw.ImageDraw, game_details: Dict[str, Any]):
         """Draws the layout for an upcoming game."""
         font_team = self.fonts.get('team', ImageFont.load_default())
         font_main = self.fonts.get('upcoming_main', ImageFont.load_default())
         font_vs = self.fonts.get('upcoming_vs', ImageFont.load_default())
-        img = draw.im # Get the image object associated with the draw object
+        img = draw.im
 
         logging.debug("[NHL] Drawing upcoming game layout.")
 
@@ -1037,7 +988,7 @@ class NHLScoreboardManager:
             try:
                 away_logo = Image.open(game_details["away_logo_path"]).convert("RGBA")
                 away_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
-                img.paste(away_logo, (away_logo_x, (self.display_height - away_logo.height) // 2), away_logo)
+                img.paste(away_logo, (away_logo_x, (self.display_height - away_logo.height) // 2), mask=away_logo)
             except Exception as e:
                 logging.error(f"[NHL] Error rendering upcoming away logo {game_details['away_logo_path']}: {e}")
                 draw.text((away_logo_x, 5), game_details.get("away_abbr", "?"), font=font_team, fill="white")
@@ -1049,7 +1000,7 @@ class NHLScoreboardManager:
              try:
                 home_logo = Image.open(game_details["home_logo_path"]).convert("RGBA")
                 home_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
-                img.paste(home_logo, (home_logo_x, (self.display_height - home_logo.height) // 2), home_logo)
+                img.paste(home_logo, (home_logo_x, (self.display_height - home_logo.height) // 2), mask=home_logo)
              except Exception as e:
                 logging.error(f"[NHL] Error rendering upcoming home logo {game_details['home_logo_path']}: {e}")
                 draw.text((home_logo_x, 5), game_details.get("home_abbr", "?"), font=font_team, fill="white")
@@ -1092,7 +1043,7 @@ class NHLScoreboardManager:
         draw.text((center_x, vs_y), vs_str, font=font_vs, fill='white', anchor="mt")
 
 
-    def _draw_scorebug_layout(self, draw, game_details):
+    def _draw_scorebug_layout(self, draw: ImageDraw.ImageDraw, game_details: Dict[str, Any]):
         """Draws the standard score bug layout for live or final games."""
         font_score = self.fonts.get('score', ImageFont.load_default())
         font_time = self.fonts.get('time', ImageFont.load_default())
@@ -1121,7 +1072,7 @@ class NHLScoreboardManager:
             try:
                 away_logo = Image.open(game_details["away_logo_path"]).convert("RGBA")
                 away_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
-                img.paste(away_logo, (away_logo_x, (self.display_height - away_logo.height) // 2), away_logo)
+                img.paste(away_logo, (away_logo_x, (self.display_height - away_logo.height) // 2), mask=away_logo)
                 away_logo_drawn_size = away_logo.size
             except Exception as e:
                 logging.error(f"[NHL] Error rendering away logo {game_details['away_logo_path']}: {e}")
@@ -1138,7 +1089,7 @@ class NHLScoreboardManager:
              try:
                 home_logo = Image.open(game_details["home_logo_path"]).convert("RGBA")
                 home_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
-                img.paste(home_logo, (home_logo_x, (self.display_height - home_logo.height) // 2), home_logo)
+                img.paste(home_logo, (home_logo_x, (self.display_height - home_logo.height) // 2), mask=home_logo)
                 home_logo_drawn_size = home_logo.size
              except Exception as e:
                 logging.error(f"[NHL] Error rendering home logo {game_details['home_logo_path']}: {e}")
