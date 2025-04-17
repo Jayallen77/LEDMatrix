@@ -190,12 +190,13 @@ class StockNewsManager:
         if not all_news:
             return
 
+        # Define width and height here, so they are always available
+        width = self.display_manager.matrix.width
+        height = self.display_manager.matrix.height
+
         # Create a continuous scrolling image if needed
         if self.cached_text_image is None:
             random.shuffle(all_news)
-            
-            width = self.display_manager.matrix.width
-            height = self.display_manager.matrix.height
             
             # Estimate total width needed (adjust multiplier if needed)
             # Average headline length guess + symbol + screen width gap
@@ -243,7 +244,7 @@ class StockNewsManager:
             # self.last_update = time.time()
         
         # --- Scrolling logic remains the same --- 
-        width = self.display_manager.matrix.width
+        # width = self.display_manager.matrix.width # Moved up
         # Check if cached image exists before accessing width
         if self.cached_text_image is None:
             logger.warning("[StockNews] Cached image is None, cannot scroll.")
