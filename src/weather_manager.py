@@ -227,48 +227,50 @@ class WeatherManager:
             image = Image.new('RGB', (self.display_manager.matrix.width, self.display_manager.matrix.height))
             draw = ImageDraw.Draw(image)
             
-            # Draw weather condition icon and text at the top
+            # --- Top Left: Icon ---
             condition = weather_data['weather'][0]['main']
-            icon_y = 1  # Adjusted y position
-            icon_x = (self.display_manager.matrix.width - self.ICON_SIZE['large']) // 2  # Center horizontally
-            WeatherIcons.draw_weather_icon(image, condition, icon_x, icon_y, size=self.ICON_SIZE['large'])
+            icon_size = self.ICON_SIZE['large'] # Currently 28
+            icon_x = 1 # Small padding from left edge
+            icon_y = 1 # Small padding from top edge
+            WeatherIcons.draw_weather_icon(image, condition, icon_x, icon_y, size=icon_size)
             
-            # Draw condition text next to icon (using small font)
+            # --- Top Right: Condition Text ---
             condition_text = condition
-            draw.text((icon_x + self.ICON_SIZE['large'] + 3, icon_y), # Increased padding from 1 to 3
+            condition_font = self.display_manager.small_font
+            condition_text_width = draw.textlength(condition_text, font=condition_font)
+            condition_x = self.display_manager.matrix.width - condition_text_width - 1 # Align right
+            condition_y = 1 # Align top
+            draw.text((condition_x, condition_y), 
                      condition_text, 
-                     font=self.display_manager.small_font, 
+                     font=condition_font, 
                      fill=self.COLORS['text'])
-            
-            # Draw "time ago" text below condition (using small font)
-            # time_since_update = int((time.time() - self.last_update) / 3600)  # hours
-            # time_text = f"{time_since_update}h"  # Even shorter text
-            # draw.text((icon_x + self.ICON_SIZE['large'] + 1, icon_y + 7),  # Reduced from 8
-            #          time_text,
-            #          font=self.display_manager.small_font,
-            #          fill=self.COLORS['dim'])  # Using dimmer color
-            
-            # Draw current temperature on the right (using small font instead of regular)
+
+            # --- Right Side (Below Condition): Current Temp ---
             temp = round(weather_data['main']['temp'])
-            temp_text = f"{temp}°"  # Shortened to just degrees
-            temp_width = draw.textlength(temp_text, font=self.display_manager.small_font)
-            temp_x = self.display_manager.matrix.width - temp_width - 1  # Reduced right margin
-            draw.text((temp_x, 1),
+            temp_text = f"{temp}°"
+            temp_font = self.display_manager.small_font # Using small font
+            temp_text_width = draw.textlength(temp_text, font=temp_font)
+            temp_x = self.display_manager.matrix.width - temp_text_width - 1 # Align right
+            temp_y = condition_y + 8 # Position below condition text (adjust 8 based on font size)
+            draw.text((temp_x, temp_y),
                      temp_text,
-                     font=self.display_manager.small_font,  # Changed from regular to small
+                     font=temp_font,
                      fill=self.COLORS['highlight'])
             
-            # Draw high/low temperatures below current temp (using small font)
+            # --- Right Side (Below Current Temp): High/Low Temp ---
             temp_max = round(weather_data['main']['temp_max'])
             temp_min = round(weather_data['main']['temp_min'])
-            high_low_text = f"{temp_min}°/{temp_max}°"  # Swapped order: low/high
-            high_low_width = draw.textlength(high_low_text, font=self.display_manager.small_font)
-            draw.text((self.display_manager.matrix.width - high_low_width - 1, 9),
+            high_low_text = f"{temp_min}°/{temp_max}°"
+            high_low_font = self.display_manager.small_font # Using small font
+            high_low_width = draw.textlength(high_low_text, font=high_low_font)
+            high_low_x = self.display_manager.matrix.width - high_low_width - 1 # Align right
+            high_low_y = temp_y + 8 # Position below current temp text (adjust 8 based on font size)
+            draw.text((high_low_x, high_low_y),
                      high_low_text,
-                     font=self.display_manager.small_font,
+                     font=high_low_font,
                      fill=self.COLORS['dim'])
             
-            # Draw additional weather metrics spaced evenly in thirds at the bottom
+            # --- Bottom: Additional Metrics (Unchanged) ---
             display_width = self.display_manager.matrix.width
             section_width = display_width // 3
             y_pos = self.display_manager.matrix.height - 7 # Position near bottom for 6px font
