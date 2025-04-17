@@ -337,6 +337,10 @@ def create_scorebug_image(game_details):
             # Create RGBA background region
             bg_region_rgba = img.crop(box).convert("RGBA")
 
+            # Ensure images are loaded before compositing (for compatibility)
+            bg_region_rgba.load()
+            away_logo_rgba.load()
+
             # Alpha composite logo onto background region
             composite_region = Image.alpha_composite(bg_region_rgba, away_logo_rgba)
 
@@ -368,6 +372,10 @@ def create_scorebug_image(game_details):
 
             # Create RGBA background region
             bg_region_rgba = img.crop(box).convert("RGBA")
+
+            # Ensure images are loaded before compositing (for compatibility)
+            bg_region_rgba.load()
+            home_logo_rgba.load()
 
             # Alpha composite logo onto background region
             composite_region = Image.alpha_composite(bg_region_rgba, home_logo_rgba)
@@ -1098,6 +1106,10 @@ class NHLScoreboardManager:
                 # Create RGBA background region
                 bg_region_rgba = img.crop(box).convert("RGBA")
 
+                # Ensure images are loaded before compositing (for compatibility)
+                bg_region_rgba.load()
+                away_logo_rgba.load()
+
                 # Alpha composite logo onto background region
                 composite_region = Image.alpha_composite(bg_region_rgba, away_logo_rgba)
 
@@ -1125,6 +1137,10 @@ class NHLScoreboardManager:
 
                 # Create RGBA background region
                 bg_region_rgba = img.crop(box).convert("RGBA")
+
+                # Ensure images are loaded before compositing (for compatibility)
+                bg_region_rgba.load()
+                home_logo_rgba.load()
 
                 # Alpha composite logo onto background region
                 composite_region = Image.alpha_composite(bg_region_rgba, home_logo_rgba)
@@ -1215,6 +1231,10 @@ class NHLScoreboardManager:
                 # Create RGBA background region
                 bg_region_rgba = img.crop(box).convert("RGBA")
 
+                # Ensure images are loaded before compositing (for compatibility)
+                bg_region_rgba.load()
+                away_logo_rgba.load()
+
                 # Alpha composite logo onto background region
                 composite_region = Image.alpha_composite(bg_region_rgba, away_logo_rgba)
 
@@ -1247,6 +1267,10 @@ class NHLScoreboardManager:
 
                 # Create RGBA background region
                 bg_region_rgba = img.crop(box).convert("RGBA")
+
+                # Ensure images are loaded before compositing (for compatibility)
+                bg_region_rgba.load()
+                home_logo_rgba.load()
 
                 # Alpha composite logo onto background region
                 composite_region = Image.alpha_composite(bg_region_rgba, home_logo_rgba)
