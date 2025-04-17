@@ -58,6 +58,11 @@ class StockManager:
                  # Directory exists, check if writable by trying to create a temp file
                 try:
                     temp_file_path = os.path.join(self.logo_dir, "write_test_py.tmp")
+                    abs_path = os.path.abspath(temp_file_path)
+                    cwd = os.getcwd()
+                    euid = os.geteuid()
+                    egid = os.getegid()
+                    logger.debug(f"Write test: UID={euid}, GID={egid}, CWD='{cwd}', Path='{abs_path}'")
                     with open(temp_file_path, 'w') as f:
                         f.write('test')
                     os.remove(temp_file_path)
