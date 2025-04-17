@@ -39,6 +39,7 @@ class WeatherManager:
         # Layout constants
         self.PADDING = 1
         self.ICON_SIZE = {
+            'extra_large': 32, # Changed from 30
             'large': 28,
             'medium': 20,
             'small': 14
@@ -229,7 +230,7 @@ class WeatherManager:
             
             # --- Top Left: Icon ---
             condition = weather_data['weather'][0]['main']
-            icon_size = self.ICON_SIZE['large'] # Currently 28
+            icon_size = self.ICON_SIZE['extra_large'] # Use new extra_large size
             icon_x = 1 # Small padding from left edge
             icon_y = 1 # Small padding from top edge
             WeatherIcons.draw_weather_icon(image, condition, icon_x, icon_y, size=icon_size)
