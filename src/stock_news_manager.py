@@ -192,67 +192,102 @@ class StockNewsManager:
 
         # Create a continuous scrolling image if needed
         if self.cached_text_image is None:
-            # Shuffle the news items for random order
             random.shuffle(all_news)
             
-            # Create a very wide image that contains all news items in sequence
             width = self.display_manager.matrix.width
             height = self.display_manager.matrix.height
             
-            # Calculate total width needed for all news items
-            # Each news item needs width*2 for scrolling, plus consistent gaps between items
-            news_gap = width // 3  # Gap between news items
-            total_width = sum(width * 2 for _ in all_news) + news_gap * (len(all_news) - 1)
-            
-            # Create the full image
-            full_image = Image.new('RGB', (total_width, height), (0, 0, 0))
+            # Estimate total width needed (adjust multiplier if needed)
+            # Average headline length guess + symbol + screen width gap
+            estimated_item_width = width * 3 # Estimate each item + gap needs ~3 screen widths
+            estimated_total_width = estimated_item_width * len(all_news)
+
+            # Create the full image with estimated width
+            full_image = Image.new('RGB', (max(estimated_total_width, width), height), (0, 0, 0))
             draw = ImageDraw.Draw(full_image)
             
-            # Draw each news item in sequence with consistent spacing
             current_x = 0
-            separator = "   -   "  # Visual separator between news items
+            screen_width_gap = width # Use a full screen width as the gap
             
+            actual_total_width = 0
             for news in all_news:
                 news_text = f"{news['symbol']}: {news['title']}   "
-                # Create news text image for this item
                 news_image = self._create_text_image(news_text)
                 
+                # Check if image needs resizing (should be rare with estimate)
+                if current_x + news_image.width > full_image.width:
+                    # Resize needed - this is less efficient but handles variability
+                    new_width = current_x + news_image.width + screen_width_gap * (len(all_news) - all_news.index(news)) # Estimate remaining needed
+                    new_full_image = Image.new('RGB', (new_width, height), (0, 0, 0))
+                    new_full_image.paste(full_image, (0, 0))
+                    full_image = new_full_image
+                    draw = ImageDraw.Draw(full_image) # Update draw object
+                    logging.warning(f"[StockNews] Resized full_image to {new_width}px")
+
                 # Paste this news image into the full image
                 full_image.paste(news_image, (current_x, 0))
                 
-                # Move to next position with consistent spacing
-                current_x += width * 2
+                # Move to next position: text width + screen width gap
+                current_x += news_image.width + screen_width_gap
                 
-                # Add separator between news items
-                if news != all_news[-1]:  # Don't add separator after the last news
-                    current_x += news_gap
+            actual_total_width = current_x - screen_width_gap # Remove trailing gap
             
+            # Crop the image to the actual needed size
+            if actual_total_width > 0 and actual_total_width < full_image.width:
+                 full_image = full_image.crop((0, 0, actual_total_width, height))
+
             # Cache the full image
             self.cached_text_image = full_image
             self.scroll_position = 0
-            self.last_update = time.time()
+            # Don't reset last_update time here, cache creation isn't a data update
+            # self.last_update = time.time()
         
-        # Calculate the visible portion of the image
+        # --- Scrolling logic remains the same --- 
         width = self.display_manager.matrix.width
+        # Check if cached image exists before accessing width
+        if self.cached_text_image is None:
+            logger.warning("[StockNews] Cached image is None, cannot scroll.")
+            return False # Indicate nothing was displayed
+            
         total_width = self.cached_text_image.width
         
-        # Update scroll position with small increments
-        self.scroll_position = (self.scroll_position + self.scroll_speed) % total_width
-        
+        # If total_width is somehow less than screen width, don't scroll
+        if total_width <= width:
+            self.display_manager.image.paste(self.cached_text_image, (0, 0))
+            self.display_manager.update_display()
+            time.sleep(self.stock_news_config.get('item_display_duration', 5)) # Hold static image
+            self.cached_text_image = None # Force recreation next cycle
+            return True
+
+        # Update scroll position
+        self.scroll_position += self.scroll_speed
+        if self.scroll_position >= total_width:
+            self.scroll_position = 0 # Wrap around
+            # Optional: Force reload/reshuffle when wrapping
+            # self.cached_text_image = None 
+            # return True # Indicate wrap happened if needed by controller
+
         # Calculate the visible portion
-        visible_portion = self.cached_text_image.crop((
-            self.scroll_position, 0,
-            self.scroll_position + width, self.display_manager.matrix.height
-        ))
-        
-        # Copy the visible portion to the display
-        self.display_manager.image.paste(visible_portion, (0, 0))
+        # Handle wrap-around drawing
+        visible_end = self.scroll_position + width
+        if visible_end <= total_width:
+            # Normal case: Paste single crop
+            visible_portion = self.cached_text_image.crop((
+                self.scroll_position, 0,
+                visible_end, height
+            ))
+            self.display_manager.image.paste(visible_portion, (0, 0))
+        else:
+            # Wrap-around case: Paste two parts
+            width1 = total_width - self.scroll_position
+            width2 = width - width1
+            portion1 = self.cached_text_image.crop((self.scroll_position, 0, total_width, height))
+            portion2 = self.cached_text_image.crop((0, 0, width2, height))
+            self.display_manager.image.paste(portion1, (0, 0))
+            self.display_manager.image.paste(portion2, (width1, 0))
+
         self.display_manager.update_display()
-        
-        # Log frame rate
         self._log_frame_rate()
-        
-        # Add a small delay between frames
         time.sleep(self.scroll_delay)
         
         return True 
