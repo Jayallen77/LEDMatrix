@@ -430,8 +430,8 @@ class WeatherManager:
                     icon_x = center_x - icon_size // 2
                     WeatherIcons.draw_weather_icon(draw, forecast['condition'], icon_x, icon_y, icon_size)
                     
-                    # Draw high/low temperatures at bottom
-                    temp_text = f"{forecast['temp_low']}°/{forecast['temp_high']}°"
+                    # Draw high/low temperatures at bottom (without degree symbol)
+                    temp_text = f"{forecast['temp_low']}/{forecast['temp_high']}" # Removed degree symbols
                     temp_width = draw.textlength(temp_text, font=self.display_manager.extra_small_font)
                     temp_y = self.display_manager.matrix.height - 8  # Position at bottom with small margin
                     draw.text((center_x - temp_width // 2, temp_y),
