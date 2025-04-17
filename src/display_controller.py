@@ -73,7 +73,7 @@ class DisplayController:
         # Update methods might have different frequencies, but call here for simplicity
         # Could add timers per module later if needed
         if self.weather: self.weather.get_weather() # weather update fetches data
-        if self.stocks: self.stocks.update() # Assuming stock manager has update()
+        if self.stocks: self.stocks.update_stock_data() # Correct method name
         if self.news: self.news.update() # Assuming news manager has update()
         if self.nhl: self.nhl.update()
         # Clock updates itself during display typically
