@@ -28,10 +28,11 @@
         "display_durations": {
             "clock": 15,
             "weather": 15,
-            "stocks": 45,
+            "stocks": 30,
             "hourly_forecast": 15,
             "daily_forecast": 15,
-            "stock_news": 30
+            "stock_news": 30,
+            "nhl": 20
         }
     },
     "clock": {
@@ -70,6 +71,7 @@
         "test_mode": true,
         "update_interval_seconds": 15,
         "idle_update_interval_seconds": 300,
-        "show_only_favorites": true
+        "show_only_favorites": true,
+        "cycle_game_duration_seconds": 10
     }
 } 
