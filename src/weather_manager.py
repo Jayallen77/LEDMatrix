@@ -428,11 +428,11 @@ class WeatherManager:
                 
                 # Draw high/low temperatures at bottom
                 temp_text = f"{forecast['temp_low']}°/{forecast['temp_high']}°"
-                temp_width = draw.textlength(temp_text, font=self.display_manager.small_font)
+                temp_width = draw.textlength(temp_text, font=self.display_manager.extra_small_font)
                 temp_y = self.display_manager.matrix.height - 8  # Position at bottom with small margin
                 draw.text((center_x - temp_width // 2, temp_y),
                          temp_text,
-                         font=self.display_manager.small_font,
+                         font=self.display_manager.extra_small_font,
                          fill=self.COLORS['text'])
             
             # Update the display
