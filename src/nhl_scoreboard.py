@@ -631,26 +631,40 @@ class NHLScoreboardManager:
             fonts['default'] = ImageFont.load_default()
         return fonts
 
-    def _fetch_data(self):
-        """Fetches scoreboard data from ESPN API or loads test data."""
+    def _fetch_data(self, date_str: str = None):
+        """Fetches scoreboard data from ESPN API for a specific date or default (today)."""
+        url = ESPN_NHL_SCOREBOARD_URL
+        params = {}
+        log_prefix = "[NHL]"
+        if date_str:
+            params['dates'] = date_str
+            log_prefix = f"[NHL {date_str}]"
+            logging.info(f"{log_prefix} Fetching data for specific date.")
+        else:
+            logging.info(f"{log_prefix} Fetching default (today's) data.")
+            
         try:
-            response = requests.get(ESPN_NHL_SCOREBOARD_URL)
+            response = requests.get(url, params=params) # Pass params dict
             response.raise_for_status()
             data = response.json()
-            logging.info("[NHL] Successfully fetched live data from ESPN.")
-            if self.test_mode:
+            logging.info(f"{log_prefix} Successfully fetched data.")
+            
+            # Only save test data when fetching default/today's view
+            if not date_str and self.test_mode:
                 try:
                     with open(self.test_data_file, 'w') as f:
                         json.dump(data, f, indent=2)
-                    logging.info(f"[NHL] Saved live data to {self.test_data_file.name}")
+                    logging.info(f"[NHL] Saved today's live data to {self.test_data_file.name}")
                 except Exception as e:
                     logging.error(f"[NHL] Failed to save test data: {e}")
-            self.last_update_time = time.time()
+            
+            # Don't update last_update_time here, let the caller handle it after successful fetches
             return data
         except requests.exceptions.RequestException as e:
-            logging.error(f"[NHL] Error fetching data from ESPN: {e}")
-            if self.test_mode:
-                logging.warning("[NHL] Fetching failed, attempting to load test data.")
+            logging.error(f"{log_prefix} Error fetching data from ESPN: {e}")
+            # Only try test data if fetching default view failed
+            if not date_str and self.test_mode:
+                logging.warning("[NHL] Fetching default failed, attempting to load test data.")
                 try:
                     with open(self.test_data_file, 'r') as f:
                         data = json.load(f)
@@ -662,7 +676,7 @@ class NHLScoreboardManager:
                     logging.error(f"[NHL] Error decoding test data file {self.test_data_file.name}.")
                 except Exception as e:
                     logging.error(f"[NHL] Failed to load test data: {e}")
-            return None
+            return None # Return None if fetch fails
 
     def _extract_game_details(self, game_event):
         """Extracts relevant details for the score bug display from raw event data."""
@@ -937,18 +951,61 @@ class NHLScoreboardManager:
 
         # Check interval or if forced
         if force_check or (now - self.last_update_time > current_interval):
-            logging.debug(f"[NHL] Checking for updates (Force: {force_check}, Interval: {current_interval}s). Triggered at {now:.2f}, Last update: {self.last_update_time:.2f}")
-            all_data = self._fetch_data() 
-            new_event_data = None
-            if all_data:
-                new_event_data = self._find_relevant_favorite_event(all_data)
-                if not new_event_data and not self.show_only_favorites and all_data.get("events"):
-                    live_games = [e for e in all_data["events"] if e.get("competitions", [{}])[0].get("status", {}).get("type", {}).get("state") == "in"]
-                    if live_games:
-                        new_event_data = live_games[0]
-                    elif all_data["events"]:
-                         new_event_data = all_data["events"][0]
-            # else: fetch failed, new_event_data remains None
+            logging.info(f"[NHL] Update triggered (Force: {force_check}, Interval: {current_interval}s).")
+
+            # Fetch data for today and potentially yesterday
+            today_str = datetime.now(self.local_timezone).strftime('%Y%m%d')
+            yesterday_str = (datetime.now(self.local_timezone) - timedelta(days=1)).strftime('%Y%m%d')
+
+            today_data = self._fetch_data() # Fetch today (default)
+            yesterday_data = self._fetch_data(date_str=yesterday_str) # Fetch yesterday
+
+            # If either fetch failed, we might have partial data or None
+            if today_data is None and yesterday_data is None:
+                 logging.warning("[NHL] Failed to fetch data for today and yesterday.")
+                 # Optionally clear current game or keep stale data?
+                 # Keeping stale data for now, just won't update interval timer
+                 return # Skip rest of update if all fetches fail
+
+            # --- Combine Events --- 
+            all_events = [] 
+            event_ids = set() # To handle potential duplicates if API includes overlap
+            
+            if yesterday_data and "events" in yesterday_data:
+                for event in yesterday_data["events"]:
+                    if event["id"] not in event_ids:
+                        all_events.append(event)
+                        event_ids.add(event["id"])
+                        
+            if today_data and "events" in today_data:
+                 for event in today_data["events"]:
+                    if event["id"] not in event_ids:
+                        all_events.append(event)
+                        event_ids.add(event["id"])
+            
+            logging.debug(f"[NHL] Combined {len(all_events)} events from yesterday and today.")
+
+            # Update timestamp only after successful fetches
+            self.last_update_time = now 
+            
+            # --- Find Relevant Event from Combined List --- 
+            new_event_data = self._find_relevant_favorite_event({"events": all_events}) # Pass combined events
+
+            # Fallback logic (applied to combined list)
+            if not new_event_data and not self.show_only_favorites and all_events:
+                logging.debug("[NHL] No relevant favorite game found, fallback active on combined list.")
+                live_games = [e for e in all_events if e.get("competitions", [{}])[0].get("status", {}).get("type", {}).get("state") == "in"]
+                if live_games:
+                    # Prioritize today's live games if multiple exist?
+                    # For now, just take the first one found.
+                    new_event_data = live_games[0]
+                elif all_events: # Show first available (could be yesterday's final or today's upcoming)
+                     # Sort combined events by date/time to show earliest first?
+                     try:
+                          all_events.sort(key=lambda x: datetime.fromisoformat(x["date"].replace("Z", "+00:00")))
+                     except (KeyError, ValueError):
+                          logging.warning("[NHL] Could not sort combined events by date.")
+                     new_event_data = all_events[0]
 
             # --- Compare and Update State --- 
             old_event_id = self.current_event_data.get("id") if self.current_event_data else None
@@ -956,16 +1013,14 @@ class NHLScoreboardManager:
             
             new_details = self._extract_game_details(new_event_data)
 
-            # Significant change detection (more robust needed?)
-            # Compare relevant fields: score, clock, period, status state
-            if new_details != self.current_game_details: # Basic check for now
+            if new_details != self.current_game_details: 
                  logging.debug("[NHL] Game details updated or event changed.")
                  self.current_event_data = new_event_data
                  self.current_game_details = new_details
                  self.needs_update = True
             else:
                  logging.debug("[NHL] No change detected in event or details.")
-                 # self.needs_update remains unchanged (likely False)
+                 # Keep needs_update as is (likely False if details didn't change)
 
         # No else needed here, if interval hasn't passed, we do nothing
 
