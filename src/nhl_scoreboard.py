@@ -324,16 +324,25 @@ def create_scorebug_image(game_details):
     # --- Draw Away Team ---
     if game_details["away_logo_path"]:
         try:
-            away_logo = Image.open(game_details["away_logo_path"]).convert("RGBA")
-            away_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
-            away_mask = away_logo.split()[-1] # Extract alpha channel as mask
-            # Calculate 4-element box explicitly
+            away_logo_rgba = Image.open(game_details["away_logo_path"]).convert("RGBA")
+            away_logo_rgba.thumbnail(logo_size, Image.Resampling.LANCZOS)
+
+            # Calculate 4-element box for the target region
             left = away_logo_pos[0]
-            upper = (DISPLAY_HEIGHT - away_logo.height) // 2
-            right = left + away_logo.width
-            lower = upper + away_logo.height
+            upper = (DISPLAY_HEIGHT - away_logo_rgba.height) // 2
+            right = left + away_logo_rgba.width
+            lower = upper + away_logo_rgba.height
             box = (left, upper, right, lower)
-            img.paste(away_logo, box, away_mask) # Use 4-tuple box and image mask
+
+            # Create RGBA background region
+            bg_region_rgba = img.crop(box).convert("RGBA")
+
+            # Alpha composite logo onto background region
+            composite_region = Image.alpha_composite(bg_region_rgba, away_logo_rgba)
+
+            # Paste the composited region back (no mask needed)
+            img.paste(composite_region, (box[0], box[1]))
+
         except Exception as e:
             logging.error(f"Error loading/pasting away logo {game_details['away_logo_path']}: {e}")
             # Draw placeholder text if logo fails
@@ -347,16 +356,25 @@ def create_scorebug_image(game_details):
     # --- Draw Home Team ---
     if game_details["home_logo_path"]:
          try:
-            home_logo = Image.open(game_details["home_logo_path"]).convert("RGBA")
-            home_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
-            home_mask = home_logo.split()[-1] # Extract alpha channel as mask
-            # Calculate 4-element box explicitly
+            home_logo_rgba = Image.open(game_details["home_logo_path"]).convert("RGBA")
+            home_logo_rgba.thumbnail(logo_size, Image.Resampling.LANCZOS)
+
+            # Calculate 4-element box for the target region
             left = home_logo_pos[0]
-            upper = (DISPLAY_HEIGHT - home_logo.height) // 2
-            right = left + home_logo.width
-            lower = upper + home_logo.height
+            upper = (DISPLAY_HEIGHT - home_logo_rgba.height) // 2
+            right = left + home_logo_rgba.width
+            lower = upper + home_logo_rgba.height
             box = (left, upper, right, lower)
-            img.paste(home_logo, box, home_mask) # Use 4-tuple box and image mask
+
+            # Create RGBA background region
+            bg_region_rgba = img.crop(box).convert("RGBA")
+
+            # Alpha composite logo onto background region
+            composite_region = Image.alpha_composite(bg_region_rgba, home_logo_rgba)
+
+            # Paste the composited region back (no mask needed)
+            img.paste(composite_region, (box[0], box[1]))
+
          except Exception as e:
             logging.error(f"Error loading/pasting home logo {game_details['home_logo_path']}: {e}")
             draw.text(home_logo_pos, game_details["home_abbr"], font=team_font, fill="white")
@@ -1067,16 +1085,25 @@ class NHLScoreboardManager:
         # Draw Away Logo
         if game_details.get("away_logo_path"):
             try:
-                away_logo = Image.open(game_details["away_logo_path"]).convert("RGBA")
-                away_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
-                away_mask = away_logo.split()[-1] # Extract alpha channel as mask
-                # Calculate 4-element box explicitly
+                away_logo_rgba = Image.open(game_details["away_logo_path"]).convert("RGBA")
+                away_logo_rgba.thumbnail(logo_size, Image.Resampling.LANCZOS)
+
+                # Calculate 4-element box for the target region
                 left = away_logo_x
-                upper = (self.display_height - away_logo.height) // 2
-                right = left + away_logo.width
-                lower = upper + away_logo.height
+                upper = (self.display_height - away_logo_rgba.height) // 2
+                right = left + away_logo_rgba.width
+                lower = upper + away_logo_rgba.height
                 box = (left, upper, right, lower)
-                img.paste(away_logo, box, away_mask) # Use 4-tuple box and image mask
+
+                # Create RGBA background region
+                bg_region_rgba = img.crop(box).convert("RGBA")
+
+                # Alpha composite logo onto background region
+                composite_region = Image.alpha_composite(bg_region_rgba, away_logo_rgba)
+
+                # Paste the composited region back (no mask needed)
+                img.paste(composite_region, (box[0], box[1]))
+
             except Exception as e:
                 logging.error(f"[NHL] Error rendering upcoming away logo {game_details['away_logo_path']}: {e}")
                 draw.text((away_logo_x, 5), game_details.get("away_abbr", "?"), font=font_team, fill="white")
@@ -1086,16 +1113,25 @@ class NHLScoreboardManager:
         # Draw Home Logo
         if game_details.get("home_logo_path"):
              try:
-                home_logo = Image.open(game_details["home_logo_path"]).convert("RGBA")
-                home_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
-                home_mask = home_logo.split()[-1] # Extract alpha channel as mask
-                # Calculate 4-element box explicitly
+                home_logo_rgba = Image.open(game_details["home_logo_path"]).convert("RGBA")
+                home_logo_rgba.thumbnail(logo_size, Image.Resampling.LANCZOS)
+
+                # Calculate 4-element box for the target region
                 left = home_logo_x
-                upper = (self.display_height - home_logo.height) // 2
-                right = left + home_logo.width
-                lower = upper + home_logo.height
+                upper = (self.display_height - home_logo_rgba.height) // 2
+                right = left + home_logo_rgba.width
+                lower = upper + home_logo_rgba.height
                 box = (left, upper, right, lower)
-                img.paste(home_logo, box, home_mask) # Use 4-tuple box and image mask
+
+                # Create RGBA background region
+                bg_region_rgba = img.crop(box).convert("RGBA")
+
+                # Alpha composite logo onto background region
+                composite_region = Image.alpha_composite(bg_region_rgba, home_logo_rgba)
+
+                # Paste the composited region back (no mask needed)
+                img.paste(composite_region, (box[0], box[1]))
+
              except Exception as e:
                 logging.error(f"[NHL] Error rendering upcoming home logo {game_details['home_logo_path']}: {e}")
                 draw.text((home_logo_x, 5), game_details.get("home_abbr", "?"), font=font_team, fill="white")
@@ -1165,17 +1201,26 @@ class NHLScoreboardManager:
         away_logo_drawn_size = (0,0)
         if game_details.get("away_logo_path"):
             try:
-                away_logo = Image.open(game_details["away_logo_path"]).convert("RGBA")
-                away_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
-                away_logo_drawn_size = away_logo.size # Keep track of size
-                away_mask = away_logo.split()[-1] # Extract alpha channel as mask
-                # Calculate 4-element box explicitly
+                away_logo_rgba = Image.open(game_details["away_logo_path"]).convert("RGBA")
+                away_logo_rgba.thumbnail(logo_size, Image.Resampling.LANCZOS)
+                away_logo_drawn_size = away_logo_rgba.size # Keep track of size
+
+                # Calculate 4-element box for the target region
                 left = away_logo_x
-                upper = (self.display_height - away_logo.height) // 2
-                right = left + away_logo.width
-                lower = upper + away_logo.height
+                upper = (self.display_height - away_logo_rgba.height) // 2
+                right = left + away_logo_rgba.width
+                lower = upper + away_logo_rgba.height
                 box = (left, upper, right, lower)
-                img.paste(away_logo, box, away_mask) # Use 4-tuple box and image mask
+
+                # Create RGBA background region
+                bg_region_rgba = img.crop(box).convert("RGBA")
+
+                # Alpha composite logo onto background region
+                composite_region = Image.alpha_composite(bg_region_rgba, away_logo_rgba)
+
+                # Paste the composited region back (no mask needed)
+                img.paste(composite_region, (box[0], box[1]))
+
             except Exception as e:
                 logging.error(f"[NHL] Error rendering away logo {game_details['away_logo_path']}: {e}")
                 draw.text((away_logo_x + 2, 5), game_details.get("away_abbr", "?"), font=font_team, fill="white")
@@ -1189,17 +1234,26 @@ class NHLScoreboardManager:
         home_logo_drawn_size = (0,0)
         if game_details.get("home_logo_path"):
              try:
-                home_logo = Image.open(game_details["home_logo_path"]).convert("RGBA")
-                home_logo.thumbnail(logo_size, Image.Resampling.LANCZOS)
-                home_logo_drawn_size = home_logo.size # Keep track of size
-                home_mask = home_logo.split()[-1] # Extract alpha channel as mask
-                # Calculate 4-element box explicitly
+                home_logo_rgba = Image.open(game_details["home_logo_path"]).convert("RGBA")
+                home_logo_rgba.thumbnail(logo_size, Image.Resampling.LANCZOS)
+                home_logo_drawn_size = home_logo_rgba.size # Keep track of size
+
+                # Calculate 4-element box for the target region
                 left = home_logo_x
-                upper = (self.display_height - home_logo.height) // 2
-                right = left + home_logo.width
-                lower = upper + home_logo.height
+                upper = (self.display_height - home_logo_rgba.height) // 2
+                right = left + home_logo_rgba.width
+                lower = upper + home_logo_rgba.height
                 box = (left, upper, right, lower)
-                img.paste(home_logo, box, home_mask) # Use 4-tuple box and image mask
+
+                # Create RGBA background region
+                bg_region_rgba = img.crop(box).convert("RGBA")
+
+                # Alpha composite logo onto background region
+                composite_region = Image.alpha_composite(bg_region_rgba, home_logo_rgba)
+
+                # Paste the composited region back (no mask needed)
+                img.paste(composite_region, (box[0], box[1]))
+
              except Exception as e:
                 logging.error(f"[NHL] Error rendering home logo {game_details['home_logo_path']}: {e}")
                 draw.text((home_logo_x + 2, 5), game_details.get("home_abbr", "?"), font=font_team, fill="white")
