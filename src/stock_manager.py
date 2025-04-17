@@ -51,8 +51,24 @@ class StockManager:
                     logger.warning(f"Cannot create logo directory '{self.logo_dir}': {str(e)}. Using temporary directory.")
                     import tempfile
                     self.logo_dir = tempfile.mkdtemp(prefix='stock_logos_')
-            elif not os.access(self.logo_dir, os.W_OK):
-                logger.warning(f"Cannot write to logo directory '{self.logo_dir}'. Using temporary directory.")
+                    writable = False # Explicitly set writable to false if creation fails
+                else:
+                    writable = True # Assume writable if created successfully
+            else:
+                 # Directory exists, check if writable by trying to create a temp file
+                try:
+                    temp_file_path = os.path.join(self.logo_dir, ".write_test")
+                    with open(temp_file_path, 'w') as f:
+                        f.write('test')
+                    os.remove(temp_file_path)
+                    logger.debug(f"Write test successful in {self.logo_dir}")
+                    writable = True
+                except (PermissionError, OSError) as e:
+                    logger.warning(f"Cannot write to logo directory '{self.logo_dir}' (write test failed): {e}. Using temporary directory.")
+                    writable = False
+
+            # If not writable, switch to a temporary directory
+            if not writable:
                 import tempfile
                 self.logo_dir = tempfile.mkdtemp(prefix='stock_logos_')
                 
