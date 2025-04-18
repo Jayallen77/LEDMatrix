@@ -152,10 +152,12 @@ class BaseNHLManager:
                 "is_upcoming": status["type"]["state"] == "pre",
                 "home_abbr": home_team["team"]["abbreviation"],
                 "home_score": home_team.get("score", "0"),
-                "home_logo_path": self.logo_dir / f"{home_team['team']['abbreviation']}.png",
+                "home_logo_path": os.path.join(self.logo_dir, f"{home_team['team']['abbreviation']}.png"),
                 "away_abbr": away_team["team"]["abbreviation"],
                 "away_score": away_team.get("score", "0"),
-                "away_logo_path": self.logo_dir / f"{away_team['team']['abbreviation']}.png"
+                "away_logo_path": os.path.join(self.logo_dir, f"{away_team['team']['abbreviation']}.png"),
+                "game_time": game_time,
+                "game_date": game_date
             }
 
             # Validate logo files
