@@ -24,7 +24,7 @@ class BaseNHLManager:
         self.config = config
         self.nhl_config = config.get("nhl_scoreboard", {})
         self.is_enabled = self.nhl_config.get("enabled", False)
-        self.test_mode = self.nhl_config.get("test_mode", False)
+        self.test_mode = True  # Force test mode to be enabled
         self.logo_dir = self.nhl_config.get("logo_dir", "assets/sports/nhl_logos")
         self.update_interval = self.nhl_config.get("update_interval_seconds", 60)
         self.last_update = 0
