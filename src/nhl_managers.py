@@ -142,6 +142,15 @@ class BaseNHLManager:
             home_team = next(c for c in competitors if c.get("homeAway") == "home")
             away_team = next(c for c in competitors if c.get("homeAway") == "away")
 
+            # Format game time and date for display
+            game_time = ""
+            game_date = ""
+            if start_time_utc:
+                # Convert to local time
+                local_time = start_time_utc.astimezone()
+                game_time = local_time.strftime("%I:%M %p")
+                game_date = local_time.strftime("%b %d")
+
             details = {
                 "start_time_utc": start_time_utc,
                 "status_text": status["type"]["shortDetail"],
