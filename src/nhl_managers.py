@@ -520,15 +520,20 @@ class NHLRecentManager(BaseNHLManager):
                     for event in data["events"]:
                         details = self._extract_game_details(event)
                         if details:
-                            logging.debug(f"[NHL] Processing game: {details['away_abbr']} vs {details['home_abbr']}")
-                            logging.debug(f"[NHL] Game status: is_final={details['is_final']}, is_within_window={details['is_within_window']}")
+                            self.logger.info(f"[NHL] Processing game: {details['away_abbr']} vs {details['home_abbr']}")
+                            self.logger.info(f"[NHL] Game status: is_final={details['is_final']}, is_within_window={details['is_within_window']}")
+                            self.logger.info(f"[NHL] Game time: {details['start_time_utc']}, Cutoff time: {datetime.now(timezone.utc) - timedelta(hours=self.recent_hours)}")
                             if details["is_final"] and details["is_within_window"]:
                                 if not self.favorite_teams or (
                                     details["home_abbr"] in self.favorite_teams or 
                                     details["away_abbr"] in self.favorite_teams
                                 ):
                                     new_recent_games.append(details)
-                                    logging.info(f"[NHL] Found recent game: {details['away_abbr']} vs {details['home_abbr']}")
+                                    self.logger.info(f"[NHL] Found recent game: {details['away_abbr']} vs {details['home_abbr']}")
+                                else:
+                                    self.logger.info(f"[NHL] Game not involving favorite teams: {details['away_abbr']} vs {details['home_abbr']}")
+                            else:
+                                self.logger.info(f"[NHL] Game not meeting criteria: is_final={details['is_final']}, is_within_window={details['is_within_window']}")
                     
                     if new_recent_games:
                         logging.info(f"[NHL] Found {len(new_recent_games)} recent games for favorite teams")
