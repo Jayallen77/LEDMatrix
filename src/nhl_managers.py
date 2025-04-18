@@ -57,13 +57,18 @@ class BaseNHLManager:
     def _load_and_resize_logo(self, logo_path: Path, max_size: tuple) -> Optional[Image.Image]:
         """Load and resize a logo image."""
         if not logo_path or not logo_path.is_file():
+            logging.warning(f"[NHL] Logo file not found: {logo_path}")
             return None
 
         try:
+            logging.info(f"[NHL] Loading logo from: {logo_path}")
             logo = Image.open(logo_path)
             if logo.mode != 'RGBA':
+                logging.info(f"[NHL] Converting logo from {logo.mode} to RGBA")
                 logo = logo.convert('RGBA')
+            logging.info(f"[NHL] Original logo size: {logo.size}")
             logo.thumbnail(max_size, Image.Resampling.LANCZOS)
+            logging.info(f"[NHL] Resized logo size: {logo.size}")
             return logo
         except Exception as e:
             logging.error(f"[NHL] Error loading logo {logo_path}: {e}")
@@ -283,15 +288,20 @@ class NHLLiveManager(BaseNHLManager):
 
             # Calculate logo sizes
             max_size = (self.display_width // 3, self.display_height // 2)
+            logging.info(f"[NHL] Logo max size: {max_size}")
 
             # Load and resize logos
             home_logo = self._load_and_resize_logo(self.current_game["home_logo_path"], max_size)
             away_logo = self._load_and_resize_logo(self.current_game["away_logo_path"], max_size)
+            
+            logging.info(f"[NHL] Home logo loaded: {home_logo is not None}, path: {self.current_game['home_logo_path']}")
+            logging.info(f"[NHL] Away logo loaded: {away_logo is not None}, path: {self.current_game['away_logo_path']}")
 
             # Draw home team logo
             if home_logo:
                 home_x = self.display_width // 4 - home_logo.width // 2
                 home_y = self.display_height // 4 - home_logo.height // 2
+                logging.info(f"[NHL] Home logo position: ({home_x}, {home_y}), size: {home_logo.size}")
                 temp_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
                 temp_draw = ImageDraw.Draw(temp_img)
                 temp_img.paste(home_logo, (home_x, home_y), home_logo)
@@ -301,6 +311,7 @@ class NHLLiveManager(BaseNHLManager):
             if away_logo:
                 away_x = self.display_width // 4 - away_logo.width // 2
                 away_y = 3 * self.display_height // 4 - away_logo.height // 2
+                logging.info(f"[NHL] Away logo position: ({away_x}, {away_y}), size: {away_logo.size}")
                 temp_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
                 temp_draw = ImageDraw.Draw(temp_img)
                 temp_img.paste(away_logo, (away_x, away_y), away_logo)
@@ -413,28 +424,35 @@ class NHLRecentManager(BaseNHLManager):
 
             # Calculate logo sizes
             max_size = (self.display_width // 3, self.display_height // 2)
+            logging.info(f"[NHL] Logo max size: {max_size}")
 
             # Load and resize logos
             home_logo = self._load_and_resize_logo(self.current_game["home_logo_path"], max_size)
             away_logo = self._load_and_resize_logo(self.current_game["away_logo_path"], max_size)
+            
+            logging.info(f"[NHL] Home logo loaded: {home_logo is not None}, path: {self.current_game['home_logo_path']}")
+            logging.info(f"[NHL] Away logo loaded: {away_logo is not None}, path: {self.current_game['away_logo_path']}")
+
+            # Create a single temporary image for both logos
+            temp_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
+            temp_draw = ImageDraw.Draw(temp_img)
 
             # Draw home team logo
             if home_logo:
                 home_x = self.display_width // 4 - home_logo.width // 2
                 home_y = self.display_height // 4 - home_logo.height // 2
-                temp_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
-                temp_draw = ImageDraw.Draw(temp_img)
+                logging.info(f"[NHL] Home logo position: ({home_x}, {home_y}), size: {home_logo.size}")
                 temp_img.paste(home_logo, (home_x, home_y), home_logo)
-                img.paste(temp_img, (0, 0))
 
             # Draw away team logo
             if away_logo:
                 away_x = self.display_width // 4 - away_logo.width // 2
                 away_y = 3 * self.display_height // 4 - away_logo.height // 2
-                temp_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
-                temp_draw = ImageDraw.Draw(temp_img)
+                logging.info(f"[NHL] Away logo position: ({away_x}, {away_y}), size: {away_logo.size}")
                 temp_img.paste(away_logo, (away_x, away_y), away_logo)
-                img.paste(temp_img, (0, 0))
+
+            # Paste the combined image onto the main image
+            img.paste(temp_img, (0, 0))
 
             # Draw scores
             home_score = str(self.current_game["home_score"])
@@ -548,28 +566,35 @@ class NHLUpcomingManager(BaseNHLManager):
 
             # Calculate logo sizes
             max_size = (self.display_width // 3, self.display_height // 2)
+            logging.info(f"[NHL] Logo max size: {max_size}")
 
             # Load and resize logos
             home_logo = self._load_and_resize_logo(self.current_game["home_logo_path"], max_size)
             away_logo = self._load_and_resize_logo(self.current_game["away_logo_path"], max_size)
+            
+            logging.info(f"[NHL] Home logo loaded: {home_logo is not None}, path: {self.current_game['home_logo_path']}")
+            logging.info(f"[NHL] Away logo loaded: {away_logo is not None}, path: {self.current_game['away_logo_path']}")
+
+            # Create a single temporary image for both logos
+            temp_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
+            temp_draw = ImageDraw.Draw(temp_img)
 
             # Draw home team logo
             if home_logo:
                 home_x = self.display_width // 4 - home_logo.width // 2
                 home_y = self.display_height // 4 - home_logo.height // 2
-                temp_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
-                temp_draw = ImageDraw.Draw(temp_img)
+                logging.info(f"[NHL] Home logo position: ({home_x}, {home_y}), size: {home_logo.size}")
                 temp_img.paste(home_logo, (home_x, home_y), home_logo)
-                img.paste(temp_img, (0, 0))
 
             # Draw away team logo
             if away_logo:
                 away_x = self.display_width // 4 - away_logo.width // 2
                 away_y = 3 * self.display_height // 4 - away_logo.height // 2
-                temp_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
-                temp_draw = ImageDraw.Draw(temp_img)
+                logging.info(f"[NHL] Away logo position: ({away_x}, {away_y}), size: {away_logo.size}")
                 temp_img.paste(away_logo, (away_x, away_y), away_logo)
-                img.paste(temp_img, (0, 0))
+
+            # Paste the combined image onto the main image
+            img.paste(temp_img, (0, 0))
 
             # Draw game time
             status_x = self.display_width // 2 - 20
