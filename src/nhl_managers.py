@@ -269,8 +269,10 @@ class NHLLiveManager(BaseNHLManager):
                 "away_score": "2",
                 "period": 2,
                 "clock": "12:34",
-                "home_logo_path": self.logo_dir / "TBL.png",
-                "away_logo_path": self.logo_dir / "DAL.png"
+                "home_logo_path": os.path.join(self.logo_dir, "TBL.png"),
+                "away_logo_path": os.path.join(self.logo_dir, "DAL.png"),
+                "game_time": "7:30 PM",
+                "game_date": "Apr 17"
             }
             logging.info("[NHL] Initialized NHLLiveManager with test game: TBL vs DAL")
         else:
@@ -419,8 +421,10 @@ class NHLRecentManager(BaseNHLManager):
                 "home_score": "4",
                 "away_score": "2",
                 "status_text": "Final",
-                "home_logo_path": self.logo_dir / "TBL.png",
-                "away_logo_path": self.logo_dir / "DAL.png"
+                "home_logo_path": os.path.join(self.logo_dir, "TBL.png"),
+                "away_logo_path": os.path.join(self.logo_dir, "DAL.png"),
+                "game_time": "7:30 PM",
+                "game_date": "Apr 17"
             }
             logging.info("[NHL] Initialized NHLRecentManager with test game: TBL vs DAL")
         else:
@@ -548,8 +552,10 @@ class NHLUpcomingManager(BaseNHLManager):
                 "home_abbr": "TBL",
                 "away_abbr": "DAL",
                 "status_text": "7:30 PM ET",
-                "home_logo_path": self.logo_dir / "TBL.png",
-                "away_logo_path": self.logo_dir / "DAL.png"
+                "home_logo_path": os.path.join(self.logo_dir, "TBL.png"),
+                "away_logo_path": os.path.join(self.logo_dir, "DAL.png"),
+                "game_time": "7:30 PM",
+                "game_date": "Apr 17"
             }
             logging.info("[NHL] Initialized NHLUpcomingManager with test game: TBL vs DAL")
         else:
