@@ -1219,7 +1219,7 @@ class NHLScoreboardManager:
             
             # Draw team logos
             if home_logo:
-                home_x = width // 4 - home_logo.width // 2
+                home_x = 3 * width // 4 - home_logo.width // 2
                 home_y = height // 4 - home_logo.height // 2
                 # Create a temporary RGB image for compositing
                 temp_img = Image.new('RGB', (width, height), 'black')
