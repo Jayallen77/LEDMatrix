@@ -297,7 +297,14 @@ class BaseNHLManager:
                 else:
                     period = self.current_game.get("period", 0)
                     clock = self.current_game.get("clock", "0:00")
-                    status_text = f"P:{period} {clock}"
+                    
+                    # Format period text
+                    if period > 3:
+                        period_text = "OT"
+                    else:
+                        period_text = f"{period}{'st' if period == 1 else 'nd' if period == 2 else 'rd'}"
+                    
+                    status_text = f"{period_text} {clock}"
                 
                 # Calculate position for the status text (centered at the top)
                 status_width = draw.textlength(status_text, font=self.fonts['time'])
