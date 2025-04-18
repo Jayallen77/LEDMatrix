@@ -7,6 +7,7 @@ from typing import Dict, Any, Optional, List
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
+from src.display_manager import DisplayManager
 
 # Constants
 ESPN_NHL_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard"
