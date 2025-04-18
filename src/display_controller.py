@@ -55,7 +55,7 @@ class DisplayController:
             if self.nhl_recent: self.available_modes.append('nhl_recent')
             if self.nhl_upcoming: self.available_modes.append('nhl_upcoming')
         
-        # Set initial display to first available mode
+        # Set initial display to first available mode (clock)
         self.current_mode_index = 0
         self.current_display_mode = self.available_modes[0] if self.available_modes else 'none'
         self.last_switch = time.time()
@@ -66,7 +66,6 @@ class DisplayController:
         self.current_team_index = 0
         self.showing_recent = True  # True for recent, False for upcoming
         self.favorite_teams = self.config.get('nhl_scoreboard', {}).get('favorite_teams', [])
-        self.team_rotation_count = 0  # Track how many times we've rotated through teams
         
         # Update display durations to include NHL modes
         self.display_durations = self.config['display'].get('display_durations', {
@@ -166,16 +165,8 @@ class DisplayController:
                 # Check for live games
                 has_live_games = self._check_live_games()
                 
-                # If we're in NHL live mode but there are no live games, skip to next mode
-                if self.current_display_mode == 'nhl_live' and not has_live_games:
-                    self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
-                    self.current_display_mode = self.available_modes[self.current_mode_index]
-                    logger.info(f"No live games, switching to: {self.current_display_mode}")
-                    self.last_switch = current_time
-                    self.force_clear = True
-                
                 # Check for mode switch
-                elif current_time - self.last_switch > self.get_current_duration():
+                if current_time - self.last_switch > self.get_current_duration():
                     # If there are live games and we're not in NHL live mode, switch to it
                     if has_live_games and self.current_display_mode != 'nhl_live':
                         live_index = self.available_modes.index('nhl_live')
@@ -201,7 +192,7 @@ class DisplayController:
                                     self.current_display_mode = 'nhl_upcoming'
                                     logger.info(f"Starting NHL rotation with upcoming game for {self.favorite_teams[self.current_team_index]}")
                                 else:
-                                    # No games for this team, move to next mode
+                                    # No games for this team, move to next mode in rotation
                                     self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
                                     self.current_display_mode = self.available_modes[self.current_mode_index]
                                     logger.info(f"No games for team, switching to: {self.current_display_mode}")
