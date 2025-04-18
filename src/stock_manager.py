@@ -43,47 +43,47 @@ class StockManager:
         if not os.path.exists(self.ticker_icons_dir):
             logger.warning(f"Ticker icons directory not found: {self.ticker_icons_dir}")
             
-        # Set up the logo directory for external logos
-        self.logo_dir = os.path.join('assets', 'stocks')
+        # # Set up the logo directory for external logos
+        # self.logo_dir = os.path.join('assets', 'stocks')
         
-        # Check if we can use the logo directory, otherwise use temporary
-        try:
-            if not os.path.exists(self.logo_dir):
-                try:
-                    os.makedirs(self.logo_dir, mode=0o755, exist_ok=True)
-                    logger.info(f"Created logo directory: {self.logo_dir}")
-                except (PermissionError, OSError) as e:
-                    logger.warning(f"Cannot create logo directory '{self.logo_dir}': {str(e)}. Using temporary directory.")
-                    import tempfile
-                    self.logo_dir = tempfile.mkdtemp(prefix='stock_logos_')
-                    writable = False # Explicitly set writable to false if creation fails
-                else:
-                    writable = True # Assume writable if created successfully
-            else:
-                 # Directory exists, check if writable by trying to create a temp file
-                try:
-                    temp_file_path = os.path.join(self.logo_dir, "write_test_py.tmp")
-                    with open(temp_file_path, 'w') as f:
-                        f.write('test')
-                    os.remove(temp_file_path)
-                    writable = True
-                except (PermissionError, OSError) as e:
-                    logger.warning(f"Cannot write to logo directory '{self.logo_dir}' (write test failed): {e}. Using temporary directory.")
-                    writable = False
+        # # Check if we can use the logo directory, otherwise use temporary
+        # try:
+        #     if not os.path.exists(self.logo_dir):
+        #         try:
+        #             os.makedirs(self.logo_dir, mode=0o755, exist_ok=True)
+        #             logger.info(f"Created logo directory: {self.logo_dir}")
+        #         except (PermissionError, OSError) as e:
+        #             logger.warning(f"Cannot create logo directory '{self.logo_dir}': {str(e)}. Using temporary directory.")
+        #             import tempfile
+        #             self.logo_dir = tempfile.mkdtemp(prefix='stock_logos_')
+        #             writable = False # Explicitly set writable to false if creation fails
+        #         else:
+        #             writable = True # Assume writable if created successfully
+        #     else:
+        #          # Directory exists, check if writable by trying to create a temp file
+        #         try:
+        #             temp_file_path = os.path.join(self.logo_dir, "write_test_py.tmp")
+        #             with open(temp_file_path, 'w') as f:
+        #                 f.write('test')
+        #             os.remove(temp_file_path)
+        #             writable = True
+        #         except (PermissionError, OSError) as e:
+        #             logger.warning(f"Cannot write to logo directory '{self.logo_dir}' (write test failed): {e}. Using temporary directory.")
+        #             writable = False
 
-            # If not writable, switch to a temporary directory
-            if not writable:
-                import tempfile
-                self.logo_dir = tempfile.mkdtemp(prefix='stock_logos_')
+        #     # If not writable, switch to a temporary directory
+        #     if not writable:
+        #         import tempfile
+        #         self.logo_dir = tempfile.mkdtemp(prefix='stock_logos_')
                 
-            logger.info(f"Using logo directory: {self.logo_dir}")
+        #     logger.info(f"Using logo directory: {self.logo_dir}")
                 
-        except Exception as e:
-            logger.error(f"Error setting up logo directory: {str(e)}")
-            # Fall back to using a temporary directory
-            import tempfile
-            self.logo_dir = tempfile.mkdtemp(prefix='stock_logos_')
-            logger.info(f"Using temporary directory for logos: {self.logo_dir}")
+        # except Exception as e:
+        #     logger.error(f"Error setting up logo directory: {str(e)}")
+        #     # Fall back to using a temporary directory
+        #     import tempfile
+        #     self.logo_dir = tempfile.mkdtemp(prefix='stock_logos_')
+        #     logger.info(f"Using temporary directory for logos: {self.logo_dir}")
         
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
