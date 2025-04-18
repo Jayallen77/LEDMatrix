@@ -1099,68 +1099,32 @@ class NHLScoreboardManager:
         # Draw Away Logo
         if game_details.get("away_logo_path"):
             try:
-                away_logo_rgba = Image.open(game_details["away_logo_path"]).convert("RGBA")
-                # Resize and reassign, instead of in-place thumbnail
-                away_logo_rgba = away_logo_rgba.resize(logo_size, Image.Resampling.LANCZOS)
-                # --- Debugging --- 
-                logging.debug(f"[NHL Debug] Away upcoming Type after resize: {type(away_logo_rgba)}")
-                logging.debug(f"[NHL Debug] Away upcoming Has width attr: {hasattr(away_logo_rgba, 'width')}")
-                logging.debug(f"[NHL Debug] Away upcoming Has height attr: {hasattr(away_logo_rgba, 'height')}")
-                # --- End Debugging ---
-
-                paste_x = away_logo_x
-                paste_y = (self.display_height - away_logo_rgba.height) // 2
-
-                # Manual pixel paste (robust alternative)
-                try:
-                    for x in range(away_logo_rgba.width):
-                        for y in range(away_logo_rgba.height):
-                            r, g, b, a = away_logo_rgba.getpixel((x, y))
-                            if a > 128: # Check alpha threshold
-                                target_x = paste_x + x
-                                target_y = paste_y + y
-                                # Ensure target pixel is within image bounds
-                                if 0 <= target_x < img.width and 0 <= target_y < img.height:
-                                    img.putpixel((target_x, target_y), (r, g, b))
-                except AttributeError as ae:
-                     logging.error(f"[NHL Debug] Away upcoming AttributeError accessing width/height in loop: {ae}")
-
+                away_logo = Image.open(game_details["away_logo_path"]).convert("RGBA")
+                away_logo = away_logo.resize(logo_size, Image.Resampling.LANCZOS)
+                paste_y = (self.display_height - away_logo.height) // 2
+                
+                # Create a mask from the alpha channel
+                mask = away_logo.split()[3]
+                # Paste using the alpha channel as mask
+                img.paste(away_logo, (away_logo_x, paste_y), mask)
             except Exception as e:
                 logging.error(f"[NHL] Error rendering upcoming away logo {game_details['away_logo_path']}: {e}")
                 draw.text((away_logo_x, 5), game_details.get("away_abbr", "?"), font=font_team, fill="white")
         else:
-             draw.text((away_logo_x, 5), game_details.get("away_abbr", "?"), font=font_team, fill="white")
+            draw.text((away_logo_x, 5), game_details.get("away_abbr", "?"), font=font_team, fill="white")
 
         # Draw Home Logo
         if game_details.get("home_logo_path"):
-             try:
-                home_logo_rgba = Image.open(game_details["home_logo_path"]).convert("RGBA")
-                # Resize and reassign, instead of in-place thumbnail
-                home_logo_rgba = home_logo_rgba.resize(logo_size, Image.Resampling.LANCZOS)
-                # --- Debugging --- 
-                logging.debug(f"[NHL Debug] Home upcoming Type after resize: {type(home_logo_rgba)}")
-                logging.debug(f"[NHL Debug] Home upcoming Has width attr: {hasattr(home_logo_rgba, 'width')}")
-                logging.debug(f"[NHL Debug] Home upcoming Has height attr: {hasattr(home_logo_rgba, 'height')}")
-                # --- End Debugging ---
-
-                paste_x = home_logo_x
-                paste_y = (self.display_height - home_logo_rgba.height) // 2
-
-                # Manual pixel paste (robust alternative)
-                try:
-                    for x in range(home_logo_rgba.width):
-                        for y in range(home_logo_rgba.height):
-                            r, g, b, a = home_logo_rgba.getpixel((x, y))
-                            if a > 128: # Check alpha threshold
-                                target_x = paste_x + x
-                                target_y = paste_y + y
-                                # Ensure target pixel is within image bounds
-                                if 0 <= target_x < img.width and 0 <= target_y < img.height:
-                                    img.putpixel((target_x, target_y), (r, g, b))
-                except AttributeError as ae:
-                     logging.error(f"[NHL Debug] Home upcoming AttributeError accessing width/height in loop: {ae}")
-
-             except Exception as e:
+            try:
+                home_logo = Image.open(game_details["home_logo_path"]).convert("RGBA")
+                home_logo = home_logo.resize(logo_size, Image.Resampling.LANCZOS)
+                paste_y = (self.display_height - home_logo.height) // 2
+                
+                # Create a mask from the alpha channel
+                mask = home_logo.split()[3]
+                # Paste using the alpha channel as mask
+                img.paste(home_logo, (home_logo_x, paste_y), mask)
+            except Exception as e:
                 logging.error(f"[NHL] Error rendering upcoming home logo {game_details['home_logo_path']}: {e}")
                 draw.text((home_logo_x, 5), game_details.get("home_abbr", "?"), font=font_team, fill="white")
         else:
@@ -1229,33 +1193,15 @@ class NHLScoreboardManager:
         away_logo_drawn_size = (0,0)
         if game_details.get("away_logo_path"):
             try:
-                away_logo_rgba = Image.open(game_details["away_logo_path"]).convert("RGBA")
-                # Resize and reassign, instead of in-place thumbnail
-                away_logo_rgba = away_logo_rgba.resize(logo_size, Image.Resampling.LANCZOS)
-                # --- Debugging --- 
-                logging.debug(f"[NHL Debug] Away scorebug Type after resize: {type(away_logo_rgba)}")
-                logging.debug(f"[NHL Debug] Away scorebug Has width attr: {hasattr(away_logo_rgba, 'width')}")
-                logging.debug(f"[NHL Debug] Away scorebug Has height attr: {hasattr(away_logo_rgba, 'height')}")
-                # --- End Debugging ---
-                away_logo_drawn_size = away_logo_rgba.size # Keep track of size
-
-                paste_x = away_logo_x
-                paste_y = (self.display_height - away_logo_rgba.height) // 2
-
-                # Manual pixel paste (robust alternative)
-                try:
-                    for x in range(away_logo_rgba.width):
-                        for y in range(away_logo_rgba.height):
-                            r, g, b, a = away_logo_rgba.getpixel((x, y))
-                            if a > 128: # Check alpha threshold
-                                target_x = paste_x + x
-                                target_y = paste_y + y
-                                # Ensure target pixel is within image bounds
-                                if 0 <= target_x < img.width and 0 <= target_y < img.height:
-                                    img.putpixel((target_x, target_y), (r, g, b))
-                except AttributeError as ae:
-                     logging.error(f"[NHL Debug] Away scorebug AttributeError accessing width/height in loop: {ae}")
-
+                away_logo = Image.open(game_details["away_logo_path"]).convert("RGBA")
+                away_logo = away_logo.resize(logo_size, Image.Resampling.LANCZOS)
+                away_logo_drawn_size = away_logo.size
+                paste_y = (self.display_height - away_logo.height) // 2
+                
+                # Create a mask from the alpha channel
+                mask = away_logo.split()[3]
+                # Paste using the alpha channel as mask
+                img.paste(away_logo, (away_logo_x, paste_y), mask)
             except Exception as e:
                 logging.error(f"[NHL] Error rendering away logo {game_details['away_logo_path']}: {e}")
                 draw.text((away_logo_x + 2, 5), game_details.get("away_abbr", "?"), font=font_team, fill="white")
@@ -1268,35 +1214,17 @@ class NHLScoreboardManager:
         # --- Draw Home Team ---
         home_logo_drawn_size = (0,0)
         if game_details.get("home_logo_path"):
-             try:
-                home_logo_rgba = Image.open(game_details["home_logo_path"]).convert("RGBA")
-                # Resize and reassign, instead of in-place thumbnail
-                home_logo_rgba = home_logo_rgba.resize(logo_size, Image.Resampling.LANCZOS)
-                # --- Debugging --- 
-                logging.debug(f"[NHL Debug] Home scorebug Type after resize: {type(home_logo_rgba)}")
-                logging.debug(f"[NHL Debug] Home scorebug Has width attr: {hasattr(home_logo_rgba, 'width')}")
-                logging.debug(f"[NHL Debug] Home scorebug Has height attr: {hasattr(home_logo_rgba, 'height')}")
-                # --- End Debugging ---
-                home_logo_drawn_size = home_logo_rgba.size # Keep track of size
-
-                paste_x = home_logo_x
-                paste_y = (self.display_height - home_logo_rgba.height) // 2
-
-                # Manual pixel paste (robust alternative)
-                try:
-                    for x in range(home_logo_rgba.width):
-                        for y in range(home_logo_rgba.height):
-                            r, g, b, a = home_logo_rgba.getpixel((x, y))
-                            if a > 128: # Check alpha threshold
-                                target_x = paste_x + x
-                                target_y = paste_y + y
-                                # Ensure target pixel is within image bounds
-                                if 0 <= target_x < img.width and 0 <= target_y < img.height:
-                                    img.putpixel((target_x, target_y), (r, g, b))
-                except AttributeError as ae:
-                     logging.error(f"[NHL Debug] Home scorebug AttributeError accessing width/height in loop: {ae}")
-
-             except Exception as e:
+            try:
+                home_logo = Image.open(game_details["home_logo_path"]).convert("RGBA")
+                home_logo = home_logo.resize(logo_size, Image.Resampling.LANCZOS)
+                home_logo_drawn_size = home_logo.size
+                paste_y = (self.display_height - home_logo.height) // 2
+                
+                # Create a mask from the alpha channel
+                mask = home_logo.split()[3]
+                # Paste using the alpha channel as mask
+                img.paste(home_logo, (home_logo_x, paste_y), mask)
+            except Exception as e:
                 logging.error(f"[NHL] Error rendering home logo {game_details['home_logo_path']}: {e}")
                 draw.text((home_logo_x + 2, 5), game_details.get("home_abbr", "?"), font=font_team, fill="white")
         else:
