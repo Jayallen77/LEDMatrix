@@ -33,8 +33,8 @@ class BaseNHLManager:
         self.favorite_teams = self.nhl_config.get("favorite_teams", [])
         self.logger = logging.getLogger('NHL')
         
-        # Set logging level to DEBUG
-        self.logger.setLevel(logging.DEBUG)
+        # Set logging level to INFO to reduce noise
+        self.logger.setLevel(logging.INFO)
         
         # Get display dimensions from config
         display_config = config.get("display", {})
@@ -48,9 +48,7 @@ class BaseNHLManager:
         self._logo_cache = {}
         
         self.logger.info(f"Initialized NHL manager with display dimensions: {self.display_width}x{self.display_height}")
-        self.logger.info(f"[NHL] Test mode: {'enabled' if self.test_mode else 'disabled'}")
-        self.logger.info(f"[NHL] Favorite teams: {self.favorite_teams}")
-        self.logger.info(f"[NHL] Logo directory: {self.logo_dir}")
+        self.logger.info(f"Logo directory: {self.logo_dir}")
 
     def _load_fonts(self):
         """Load fonts used by the scoreboard."""
@@ -82,19 +80,15 @@ class BaseNHLManager:
 
     def _load_and_resize_logo(self, team_abbrev: str) -> Optional[Image.Image]:
         """Load and resize a team logo, with caching."""
-        self.logger.debug(f"Attempting to load logo for team: {team_abbrev}")
-        
         if team_abbrev in self._logo_cache:
-            self.logger.debug(f"Using cached logo for {team_abbrev}")
             return self._logo_cache[team_abbrev]
             
         logo_path = os.path.join(self.logo_dir, f"{team_abbrev}.png")
-        self.logger.debug(f"Loading logo from path: {logo_path}")
         
         try:
             # Create test logos if they don't exist
             if not os.path.exists(logo_path):
-                self.logger.debug(f"Logo file not found at {logo_path}, creating test logo")
+                self.logger.info(f"Creating test logo for {team_abbrev}")
                 os.makedirs(os.path.dirname(logo_path), exist_ok=True)
                 # Create a simple colored rectangle as a test logo
                 logo = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
@@ -108,15 +102,11 @@ class BaseNHLManager:
                 # Add team abbreviation
                 draw.text((8, 8), team_abbrev, fill=(255, 255, 255, 255))
                 logo.save(logo_path)
-                self.logger.info(f"Created test logo for {team_abbrev}")
             
             logo = Image.open(logo_path)
-            original_size = logo.size
-            self.logger.debug(f"Original logo size for {team_abbrev}: {original_size}")
             
             # Convert to RGBA if not already
             if logo.mode != 'RGBA':
-                self.logger.debug(f"Converting logo from {logo.mode} to RGBA")
                 logo = logo.convert('RGBA')
             
             # Calculate max size based on display dimensions
@@ -125,11 +115,9 @@ class BaseNHLManager:
             
             # Resize maintaining aspect ratio
             logo.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
-            self.logger.debug(f"Resized logo size for {team_abbrev}: {logo.size}")
             
             # Cache the resized logo
             self._logo_cache[team_abbrev] = logo
-            self.logger.debug(f"Successfully loaded and cached logo for {team_abbrev}")
             return logo
             
         except Exception as e:
@@ -236,22 +224,18 @@ class BaseNHLManager:
     def _draw_scorebug_layout(self):
         """Draw the scorebug layout for the current game."""
         try:
-            self.logger.debug("Starting to draw scorebug layout")
             # Create a new black image
             img = Image.new('RGB', (self.display_width, self.display_height), 'black')
             draw = ImageDraw.Draw(img)
 
-            # Load and resize logos
-            self.logger.debug("Loading home logo...")
+            # Load logos once
             home_logo = self._load_and_resize_logo(self.current_game["home_abbr"])
-            self.logger.debug("Loading away logo...")
             away_logo = self._load_and_resize_logo(self.current_game["away_abbr"])
 
             # Draw home team logo (right side)
             if home_logo:
                 home_x = 3 * self.display_width // 4 - home_logo.width // 2
                 home_y = self.display_height // 4 - home_logo.height // 2
-                self.logger.debug(f"Pasting home logo at ({home_x}, {home_y})")
                 img.paste(home_logo, (home_x, home_y), home_logo)
             else:
                 self.logger.warning(f"Home logo is None for team {self.current_game['home_abbr']}")
@@ -260,7 +244,6 @@ class BaseNHLManager:
             if away_logo:
                 away_x = self.display_width // 4 - away_logo.width // 2
                 away_y = self.display_height // 4 - away_logo.height // 2
-                self.logger.debug(f"Pasting away logo at ({away_x}, {away_y})")
                 img.paste(away_logo, (away_x, away_y), away_logo)
             else:
                 self.logger.warning(f"Away logo is None for team {self.current_game['away_abbr']}")
@@ -291,7 +274,6 @@ class BaseNHLManager:
             # Display the image
             self.display_manager.image.paste(img, (0, 0))
             self.display_manager.update_display()
-            self.logger.debug("Successfully displayed game")
 
         except Exception as e:
             self.logger.error(f"Error displaying game: {e}", exc_info=True)
