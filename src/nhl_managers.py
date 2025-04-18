@@ -425,16 +425,28 @@ class NHLRecentManager(BaseNHLManager):
             self.logger.debug("Updating recent game data")
             self.last_update = current_time
             
-            # Fetch data for the last 48 hours
-            cutoff_time = datetime.now(timezone.utc) - timedelta(hours=self.recent_hours)
-            data = self._fetch_data()
+            # Fetch data for the last few days
+            today = datetime.now(timezone.utc).date()
+            dates_to_fetch = [
+                (today - timedelta(days=2)).strftime('%Y%m%d'),
+                (today - timedelta(days=1)).strftime('%Y%m%d'),
+                today.strftime('%Y%m%d')
+            ]
             
-            if data and "events" in data:
+            # Fetch and combine data from all days
+            all_events = []
+            for date_str in dates_to_fetch:
+                data = self._fetch_data(date_str)
+                if data and "events" in data:
+                    all_events.extend(data["events"])
+            
+            if all_events:
                 # Find the most recent completed game involving favorite teams
                 most_recent_game = None
                 most_recent_time = None
+                cutoff_time = datetime.now(timezone.utc) - timedelta(hours=self.recent_hours)
                 
-                for event in data["events"]:
+                for event in all_events:
                     details = self._extract_game_details(event)
                     if details and details["is_final"] and details["start_time_utc"]:
                         # Check if game is within our time window
@@ -454,6 +466,8 @@ class NHLRecentManager(BaseNHLManager):
                     logging.info(f"[NHL] Found recent game: {most_recent_game['away_abbr']} vs {most_recent_game['home_abbr']}")
                 else:
                     logging.info("[NHL] No recent games found")
+            else:
+                logging.info("[NHL] No events found in the last few days")
 
     def display(self, force_clear: bool = False):
         """Display recent game information."""
