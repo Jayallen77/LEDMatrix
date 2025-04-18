@@ -178,7 +178,7 @@ class BaseNHLManager:
                 # Convert to local time
                 local_time = start_time_utc.astimezone()
                 game_time = local_time.strftime("%-I:%M %p")
-                game_date = local_time.strftime("%b %d")
+                game_date = local_time.strftime("%-m/%-d")
 
             details = {
                 "start_time_utc": start_time_utc,
@@ -273,8 +273,8 @@ class BaseNHLManager:
                 date_time_y = self.display_height - 15
                 draw.text((date_time_x, date_time_y), date_time_text, font=self.fonts['time'], fill=(255, 255, 255))
                 
-                # Show "Upcoming Game" at the top
-                status_text = "Upcoming Game"
+                # Show "Next Game" at the top
+                status_text = "Next Game"
                 status_width = draw.textlength(status_text, font=self.fonts['status'])
                 status_x = (self.display_width - status_width) // 2
                 status_y = 5
