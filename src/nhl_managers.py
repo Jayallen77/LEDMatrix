@@ -117,7 +117,7 @@ class BaseNHLManager:
                 logo = logo.convert('RGBA')
             
             # Calculate max size based on display dimensions
-            max_width = self.display_width // 4
+            max_width = self.display_width // 3  # Increased from 4 to 3 for larger logos
             max_height = self.display_height // 2  # Half of display height
             
             # Resize maintaining aspect ratio
@@ -330,10 +330,13 @@ class BaseNHLManager:
             # Composite the overlay with the main image
             main_img = Image.alpha_composite(main_img, overlay)
 
-            # Save debug image to check logo positions
-            debug_path = os.path.join(os.path.dirname(self.logo_dir), "debug_layout.png")
-            main_img.save(debug_path)
-            self.logger.info(f"Debug layout saved to: {debug_path}")
+            # Save debug image to check logo positions (in the same directory as the script)
+            debug_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "debug_layout.png")
+            try:
+                main_img.save(debug_path)
+                self.logger.info(f"Debug layout saved to: {debug_path}")
+            except Exception as e:
+                self.logger.warning(f"Could not save debug image: {e}")
 
             # Convert to RGB for final display
             main_img = main_img.convert('RGB')
