@@ -75,9 +75,6 @@ class DisplayController:
             'weather_hourly': 15,
             'weather_daily': 15,
             'stocks': 45,
-            'nhl_live': 30,  # Live games update more frequently
-            'nhl_recent': 15,  # Recent games - 15 seconds per team
-            'nhl_upcoming': 20,  # Upcoming games
             'stock_news': 30
         })
         logger.info("DisplayController initialized with display_manager: %s", id(self.display_manager))
