@@ -369,7 +369,7 @@ class WeatherManager:
                 available_height_for_icon = bottom_text_y - top_text_height
                 # Ensure calculated y is not negative if space is very tight
                 calculated_y = top_text_height + (available_height_for_icon - icon_size) // 2
-                icon_y = (self.display_manager.matrix.height // 2) - 20
+                icon_y = (self.display_manager.matrix.height // 2) - 15
                 icon_x = center_x - icon_size // 2
                 WeatherIcons.draw_weather_icon(image, forecast['condition'], icon_x, icon_y, icon_size)
                 
@@ -439,7 +439,7 @@ class WeatherManager:
                     available_height_for_icon = bottom_text_y - top_text_height
                     # Ensure calculated y is not negative if space is very tight
                     calculated_y = top_text_height + (available_height_for_icon - icon_size) // 2
-                    icon_y = max(top_text_height, calculated_y - 6) # Shift up by 6 pixels
+                    icon_y = (self.display_manager.matrix.height // 2) - 15
                     icon_x = center_x - icon_size // 2
                     WeatherIcons.draw_weather_icon(image, forecast['condition'], icon_x, icon_y, icon_size)
                     
