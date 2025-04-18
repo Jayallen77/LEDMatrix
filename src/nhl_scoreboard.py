@@ -6,6 +6,7 @@ from PIL import Image, ImageDraw, ImageFont
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional, Any
+import os
 try:
     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 except ImportError:
@@ -1121,224 +1122,133 @@ class NHLScoreboardManager:
                   msg, font=font, fill='grey')
 
     def _draw_upcoming_layout(self, draw: ImageDraw.ImageDraw, game_details: Dict[str, Any]):
-        """Draws the layout for an upcoming game."""
-        font_team = self.fonts.get('team', ImageFont.load_default())
-        font_main = self.fonts.get('upcoming_main', ImageFont.load_default())
-        font_vs = self.fonts.get('upcoming_vs', ImageFont.load_default())
-        img = draw.im
-
-        logging.debug("[NHL] Drawing upcoming game layout.")
-
-        logo_padding = 2
-        logo_max_h = self.display_height - (logo_padding * 2)
-        logo_area_width = int(self.display_width * 0.4)
-        logo_max_w = logo_area_width - logo_padding
-        logo_size = (logo_max_w, logo_max_h)
-
-        away_logo_x = logo_padding
-        home_logo_x = self.display_width - logo_area_width + logo_padding
-
-        # Draw Away Logo
-        if game_details.get("away_logo_path"):
-            try:
-                # Load and resize logo
-                away_logo = Image.open(game_details["away_logo_path"]).convert("RGBA")
-                aspect_ratio = away_logo.width / away_logo.height
-                if aspect_ratio > 1:  # wider than tall
-                    new_width = min(logo_max_w, int(logo_max_h * aspect_ratio))
-                    new_height = int(new_width / aspect_ratio)
-                else:  # taller than wide
-                    new_height = min(logo_max_h, int(logo_max_w / aspect_ratio))
-                    new_width = int(new_height * aspect_ratio)
-                
-                away_logo = away_logo.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                paste_y = (self.display_height - new_height) // 2
-                
-                # Convert to RGB before pasting
-                away_logo_rgb = away_logo.convert('RGB')
-                img.paste(away_logo_rgb, (away_logo_x, paste_y))
-                
-                logging.debug(f"[NHL] Successfully rendered away logo: {game_details['away_logo_path']}")
-            except Exception as e:
-                logging.error(f"[NHL] Error rendering upcoming away logo {game_details['away_logo_path']}: {e}")
-                draw.text((away_logo_x, 5), game_details.get("away_abbr", "?"), font=font_team, fill="white")
-        else:
-            draw.text((away_logo_x, 5), game_details.get("away_abbr", "?"), font=font_team, fill="white")
-
-        # Draw Home Logo
-        if game_details.get("home_logo_path"):
-            try:
-                # Load and resize logo
-                home_logo = Image.open(game_details["home_logo_path"]).convert("RGBA")
-                aspect_ratio = home_logo.width / home_logo.height
-                if aspect_ratio > 1:  # wider than tall
-                    new_width = min(logo_max_w, int(logo_max_h * aspect_ratio))
-                    new_height = int(new_width / aspect_ratio)
-                else:  # taller than wide
-                    new_height = min(logo_max_h, int(logo_max_w / aspect_ratio))
-                    new_width = int(new_height * aspect_ratio)
-                
-                home_logo = home_logo.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                paste_y = (self.display_height - new_height) // 2
-                
-                # Convert to RGB before pasting
-                home_logo_rgb = home_logo.convert('RGB')
-                img.paste(home_logo_rgb, (home_logo_x, paste_y))
-                
-                logging.debug(f"[NHL] Successfully rendered home logo: {game_details['home_logo_path']}")
-            except Exception as e:
-                logging.error(f"[NHL] Error rendering upcoming home logo {game_details['home_logo_path']}: {e}")
-                draw.text((home_logo_x, 5), game_details.get("home_abbr", "?"), font=font_team, fill="white")
-        else:
-            draw.text((home_logo_x, 5), game_details.get("home_abbr", "?"), font=font_team, fill="white")
-
-        # Center Text Area
-        center_start_x = logo_area_width
-        center_end_x = self.display_width - logo_area_width
-        center_x = (center_start_x + center_end_x) // 2
-
-        # Prepare Text
-        start_utc = game_details.get("start_time_utc")
-        date_str = "???"
-        time_str = "??:??"
-        if start_utc:
-            start_local = start_utc.astimezone(self.local_timezone)
-            now_local = datetime.now(self.local_timezone)
-            today_local = now_local.date()
-            start_date_local = start_local.date()
-            if start_date_local == today_local: date_str = "TODAY"
-            elif start_date_local == today_local + timedelta(days=1): date_str = "TOMORROW"
-            else: date_str = start_local.strftime("%a %b %d").upper()
-            time_str = start_local.strftime("%H:%M")
-        vs_str = "VS"
-
-        # Calculate Positions (adjust line_height as needed)
-        line_height_approx = font_main.getbbox("Aj")[3] - font_main.getbbox("Aj")[1] + 2
-        vs_height = font_vs.getbbox("VS")[3] - font_vs.getbbox("VS")[1]
-        total_text_height = (line_height_approx * 2) + vs_height
-        start_y = (self.display_height - total_text_height) // 2
-
-        date_y = start_y
-        time_y = date_y + line_height_approx
-        vs_y = time_y + line_height_approx
-
-        # Draw Text
-        draw.text((center_x, date_y), date_str, font=font_main, fill='white', anchor="mt")
-        draw.text((center_x, time_y), time_str, font=font_main, fill='white', anchor="mt")
-        draw.text((center_x, vs_y), vs_str, font=font_vs, fill='white', anchor="mt")
-
+        """Draws the upcoming game layout with team logos and game time."""
+        try:
+            # Load and resize logos
+            home_logo_path = os.path.join(self.logo_dir, f"{game_details['home_abbr']}.png")
+            away_logo_path = os.path.join(self.logo_dir, f"{game_details['away_abbr']}.png")
+            
+            # Load and process home logo
+            home_logo = None
+            if os.path.exists(home_logo_path):
+                try:
+                    home_logo = Image.open(home_logo_path)
+                    if home_logo.mode != 'RGBA':
+                        home_logo = home_logo.convert('RGBA')
+                    # Resize maintaining aspect ratio
+                    max_size = min(int(self.display_width / 3), int(self.display_height / 2))
+                    home_logo.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+                except Exception as e:
+                    logging.error(f"Error loading home logo {home_logo_path}: {e}")
+            
+            # Load and process away logo
+            away_logo = None
+            if os.path.exists(away_logo_path):
+                try:
+                    away_logo = Image.open(away_logo_path)
+                    if away_logo.mode != 'RGBA':
+                        away_logo = away_logo.convert('RGBA')
+                    # Resize maintaining aspect ratio
+                    max_size = min(int(self.display_width / 3), int(self.display_height / 2))
+                    away_logo.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+                except Exception as e:
+                    logging.error(f"Error loading away logo {away_logo_path}: {e}")
+            
+            # Calculate positions
+            width = self.display_width
+            height = self.display_height
+            
+            # Draw team logos
+            if home_logo:
+                home_x = width // 4 - home_logo.width // 2
+                home_y = height // 4 - home_logo.height // 2
+                draw.im.paste(home_logo, (home_x, home_y), home_logo)
+            
+            if away_logo:
+                away_x = width // 4 - away_logo.width // 2
+                away_y = 3 * height // 4 - away_logo.height // 2
+                draw.im.paste(away_logo, (away_x, away_y), away_logo)
+            
+            # Draw game time
+            game_time = game_details.get('clock', '')
+            time_x = width // 2 - 20
+            time_y = height // 2 - 8
+            draw.text((time_x, time_y), game_time, font=self.fonts['time'], fill=(255, 255, 255))
+            
+        except Exception as e:
+            logging.error(f"Error in _draw_upcoming_layout: {e}")
 
     def _draw_scorebug_layout(self, draw: ImageDraw.ImageDraw, game_details: Dict[str, Any]):
-        """Draws the standard score bug layout for live or final games."""
-        font_score = self.fonts.get('score', ImageFont.load_default())
-        font_time = self.fonts.get('time', ImageFont.load_default())
-        font_team = self.fonts.get('team', ImageFont.load_default())
-        font_status = self.fonts.get('status', ImageFont.load_default())
-        img = draw.im
-
-        logging.debug("[NHL] Drawing live/final game layout.")
-
-        # Layout Calculations
-        logo_max_h = self.display_height - 4
-        logo_max_w = int(self.display_width * 0.25)
-        logo_size = (logo_max_w, logo_max_h)
-        away_logo_x = 2
-        score_width_approx = 25
-        away_score_x = away_logo_x + logo_max_w + 4
-        home_logo_x = self.display_width - logo_max_w - 2
-        home_score_x = home_logo_x - score_width_approx - 4
-        center_x = self.display_width // 2
-        time_y = 2
-        period_y = 15
-
-        # --- Draw Away Team ---
-        away_logo_drawn_size = (0,0)
-        if game_details.get("away_logo_path"):
-            try:
-                # Load and resize logo
-                away_logo = Image.open(game_details["away_logo_path"]).convert("RGBA")
-                aspect_ratio = away_logo.width / away_logo.height
-                if aspect_ratio > 1:  # wider than tall
-                    new_width = min(logo_max_w, int(logo_max_h * aspect_ratio))
-                    new_height = int(new_width / aspect_ratio)
-                else:  # taller than wide
-                    new_height = min(logo_max_h, int(logo_max_w / aspect_ratio))
-                    new_width = int(new_height * aspect_ratio)
-                
-                away_logo = away_logo.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                away_logo_drawn_size = (new_width, new_height)
-                paste_y = (self.display_height - new_height) // 2
-                
-                # Convert to RGB before pasting
-                away_logo_rgb = away_logo.convert('RGB')
-                img.paste(away_logo_rgb, (away_logo_x, paste_y))
-                
-                logging.debug(f"[NHL] Successfully rendered away logo: {game_details['away_logo_path']}")
-            except Exception as e:
-                logging.error(f"[NHL] Error rendering away logo {game_details['away_logo_path']}: {e}")
-                draw.text((away_logo_x + 2, 5), game_details.get("away_abbr", "?"), font=font_team, fill="white")
-        else:
-            draw.text((away_logo_x + 2, 5), game_details.get("away_abbr", "?"), font=font_team, fill="white")
-
-        current_away_score_x = (away_logo_x + away_logo_drawn_size[0] + 4) if away_logo_drawn_size[0] > 0 else away_score_x
-        draw.text((current_away_score_x, (self.display_height - 12) // 2), str(game_details.get("away_score", "0")), font=font_score, fill='white')
-
-        # --- Draw Home Team ---
-        home_logo_drawn_size = (0,0)
-        if game_details.get("home_logo_path"):
-            try:
-                # Load and resize logo
-                home_logo = Image.open(game_details["home_logo_path"]).convert("RGBA")
-                aspect_ratio = home_logo.width / home_logo.height
-                if aspect_ratio > 1:  # wider than tall
-                    new_width = min(logo_max_w, int(logo_max_h * aspect_ratio))
-                    new_height = int(new_width / aspect_ratio)
-                else:  # taller than wide
-                    new_height = min(logo_max_h, int(logo_max_w / aspect_ratio))
-                    new_width = int(new_height * aspect_ratio)
-                
-                home_logo = home_logo.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                home_logo_drawn_size = (new_width, new_height)
-                paste_y = (self.display_height - new_height) // 2
-                
-                # Convert to RGB before pasting
-                home_logo_rgb = home_logo.convert('RGB')
-                img.paste(home_logo_rgb, (home_logo_x, paste_y))
-                
-                logging.debug(f"[NHL] Successfully rendered home logo: {game_details['home_logo_path']}")
-            except Exception as e:
-                logging.error(f"[NHL] Error rendering home logo {game_details['home_logo_path']}: {e}")
-                draw.text((home_logo_x + 2, 5), game_details.get("home_abbr", "?"), font=font_team, fill="white")
-        else:
-            draw.text((home_logo_x + 2, 5), game_details.get("home_abbr", "?"), font=font_team, fill="white")
-
-        current_home_score_x = home_logo_x - score_width_approx - 4
-        draw.text((current_home_score_x, (self.display_height - 12) // 2), str(game_details.get("home_score", "0")), font=font_score, fill='white')
-
-        # --- Draw Center Info ---
-        if game_details.get("is_live"):
-            period = game_details.get('period', 0)
-            period_str = f"{period}{'st' if period==1 else 'nd' if period==2 else 'rd' if period==3 else 'th'}".upper() if period > 0 and period <= 3 else "OT" if period > 3 else ""
-            status_name = game_details.get("status_type_name", "")
-            clock_text = game_details.get("clock", "")
-            if status_name == "STATUS_HALFTIME" or "intermission" in game_details.get("status_text", "").lower():
-                period_str = "INTER"
-                clock_text = ""
-            draw.text((center_x, time_y), clock_text, font=font_time, fill='yellow', anchor="mt")
-            draw.text((center_x, period_y), period_str, font=font_time, fill='yellow', anchor="mt")
-        elif game_details.get("is_final"):
-            draw.text((center_x, time_y), "FINAL", font=font_status, fill='red', anchor="mt")
-            period = game_details.get('period', 0)
-            final_period_str = ""
-            if period > 3:
-                 final_period_str = f"OT{period - 3 if period < 7 else ''}"
-            elif game_details.get("status_type_name") == "STATUS_SHOOTOUT":
-                 final_period_str = "SO"
-            if final_period_str:
-                draw.text((center_x, period_y), final_period_str, font=font_time, fill='red', anchor="mt")
-        else: # Should not happen if logic is correct, but fallback
-             status_text = game_details.get("status_text", "Error")
-             draw.text((center_x, time_y), status_text, font=font_time, fill='grey', anchor="mt")
+        """Draw the scorebug layout with team logos, scores, and game status."""
+        try:
+            # Load and resize logos
+            home_logo_path = os.path.join(self.logo_dir, f"{game_details['home_abbr']}.png")
+            away_logo_path = os.path.join(self.logo_dir, f"{game_details['away_abbr']}.png")
+            
+            # Load and process home logo
+            home_logo = None
+            if os.path.exists(home_logo_path):
+                try:
+                    home_logo = Image.open(home_logo_path)
+                    if home_logo.mode != 'RGBA':
+                        home_logo = home_logo.convert('RGBA')
+                    # Resize maintaining aspect ratio
+                    max_size = min(int(self.display_width / 3), int(self.display_height / 2))
+                    home_logo.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+                except Exception as e:
+                    logging.error(f"Error loading home logo {home_logo_path}: {e}")
+            
+            # Load and process away logo
+            away_logo = None
+            if os.path.exists(away_logo_path):
+                try:
+                    away_logo = Image.open(away_logo_path)
+                    if away_logo.mode != 'RGBA':
+                        away_logo = away_logo.convert('RGBA')
+                    # Resize maintaining aspect ratio
+                    max_size = min(int(self.display_width / 3), int(self.display_height / 2))
+                    away_logo.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+                except Exception as e:
+                    logging.error(f"Error loading away logo {away_logo_path}: {e}")
+            
+            # Calculate positions
+            width = self.display_width
+            height = self.display_height
+            
+            # Draw team logos
+            if home_logo:
+                home_x = width // 4 - home_logo.width // 2
+                home_y = height // 4 - home_logo.height // 2
+                draw.im.paste(home_logo, (home_x, home_y), home_logo)
+            
+            if away_logo:
+                away_x = width // 4 - away_logo.width // 2
+                away_y = 3 * height // 4 - away_logo.height // 2
+                draw.im.paste(away_logo, (away_x, away_y), away_logo)
+            
+            # Draw scores
+            score_color = (255, 255, 255)
+            home_score = str(game_details['home_score'])
+            away_score = str(game_details['away_score'])
+            
+            # Draw home score
+            home_score_x = width // 2 - 10
+            home_score_y = height // 4 - 8
+            draw.text((home_score_x, home_score_y), home_score, font=self.fonts['score'], fill=score_color)
+            
+            # Draw away score
+            away_score_x = width // 2 - 10
+            away_score_y = 3 * height // 4 - 8
+            draw.text((away_score_x, away_score_y), away_score, font=self.fonts['score'], fill=score_color)
+            
+            # Draw game status
+            status_text = game_details.get('status', '')
+            status_x = width // 2 - 20
+            status_y = height // 2 - 8
+            draw.text((status_x, status_y), status_text, font=self.fonts['status'], fill=score_color)
+            
+        except Exception as e:
+            logging.error(f"Error in _draw_scorebug_layout: {e}")
 
 
 if __name__ == "__main__":
