@@ -38,7 +38,12 @@ class StockManager:
         self.last_fps_log_time = time.time()
         self.frame_times = []
         
-        # Try to use the assets/stocks directory from the repository
+        # Set up the ticker icons directory
+        self.ticker_icons_dir = os.path.join('assets', 'stocks', 'ticker_icons')
+        if not os.path.exists(self.ticker_icons_dir):
+            logger.warning(f"Ticker icons directory not found: {self.ticker_icons_dir}")
+            
+        # Set up the logo directory for external logos
         self.logo_dir = os.path.join('assets', 'stocks')
         
         # Check if we can use the logo directory, otherwise use temporary
@@ -404,7 +409,7 @@ class StockManager:
             return None # Return None indicates save failure
 
     def _get_stock_logo(self, symbol: str) -> Image.Image:
-        """Get stock logo image, or create a text-based fallback.
+        """Get stock logo image, first checking local ticker icons, then falling back to external sources.
         
         Args:
             symbol: Stock symbol (e.g., 'AAPL', 'MSFT')
@@ -412,6 +417,25 @@ class StockManager:
         Returns:
             PIL Image of the logo or text-based fallback
         """
+        # First try to get the local ticker icon
+        try:
+            icon_path = os.path.join(self.ticker_icons_dir, f"{symbol}.png")
+            if os.path.exists(icon_path):
+                with Image.open(icon_path) as img:
+                    # Convert to RGBA if not already
+                    if img.mode != 'RGBA':
+                        img = img.convert('RGBA')
+                    # Resize to fit in the display
+                    max_size = min(int(self.display_manager.matrix.width / 1.5), 
+                                  int(self.display_manager.matrix.height / 1.5))
+                    img = img.resize((max_size, max_size), Image.Resampling.LANCZOS)
+                    return img.copy()
+        except Exception as e:
+            logger.warning(f"Error loading local ticker icon for {symbol}: {e}")
+        
+        # If local icon not found or failed to load, try external sources
+        logger.info(f"No local icon found for {symbol}, trying external sources")
+        
         # Try to get the path to a saved logo (or save it)
         logo_path = self._download_stock_logo(symbol)
         
@@ -431,7 +455,7 @@ class StockManager:
                 # Resize to fit in the display
                 max_size = min(int(self.display_manager.matrix.width / 1.5), 
                               int(self.display_manager.matrix.height / 1.5))
-                logo = logo.resize((max_size, max_size), Image.LANCZOS)
+                logo = logo.resize((max_size, max_size), Image.Resampling.LANCZOS)
                 
                 return logo
             except Exception as e:
@@ -454,14 +478,29 @@ class StockManager:
                 
                 max_size = min(int(self.display_manager.matrix.width / 1.5), 
                               int(self.display_manager.matrix.height / 1.5))
-                logo = logo.resize((max_size, max_size), Image.LANCZOS)
+                logo = logo.resize((max_size, max_size), Image.Resampling.LANCZOS)
                 return logo
             except Exception as e:
                 logger.error(f"Error processing in-memory logo data for {symbol}: {e}")
 
-        # Fallback if all attempts fail
-        logger.warning(f"Failed to obtain logo for {symbol} from disk or download.")
-        return None
+        # If all attempts fail, create a text-based fallback
+        logger.warning(f"Failed to obtain logo for {symbol} from any source. Using text fallback.")
+        fallback = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(fallback)
+        try:
+            font = ImageFont.truetype("assets/fonts/OpenSans-Regular.ttf", 16)
+        except:
+            font = ImageFont.load_default()
+        
+        # Draw the symbol text
+        text = symbol[:3]  # Limit to first 3 characters
+        text_bbox = draw.textbbox((0, 0), text, font=font)
+        text_width = text_bbox[2] - text_bbox[0]
+        text_height = text_bbox[3] - text_bbox[1]
+        x = (32 - text_width) // 2
+        y = (32 - text_height) // 2
+        draw.text((x, y), text, font=font, fill=(255, 255, 255, 255))
+        return fallback
 
     def _create_stock_display(self, symbol: str, price: float, change: float, change_percent: float) -> Image.Image:
         """Create a display image for a stock with logo, symbol, price, and change.
