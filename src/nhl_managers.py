@@ -13,19 +13,20 @@ ESPN_NHL_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/hockey/
 
 class BaseNHLManager:
     """Base class for NHL managers with common functionality."""
-    def __init__(self, config: dict, display_manager):
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         self.display_manager = display_manager
         self.config = config
         self.nhl_config = config.get("nhl_scoreboard", {})
         self.is_enabled = self.nhl_config.get("enabled", False)
         self.test_mode = self.nhl_config.get("test_mode", False)
-        self.logo_dir = Path(config.get("nhl_scoreboard", {}).get("logo_dir", "assets/sports/nhl_logos"))
+        self.logo_dir = self.nhl_config.get("logo_dir", "assets/sports/nhl_logos")
         self.update_interval = self.nhl_config.get("update_interval_seconds", 60)
         self.last_update = 0
         self.current_game = None
         self.fonts = self._load_fonts()
         self.favorite_teams = self.nhl_config.get("favorite_teams", [])
-
+        self.logger = logging.getLogger('NHL')
+        
         # Get display dimensions from config
         display_config = config.get("display", {})
         hardware_config = display_config.get("hardware", {})
@@ -34,9 +35,16 @@ class BaseNHLManager:
         self.display_width = int(cols * chain)
         self.display_height = hardware_config.get("rows", 32)
         
+        # Load fonts
+        self.font = ImageFont.truetype("assets/fonts/4x6.bdf", 6)
+        self.small_font = ImageFont.truetype("assets/fonts/3x5.bdf", 5)
+        
+        # Cache for loaded logos
+        self._logo_cache = {}
+        
+        self.logger.info(f"Initialized NHL manager with display dimensions: {self.display_width}x{self.display_height}")
         logging.info(f"[NHL] Test mode: {'enabled' if self.test_mode else 'disabled'}")
         logging.info(f"[NHL] Favorite teams: {self.favorite_teams}")
-        logging.info(f"[NHL] Display dimensions: {self.display_width}x{self.display_height}")
 
     def _load_fonts(self):
         """Load fonts used by the scoreboard."""
@@ -54,24 +62,37 @@ class BaseNHLManager:
             fonts['status'] = ImageFont.load_default()
         return fonts
 
-    def _load_and_resize_logo(self, logo_path: Path, max_size: tuple) -> Optional[Image.Image]:
-        """Load and resize a logo image."""
-        if not logo_path or not logo_path.is_file():
-            logging.warning(f"[NHL] Logo file not found: {logo_path}")
-            return None
-
+    def _load_and_resize_logo(self, team_abbrev: str) -> Optional[Image.Image]:
+        """Load and resize a team logo, with caching."""
+        if team_abbrev in self._logo_cache:
+            return self._logo_cache[team_abbrev]
+            
+        logo_path = os.path.join(self.logo_dir, f"{team_abbrev}.png")
+        self.logger.debug(f"Loading logo from: {logo_path}")
+        
         try:
-            logging.info(f"[NHL] Loading logo from: {logo_path}")
             logo = Image.open(logo_path)
+            original_size = logo.size
+            self.logger.debug(f"Original logo size: {original_size}")
+            
+            # Convert to RGBA if not already
             if logo.mode != 'RGBA':
-                logging.info(f"[NHL] Converting logo from {logo.mode} to RGBA")
                 logo = logo.convert('RGBA')
-            logging.info(f"[NHL] Original logo size: {logo.size}")
-            logo.thumbnail(max_size, Image.Resampling.LANCZOS)
-            logging.info(f"[NHL] Resized logo size: {logo.size}")
+            
+            # Calculate max size based on display dimensions
+            max_width = self.display_width // 4  # Quarter of display width
+            max_height = self.display_height // 2  # Half of display height
+            
+            # Resize maintaining aspect ratio
+            logo.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+            self.logger.debug(f"Resized logo size: {logo.size}")
+            
+            # Cache the resized logo
+            self._logo_cache[team_abbrev] = logo
             return logo
+            
         except Exception as e:
-            logging.error(f"[NHL] Error loading logo {logo_path}: {e}")
+            self.logger.error(f"Error loading logo for {team_abbrev}: {e}")
             return None
 
     def _fetch_data(self, date_str: str = None) -> Optional[Dict]:
@@ -162,8 +183,8 @@ class BaseNHLManager:
             max_size = (self.display_width // 3, self.display_height // 2)
 
             # Load and resize logos
-            home_logo = self._load_and_resize_logo(self.current_game["home_logo_path"], max_size)
-            away_logo = self._load_and_resize_logo(self.current_game["away_logo_path"], max_size)
+            home_logo = self._load_and_resize_logo(self.current_game["home_abbr"])
+            away_logo = self._load_and_resize_logo(self.current_game["away_abbr"])
 
             # Draw home team logo
             if home_logo:
@@ -210,9 +231,11 @@ class BaseNHLManager:
 
 class NHLLiveManager(BaseNHLManager):
     """Manager for live NHL games."""
-    def __init__(self, config: dict, display_manager):
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         super().__init__(config, display_manager)
-        self.update_interval = self.nhl_config.get("live_update_interval", 30)  # More frequent updates for live games
+        self.update_interval = self.nhl_config.get("live_update_interval", 30)
+        self.last_update = 0
+        self.logger.info("Initialized NHL Live Manager")
         
         # Initialize with test game only if test mode is enabled
         if self.test_mode:
@@ -233,47 +256,45 @@ class NHLLiveManager(BaseNHLManager):
     def update(self):
         """Update live game data."""
         current_time = time.time()
-        if current_time - self.last_update < self.update_interval:
-            return
-
-        if self.test_mode:
-            # For testing, we'll just update the clock to show it's working
-            if self.current_game:
-                minutes = int(self.current_game["clock"].split(":")[0])
-                seconds = int(self.current_game["clock"].split(":")[1])
-                seconds -= 1
-                if seconds < 0:
-                    seconds = 59
-                    minutes -= 1
-                    if minutes < 0:
-                        minutes = 19
-                        if self.current_game["period"] < 3:
-                            self.current_game["period"] += 1
-                        else:
-                            self.current_game["period"] = 1
-                self.current_game["clock"] = f"{minutes:02d}:{seconds:02d}"
-                logging.debug(f"[NHL] Updated test game clock: {self.current_game['clock']}")
-        else:
-            # Fetch live game data from ESPN API
-            data = self._fetch_data()
-            if data and "events" in data:
-                # Find the first live game involving favorite teams
-                for event in data["events"]:
-                    details = self._extract_game_details(event)
-                    if details and details["is_live"]:
-                        if not self.favorite_teams or (
-                            details["home_abbr"] in self.favorite_teams or 
-                            details["away_abbr"] in self.favorite_teams
-                        ):
-                            self.current_game = details
-                            logging.info(f"[NHL] Found live game: {details['away_abbr']} vs {details['home_abbr']}")
-                            break
-                else:
-                    # No live games found
-                    self.current_game = None
-                    logging.info("[NHL] No live games found")
-
-        self.last_update = current_time
+        if current_time - self.last_update >= self.update_interval:
+            self.logger.debug("Updating live game data")
+            self.last_update = current_time
+            if self.test_mode:
+                # For testing, we'll just update the clock to show it's working
+                if self.current_game:
+                    minutes = int(self.current_game["clock"].split(":")[0])
+                    seconds = int(self.current_game["clock"].split(":")[1])
+                    seconds -= 1
+                    if seconds < 0:
+                        seconds = 59
+                        minutes -= 1
+                        if minutes < 0:
+                            minutes = 19
+                            if self.current_game["period"] < 3:
+                                self.current_game["period"] += 1
+                            else:
+                                self.current_game["period"] = 1
+                    self.current_game["clock"] = f"{minutes:02d}:{seconds:02d}"
+                    logging.debug(f"[NHL] Updated test game clock: {self.current_game['clock']}")
+            else:
+                # Fetch live game data from ESPN API
+                data = self._fetch_data()
+                if data and "events" in data:
+                    # Find the first live game involving favorite teams
+                    for event in data["events"]:
+                        details = self._extract_game_details(event)
+                        if details and details["is_live"]:
+                            if not self.favorite_teams or (
+                                details["home_abbr"] in self.favorite_teams or 
+                                details["away_abbr"] in self.favorite_teams
+                            ):
+                                self.current_game = details
+                                logging.info(f"[NHL] Found live game: {details['away_abbr']} vs {details['home_abbr']}")
+                                break
+                    else:
+                        # No live games found
+                        self.current_game = None
+                        logging.info("[NHL] No live games found")
 
     def display(self, force_clear: bool = False):
         """Display live game information."""
@@ -291,8 +312,8 @@ class NHLLiveManager(BaseNHLManager):
             logging.info(f"[NHL] Logo max size: {max_size}")
 
             # Load and resize logos
-            home_logo = self._load_and_resize_logo(self.current_game["home_logo_path"], max_size)
-            away_logo = self._load_and_resize_logo(self.current_game["away_logo_path"], max_size)
+            home_logo = self._load_and_resize_logo(self.current_game["home_abbr"])
+            away_logo = self._load_and_resize_logo(self.current_game["away_abbr"])
             
             logging.info(f"[NHL] Home logo loaded: {home_logo is not None}, path: {self.current_game['home_logo_path']}")
             logging.info(f"[NHL] Away logo loaded: {away_logo is not None}, path: {self.current_game['away_logo_path']}")
@@ -348,9 +369,11 @@ class NHLLiveManager(BaseNHLManager):
 
 class NHLRecentManager(BaseNHLManager):
     """Manager for recently completed NHL games."""
-    def __init__(self, config: dict, display_manager):
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         super().__init__(config, display_manager)
-        self.update_interval = self.nhl_config.get("recent_update_interval", 3600)  # 1 hour
+        self.update_interval = self.nhl_config.get("recent_update_interval", 300)  # 5 minutes
+        self.last_update = 0
+        self.logger.info("Initialized NHL Recent Manager")
         self.recent_hours = self.nhl_config.get("recent_game_hours", 48)  # Default 48 hours
         self.current_game = None
         
@@ -372,44 +395,42 @@ class NHLRecentManager(BaseNHLManager):
     def update(self):
         """Update recent game data."""
         current_time = time.time()
-        if current_time - self.last_update < self.update_interval:
-            return
-
-        if self.test_mode:
-            # In test mode, just keep the test game
-            pass
-        else:
-            # Fetch data for the last 48 hours
-            cutoff_time = datetime.now(timezone.utc) - timedelta(hours=self.recent_hours)
-            data = self._fetch_data()
-            
-            if data and "events" in data:
-                # Find the most recent completed game involving favorite teams
-                most_recent_game = None
-                most_recent_time = None
+        if current_time - self.last_update >= self.update_interval:
+            self.logger.debug("Updating recent game data")
+            self.last_update = current_time
+            if self.test_mode:
+                # In test mode, just keep the test game
+                pass
+            else:
+                # Fetch data for the last 48 hours
+                cutoff_time = datetime.now(timezone.utc) - timedelta(hours=self.recent_hours)
+                data = self._fetch_data()
                 
-                for event in data["events"]:
-                    details = self._extract_game_details(event)
-                    if details and details["is_final"] and details["start_time_utc"]:
-                        # Check if game is within our time window
-                        if details["start_time_utc"] > cutoff_time:
-                            # Check if it involves favorite teams (if any are configured)
-                            if not self.favorite_teams or (
-                                details["home_abbr"] in self.favorite_teams or 
-                                details["away_abbr"] in self.favorite_teams
-                            ):
-                                # Keep the most recent game
-                                if most_recent_time is None or details["start_time_utc"] > most_recent_time:
-                                    most_recent_game = details
-                                    most_recent_time = details["start_time_utc"]
-                
-                self.current_game = most_recent_game
-                if most_recent_game:
-                    logging.info(f"[NHL] Found recent game: {most_recent_game['away_abbr']} vs {most_recent_game['home_abbr']}")
-                else:
-                    logging.info("[NHL] No recent games found")
-
-        self.last_update = current_time
+                if data and "events" in data:
+                    # Find the most recent completed game involving favorite teams
+                    most_recent_game = None
+                    most_recent_time = None
+                    
+                    for event in data["events"]:
+                        details = self._extract_game_details(event)
+                        if details and details["is_final"] and details["start_time_utc"]:
+                            # Check if game is within our time window
+                            if details["start_time_utc"] > cutoff_time:
+                                # Check if it involves favorite teams (if any are configured)
+                                if not self.favorite_teams or (
+                                    details["home_abbr"] in self.favorite_teams or 
+                                    details["away_abbr"] in self.favorite_teams
+                                ):
+                                    # Keep the most recent game
+                                    if most_recent_time is None or details["start_time_utc"] > most_recent_time:
+                                        most_recent_game = details
+                                        most_recent_time = details["start_time_utc"]
+                    
+                    self.current_game = most_recent_game
+                    if most_recent_game:
+                        logging.info(f"[NHL] Found recent game: {most_recent_game['away_abbr']} vs {most_recent_game['home_abbr']}")
+                    else:
+                        logging.info("[NHL] No recent games found")
 
     def display(self, force_clear: bool = False):
         """Display recent game information."""
@@ -427,8 +448,8 @@ class NHLRecentManager(BaseNHLManager):
             logging.info(f"[NHL] Logo max size: {max_size}")
 
             # Load and resize logos
-            home_logo = self._load_and_resize_logo(self.current_game["home_logo_path"], max_size)
-            away_logo = self._load_and_resize_logo(self.current_game["away_logo_path"], max_size)
+            home_logo = self._load_and_resize_logo(self.current_game["home_abbr"])
+            away_logo = self._load_and_resize_logo(self.current_game["away_abbr"])
             
             logging.info(f"[NHL] Home logo loaded: {home_logo is not None}, path: {self.current_game['home_logo_path']}")
             logging.info(f"[NHL] Away logo loaded: {away_logo is not None}, path: {self.current_game['away_logo_path']}")
@@ -481,9 +502,11 @@ class NHLRecentManager(BaseNHLManager):
 
 class NHLUpcomingManager(BaseNHLManager):
     """Manager for upcoming NHL games."""
-    def __init__(self, config: dict, display_manager):
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         super().__init__(config, display_manager)
-        self.update_interval = self.nhl_config.get("upcoming_update_interval", 3600)  # 1 hour
+        self.update_interval = self.nhl_config.get("upcoming_update_interval", 300)  # 5 minutes
+        self.last_update = 0
+        self.logger.info("Initialized NHL Upcoming Manager")
         self.current_game = None
         
         if self.test_mode:
@@ -502,56 +525,54 @@ class NHLUpcomingManager(BaseNHLManager):
     def update(self):
         """Update upcoming game data."""
         current_time = time.time()
-        if current_time - self.last_update < self.update_interval:
-            return
-
-        if self.test_mode:
-            # In test mode, just keep the test game
-            pass
-        else:
-            # Fetch today's and tomorrow's data
-            today = datetime.now(timezone.utc).date()
-            tomorrow = today + timedelta(days=1)
-            
-            # Format dates for API (YYYYMMDD)
-            today_str = today.strftime('%Y%m%d')
-            tomorrow_str = tomorrow.strftime('%Y%m%d')
-            
-            # Fetch data for both days
-            today_data = self._fetch_data(today_str)
-            tomorrow_data = self._fetch_data(tomorrow_str)
-            
-            # Combine events from both days
-            all_events = []
-            if today_data and "events" in today_data:
-                all_events.extend(today_data["events"])
-            if tomorrow_data and "events" in tomorrow_data:
-                all_events.extend(tomorrow_data["events"])
-            
-            # Find the next upcoming game involving favorite teams
-            next_game = None
-            next_game_time = None
-            
-            for event in all_events:
-                details = self._extract_game_details(event)
-                if details and details["is_upcoming"] and details["start_time_utc"]:
-                    # Check if it involves favorite teams (if any are configured)
-                    if not self.favorite_teams or (
-                        details["home_abbr"] in self.favorite_teams or 
-                        details["away_abbr"] in self.favorite_teams
-                    ):
-                        # Keep the soonest upcoming game
-                        if next_game_time is None or details["start_time_utc"] < next_game_time:
-                            next_game = details
-                            next_game_time = details["start_time_utc"]
-            
-            self.current_game = next_game
-            if next_game:
-                logging.info(f"[NHL] Found upcoming game: {next_game['away_abbr']} vs {next_game['home_abbr']}")
+        if current_time - self.last_update >= self.update_interval:
+            self.logger.debug("Updating upcoming game data")
+            self.last_update = current_time
+            if self.test_mode:
+                # In test mode, just keep the test game
+                pass
             else:
-                logging.info("[NHL] No upcoming games found")
-
-        self.last_update = current_time
+                # Fetch today's and tomorrow's data
+                today = datetime.now(timezone.utc).date()
+                tomorrow = today + timedelta(days=1)
+                
+                # Format dates for API (YYYYMMDD)
+                today_str = today.strftime('%Y%m%d')
+                tomorrow_str = tomorrow.strftime('%Y%m%d')
+                
+                # Fetch data for both days
+                today_data = self._fetch_data(today_str)
+                tomorrow_data = self._fetch_data(tomorrow_str)
+                
+                # Combine events from both days
+                all_events = []
+                if today_data and "events" in today_data:
+                    all_events.extend(today_data["events"])
+                if tomorrow_data and "events" in tomorrow_data:
+                    all_events.extend(tomorrow_data["events"])
+                
+                # Find the next upcoming game involving favorite teams
+                next_game = None
+                next_game_time = None
+                
+                for event in all_events:
+                    details = self._extract_game_details(event)
+                    if details and details["is_upcoming"] and details["start_time_utc"]:
+                        # Check if it involves favorite teams (if any are configured)
+                        if not self.favorite_teams or (
+                            details["home_abbr"] in self.favorite_teams or 
+                            details["away_abbr"] in self.favorite_teams
+                        ):
+                            # Keep the soonest upcoming game
+                            if next_game_time is None or details["start_time_utc"] < next_game_time:
+                                next_game = details
+                                next_game_time = details["start_time_utc"]
+                
+                self.current_game = next_game
+                if next_game:
+                    logging.info(f"[NHL] Found upcoming game: {next_game['away_abbr']} vs {next_game['home_abbr']}")
+                else:
+                    logging.info("[NHL] No upcoming games found")
 
     def display(self, force_clear: bool = False):
         """Display upcoming game information."""
@@ -569,8 +590,8 @@ class NHLUpcomingManager(BaseNHLManager):
             logging.info(f"[NHL] Logo max size: {max_size}")
 
             # Load and resize logos
-            home_logo = self._load_and_resize_logo(self.current_game["home_logo_path"], max_size)
-            away_logo = self._load_and_resize_logo(self.current_game["away_logo_path"], max_size)
+            home_logo = self._load_and_resize_logo(self.current_game["home_abbr"])
+            away_logo = self._load_and_resize_logo(self.current_game["away_abbr"])
             
             logging.info(f"[NHL] Home logo loaded: {home_logo is not None}, path: {self.current_game['home_logo_path']}")
             logging.info(f"[NHL] Away logo loaded: {away_logo is not None}, path: {self.current_game['away_logo_path']}")

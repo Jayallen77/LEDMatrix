@@ -10,7 +10,15 @@ from src.stock_news_manager import StockNewsManager
 from src.nhl_managers import NHLLiveManager, NHLRecentManager, NHLUpcomingManager
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(levelname)s:%(name)s:%(message)s'
+)
+
+# Set NHL logger to INFO level to reduce spam
+nhl_logger = logging.getLogger('NHL')
+nhl_logger.setLevel(logging.INFO)
+
 logger = logging.getLogger(__name__)
 
 class DisplayController:
