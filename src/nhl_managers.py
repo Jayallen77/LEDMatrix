@@ -117,8 +117,9 @@ class BaseNHLManager:
                 logo = logo.convert('RGBA')
             
             # Calculate max size based on display dimensions
-            max_width = self.display_width // 3  # Increased from 4 to 3 for larger logos
-            max_height = self.display_height // 2  # Half of display height
+            # Make logos 150% of display width to allow them to extend off screen
+            max_width = int(self.display_width * 1.5)
+            max_height = int(self.display_height * 1.5)
             
             # Resize maintaining aspect ratio
             logo.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
@@ -257,23 +258,49 @@ class BaseNHLManager:
             main_img = main_img.convert('RGB')
             draw = ImageDraw.Draw(main_img)
 
-            # Draw scores in the format "AWAY - HOME"
-            home_score = str(self.current_game["home_score"])
-            away_score = str(self.current_game["away_score"])
-            score_text = f"{away_score} - {home_score}"
+            # Check if this is an upcoming game
+            is_upcoming = self.current_game.get("is_upcoming", False)
             
-            # Calculate position for the score text (centered at the bottom)
-            score_width = draw.textlength(score_text, font=self.fonts['score'])
-            score_x = (self.display_width - score_width) // 2
-            score_y = self.display_height - 15
-            draw.text((score_x, score_y), score_text, font=self.fonts['score'], fill=(255, 255, 255))
+            if is_upcoming:
+                # For upcoming games, show date and time
+                game_date = self.current_game.get("game_date", "")
+                game_time = self.current_game.get("game_time", "")
+                date_time_text = f"{game_date} {game_time}"
+                
+                # Calculate position for the date/time text (centered at the bottom)
+                date_time_width = draw.textlength(date_time_text, font=self.fonts['time'])
+                date_time_x = (self.display_width - date_time_width) // 2
+                date_time_y = self.display_height - 15
+                draw.text((date_time_x, date_time_y), date_time_text, font=self.fonts['time'], fill=(255, 255, 255))
+                
+                # Show "Upcoming Game" at the top
+                status_text = "Upcoming Game"
+                status_width = draw.textlength(status_text, font=self.fonts['status'])
+                status_x = (self.display_width - status_width) // 2
+                status_y = 5
+                draw.text((status_x, status_y), status_text, font=self.fonts['status'], fill=(255, 255, 255))
+            else:
+                # For live/final games, show scores and period/time
+                home_score = str(self.current_game.get("home_score", "0"))
+                away_score = str(self.current_game.get("away_score", "0"))
+                score_text = f"{away_score} - {home_score}"
+                
+                # Calculate position for the score text (centered at the bottom)
+                score_width = draw.textlength(score_text, font=self.fonts['score'])
+                score_x = (self.display_width - score_width) // 2
+                score_y = self.display_height - 15
+                draw.text((score_x, score_y), score_text, font=self.fonts['score'], fill=(255, 255, 255))
 
-            # Draw game status
-            status_text = self.current_game.get("status_text", "")
-            status_width = draw.textlength(status_text, font=self.fonts['status'])
-            status_x = (self.display_width - status_width) // 2
-            status_y = 5
-            draw.text((status_x, status_y), status_text, font=self.fonts['status'], fill=(255, 255, 255))
+                # Draw period and time
+                period = self.current_game.get("period", 0)
+                clock = self.current_game.get("clock", "0:00")
+                period_text = f"Period {period} {clock}"
+                
+                # Calculate position for the period text (centered at the top)
+                period_width = draw.textlength(period_text, font=self.fonts['time'])
+                period_x = (self.display_width - period_width) // 2
+                period_y = 5
+                draw.text((period_x, period_y), period_text, font=self.fonts['time'], fill=(255, 255, 255))
 
             # Display the image
             self.display_manager.image.paste(main_img, (0, 0))
