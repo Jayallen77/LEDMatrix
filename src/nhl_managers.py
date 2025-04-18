@@ -193,20 +193,21 @@ class BaseNHLManager:
             logging.error(f"[NHL] Error extracting game details: {e}")
             return None
 
-    def display(self, force_clear: bool = False):
-        """Display game information."""
+    def display(self, force_clear: bool = False) -> None:
+        """Common display method for all NHL managers"""
         if not self.current_game:
             current_time = time.time()
-            # Only log a warning if we haven't logged one recently
-            if not BaseNHLManager._no_data_warning_logged and (current_time - BaseNHLManager._last_warning_time) > BaseNHLManager._warning_cooldown:
-                logging.warning("[NHL] No game data available to display")
-                BaseNHLManager._no_data_warning_logged = True
-                BaseNHLManager._last_warning_time = current_time
+            if not hasattr(self, '_last_warning_time'):
+                self._last_warning_time = 0
+            if current_time - self._last_warning_time > 300:  # 5 minutes cooldown
+                self.logger.warning("[NHL] No game data available to display")
+                self._last_warning_time = current_time
             return
+            
+        self._draw_scorebug_layout()
 
-        # Reset the warning flag when we have data
-        BaseNHLManager._no_data_warning_logged = False
-
+    def _draw_scorebug_layout(self):
+        """Draw the scorebug layout for the current game."""
         try:
             # Create a new black image
             img = Image.new('RGB', (self.display_width, self.display_height), 'black')
