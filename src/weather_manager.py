@@ -40,7 +40,7 @@ class WeatherManager:
         self.PADDING = 1
         self.ICON_SIZE = {
             'extra_large': 40, # Changed from 30
-            'large': 32,
+            'large': 30,
             'medium': 24,
             'small': 14
         }
