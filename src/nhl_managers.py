@@ -24,7 +24,7 @@ class BaseNHLManager:
         self.config = config
         self.nhl_config = config.get("nhl_scoreboard", {})
         self.is_enabled = self.nhl_config.get("enabled", False)
-        self.test_mode = True  # Force test mode to be enabled
+        self.test_mode = self.nhl_config.get("test_mode", False)  # Use test_mode from config
         self.logo_dir = self.nhl_config.get("logo_dir", "assets/sports/nhl_logos")
         self.update_interval = self.nhl_config.get("update_interval_seconds", 60)
         self.last_update = 0
@@ -640,7 +640,6 @@ class NHLUpcomingManager(BaseNHLManager):
                                 if next_team in team_games and team_games[next_team]:
                                     self.current_team_index = next_team_index
                                     self.current_game = team_games[next_team][0]
-                                    break
                             
                             # If no next team has games, go back to the first team with games
                             if not next_team or next_team not in team_games or not team_games[next_team]:
