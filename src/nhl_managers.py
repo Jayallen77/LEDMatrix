@@ -423,6 +423,7 @@ class NHLRecentManager(BaseNHLManager):
         self.current_game = None
         self.games_list = []  # List to store all recent games
         self.current_game_index = 0  # Index to track which game to show
+        self.current_team_index = 0  # Index to track which team we're showing
         # Override test_mode to always use real data for recent games
         self.test_mode = False
         logging.info("[NHL] Initialized NHLRecentManager in live mode")
@@ -479,26 +480,67 @@ class NHLRecentManager(BaseNHLManager):
                                 details["home_abbr"] in self.favorite_teams or 
                                 details["away_abbr"] in self.favorite_teams
                             ):
+                                # Verify logo files exist for both teams
+                                home_logo_path = os.path.join(self.logo_dir, f"{details['home_abbr']}.png")
+                                away_logo_path = os.path.join(self.logo_dir, f"{details['away_abbr']}.png")
+                                
+                                if not os.path.exists(home_logo_path):
+                                    logging.warning(f"[NHL] Home logo not found: {home_logo_path}")
+                                    continue
+                                if not os.path.exists(away_logo_path):
+                                    logging.warning(f"[NHL] Away logo not found: {away_logo_path}")
+                                    continue
+                                
                                 recent_games.append(details)
                 
                 # Sort games by start time, most recent first
                 recent_games.sort(key=lambda x: x["start_time_utc"], reverse=True)
                 
                 if recent_games:
-                    self.games_list = recent_games
+                    # Group games by team
+                    team_games = {}
+                    for game in recent_games:
+                        for team in self.favorite_teams:
+                            if game["home_abbr"] == team or game["away_abbr"] == team:
+                                if team not in team_games:
+                                    team_games[team] = []
+                                team_games[team].append(game)
+                    
                     # If we don't have a current game or it's not in the new list, start from the beginning
-                    if not self.current_game or self.current_game not in self.games_list:
+                    if not self.current_game or self.current_game not in recent_games:
+                        self.current_team_index = 0
                         self.current_game_index = 0
                     else:
-                        # Keep the same index if possible, otherwise reset to 0
-                        try:
-                            self.current_game_index = self.games_list.index(self.current_game)
-                        except ValueError:
-                            self.current_game_index = 0
+                        # Find which team we're currently showing
+                        for i, team in enumerate(self.favorite_teams):
+                            if team in team_games and self.current_game in team_games[team]:
+                                self.current_team_index = i
+                                self.current_game_index = team_games[team].index(self.current_game)
+                                break
                     
-                    # Rotate to the next game
-                    self.current_game_index = (self.current_game_index + 1) % len(self.games_list)
-                    self.current_game = self.games_list[self.current_game_index]
+                    # Get the current team's games
+                    current_team = self.favorite_teams[self.current_team_index]
+                    current_team_games = team_games.get(current_team, [])
+                    
+                    if current_team_games:
+                        # Move to next game for current team
+                        self.current_game_index = (self.current_game_index + 1) % len(current_team_games)
+                        self.current_game = current_team_games[self.current_game_index]
+                        
+                        # If we've shown all games for this team, move to next team
+                        if self.current_game_index == 0:
+                            self.current_team_index = (self.current_team_index + 1) % len(self.favorite_teams)
+                            next_team = self.favorite_teams[self.current_team_index]
+                            if next_team in team_games and team_games[next_team]:
+                                self.current_game = team_games[next_team][0]
+                    
+                    # Debug: Print all favorite team games we found
+                    print("\nDEBUG - Favorite team games found:")
+                    for team, games in team_games.items():
+                        print(f"\n{team} games:")
+                        for game in games:
+                            print(f"  {game['away_abbr']} vs {game['home_abbr']}")
+                    
                     logging.info(f"[NHL] Rotating to recent game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
                 else:
                     logging.info("[NHL] No recent games found")
@@ -522,6 +564,7 @@ class NHLUpcomingManager(BaseNHLManager):
         self.current_game = None
         self.games_list = []  # List to store all upcoming games
         self.current_game_index = 0  # Index to track which game to show
+        self.current_team_index = 0  # Index to track which team we're showing
 
     def update(self):
         """Update upcoming game data."""
@@ -563,26 +606,67 @@ class NHLUpcomingManager(BaseNHLManager):
                         details["home_abbr"] in self.favorite_teams or 
                         details["away_abbr"] in self.favorite_teams
                     ):
+                        # Verify logo files exist for both teams
+                        home_logo_path = os.path.join(self.logo_dir, f"{details['home_abbr']}.png")
+                        away_logo_path = os.path.join(self.logo_dir, f"{details['away_abbr']}.png")
+                        
+                        if not os.path.exists(home_logo_path):
+                            logging.warning(f"[NHL] Home logo not found: {home_logo_path}")
+                            continue
+                        if not os.path.exists(away_logo_path):
+                            logging.warning(f"[NHL] Away logo not found: {away_logo_path}")
+                            continue
+                        
                         upcoming_games.append(details)
             
             # Sort games by start time
             upcoming_games.sort(key=lambda x: x["start_time_utc"])
             
             if upcoming_games:
-                self.games_list = upcoming_games
+                # Group games by team
+                team_games = {}
+                for game in upcoming_games:
+                    for team in self.favorite_teams:
+                        if game["home_abbr"] == team or game["away_abbr"] == team:
+                            if team not in team_games:
+                                team_games[team] = []
+                            team_games[team].append(game)
+                
                 # If we don't have a current game or it's not in the new list, start from the beginning
-                if not self.current_game or self.current_game not in self.games_list:
+                if not self.current_game or self.current_game not in upcoming_games:
+                    self.current_team_index = 0
                     self.current_game_index = 0
                 else:
-                    # Keep the same index if possible, otherwise reset to 0
-                    try:
-                        self.current_game_index = self.games_list.index(self.current_game)
-                    except ValueError:
-                        self.current_game_index = 0
+                    # Find which team we're currently showing
+                    for i, team in enumerate(self.favorite_teams):
+                        if team in team_games and self.current_game in team_games[team]:
+                            self.current_team_index = i
+                            self.current_game_index = team_games[team].index(self.current_game)
+                            break
                 
-                # Rotate to the next game
-                self.current_game_index = (self.current_game_index + 1) % len(self.games_list)
-                self.current_game = self.games_list[self.current_game_index]
+                # Get the current team's games
+                current_team = self.favorite_teams[self.current_team_index]
+                current_team_games = team_games.get(current_team, [])
+                
+                if current_team_games:
+                    # Move to next game for current team
+                    self.current_game_index = (self.current_game_index + 1) % len(current_team_games)
+                    self.current_game = current_team_games[self.current_game_index]
+                    
+                    # If we've shown all games for this team, move to next team
+                    if self.current_game_index == 0:
+                        self.current_team_index = (self.current_team_index + 1) % len(self.favorite_teams)
+                        next_team = self.favorite_teams[self.current_team_index]
+                        if next_team in team_games and team_games[next_team]:
+                            self.current_game = team_games[next_team][0]
+                
+                # Debug: Print all favorite team games we found
+                print("\nDEBUG - Favorite team games found:")
+                for team, games in team_games.items():
+                    print(f"\n{team} games:")
+                    for game in games:
+                        print(f"  {game['away_abbr']} vs {game['home_abbr']}")
+                
                 logging.info(f"[NHL] Rotating to upcoming game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
             else:
                 logging.info("[NHL] No upcoming games found")
