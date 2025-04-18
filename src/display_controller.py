@@ -51,16 +51,16 @@ class DisplayController:
         
         # Add NHL display modes if enabled
         if nhl_enabled:
-            if self.nhl_live: self.available_modes.append('nhl_live')
             if self.nhl_recent: self.available_modes.append('nhl_recent')
             if self.nhl_upcoming: self.available_modes.append('nhl_upcoming')
+            # nhl_live is handled separately when live games are available
         
         # Set initial display to first available mode (clock)
         self.current_mode_index = 0
         self.current_display_mode = self.available_modes[0] if self.available_modes else 'none'
         self.last_switch = time.time()
         self.force_clear = True
-        self.update_interval = 0.1
+        self.update_interval = 0.01  # Reduced from 0.1 to 0.01 for smoother scrolling
         
         # Track team-based rotation state
         self.current_team_index = 0
@@ -168,10 +168,8 @@ class DisplayController:
                 
                 # Check for mode switch
                 if current_time - self.last_switch > self.get_current_duration():
-                    # If there are live games and we're not in NHL live mode, switch to it
-                    if has_live_games and self.current_display_mode != 'nhl_live':
-                        live_index = self.available_modes.index('nhl_live')
-                        self.current_mode_index = live_index
+                    # If there are live games, switch to live mode
+                    if has_live_games:
                         self.current_display_mode = 'nhl_live'
                         logger.info("Live games available, switching to NHL live mode")
                     else:
