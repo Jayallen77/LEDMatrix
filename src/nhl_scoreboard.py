@@ -1215,12 +1215,12 @@ class NHLScoreboardManager:
             if home_logo:
                 home_x = width // 4 - home_logo.width // 2
                 home_y = height // 4 - home_logo.height // 2
-                draw.im.paste(home_logo, (home_x, home_y))
+                draw.im.paste(home_logo, (home_x, home_y), home_logo)
             
             if away_logo:
                 away_x = width // 4 - away_logo.width // 2
                 away_y = 3 * height // 4 - away_logo.height // 2
-                draw.im.paste(away_logo, (away_x, away_y))
+                draw.im.paste(away_logo, (away_x, away_y), away_logo)
             
             # Draw scores
             score_color = (255, 255, 255)
