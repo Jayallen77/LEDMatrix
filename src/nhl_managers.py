@@ -233,7 +233,6 @@ class BaseNHLManager:
     def _draw_scorebug_layout(self):
         """Draw the scorebug layout for the current game."""
         try:
-            self.logger.info("=== Starting scorebug layout ===")
             # Create a new black image for the main display
             main_img = Image.new('RGBA', (self.display_width, self.display_height), (0, 0, 0, 255))
             
@@ -241,102 +240,49 @@ class BaseNHLManager:
             home_logo = self._load_and_resize_logo(self.current_game["home_abbr"])
             away_logo = self._load_and_resize_logo(self.current_game["away_abbr"])
             
-            self.logger.info(f"Display dimensions: {self.display_width}x{self.display_height}")
-            self.logger.info(f"Home team ({self.current_game['home_abbr']}) logo loaded: {home_logo is not None}")
-            self.logger.info(f"Away team ({self.current_game['away_abbr']}) logo loaded: {away_logo is not None}")
-            
-            if home_logo:
-                self.logger.info(f"Home logo size: {home_logo.size}, mode: {home_logo.mode}")
-            if away_logo:
-                self.logger.info(f"Away logo size: {away_logo.size}, mode: {away_logo.mode}")
+            if not home_logo or not away_logo:
+                self.logger.error("Failed to load one or both team logos")
+                return
 
             # Create a single overlay for both logos
             overlay = Image.new('RGBA', (self.display_width, self.display_height), (0, 0, 0, 0))
 
             # Calculate vertical center line for alignment
             center_y = self.display_height // 2
-            self.logger.info(f"Vertical center line: {center_y}")
 
             # Draw home team logo (far right)
-            if home_logo:
-                # Position home logo at the far right with padding
-                home_x = self.display_width - home_logo.width - 10  # Increased padding to 10 pixels
-                home_y = center_y - (home_logo.height // 2)  # Center vertically
-                self.logger.info(f"Home logo position: ({home_x}, {home_y})")
-                
-                # Check if logo fits within display bounds
-                if home_x < 0 or home_y < 0 or home_x + home_logo.width > self.display_width or home_y + home_logo.height > self.display_height:
-                    self.logger.warning(f"Home logo may be out of bounds: x={home_x}, y={home_y}, width={home_logo.width}, height={home_logo.height}")
-                
-                # Create a blue-tinted version of the home logo
-                home_tinted = home_logo.copy()
-                home_tinted_data = home_tinted.load()
-                for x in range(home_tinted.width):
-                    for y in range(home_tinted.height):
-                        r, g, b, a = home_tinted_data[x, y]
-                        if a > 0:  # Only modify non-transparent pixels
-                            # Strong blue tint
-                            home_tinted_data[x, y] = (r, g, min(255, b + 200), a)
-                
-                # Create stronger glow effect
-                glow_draw = ImageDraw.Draw(overlay)
-                glow_color = (0, 0, 255, 180)  # More opaque blue glow
-                glow_draw.ellipse([
-                    home_x - 10, home_y - 10,
-                    home_x + home_logo.width + 10,
-                    home_y + home_logo.height + 10
-                ], fill=glow_color)
-                
-                # Paste the home logo onto the overlay
-                overlay.paste(home_tinted, (home_x, home_y), home_tinted)
-            else:
-                self.logger.error(f"Home logo is None for team {self.current_game['home_abbr']}")
+            home_x = self.display_width - home_logo.width - 10
+            home_y = center_y - (home_logo.height // 2)
+            
+            # Create glow effect for home logo
+            glow_draw = ImageDraw.Draw(overlay)
+            glow_color = (0, 0, 255, 180)
+            glow_draw.ellipse([
+                home_x - 10, home_y - 10,
+                home_x + home_logo.width + 10,
+                home_y + home_logo.height + 10
+            ], fill=glow_color)
+            
+            # Paste the home logo onto the overlay
+            overlay.paste(home_logo, (home_x, home_y), home_logo)
 
             # Draw away team logo (far left)
-            if away_logo:
-                # Position away logo at the far left with padding
-                away_x = 10  # Increased padding to 10 pixels
-                away_y = center_y - (away_logo.height // 2)  # Center vertically
-                self.logger.info(f"Away logo position: ({away_x}, {away_y})")
-                
-                # Check if logo fits within display bounds
-                if away_x < 0 or away_y < 0 or away_x + away_logo.width > self.display_width or away_y + away_logo.height > self.display_height:
-                    self.logger.warning(f"Away logo may be out of bounds: x={away_x}, y={away_y}, width={away_logo.width}, height={away_logo.height}")
-                
-                # Create a red-tinted version of the away logo
-                away_tinted = away_logo.copy()
-                away_tinted_data = away_tinted.load()
-                for x in range(away_tinted.width):
-                    for y in range(away_tinted.height):
-                        r, g, b, a = away_tinted_data[x, y]
-                        if a > 0:  # Only modify non-transparent pixels
-                            # Strong red tint
-                            away_tinted_data[x, y] = (min(255, r + 200), g, b, a)
-                
-                # Create stronger glow effect
-                glow_draw = ImageDraw.Draw(overlay)
-                glow_color = (255, 0, 0, 180)  # More opaque red glow
-                glow_draw.ellipse([
-                    away_x - 10, away_y - 10,
-                    away_x + away_logo.width + 10,
-                    away_y + away_logo.height + 10
-                ], fill=glow_color)
-                
-                # Paste the away logo onto the overlay
-                overlay.paste(away_tinted, (away_x, away_y), away_tinted)
-            else:
-                self.logger.error(f"Away logo is None for team {self.current_game['away_abbr']}")
+            away_x = 10
+            away_y = center_y - (away_logo.height // 2)
+            
+            # Create glow effect for away logo
+            glow_color = (255, 0, 0, 180)
+            glow_draw.ellipse([
+                away_x - 10, away_y - 10,
+                away_x + away_logo.width + 10,
+                away_y + away_logo.height + 10
+            ], fill=glow_color)
+            
+            # Paste the away logo onto the overlay
+            overlay.paste(away_logo, (away_x, away_y), away_logo)
 
             # Composite the overlay with the main image
             main_img = Image.alpha_composite(main_img, overlay)
-
-            # Save debug image to check logo positions (in the same directory as the script)
-            debug_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "debug_layout.png")
-            try:
-                main_img.save(debug_path)
-                self.logger.info(f"Debug layout saved to: {debug_path}")
-            except Exception as e:
-                self.logger.warning(f"Could not save debug image: {e}")
 
             # Convert to RGB for final display
             main_img = main_img.convert('RGB')
@@ -350,22 +296,19 @@ class BaseNHLManager:
             # Calculate position for the score text (centered at the bottom)
             score_width = draw.textlength(score_text, font=self.fonts['score'])
             score_x = (self.display_width - score_width) // 2
-            score_y = self.display_height - 15  # Position at bottom with padding
-            self.logger.info(f"Score text position: ({score_x}, {score_y})")
+            score_y = self.display_height - 15
             draw.text((score_x, score_y), score_text, font=self.fonts['score'], fill=(255, 255, 255))
 
             # Draw game status
             status_text = self.current_game.get("status_text", "")
             status_width = draw.textlength(status_text, font=self.fonts['status'])
             status_x = (self.display_width - status_width) // 2
-            status_y = 5  # Position at top with padding
-            self.logger.info(f"Status text position: ({status_x}, {status_y})")
+            status_y = 5
             draw.text((status_x, status_y), status_text, font=self.fonts['status'], fill=(255, 255, 255))
 
             # Display the image
             self.display_manager.image.paste(main_img, (0, 0))
             self.display_manager.update_display()
-            self.logger.info("=== Scorebug layout completed ===")
 
         except Exception as e:
             self.logger.error(f"Error displaying game: {e}", exc_info=True)
