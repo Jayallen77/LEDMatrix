@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class DisplayController:
     def __init__(self):
         self.config_manager = ConfigManager()
-        self.config = self.config_manager.get_config()
+        self.config = self.config_manager.load_config()
         self.display_manager = DisplayManager(self.config)
         
         # Initialize display modes
