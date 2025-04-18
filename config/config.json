@@ -43,13 +43,13 @@
         "update_interval": 1
     },
     "weather": {
-        "enabled": false,
+        "enabled": true,
         "update_interval": 600,
         "units": "imperial",
         "display_format": "{temp}°F\n{condition}"
     },
     "stocks": {
-        "enabled": false,
+        "enabled": true,
         "update_interval": 300,
         "symbols": [
             "ASTS", "SCHD", "INTC", "NVDA", "T", "VOO", "SPYG", "SMCI"
@@ -57,7 +57,7 @@
         "display_format": "{symbol}: ${price} ({change}%)"
     },
     "stock_news": {
-        "enabled": false,
+        "enabled": true,
         "update_interval": 800,
         "scroll_speed": 1,
         "scroll_delay": 0.001,
