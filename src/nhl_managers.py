@@ -421,6 +421,8 @@ class NHLRecentManager(BaseNHLManager):
         self.logger.info("Initialized NHL Recent Manager")
         self.recent_hours = self.nhl_config.get("recent_game_hours", 48)  # Default 48 hours
         self.current_game = None
+        self.games_list = []  # List to store all recent games
+        self.current_game_index = 0  # Index to track which game to show
         # Override test_mode to always use real data for recent games
         self.test_mode = False
         logging.info("[NHL] Initialized NHLRecentManager in live mode")
@@ -429,7 +431,7 @@ class NHLRecentManager(BaseNHLManager):
         """Update recent game data."""
         current_time = time.time()
         # Use longer interval if no game data
-        interval = self.no_data_interval if not self.current_game else self.update_interval
+        interval = self.no_data_interval if not self.games_list else self.update_interval
         
         if current_time - self.last_update >= interval:
             self.logger.debug("Updating recent game data")
@@ -451,9 +453,8 @@ class NHLRecentManager(BaseNHLManager):
                     all_events.extend(data["events"])
             
             if all_events:
-                # Find the most recent completed game involving favorite teams
-                most_recent_game = None
-                most_recent_time = None
+                # Find all recent completed games involving favorite teams
+                recent_games = []
                 cutoff_time = datetime.now(timezone.utc) - timedelta(hours=self.recent_hours)
                 
                 for event in all_events:
@@ -466,14 +467,27 @@ class NHLRecentManager(BaseNHLManager):
                                 details["home_abbr"] in self.favorite_teams or 
                                 details["away_abbr"] in self.favorite_teams
                             ):
-                                # Keep the most recent game
-                                if most_recent_time is None or details["start_time_utc"] > most_recent_time:
-                                    most_recent_game = details
-                                    most_recent_time = details["start_time_utc"]
+                                recent_games.append(details)
                 
-                self.current_game = most_recent_game
-                if most_recent_game:
-                    logging.info(f"[NHL] Found recent game: {most_recent_game['away_abbr']} vs {most_recent_game['home_abbr']}")
+                # Sort games by start time, most recent first
+                recent_games.sort(key=lambda x: x["start_time_utc"], reverse=True)
+                
+                if recent_games:
+                    self.games_list = recent_games
+                    # If we don't have a current game or it's not in the new list, start from the beginning
+                    if not self.current_game or self.current_game not in self.games_list:
+                        self.current_game_index = 0
+                    else:
+                        # Keep the same index if possible, otherwise reset to 0
+                        try:
+                            self.current_game_index = self.games_list.index(self.current_game)
+                        except ValueError:
+                            self.current_game_index = 0
+                    
+                    # Rotate to the next game
+                    self.current_game_index = (self.current_game_index + 1) % len(self.games_list)
+                    self.current_game = self.games_list[self.current_game_index]
+                    logging.info(f"[NHL] Rotating to recent game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
                 else:
                     logging.info("[NHL] No recent games found")
             else:
@@ -494,12 +508,14 @@ class NHLUpcomingManager(BaseNHLManager):
         self.last_update = 0
         self.logger.info("Initialized NHL Upcoming Manager")
         self.current_game = None
+        self.games_list = []  # List to store all upcoming games
+        self.current_game_index = 0  # Index to track which game to show
 
     def update(self):
         """Update upcoming game data."""
         current_time = time.time()
         # Use longer interval if no game data
-        interval = self.no_data_interval if not self.current_game else self.update_interval
+        interval = self.no_data_interval if not self.games_list else self.update_interval
         
         if current_time - self.last_update >= interval:
             self.logger.debug("Updating upcoming game data")
@@ -524,9 +540,8 @@ class NHLUpcomingManager(BaseNHLManager):
             if tomorrow_data and "events" in tomorrow_data:
                 all_events.extend(tomorrow_data["events"])
             
-            # Find the next upcoming game involving favorite teams
-            next_game = None
-            next_game_time = None
+            # Find all upcoming games involving favorite teams
+            upcoming_games = []
             
             for event in all_events:
                 details = self._extract_game_details(event)
@@ -536,14 +551,27 @@ class NHLUpcomingManager(BaseNHLManager):
                         details["home_abbr"] in self.favorite_teams or 
                         details["away_abbr"] in self.favorite_teams
                     ):
-                        # Keep the soonest upcoming game
-                        if next_game_time is None or details["start_time_utc"] < next_game_time:
-                            next_game = details
-                            next_game_time = details["start_time_utc"]
+                        upcoming_games.append(details)
             
-            self.current_game = next_game
-            if next_game:
-                logging.info(f"[NHL] Found upcoming game: {next_game['away_abbr']} vs {next_game['home_abbr']}")
+            # Sort games by start time
+            upcoming_games.sort(key=lambda x: x["start_time_utc"])
+            
+            if upcoming_games:
+                self.games_list = upcoming_games
+                # If we don't have a current game or it's not in the new list, start from the beginning
+                if not self.current_game or self.current_game not in self.games_list:
+                    self.current_game_index = 0
+                else:
+                    # Keep the same index if possible, otherwise reset to 0
+                    try:
+                        self.current_game_index = self.games_list.index(self.current_game)
+                    except ValueError:
+                        self.current_game_index = 0
+                
+                # Rotate to the next game
+                self.current_game_index = (self.current_game_index + 1) % len(self.games_list)
+                self.current_game = self.games_list[self.current_game_index]
+                logging.info(f"[NHL] Rotating to upcoming game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
             else:
                 logging.info("[NHL] No upcoming games found")
 
