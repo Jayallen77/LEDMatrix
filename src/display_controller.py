@@ -26,11 +26,14 @@ class DisplayController:
         self.news = StockNewsManager(self.config, self.display_manager) if self.config.get('stock_news', {}).get('enabled', False) else None
         
         # Initialize NHL managers if NHL is enabled
-        nhl_enabled = self.config.get('nhl_scoreboard', {}).get('enabled', False)
+        nhl_config = self.config.get('nhl_scoreboard', {})
+        nhl_enabled = nhl_config.get('enabled', False)
+        nhl_display_modes = nhl_config.get('display_modes', {})
+        
         if nhl_enabled:
-            self.nhl_live = NHLLiveManager(self.config, self.display_manager)
-            self.nhl_recent = NHLRecentManager(self.config, self.display_manager)
-            self.nhl_upcoming = NHLUpcomingManager(self.config, self.display_manager)
+            self.nhl_live = NHLLiveManager(self.config, self.display_manager) if nhl_display_modes.get('nhl_live', True) else None
+            self.nhl_recent = NHLRecentManager(self.config, self.display_manager) if nhl_display_modes.get('nhl_recent', True) else None
+            self.nhl_upcoming = NHLUpcomingManager(self.config, self.display_manager) if nhl_display_modes.get('nhl_upcoming', True) else None
         else:
             self.nhl_live = None
             self.nhl_recent = None
@@ -43,7 +46,9 @@ class DisplayController:
         if self.stocks: self.available_modes.append('stocks')
         if self.news: self.available_modes.append('stock_news')
         if nhl_enabled:
-            self.available_modes.extend(['nhl_live', 'nhl_recent', 'nhl_upcoming'])
+            if self.nhl_live: self.available_modes.append('nhl_live')
+            if self.nhl_recent: self.available_modes.append('nhl_recent')
+            if self.nhl_upcoming: self.available_modes.append('nhl_upcoming')
         
         # Set initial display to first available mode
         self.current_mode_index = 0
