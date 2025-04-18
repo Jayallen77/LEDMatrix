@@ -259,18 +259,39 @@ def extract_game_details(game_event):
         details["home_abbr"] = home_team["team"]["abbreviation"]
         details["home_score"] = home_team.get("score", "0")
         details["home_logo_path"] = LOGO_DIR / f"{details['home_abbr']}.png"
+        logging.debug(f"[NHL] Constructed home logo path: {details['home_logo_path']}")
 
         details["away_abbr"] = away_team["team"]["abbreviation"]
         details["away_score"] = away_team.get("score", "0")
         details["away_logo_path"] = LOGO_DIR / f"{details['away_abbr']}.png"
+        logging.debug(f"[NHL] Constructed away logo path: {details['away_logo_path']}")
 
-        # Check if logo files exist
+        # Check if logo files exist and log the results
         if not details["home_logo_path"].is_file():
-             logging.warning(f"Home logo not found: {details['home_logo_path']}")
-             details["home_logo_path"] = None
+            logging.warning(f"Home logo not found: {details['home_logo_path']}")
+            details["home_logo_path"] = None
+        else:
+            logging.debug(f"Home logo file exists: {details['home_logo_path']}")
+            try:
+                # Try to open the image to verify it's valid
+                with Image.open(details["home_logo_path"]) as img:
+                    logging.debug(f"[NHL] Home logo is valid image: {img.format}, size: {img.size}")
+            except Exception as e:
+                logging.error(f"Home logo file exists but is not a valid image: {e}")
+                details["home_logo_path"] = None
+
         if not details["away_logo_path"].is_file():
-             logging.warning(f"Away logo not found: {details['away_logo_path']}")
-             details["away_logo_path"] = None
+            logging.warning(f"Away logo not found: {details['away_logo_path']}")
+            details["away_logo_path"] = None
+        else:
+            logging.debug(f"Away logo file exists: {details['away_logo_path']}")
+            try:
+                # Try to open the image to verify it's valid
+                with Image.open(details["away_logo_path"]) as img:
+                    logging.debug(f"[NHL] Away logo is valid image: {img.format}, size: {img.size}")
+            except Exception as e:
+                logging.error(f"Away logo file exists but is not a valid image: {e}")
+                details["away_logo_path"] = None
 
         return details
 
@@ -718,23 +739,44 @@ class NHLScoreboardManager:
 
             details["home_abbr"] = home_team["team"]["abbreviation"]
             details["home_score"] = home_team.get("score", "0")
-            details["home_logo_path"] = self.logo_dir / f"{details['home_abbr']}.png" # Use self.logo_dir
+            details["home_logo_path"] = self.logo_dir / f"{details['home_abbr']}.png"
+            logging.debug(f"[NHL] Constructed home logo path: {details['home_logo_path']}")
 
             details["away_abbr"] = away_team["team"]["abbreviation"]
             details["away_score"] = away_team.get("score", "0")
-            details["away_logo_path"] = self.logo_dir / f"{details['away_abbr']}.png" # Use self.logo_dir
+            details["away_logo_path"] = self.logo_dir / f"{details['away_abbr']}.png"
+            logging.debug(f"[NHL] Constructed away logo path: {details['away_logo_path']}")
 
-            # Check if logo files exist
+            # Check if logo files exist and log the results
             if not details["home_logo_path"].is_file():
                 logging.warning(f"[NHL] Home logo not found: {details['home_logo_path']}")
                 details["home_logo_path"] = None
+            else:
+                logging.debug(f"[NHL] Home logo file exists: {details['home_logo_path']}")
+                try:
+                    # Try to open the image to verify it's valid
+                    with Image.open(details["home_logo_path"]) as img:
+                        logging.debug(f"[NHL] Home logo is valid image: {img.format}, size: {img.size}")
+                except Exception as e:
+                    logging.error(f"[NHL] Home logo file exists but is not a valid image: {e}")
+                    details["home_logo_path"] = None
+
             if not details["away_logo_path"].is_file():
                 logging.warning(f"[NHL] Away logo not found: {details['away_logo_path']}")
                 details["away_logo_path"] = None
+            else:
+                logging.debug(f"[NHL] Away logo file exists: {details['away_logo_path']}")
+                try:
+                    # Try to open the image to verify it's valid
+                    with Image.open(details["away_logo_path"]) as img:
+                        logging.debug(f"[NHL] Away logo is valid image: {img.format}, size: {img.size}")
+                except Exception as e:
+                    logging.error(f"[NHL] Away logo file exists but is not a valid image: {e}")
+                    details["away_logo_path"] = None
 
             return details
 
-        except (KeyError, IndexError, StopIteration, TypeError) as e: # Added TypeError
+        except (KeyError, IndexError, StopIteration, TypeError) as e:
             logging.error(f"[NHL] Error parsing game details: {e} - Data: {game_event}")
             return None
 
@@ -1100,13 +1142,24 @@ class NHLScoreboardManager:
         if game_details.get("away_logo_path"):
             try:
                 away_logo = Image.open(game_details["away_logo_path"]).convert("RGBA")
-                away_logo = away_logo.resize(logo_size, Image.Resampling.LANCZOS)
-                paste_y = (self.display_height - away_logo.height) // 2
+                # Calculate aspect ratio preserving resize
+                aspect_ratio = away_logo.width / away_logo.height
+                if aspect_ratio > 1:  # wider than tall
+                    new_width = min(logo_max_w, int(logo_max_h * aspect_ratio))
+                    new_height = int(new_width / aspect_ratio)
+                else:  # taller than wide
+                    new_height = min(logo_max_h, int(logo_max_w / aspect_ratio))
+                    new_width = int(new_height * aspect_ratio)
                 
-                # Create a mask from the alpha channel
-                mask = away_logo.split()[3]
-                # Paste using the alpha channel as mask
-                img.paste(away_logo, (away_logo_x, paste_y), mask)
+                away_logo = away_logo.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                paste_y = (self.display_height - new_height) // 2
+                
+                # Create a new RGBA image for compositing
+                temp_img = Image.new('RGBA', img.size, (0, 0, 0, 0))
+                temp_img.paste(away_logo, (away_logo_x, paste_y))
+                img.paste(temp_img, (0, 0), temp_img)
+                
+                logging.debug(f"[NHL] Successfully rendered away logo: {game_details['away_logo_path']}")
             except Exception as e:
                 logging.error(f"[NHL] Error rendering upcoming away logo {game_details['away_logo_path']}: {e}")
                 draw.text((away_logo_x, 5), game_details.get("away_abbr", "?"), font=font_team, fill="white")
@@ -1117,13 +1170,24 @@ class NHLScoreboardManager:
         if game_details.get("home_logo_path"):
             try:
                 home_logo = Image.open(game_details["home_logo_path"]).convert("RGBA")
-                home_logo = home_logo.resize(logo_size, Image.Resampling.LANCZOS)
-                paste_y = (self.display_height - home_logo.height) // 2
+                # Calculate aspect ratio preserving resize
+                aspect_ratio = home_logo.width / home_logo.height
+                if aspect_ratio > 1:  # wider than tall
+                    new_width = min(logo_max_w, int(logo_max_h * aspect_ratio))
+                    new_height = int(new_width / aspect_ratio)
+                else:  # taller than wide
+                    new_height = min(logo_max_h, int(logo_max_w / aspect_ratio))
+                    new_width = int(new_height * aspect_ratio)
                 
-                # Create a mask from the alpha channel
-                mask = home_logo.split()[3]
-                # Paste using the alpha channel as mask
-                img.paste(home_logo, (home_logo_x, paste_y), mask)
+                home_logo = home_logo.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                paste_y = (self.display_height - new_height) // 2
+                
+                # Create a new RGBA image for compositing
+                temp_img = Image.new('RGBA', img.size, (0, 0, 0, 0))
+                temp_img.paste(home_logo, (home_logo_x, paste_y))
+                img.paste(temp_img, (0, 0), temp_img)
+                
+                logging.debug(f"[NHL] Successfully rendered home logo: {game_details['home_logo_path']}")
             except Exception as e:
                 logging.error(f"[NHL] Error rendering upcoming home logo {game_details['home_logo_path']}: {e}")
                 draw.text((home_logo_x, 5), game_details.get("home_abbr", "?"), font=font_team, fill="white")
@@ -1194,14 +1258,25 @@ class NHLScoreboardManager:
         if game_details.get("away_logo_path"):
             try:
                 away_logo = Image.open(game_details["away_logo_path"]).convert("RGBA")
-                away_logo = away_logo.resize(logo_size, Image.Resampling.LANCZOS)
-                away_logo_drawn_size = away_logo.size
-                paste_y = (self.display_height - away_logo.height) // 2
+                # Calculate aspect ratio preserving resize
+                aspect_ratio = away_logo.width / away_logo.height
+                if aspect_ratio > 1:  # wider than tall
+                    new_width = min(logo_max_w, int(logo_max_h * aspect_ratio))
+                    new_height = int(new_width / aspect_ratio)
+                else:  # taller than wide
+                    new_height = min(logo_max_h, int(logo_max_w / aspect_ratio))
+                    new_width = int(new_height * aspect_ratio)
                 
-                # Create a mask from the alpha channel
-                mask = away_logo.split()[3]
-                # Paste using the alpha channel as mask
-                img.paste(away_logo, (away_logo_x, paste_y), mask)
+                away_logo = away_logo.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                away_logo_drawn_size = (new_width, new_height)
+                paste_y = (self.display_height - new_height) // 2
+                
+                # Create a new RGBA image for compositing
+                temp_img = Image.new('RGBA', img.size, (0, 0, 0, 0))
+                temp_img.paste(away_logo, (away_logo_x, paste_y))
+                img.paste(temp_img, (0, 0), temp_img)
+                
+                logging.debug(f"[NHL] Successfully rendered away logo: {game_details['away_logo_path']}")
             except Exception as e:
                 logging.error(f"[NHL] Error rendering away logo {game_details['away_logo_path']}: {e}")
                 draw.text((away_logo_x + 2, 5), game_details.get("away_abbr", "?"), font=font_team, fill="white")
@@ -1216,14 +1291,25 @@ class NHLScoreboardManager:
         if game_details.get("home_logo_path"):
             try:
                 home_logo = Image.open(game_details["home_logo_path"]).convert("RGBA")
-                home_logo = home_logo.resize(logo_size, Image.Resampling.LANCZOS)
-                home_logo_drawn_size = home_logo.size
-                paste_y = (self.display_height - home_logo.height) // 2
+                # Calculate aspect ratio preserving resize
+                aspect_ratio = home_logo.width / home_logo.height
+                if aspect_ratio > 1:  # wider than tall
+                    new_width = min(logo_max_w, int(logo_max_h * aspect_ratio))
+                    new_height = int(new_width / aspect_ratio)
+                else:  # taller than wide
+                    new_height = min(logo_max_h, int(logo_max_w / aspect_ratio))
+                    new_width = int(new_height * aspect_ratio)
                 
-                # Create a mask from the alpha channel
-                mask = home_logo.split()[3]
-                # Paste using the alpha channel as mask
-                img.paste(home_logo, (home_logo_x, paste_y), mask)
+                home_logo = home_logo.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                home_logo_drawn_size = (new_width, new_height)
+                paste_y = (self.display_height - new_height) // 2
+                
+                # Create a new RGBA image for compositing
+                temp_img = Image.new('RGBA', img.size, (0, 0, 0, 0))
+                temp_img.paste(home_logo, (home_logo_x, paste_y))
+                img.paste(temp_img, (0, 0), temp_img)
+                
+                logging.debug(f"[NHL] Successfully rendered home logo: {game_details['home_logo_path']}")
             except Exception as e:
                 logging.error(f"[NHL] Error rendering home logo {game_details['home_logo_path']}: {e}")
                 draw.text((home_logo_x + 2, 5), game_details.get("home_abbr", "?"), font=font_team, fill="white")
