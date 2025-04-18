@@ -238,21 +238,13 @@ class BaseNHLManager:
             if home_logo:
                 home_x = 3 * self.display_width // 4 - home_logo.width // 2
                 home_y = self.display_height // 4 - home_logo.height // 2
-                # Create a temporary image for the home logo
-                home_temp = Image.new('RGB', (self.display_width, self.display_height), 'black')
-                home_temp.paste(home_logo, (home_x, home_y), home_logo)
-                # Paste the home logo onto the main image
-                img.paste(home_temp, (0, 0))
+                img.paste(home_logo, (home_x, home_y), home_logo)
 
             # Draw away team logo (left side)
             if away_logo:
                 away_x = self.display_width // 4 - away_logo.width // 2
                 away_y = self.display_height // 4 - away_logo.height // 2
-                # Create a temporary image for the away logo
-                away_temp = Image.new('RGB', (self.display_width, self.display_height), 'black')
-                away_temp.paste(away_logo, (away_x, away_y), away_logo)
-                # Paste the away logo onto the main image
-                img.paste(away_temp, (0, 0))
+                img.paste(away_logo, (away_x, away_y), away_logo)
 
             # Draw scores in the format "AWAY - HOME"
             home_score = str(self.current_game["home_score"])
