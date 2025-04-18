@@ -270,7 +270,8 @@ class NHLLiveManager(BaseNHLManager):
     """Manager for live NHL games."""
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         super().__init__(config, display_manager)
-        self.update_interval = self.nhl_config.get("live_update_interval", 30)
+        self.update_interval = self.nhl_config.get("live_update_interval", 30)  # 30 seconds for live games
+        self.no_data_interval = 300  # 5 minutes when no live games
         self.last_update = 0
         self.logger.info("Initialized NHL Live Manager")
         
@@ -295,7 +296,10 @@ class NHLLiveManager(BaseNHLManager):
     def update(self):
         """Update live game data."""
         current_time = time.time()
-        if current_time - self.last_update >= self.update_interval:
+        # Use longer interval if no game data
+        interval = self.no_data_interval if not self.current_game else self.update_interval
+        
+        if current_time - self.last_update >= interval:
             self.logger.debug("Updating live game data")
             self.last_update = current_time
             if self.test_mode:
@@ -422,6 +426,7 @@ class NHLRecentManager(BaseNHLManager):
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         super().__init__(config, display_manager)
         self.update_interval = self.nhl_config.get("recent_update_interval", 300)  # 5 minutes
+        self.no_data_interval = 900  # 15 minutes when no recent games
         self.last_update = 0
         self.logger.info("Initialized NHL Recent Manager")
         self.recent_hours = self.nhl_config.get("recent_game_hours", 48)  # Default 48 hours
@@ -447,7 +452,10 @@ class NHLRecentManager(BaseNHLManager):
     def update(self):
         """Update recent game data."""
         current_time = time.time()
-        if current_time - self.last_update >= self.update_interval:
+        # Use longer interval if no game data
+        interval = self.no_data_interval if not self.current_game else self.update_interval
+        
+        if current_time - self.last_update >= interval:
             self.logger.debug("Updating recent game data")
             self.last_update = current_time
             if self.test_mode:
@@ -556,6 +564,7 @@ class NHLUpcomingManager(BaseNHLManager):
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         super().__init__(config, display_manager)
         self.update_interval = self.nhl_config.get("upcoming_update_interval", 300)  # 5 minutes
+        self.no_data_interval = 900  # 15 minutes when no upcoming games
         self.last_update = 0
         self.logger.info("Initialized NHL Upcoming Manager")
         self.current_game = None
@@ -578,7 +587,10 @@ class NHLUpcomingManager(BaseNHLManager):
     def update(self):
         """Update upcoming game data."""
         current_time = time.time()
-        if current_time - self.last_update >= self.update_interval:
+        # Use longer interval if no game data
+        interval = self.no_data_interval if not self.current_game else self.update_interval
+        
+        if current_time - self.last_update >= interval:
             self.logger.debug("Updating upcoming game data")
             self.last_update = current_time
             if self.test_mode:
