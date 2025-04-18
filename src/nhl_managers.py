@@ -237,15 +237,15 @@ class BaseNHLManager:
             # Calculate vertical center line for alignment
             center_y = self.display_height // 2
 
-            # Draw home team logo (far right)
-            home_x = self.display_width - home_logo.width - 10
+            # Draw home team logo (far right, extending beyond screen)
+            home_x = self.display_width - home_logo.width + 20  # Move 20 pixels further right
             home_y = center_y - (home_logo.height // 2)
             
             # Paste the home logo onto the overlay
             overlay.paste(home_logo, (home_x, home_y), home_logo)
 
-            # Draw away team logo (far left)
-            away_x = 10
+            # Draw away team logo (far left, extending beyond screen)
+            away_x = -20  # Move 20 pixels further left
             away_y = center_y - (away_logo.height // 2)
             
             # Paste the away logo onto the overlay
@@ -499,7 +499,8 @@ class NHLUpcomingManager(BaseNHLManager):
                 "home_logo_path": os.path.join(self.logo_dir, "TBL.png"),
                 "away_logo_path": os.path.join(self.logo_dir, "DAL.png"),
                 "game_time": "7:30 PM",
-                "game_date": "Apr 17"
+                "game_date": "Apr 17",
+                "is_upcoming": True  # Set this flag to indicate it's an upcoming game
             }
             logging.info("[NHL] Initialized NHLUpcomingManager with test game: TBL vs DAL")
         else:
