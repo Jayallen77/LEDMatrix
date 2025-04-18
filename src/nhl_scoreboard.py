@@ -1190,9 +1190,12 @@ class NHLScoreboardManager:
             if os.path.exists(home_logo_path):
                 try:
                     home_logo = Image.open(home_logo_path)
+                    if home_logo.mode != 'RGBA':
+                        home_logo = home_logo.convert('RGBA')
                     # Resize maintaining aspect ratio
                     max_size = min(int(self.display_width / 3), int(self.display_height / 2))
                     home_logo.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+                    logging.debug(f"[NHL] Successfully loaded home logo: {home_logo_path}")
                 except Exception as e:
                     logging.error(f"Error loading home logo {home_logo_path}: {e}")
             
@@ -1201,9 +1204,12 @@ class NHLScoreboardManager:
             if os.path.exists(away_logo_path):
                 try:
                     away_logo = Image.open(away_logo_path)
+                    if away_logo.mode != 'RGBA':
+                        away_logo = away_logo.convert('RGBA')
                     # Resize maintaining aspect ratio
                     max_size = min(int(self.display_width / 3), int(self.display_height / 2))
                     away_logo.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+                    logging.debug(f"[NHL] Successfully loaded away logo: {away_logo_path}")
                 except Exception as e:
                     logging.error(f"Error loading away logo {away_logo_path}: {e}")
             
@@ -1215,12 +1221,22 @@ class NHLScoreboardManager:
             if home_logo:
                 home_x = width // 4 - home_logo.width // 2
                 home_y = height // 4 - home_logo.height // 2
-                draw.im.paste(home_logo, (home_x, home_y), home_logo)
+                # Create a temporary RGB image for compositing
+                temp_img = Image.new('RGB', (width, height), 'black')
+                temp_draw = ImageDraw.Draw(temp_img)
+                temp_draw.im.paste(home_logo, (home_x, home_y), home_logo)
+                # Paste the result onto the main image
+                draw.im.paste(temp_img, (0, 0))
             
             if away_logo:
                 away_x = width // 4 - away_logo.width // 2
                 away_y = 3 * height // 4 - away_logo.height // 2
-                draw.im.paste(away_logo, (away_x, away_y), away_logo)
+                # Create a temporary RGB image for compositing
+                temp_img = Image.new('RGB', (width, height), 'black')
+                temp_draw = ImageDraw.Draw(temp_img)
+                temp_draw.im.paste(away_logo, (away_x, away_y), away_logo)
+                # Paste the result onto the main image
+                draw.im.paste(temp_img, (0, 0))
             
             # Draw scores
             score_color = (255, 255, 255)
@@ -1238,13 +1254,18 @@ class NHLScoreboardManager:
             draw.text((away_score_x, away_score_y), away_score, font=self.fonts['score'], fill=score_color)
             
             # Draw game status
-            status_text = game_details.get('status', '')
+            status_text = game_details.get('status_text', '')
             status_x = width // 2 - 20
             status_y = height // 2 - 8
             draw.text((status_x, status_y), status_text, font=self.fonts['status'], fill=score_color)
             
         except Exception as e:
             logging.error(f"Error in _draw_scorebug_layout: {e}")
+            # Draw fallback text if logo loading fails
+            if 'home_abbr' in game_details:
+                draw.text((width // 4, height // 4), game_details['home_abbr'], font=self.fonts['team'], fill='white')
+            if 'away_abbr' in game_details:
+                draw.text((width // 4, 3 * height // 4), game_details['away_abbr'], font=self.fonts['team'], fill='white')
 
 
 if __name__ == "__main__":
