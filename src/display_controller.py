@@ -66,6 +66,7 @@ class DisplayController:
         self.current_team_index = 0
         self.showing_recent = True  # True for recent, False for upcoming
         self.favorite_teams = self.config.get('nhl_scoreboard', {}).get('favorite_teams', [])
+        self.in_nhl_rotation = False  # Track if we're in NHL rotation
         
         # Update display durations to include NHL modes
         self.display_durations = self.config['display'].get('display_durations', {
@@ -178,10 +179,11 @@ class DisplayController:
                         has_team_games = self._has_team_games()
                         
                         # If we're in a non-NHL mode and have team games, start NHL rotation
-                        if has_team_games and self.current_display_mode not in ['nhl_recent', 'nhl_upcoming']:
+                        if has_team_games and not self.in_nhl_rotation and self.current_display_mode not in ['nhl_recent', 'nhl_upcoming']:
                             # Start with recent games for the first team
                             self.current_team_index = 0
                             self.showing_recent = True
+                            self.in_nhl_rotation = True
                             if self._get_team_games(self.favorite_teams[self.current_team_index], True):
                                 self.current_display_mode = 'nhl_recent'
                                 logger.info(f"Starting NHL rotation with recent game for {self.favorite_teams[self.current_team_index]}")
@@ -193,6 +195,7 @@ class DisplayController:
                                     logger.info(f"Starting NHL rotation with upcoming game for {self.favorite_teams[self.current_team_index]}")
                                 else:
                                     # No games for this team, move to next mode in rotation
+                                    self.in_nhl_rotation = False
                                     self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
                                     self.current_display_mode = self.available_modes[self.current_mode_index]
                                     logger.info(f"No games for team, switching to: {self.current_display_mode}")
@@ -213,6 +216,7 @@ class DisplayController:
                                         logger.info(f"Switching to recent game for {self.favorite_teams[self.current_team_index]}")
                                     else:
                                         # No recent game for next team, move to next mode in rotation
+                                        self.in_nhl_rotation = False
                                         self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
                                         self.current_display_mode = self.available_modes[self.current_mode_index]
                                         logger.info(f"No games for team, switching to: {self.current_display_mode}")
@@ -221,6 +225,7 @@ class DisplayController:
                                 self.current_team_index = (self.current_team_index + 1) % len(self.favorite_teams)
                                 if self.current_team_index == 0:
                                     # We've completed a full rotation, move to next mode in rotation
+                                    self.in_nhl_rotation = False
                                     self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
                                     self.current_display_mode = self.available_modes[self.current_mode_index]
                                     logger.info(f"Completed NHL rotation, switching to: {self.current_display_mode}")
@@ -231,6 +236,7 @@ class DisplayController:
                                         logger.info(f"Switching to recent game for {self.favorite_teams[self.current_team_index]}")
                                     else:
                                         # No recent game for next team, move to next mode in rotation
+                                        self.in_nhl_rotation = False
                                         self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
                                         self.current_display_mode = self.available_modes[self.current_mode_index]
                                         logger.info(f"No games for team, switching to: {self.current_display_mode}")
