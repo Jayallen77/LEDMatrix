@@ -135,17 +135,48 @@ class BaseNHLManager:
             return None
 
     def _fetch_data(self, date_str: str = None) -> Optional[Dict]:
-        """Fetch data from ESPN API or load test data."""
+        """Fetch data from ESPN API."""
+        if self.test_mode:
+            return self._load_test_data()
+            
         url = ESPN_NHL_SCOREBOARD_URL
         params = {}
         if date_str:
             params['dates'] = date_str
-
+            
         try:
-            response = requests.get(url, params=params, timeout=10)
+            response = requests.get(url, params=params)
             response.raise_for_status()
             data = response.json()
             logging.info(f"[NHL] Successfully fetched data from ESPN API")
+            
+            # If no date specified, fetch data from multiple days
+            if not date_str:
+                # Get today's date in YYYYMMDD format
+                today = datetime.now(timezone.utc).date()
+                dates_to_fetch = [
+                    (today - timedelta(days=2)).strftime('%Y%m%d'),
+                    (today - timedelta(days=1)).strftime('%Y%m%d'),
+                    today.strftime('%Y%m%d')
+                ]
+                
+                # Fetch data for each date
+                all_events = []
+                for fetch_date in dates_to_fetch:
+                    if fetch_date != today.strftime('%Y%m%d'):  # Skip today as we already have it
+                        params['dates'] = fetch_date
+                        response = requests.get(url, params=params)
+                        response.raise_for_status()
+                        date_data = response.json()
+                        if date_data and "events" in date_data:
+                            all_events.extend(date_data["events"])
+                            logging.info(f"[NHL] Fetched {len(date_data['events'])} events for date {fetch_date}")
+                
+                # Combine events from all dates
+                if all_events:
+                    data["events"].extend(all_events)
+                    logging.info(f"[NHL] Combined {len(data['events'])} total events from all dates")
+            
             return data
         except requests.exceptions.RequestException as e:
             logging.error(f"[NHL] Error fetching data from ESPN: {e}")
