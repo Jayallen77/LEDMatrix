@@ -491,9 +491,6 @@ class NHLRecentManager(BaseNHLManager):
         self.logger.info("Initialized NHL Recent Manager")
         self.current_game = None
         self.games_list = []  # List to store all recent games
-        self.current_game_index = 0  # Index to track which game to show
-        self.last_game_switch = 0  # Track when we last switched games
-        self.game_display_duration = 20  # Display each game for 20 seconds
         # Override test_mode to always use real data for recent games
         self.test_mode = False
         logging.info("[NHL] Initialized NHLRecentManager in live mode")
@@ -557,9 +554,7 @@ class NHLRecentManager(BaseNHLManager):
                             self.games_list = new_recent_games
                             # If we don't have a current game or it's not in the new list, start from the beginning
                             if not self.current_game or self.current_game not in self.games_list:
-                                self.current_game_index = 0
                                 self.current_game = self.games_list[0]
-                                self.last_game_switch = current_time
                                 logging.info(f"[NHL] Starting with recent game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
                     else:
                         # No recent games found
@@ -568,25 +563,6 @@ class NHLRecentManager(BaseNHLManager):
                         logging.info("[NHL] No recent games found for favorite teams")
                 else:
                     logging.warning("[NHL] No events found in ESPN API response")
-                
-                # Check if it's time to switch games
-                if len(self.games_list) > 1 and (current_time - self.last_game_switch) >= self.game_display_duration:
-                    # Log current game before switching
-                    if self.current_game:
-                        logging.info(f"[NHL] Current game before switch: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
-                    
-                    # Move to next game
-                    self.current_game_index = (self.current_game_index + 1) % len(self.games_list)
-                    self.current_game = self.games_list[self.current_game_index]
-                    self.last_game_switch = current_time
-                    
-                    # Log the switch
-                    logging.info(f"[NHL] Switching to recent game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
-                    logging.info(f"[NHL] Current game index: {self.current_game_index}, Total games: {len(self.games_list)}")
-                    # Log all games in the list after switch
-                    logging.info("[NHL] Current games list:")
-                    for i, game in enumerate(self.games_list):
-                        logging.info(f"[NHL] Game {i+1}: {game['away_abbr']} vs {game['home_abbr']}")
 
     def display(self, force_clear: bool = False):
         """Display recent game information."""
@@ -606,8 +582,6 @@ class NHLUpcomingManager(BaseNHLManager):
         self.logger.info("Initialized NHL Upcoming Manager")
         self.current_game = None
         self.games_list = []  # List to store all upcoming games
-        self.current_game_index = 0  # Index to track which game to show
-        self.current_team_index = 0  # Index to track which team we're showing
 
     def update(self):
         """Update upcoming game data."""
@@ -692,45 +666,8 @@ class NHLUpcomingManager(BaseNHLManager):
                 if first_team_with_games:
                     # If we don't have a current game or it's not in the new list, start from the beginning
                     if not self.current_game or self.current_game not in upcoming_games:
-                        self.current_team_index = self.favorite_teams.index(first_team_with_games)
-                        self.current_game_index = 0
-                    else:
-                        # Find which team we're currently showing
-                        for i, team in enumerate(self.favorite_teams):
-                            if team in team_games and self.current_game in team_games[team]:
-                                self.current_team_index = i
-                                self.current_game_index = team_games[team].index(self.current_game)
-                                break
-                    
-                    # Get the current team's games
-                    current_team = self.favorite_teams[self.current_team_index]
-                    current_team_games = team_games.get(current_team, [])
-                    
-                    if current_team_games:
-                        # Move to next game for current team
-                        self.current_game_index = (self.current_game_index + 1) % len(current_team_games)
-                        self.current_game = current_team_games[self.current_game_index]
-                        
-                        # If we've shown all games for this team, move to next team
-                        if self.current_game_index == 0:
-                            # Find the next team that has games
-                            next_team = None
-                            for i in range(len(self.favorite_teams)):
-                                next_team_index = (self.current_team_index + i + 1) % len(self.favorite_teams)
-                                next_team = self.favorite_teams[next_team_index]
-                                if next_team in team_games and team_games[next_team]:
-                                    self.current_team_index = next_team_index
-                                    self.current_game = team_games[next_team][0]
-                            
-                            # If no next team has games, go back to the first team with games
-                            if not next_team or next_team not in team_games or not team_games[next_team]:
-                                self.current_team_index = self.favorite_teams.index(first_team_with_games)
-                                self.current_game = team_games[first_team_with_games][0]
-                    
-                    if self.current_game:
-                        logging.info(f"[NHL] Rotating to upcoming game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
-                    else:
-                        logging.info("[NHL] No current game to display")
+                        self.current_game = team_games[first_team_with_games][0]
+                        logging.info(f"[NHL] Starting with upcoming game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
                 else:
                     logging.info("[NHL] No upcoming games found for favorite teams")
                     self.current_game = None
