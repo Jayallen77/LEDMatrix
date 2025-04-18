@@ -85,6 +85,23 @@ class BaseNHLManager:
         self.logger.debug(f"Loading logo from: {logo_path}")
         
         try:
+            # Create test logos if they don't exist
+            if not os.path.exists(logo_path):
+                os.makedirs(os.path.dirname(logo_path), exist_ok=True)
+                # Create a simple colored rectangle as a test logo
+                logo = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
+                draw = ImageDraw.Draw(logo)
+                # Use team abbreviation to determine color
+                if team_abbrev == "TBL":
+                    color = (0, 0, 255, 255)  # Blue for Tampa Bay
+                else:
+                    color = (255, 0, 0, 255)  # Red for Dallas
+                draw.rectangle([4, 4, 28, 28], fill=color)
+                # Add team abbreviation
+                draw.text((8, 8), team_abbrev, fill=(255, 255, 255, 255))
+                logo.save(logo_path)
+                self.logger.info(f"Created test logo for {team_abbrev}")
+            
             logo = Image.open(logo_path)
             original_size = logo.size
             self.logger.debug(f"Original logo size: {original_size}")
