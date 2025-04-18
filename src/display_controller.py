@@ -20,19 +20,18 @@ logger = logging.getLogger(__name__)
 class DisplayController:
     def __init__(self):
         self.config_manager = ConfigManager()
-        self.config = self.config_manager.load_config()
-        self.display_manager = DisplayManager(self.config.get('display', {}))
+        self.config = self.config_manager.get_config()
+        self.display_manager = DisplayManager(self.config)
         
-        # Only initialize enabled modules
-        self.clock = Clock(display_manager=self.display_manager) if self.config.get('clock', {}).get('enabled', False) else None
-        self.weather = WeatherManager(self.config, self.display_manager) if self.config.get('weather', {}).get('enabled', False) else None
-        self.stocks = StockManager(self.config, self.display_manager) if self.config.get('stocks', {}).get('enabled', False) else None
-        self.news = StockNewsManager(self.config, self.display_manager) if self.config.get('stock_news', {}).get('enabled', False) else None
+        # Initialize display modes
+        self.clock = Clock(self.config, self.display_manager) if self.config['display'].get('clock_enabled', True) else None
+        self.weather = WeatherManager(self.config, self.display_manager) if self.config['display'].get('weather_enabled', True) else None
+        self.stocks = StockManager(self.config, self.display_manager) if self.config['display'].get('stocks_enabled', True) else None
+        self.news = StockNewsManager(self.config, self.display_manager) if self.config['display'].get('news_enabled', True) else None
         
-        # Initialize NHL managers if NHL is enabled
-        nhl_config = self.config.get('nhl_scoreboard', {})
-        nhl_enabled = nhl_config.get('enabled', False)
-        nhl_display_modes = nhl_config.get('display_modes', {})
+        # Initialize NHL managers if enabled
+        nhl_enabled = self.config.get('nhl_scoreboard', {}).get('enabled', False)
+        nhl_display_modes = self.config.get('nhl_scoreboard', {}).get('display_modes', {})
         
         if nhl_enabled:
             self.nhl_live = NHLLiveManager(self.config, self.display_manager) if nhl_display_modes.get('nhl_live', True) else None
@@ -71,7 +70,7 @@ class DisplayController:
             'weather_daily': 15,
             'stocks': 45,
             'nhl_live': 30,  # Live games update more frequently
-            'nhl_recent': 20,  # Recent games
+            'nhl_recent': 60,  # Recent games - increased to 60 seconds to allow proper cycling
             'nhl_upcoming': 20,  # Upcoming games
             'stock_news': 30
         })
