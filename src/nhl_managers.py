@@ -492,7 +492,6 @@ class NHLRecentManager(BaseNHLManager):
         self.current_game = None
         self.games_list = []  # List to store all recent games
         self.current_game_index = 0  # Index to track which game to show
-        self.current_team_index = 0  # Index to track which team we're showing
         self.last_game_switch = 0  # Track when we last switched games
         self.game_display_duration = 20  # Display each game for 20 seconds
         # Override test_mode to always use real data for recent games
@@ -555,10 +554,18 @@ class NHLRecentManager(BaseNHLManager):
                 
                 # Check if it's time to switch games
                 if len(self.games_list) > 1 and (current_time - self.last_game_switch) >= self.game_display_duration:
+                    # Log current game before switching
+                    if self.current_game:
+                        logging.info(f"[NHL] Current game before switch: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
+                    
+                    # Move to next game
                     self.current_game_index = (self.current_game_index + 1) % len(self.games_list)
                     self.current_game = self.games_list[self.current_game_index]
                     self.last_game_switch = current_time
+                    
+                    # Log the switch
                     logging.info(f"[NHL] Switching to recent game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
+                    logging.info(f"[NHL] Current game index: {self.current_game_index}, Total games: {len(self.games_list)}")
 
     def display(self, force_clear: bool = False):
         """Display recent game information."""
