@@ -32,6 +32,7 @@ class BaseNHLManager:
         self.fonts = self._load_fonts()
         self.favorite_teams = self.nhl_config.get("favorite_teams", [])
         self.logger = logging.getLogger('NHL')
+        self.recent_hours = self.nhl_config.get("recent_game_hours", 48)  # Default 48 hours
         
         # Set logging level to INFO to reduce noise
         self.logger.setLevel(logging.INFO)
@@ -180,6 +181,12 @@ class BaseNHLManager:
                 game_time = local_time.strftime("%-I:%M %p")
                 game_date = local_time.strftime("%-m/%-d")
 
+            # Calculate if game is within recent window
+            is_within_window = False
+            if start_time_utc:
+                cutoff_time = datetime.now(timezone.utc) - timedelta(hours=self.recent_hours)
+                is_within_window = start_time_utc > cutoff_time
+
             details = {
                 "start_time_utc": start_time_utc,
                 "status_text": status["type"]["shortDetail"],
@@ -188,6 +195,7 @@ class BaseNHLManager:
                 "is_live": status["type"]["state"] in ("in", "halftime"),
                 "is_final": status["type"]["state"] == "post",
                 "is_upcoming": status["type"]["state"] == "pre",
+                "is_within_window": is_within_window,
                 "home_abbr": home_team["team"]["abbreviation"],
                 "home_score": home_team.get("score", "0"),
                 "home_logo_path": os.path.join(self.logo_dir, f"{home_team['team']['abbreviation']}.png"),
@@ -444,7 +452,6 @@ class NHLRecentManager(BaseNHLManager):
         self.no_data_interval = 900  # 15 minutes when no recent games
         self.last_update = 0
         self.logger.info("Initialized NHL Recent Manager")
-        self.recent_hours = self.nhl_config.get("recent_game_hours", 48)  # Default 48 hours
         self.current_game = None
         self.games_list = []  # List to store all recent games
         self.current_game_index = 0  # Index to track which game to show
@@ -485,27 +492,27 @@ class NHLRecentManager(BaseNHLManager):
                     
                     if new_recent_games:
                         # Sort games by start time (most recent first)
-                        new_recent_games.sort(key=lambda x: x["start_time"], reverse=True)
+                        new_recent_games.sort(key=lambda x: x["start_time_utc"], reverse=True)
                         
                         # Only update the games list if we have new games
-                        if not self.recent_games or set(game["away_abbr"] + game["home_abbr"] for game in new_recent_games) != set(game["away_abbr"] + game["home_abbr"] for game in self.recent_games):
-                            self.recent_games = new_recent_games
+                        if not self.games_list or set(game["away_abbr"] + game["home_abbr"] for game in new_recent_games) != set(game["away_abbr"] + game["home_abbr"] for game in self.games_list):
+                            self.games_list = new_recent_games
                             # If we don't have a current game or it's not in the new list, start from the beginning
-                            if not self.current_game or self.current_game not in self.recent_games:
+                            if not self.current_game or self.current_game not in self.games_list:
                                 self.current_game_index = 0
-                                self.current_game = self.recent_games[0]
+                                self.current_game = self.games_list[0]
                                 self.last_game_switch = current_time
                                 logging.info(f"[NHL] Starting with recent game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
                     else:
                         # No recent games found
-                        self.recent_games = []
+                        self.games_list = []
                         self.current_game = None
                         logging.info("[NHL] No recent games found")
                 
                 # Check if it's time to switch games
-                if len(self.recent_games) > 1 and (current_time - self.last_game_switch) >= self.game_display_duration:
-                    self.current_game_index = (self.current_game_index + 1) % len(self.recent_games)
-                    self.current_game = self.recent_games[self.current_game_index]
+                if len(self.games_list) > 1 and (current_time - self.last_game_switch) >= self.game_display_duration:
+                    self.current_game_index = (self.current_game_index + 1) % len(self.games_list)
+                    self.current_game = self.games_list[self.current_game_index]
                     self.last_game_switch = current_time
                     logging.info(f"[NHL] Switching to recent game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
 
