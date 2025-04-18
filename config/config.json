@@ -78,6 +78,7 @@
             "nhl_live": true,
             "nhl_recent": true,
             "nhl_upcoming": true
-        }
+        },
+        "live_game_duration": 20
     }
 } 

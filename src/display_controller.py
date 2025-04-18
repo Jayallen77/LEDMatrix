@@ -102,6 +102,12 @@ class DisplayController:
         if self.nhl_recent: self.nhl_recent.update()
         if self.nhl_upcoming: self.nhl_upcoming.update()
 
+    def _check_live_games(self) -> bool:
+        """Check if there are any live games available."""
+        if not self.nhl_live:
+            return False
+        return bool(self.nhl_live.live_games)
+
     def run(self):
         """Run the display controller, switching between displays."""
         if not self.available_modes:
@@ -116,12 +122,30 @@ class DisplayController:
                 # Update data for all modules
                 self._update_modules()
                 
-                # Check for mode switch
-                if current_time - self.last_switch > self.get_current_duration():
+                # Check for live games
+                has_live_games = self._check_live_games()
+                
+                # If we're in NHL live mode but there are no live games, skip to next mode
+                if self.current_display_mode == 'nhl_live' and not has_live_games:
                     self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
                     self.current_display_mode = self.available_modes[self.current_mode_index]
+                    logger.info(f"No live games, switching to: {self.current_display_mode}")
+                    self.last_switch = current_time
+                    self.force_clear = True
+                
+                # Check for mode switch
+                elif current_time - self.last_switch > self.get_current_duration():
+                    # If there are live games and we're not in NHL live mode, switch to it
+                    if has_live_games and self.current_display_mode != 'nhl_live':
+                        live_index = self.available_modes.index('nhl_live')
+                        self.current_mode_index = live_index
+                        self.current_display_mode = 'nhl_live'
+                        logger.info("Live games available, switching to NHL live mode")
+                    else:
+                        self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
+                        self.current_display_mode = self.available_modes[self.current_mode_index]
+                        logger.info(f"Switching display to: {self.current_display_mode}")
                     
-                    logger.info(f"Switching display to: {self.current_display_mode}")
                     self.last_switch = current_time
                     self.force_clear = True
 
@@ -156,9 +180,12 @@ class DisplayController:
                     continue
 
                 self.force_clear = False
+                time.sleep(self.update_interval)
 
         except KeyboardInterrupt:
-            print("\nDisplay stopped by user")
+            logger.info("Display controller stopped by user")
+        except Exception as e:
+            logger.error(f"Error in display controller: {e}", exc_info=True)
         finally:
             self.display_manager.cleanup()
 
