@@ -32,7 +32,9 @@
             "hourly_forecast": 15,
             "daily_forecast": 15,
             "stock_news": 30,
-            "nhl": 20
+            "nhl_live": 30,
+            "nhl_recent": 20,
+            "nhl_upcoming": 20
         }
     },
     "clock": {
@@ -69,8 +71,11 @@
             "DAL"
         ],
         "test_mode": true,
-        "update_interval_seconds": 15,
-        "idle_update_interval_seconds": 600,
+        "logo_dir": "assets/sports/nhl_logos",
+        "live_update_interval": 30,
+        "recent_update_interval": 300,
+        "upcoming_update_interval": 300,
+        "recent_game_hours": 48,
         "show_only_favorites": true,
         "cycle_game_duration_seconds": 10
     }
