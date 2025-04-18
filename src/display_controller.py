@@ -24,10 +24,10 @@ class DisplayController:
         self.display_manager = DisplayManager(self.config)
         
         # Initialize display modes
-        self.clock = Clock(self.display_manager) if self.config['display'].get('clock_enabled', True) else None
-        self.weather = WeatherManager(self.config, self.display_manager) if self.config['display'].get('weather_enabled', True) else None
-        self.stocks = StockManager(self.config, self.display_manager) if self.config['display'].get('stocks_enabled', True) else None
-        self.news = StockNewsManager(self.config, self.display_manager) if self.config['display'].get('news_enabled', True) else None
+        self.clock = Clock(self.display_manager) if self.config.get('clock', {}).get('enabled', True) else None
+        self.weather = WeatherManager(self.config, self.display_manager) if self.config.get('weather', {}).get('enabled', False) else None
+        self.stocks = StockManager(self.config, self.display_manager) if self.config.get('stocks', {}).get('enabled', False) else None
+        self.news = StockNewsManager(self.config, self.display_manager) if self.config.get('stock_news', {}).get('enabled', False) else None
         
         # Initialize NHL managers if enabled
         nhl_enabled = self.config.get('nhl_scoreboard', {}).get('enabled', False)
