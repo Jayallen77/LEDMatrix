@@ -80,10 +80,14 @@ class BaseNHLManager:
 
     def _load_and_resize_logo(self, team_abbrev: str) -> Optional[Image.Image]:
         """Load and resize a team logo, with caching."""
+        self.logger.info(f"Loading logo for {team_abbrev}")
+        
         if team_abbrev in self._logo_cache:
+            self.logger.info(f"Using cached logo for {team_abbrev}")
             return self._logo_cache[team_abbrev]
             
         logo_path = os.path.join(self.logo_dir, f"{team_abbrev}.png")
+        self.logger.info(f"Logo path: {logo_path}")
         
         try:
             # Create test logos if they don't exist
@@ -102,11 +106,14 @@ class BaseNHLManager:
                 # Add team abbreviation
                 draw.text((8, 8), team_abbrev, fill=(255, 255, 255, 255))
                 logo.save(logo_path)
+                self.logger.info(f"Created test logo at {logo_path}")
             
             logo = Image.open(logo_path)
+            self.logger.info(f"Opened logo for {team_abbrev}, size: {logo.size}, mode: {logo.mode}")
             
             # Convert to RGBA if not already
             if logo.mode != 'RGBA':
+                self.logger.info(f"Converting {team_abbrev} logo from {logo.mode} to RGBA")
                 logo = logo.convert('RGBA')
             
             # Calculate max size based on display dimensions
@@ -115,6 +122,7 @@ class BaseNHLManager:
             
             # Resize maintaining aspect ratio
             logo.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+            self.logger.info(f"Resized {team_abbrev} logo to {logo.size}")
             
             # Cache the resized logo
             self._logo_cache[team_abbrev] = logo
@@ -224,22 +232,33 @@ class BaseNHLManager:
     def _draw_scorebug_layout(self):
         """Draw the scorebug layout for the current game."""
         try:
+            self.logger.info("=== Starting scorebug layout ===")
             # Create a new black image for the main display
             main_img = Image.new('RGBA', (self.display_width, self.display_height), (0, 0, 0, 255))
             
             # Load logos once
             home_logo = self._load_and_resize_logo(self.current_game["home_abbr"])
             away_logo = self._load_and_resize_logo(self.current_game["away_abbr"])
+            
+            self.logger.info(f"Home team ({self.current_game['home_abbr']}) logo loaded: {home_logo is not None}")
+            self.logger.info(f"Away team ({self.current_game['away_abbr']}) logo loaded: {away_logo is not None}")
+            
+            if home_logo:
+                self.logger.info(f"Home logo size: {home_logo.size}, mode: {home_logo.mode}")
+            if away_logo:
+                self.logger.info(f"Away logo size: {away_logo.size}, mode: {away_logo.mode}")
 
             # Draw home team logo (right side)
             if home_logo:
                 home_x = 3 * self.display_width // 4 - home_logo.width // 2
                 home_y = self.display_height // 4 - home_logo.height // 2
+                self.logger.info(f"Home logo position: ({home_x}, {home_y})")
                 
-                # Create a temporary image for the home logo with red background for debugging
-                home_overlay = Image.new('RGBA', (self.display_width, self.display_height), (255, 0, 0, 128))
+                # Create a temporary image for the home logo with bright red background
+                home_overlay = Image.new('RGBA', (self.display_width, self.display_height), (255, 0, 0, 255))
                 home_overlay.paste(home_logo, (home_x, home_y), home_logo)
                 main_img = Image.alpha_composite(main_img, home_overlay)
+                self.logger.info("Home logo composited")
             else:
                 self.logger.error(f"Home logo is None for team {self.current_game['home_abbr']}")
 
@@ -247,18 +266,20 @@ class BaseNHLManager:
             if away_logo:
                 away_x = self.display_width // 4 - away_logo.width // 2
                 away_y = self.display_height // 4 - away_logo.height // 2
+                self.logger.info(f"Away logo position: ({away_x}, {away_y})")
                 
-                # Create a temporary image for the away logo with blue background for debugging
-                away_overlay = Image.new('RGBA', (self.display_width, self.display_height), (0, 0, 255, 128))
+                # Create a temporary image for the away logo with bright blue background
+                away_overlay = Image.new('RGBA', (self.display_width, self.display_height), (0, 0, 255, 255))
                 away_overlay.paste(away_logo, (away_x, away_y), away_logo)
                 main_img = Image.alpha_composite(main_img, away_overlay)
+                self.logger.info("Away logo composited")
             else:
                 self.logger.error(f"Away logo is None for team {self.current_game['away_abbr']}")
 
             # Save debug image to check logo positions
             debug_path = os.path.join(os.path.dirname(self.logo_dir), "debug_layout.png")
             main_img.save(debug_path)
-            self.logger.info(f"Saved debug layout to: {debug_path}")
+            self.logger.info(f"Debug layout saved to: {debug_path}")
 
             # Convert to RGB for final display
             main_img = main_img.convert('RGB')
@@ -285,6 +306,7 @@ class BaseNHLManager:
             # Display the image
             self.display_manager.image.paste(main_img, (0, 0))
             self.display_manager.update_display()
+            self.logger.info("=== Scorebug layout completed ===")
 
         except Exception as e:
             self.logger.error(f"Error displaying game: {e}", exc_info=True)
