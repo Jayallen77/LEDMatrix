@@ -25,8 +25,18 @@ class BaseNHLManager:
         self.current_game = None
         self.fonts = self._load_fonts()
         self.favorite_teams = self.nhl_config.get("favorite_teams", [])
+
+        # Get display dimensions from config
+        display_config = config.get("display", {})
+        hardware_config = display_config.get("hardware", {})
+        cols = hardware_config.get("cols", 64)
+        chain = hardware_config.get("chain_length", 1)
+        self.display_width = int(cols * chain)
+        self.display_height = hardware_config.get("rows", 32)
+        
         logging.info(f"[NHL] Test mode: {'enabled' if self.test_mode else 'disabled'}")
         logging.info(f"[NHL] Favorite teams: {self.favorite_teams}")
+        logging.info(f"[NHL] Display dimensions: {self.display_width}x{self.display_height}")
 
     def _load_fonts(self):
         """Load fonts used by the scoreboard."""
@@ -132,6 +142,66 @@ class BaseNHLManager:
             logging.error(f"[NHL] Error extracting game details: {e}")
             return None
 
+    def display(self, force_clear: bool = False):
+        """Display game information."""
+        if not self.current_game:
+            logging.warning("[NHL] No game data available to display")
+            return
+
+        try:
+            # Create a new black image
+            img = Image.new('RGB', (self.display_width, self.display_height), 'black')
+            draw = ImageDraw.Draw(img)
+
+            # Calculate logo sizes
+            max_size = (self.display_width // 3, self.display_height // 2)
+
+            # Load and resize logos
+            home_logo = self._load_and_resize_logo(self.current_game["home_logo_path"], max_size)
+            away_logo = self._load_and_resize_logo(self.current_game["away_logo_path"], max_size)
+
+            # Draw home team logo
+            if home_logo:
+                home_x = self.display_width // 4 - home_logo.width // 2
+                home_y = self.display_height // 4 - home_logo.height // 2
+                temp_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
+                temp_draw = ImageDraw.Draw(temp_img)
+                temp_draw.im.paste(home_logo, (home_x, home_y), home_logo)
+                draw.im.paste(temp_img, (0, 0))
+
+            # Draw away team logo
+            if away_logo:
+                away_x = self.display_width // 4 - away_logo.width // 2
+                away_y = 3 * self.display_height // 4 - away_logo.height // 2
+                temp_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
+                temp_draw = ImageDraw.Draw(temp_img)
+                temp_draw.im.paste(away_logo, (away_x, away_y), away_logo)
+                draw.im.paste(temp_img, (0, 0))
+
+            # Draw scores
+            home_score = str(self.current_game["home_score"])
+            away_score = str(self.current_game["away_score"])
+            
+            home_score_x = self.display_width // 2 - 10
+            home_score_y = self.display_height // 4 - 8
+            away_score_x = self.display_width // 2 - 10
+            away_score_y = 3 * self.display_height // 4 - 8
+
+            draw.text((home_score_x, home_score_y), home_score, font=self.fonts['score'], fill=(255, 255, 255))
+            draw.text((away_score_x, away_score_y), away_score, font=self.fonts['score'], fill=(255, 255, 255))
+
+            # Draw game status
+            status_x = self.display_width // 2 - 20
+            status_y = self.display_height // 2 - 8
+            draw.text((status_x, status_y), self.current_game["status_text"], font=self.fonts['status'], fill=(255, 255, 255))
+
+            # Display the image
+            self.display_manager.display_image(img)
+            logging.debug("[NHL] Successfully displayed game")
+
+        except Exception as e:
+            logging.error(f"[NHL] Error displaying game: {e}", exc_info=True)
+
 class NHLLiveManager(BaseNHLManager):
     """Manager for live NHL games."""
     def __init__(self, config: dict, display_manager):
@@ -207,11 +277,11 @@ class NHLLiveManager(BaseNHLManager):
 
         try:
             # Create a new black image
-            img = Image.new('RGB', (self.display_manager.width, self.display_manager.height), 'black')
+            img = Image.new('RGB', (self.display_width, self.display_height), 'black')
             draw = ImageDraw.Draw(img)
 
             # Calculate logo sizes
-            max_size = (self.display_manager.width // 3, self.display_manager.height // 2)
+            max_size = (self.display_width // 3, self.display_height // 2)
 
             # Load and resize logos
             home_logo = self._load_and_resize_logo(self.current_game["home_logo_path"], max_size)
@@ -219,18 +289,18 @@ class NHLLiveManager(BaseNHLManager):
 
             # Draw home team logo
             if home_logo:
-                home_x = self.display_manager.width // 4 - home_logo.width // 2
-                home_y = self.display_manager.height // 4 - home_logo.height // 2
-                temp_img = Image.new('RGB', (self.display_manager.width, self.display_manager.height), 'black')
+                home_x = self.display_width // 4 - home_logo.width // 2
+                home_y = self.display_height // 4 - home_logo.height // 2
+                temp_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
                 temp_draw = ImageDraw.Draw(temp_img)
                 temp_draw.im.paste(home_logo, (home_x, home_y), home_logo)
                 draw.im.paste(temp_img, (0, 0))
 
             # Draw away team logo
             if away_logo:
-                away_x = self.display_manager.width // 4 - away_logo.width // 2
-                away_y = 3 * self.display_manager.height // 4 - away_logo.height // 2
-                temp_img = Image.new('RGB', (self.display_manager.width, self.display_manager.height), 'black')
+                away_x = self.display_width // 4 - away_logo.width // 2
+                away_y = 3 * self.display_height // 4 - away_logo.height // 2
+                temp_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
                 temp_draw = ImageDraw.Draw(temp_img)
                 temp_draw.im.paste(away_logo, (away_x, away_y), away_logo)
                 draw.im.paste(temp_img, (0, 0))
@@ -239,10 +309,10 @@ class NHLLiveManager(BaseNHLManager):
             home_score = str(self.current_game["home_score"])
             away_score = str(self.current_game["away_score"])
             
-            home_score_x = self.display_manager.width // 2 - 10
-            home_score_y = self.display_manager.height // 4 - 8
-            away_score_x = self.display_manager.width // 2 - 10
-            away_score_y = 3 * self.display_manager.height // 4 - 8
+            home_score_x = self.display_width // 2 - 10
+            home_score_y = self.display_height // 4 - 8
+            away_score_x = self.display_width // 2 - 10
+            away_score_y = 3 * self.display_height // 4 - 8
 
             draw.text((home_score_x, home_score_y), home_score, font=self.fonts['score'], fill=(255, 255, 255))
             draw.text((away_score_x, away_score_y), away_score, font=self.fonts['score'], fill=(255, 255, 255))
@@ -252,8 +322,8 @@ class NHLLiveManager(BaseNHLManager):
             clock = self.current_game["clock"]
             period_str = f"{period}{'st' if period==1 else 'nd' if period==2 else 'rd' if period==3 else 'th'}"
             
-            status_x = self.display_manager.width // 2 - 20
-            status_y = self.display_manager.height // 2 - 8
+            status_x = self.display_width // 2 - 20
+            status_y = self.display_height // 2 - 8
             draw.text((status_x, status_y), f"{period_str} {clock}", font=self.fonts['status'], fill=(255, 255, 255))
 
             # Display the image
@@ -336,11 +406,11 @@ class NHLRecentManager(BaseNHLManager):
 
         try:
             # Create a new black image
-            img = Image.new('RGB', (self.display_manager.width, self.display_manager.height), 'black')
+            img = Image.new('RGB', (self.display_width, self.display_height), 'black')
             draw = ImageDraw.Draw(img)
 
             # Calculate logo sizes
-            max_size = (self.display_manager.width // 3, self.display_manager.height // 2)
+            max_size = (self.display_width // 3, self.display_height // 2)
 
             # Load and resize logos
             home_logo = self._load_and_resize_logo(self.current_game["home_logo_path"], max_size)
@@ -348,18 +418,18 @@ class NHLRecentManager(BaseNHLManager):
 
             # Draw home team logo
             if home_logo:
-                home_x = self.display_manager.width // 4 - home_logo.width // 2
-                home_y = self.display_manager.height // 4 - home_logo.height // 2
-                temp_img = Image.new('RGB', (self.display_manager.width, self.display_manager.height), 'black')
+                home_x = self.display_width // 4 - home_logo.width // 2
+                home_y = self.display_height // 4 - home_logo.height // 2
+                temp_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
                 temp_draw = ImageDraw.Draw(temp_img)
                 temp_draw.im.paste(home_logo, (home_x, home_y), home_logo)
                 draw.im.paste(temp_img, (0, 0))
 
             # Draw away team logo
             if away_logo:
-                away_x = self.display_manager.width // 4 - away_logo.width // 2
-                away_y = 3 * self.display_manager.height // 4 - away_logo.height // 2
-                temp_img = Image.new('RGB', (self.display_manager.width, self.display_manager.height), 'black')
+                away_x = self.display_width // 4 - away_logo.width // 2
+                away_y = 3 * self.display_height // 4 - away_logo.height // 2
+                temp_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
                 temp_draw = ImageDraw.Draw(temp_img)
                 temp_draw.im.paste(away_logo, (away_x, away_y), away_logo)
                 draw.im.paste(temp_img, (0, 0))
@@ -368,17 +438,17 @@ class NHLRecentManager(BaseNHLManager):
             home_score = str(self.current_game["home_score"])
             away_score = str(self.current_game["away_score"])
             
-            home_score_x = self.display_manager.width // 2 - 10
-            home_score_y = self.display_manager.height // 4 - 8
-            away_score_x = self.display_manager.width // 2 - 10
-            away_score_y = 3 * self.display_manager.height // 4 - 8
+            home_score_x = self.display_width // 2 - 10
+            home_score_y = self.display_height // 4 - 8
+            away_score_x = self.display_width // 2 - 10
+            away_score_y = 3 * self.display_height // 4 - 8
 
             draw.text((home_score_x, home_score_y), home_score, font=self.fonts['score'], fill=(255, 255, 255))
             draw.text((away_score_x, away_score_y), away_score, font=self.fonts['score'], fill=(255, 255, 255))
 
             # Draw "FINAL" status
-            status_x = self.display_manager.width // 2 - 20
-            status_y = self.display_manager.height // 2 - 8
+            status_x = self.display_width // 2 - 20
+            status_y = self.display_height // 2 - 8
             draw.text((status_x, status_y), "FINAL", font=self.fonts['status'], fill=(255, 255, 255))
 
             # Display the image
@@ -470,11 +540,11 @@ class NHLUpcomingManager(BaseNHLManager):
 
         try:
             # Create a new black image
-            img = Image.new('RGB', (self.display_manager.width, self.display_manager.height), 'black')
+            img = Image.new('RGB', (self.display_width, self.display_height), 'black')
             draw = ImageDraw.Draw(img)
 
             # Calculate logo sizes
-            max_size = (self.display_manager.width // 3, self.display_manager.height // 2)
+            max_size = (self.display_width // 3, self.display_height // 2)
 
             # Load and resize logos
             home_logo = self._load_and_resize_logo(self.current_game["home_logo_path"], max_size)
@@ -482,25 +552,25 @@ class NHLUpcomingManager(BaseNHLManager):
 
             # Draw home team logo
             if home_logo:
-                home_x = self.display_manager.width // 4 - home_logo.width // 2
-                home_y = self.display_manager.height // 4 - home_logo.height // 2
-                temp_img = Image.new('RGB', (self.display_manager.width, self.display_manager.height), 'black')
+                home_x = self.display_width // 4 - home_logo.width // 2
+                home_y = self.display_height // 4 - home_logo.height // 2
+                temp_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
                 temp_draw = ImageDraw.Draw(temp_img)
                 temp_draw.im.paste(home_logo, (home_x, home_y), home_logo)
                 draw.im.paste(temp_img, (0, 0))
 
             # Draw away team logo
             if away_logo:
-                away_x = self.display_manager.width // 4 - away_logo.width // 2
-                away_y = 3 * self.display_manager.height // 4 - away_logo.height // 2
-                temp_img = Image.new('RGB', (self.display_manager.width, self.display_manager.height), 'black')
+                away_x = self.display_width // 4 - away_logo.width // 2
+                away_y = 3 * self.display_height // 4 - away_logo.height // 2
+                temp_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
                 temp_draw = ImageDraw.Draw(temp_img)
                 temp_draw.im.paste(away_logo, (away_x, away_y), away_logo)
                 draw.im.paste(temp_img, (0, 0))
 
             # Draw game time
-            status_x = self.display_manager.width // 2 - 20
-            status_y = self.display_manager.height // 2 - 8
+            status_x = self.display_width // 2 - 20
+            status_y = self.display_height // 2 - 8
             draw.text((status_x, status_y), self.current_game["status_text"], font=self.fonts['status'], fill=(255, 255, 255))
 
             # Display the image
