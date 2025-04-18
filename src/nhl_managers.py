@@ -457,6 +457,18 @@ class NHLRecentManager(BaseNHLManager):
                 recent_games = []
                 cutoff_time = datetime.now(timezone.utc) - timedelta(hours=self.recent_hours)
                 
+                # Debug: Print all events to see what we're getting
+                print("\nDEBUG - All events from ESPN:")
+                for event in all_events:
+                    try:
+                        home_team = next(c for c in event["competitions"][0]["competitors"] if c.get("homeAway") == "home")
+                        away_team = next(c for c in event["competitions"][0]["competitors"] if c.get("homeAway") == "away")
+                        home_abbr = home_team["team"]["abbreviation"]
+                        away_abbr = away_team["team"]["abbreviation"]
+                        print(f"Game: {away_abbr} vs {home_abbr}")
+                    except Exception as e:
+                        print(f"Error parsing event: {e}")
+                
                 for event in all_events:
                     details = self._extract_game_details(event)
                     if details and details["is_final"] and details["start_time_utc"]:
