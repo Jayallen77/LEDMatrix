@@ -248,17 +248,15 @@ class BaseNHLManager:
             if away_logo:
                 self.logger.info(f"Away logo size: {away_logo.size}, mode: {away_logo.mode}")
 
+            # Create a single overlay image for both logos
+            overlay = Image.new('RGBA', (self.display_width, self.display_height), (0, 0, 0, 0))
+
             # Draw home team logo (right side)
             if home_logo:
                 home_x = 3 * self.display_width // 4 - home_logo.width // 2
                 home_y = self.display_height // 4 - home_logo.height // 2
                 self.logger.info(f"Home logo position: ({home_x}, {home_y})")
-                
-                # Create a temporary image for the home logo with bright red background
-                home_overlay = Image.new('RGBA', (self.display_width, self.display_height), (255, 0, 0, 255))
-                home_overlay.paste(home_logo, (home_x, home_y), home_logo)
-                main_img = Image.alpha_composite(main_img, home_overlay)
-                self.logger.info("Home logo composited")
+                overlay.paste(home_logo, (home_x, home_y), home_logo)
             else:
                 self.logger.error(f"Home logo is None for team {self.current_game['home_abbr']}")
 
@@ -267,14 +265,12 @@ class BaseNHLManager:
                 away_x = self.display_width // 4 - away_logo.width // 2
                 away_y = self.display_height // 4 - away_logo.height // 2
                 self.logger.info(f"Away logo position: ({away_x}, {away_y})")
-                
-                # Create a temporary image for the away logo with bright blue background
-                away_overlay = Image.new('RGBA', (self.display_width, self.display_height), (0, 0, 255, 255))
-                away_overlay.paste(away_logo, (away_x, away_y), away_logo)
-                main_img = Image.alpha_composite(main_img, away_overlay)
-                self.logger.info("Away logo composited")
+                overlay.paste(away_logo, (away_x, away_y), away_logo)
             else:
                 self.logger.error(f"Away logo is None for team {self.current_game['away_abbr']}")
+
+            # Composite the overlay with the main image
+            main_img = Image.alpha_composite(main_img, overlay)
 
             # Save debug image to check logo positions
             debug_path = os.path.join(os.path.dirname(self.logo_dir), "debug_layout.png")
