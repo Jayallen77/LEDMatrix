@@ -171,23 +171,6 @@ class BaseNHLManager:
             home_team = next(c for c in competitors if c.get("homeAway") == "home")
             away_team = next(c for c in competitors if c.get("homeAway") == "away")
 
-            # Temporary debug logging to see raw team data
-            print(f"DEBUG - Raw team data from ESPN:")
-            print(f"Home team: {json.dumps(home_team['team'], indent=2)}")
-            print(f"Away team: {json.dumps(away_team['team'], indent=2)}")
-
-            # Map ESPN team abbreviations to our logo file names
-            team_abbr_map = {
-                "TB": "TBL",  # Tampa Bay Lightning
-                # Add more mappings as needed
-            }
-
-            # Get team abbreviations and map them if needed
-            home_abbr = home_team["team"]["abbreviation"]
-            away_abbr = away_team["team"]["abbreviation"]
-            home_abbr = team_abbr_map.get(home_abbr, home_abbr)
-            away_abbr = team_abbr_map.get(away_abbr, away_abbr)
-
             # Format game time and date for display
             game_time = ""
             game_date = ""
@@ -205,12 +188,12 @@ class BaseNHLManager:
                 "is_live": status["type"]["state"] in ("in", "halftime"),
                 "is_final": status["type"]["state"] == "post",
                 "is_upcoming": status["type"]["state"] == "pre",
-                "home_abbr": home_abbr,
+                "home_abbr": home_team["team"]["abbreviation"],
                 "home_score": home_team.get("score", "0"),
-                "home_logo_path": os.path.join(self.logo_dir, f"{home_abbr}.png"),
-                "away_abbr": away_abbr,
+                "home_logo_path": os.path.join(self.logo_dir, f"{home_team['team']['abbreviation']}.png"),
+                "away_abbr": away_team["team"]["abbreviation"],
                 "away_score": away_team.get("score", "0"),
-                "away_logo_path": os.path.join(self.logo_dir, f"{away_abbr}.png"),
+                "away_logo_path": os.path.join(self.logo_dir, f"{away_team['team']['abbreviation']}.png"),
                 "game_time": game_time,
                 "game_date": game_date
             }
