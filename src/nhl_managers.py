@@ -14,6 +14,11 @@ ESPN_NHL_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/hockey/
 
 class BaseNHLManager:
     """Base class for NHL managers with common functionality."""
+    # Class variables for warning tracking
+    _no_data_warning_logged = False
+    _last_warning_time = 0
+    _warning_cooldown = 60  # Only log warnings once per minute
+    
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         self.display_manager = display_manager
         self.config = config
@@ -27,7 +32,6 @@ class BaseNHLManager:
         self.fonts = self._load_fonts()
         self.favorite_teams = self.nhl_config.get("favorite_teams", [])
         self.logger = logging.getLogger('NHL')
-        self.no_data_warning_logged = False  # Flag to track if we've already logged a warning
         
         # Get display dimensions from config
         display_config = config.get("display", {})
@@ -192,13 +196,16 @@ class BaseNHLManager:
     def display(self, force_clear: bool = False):
         """Display game information."""
         if not self.current_game:
-            if not self.no_data_warning_logged:
+            current_time = time.time()
+            # Only log a warning if we haven't logged one recently
+            if not BaseNHLManager._no_data_warning_logged and (current_time - BaseNHLManager._last_warning_time) > BaseNHLManager._warning_cooldown:
                 logging.warning("[NHL] No game data available to display")
-                self.no_data_warning_logged = True
+                BaseNHLManager._no_data_warning_logged = True
+                BaseNHLManager._last_warning_time = current_time
             return
 
         # Reset the warning flag when we have data
-        self.no_data_warning_logged = False
+        BaseNHLManager._no_data_warning_logged = False
 
         try:
             # Create a new black image
