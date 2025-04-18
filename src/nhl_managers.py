@@ -98,7 +98,7 @@ class BaseNHLManager:
                 logo = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
                 draw = ImageDraw.Draw(logo)
                 # Use team abbreviation to determine color
-                if team_abbrev == "TBL":
+                if team_abbrev == "TB":
                     color = (0, 0, 255, 255)  # Blue for Tampa Bay
                 else:
                     color = (255, 0, 0, 255)  # Red for Dallas
@@ -344,18 +344,18 @@ class NHLLiveManager(BaseNHLManager):
         # Initialize with test game only if test mode is enabled
         if self.test_mode:
             self.current_game = {
-                "home_abbr": "TBL",
+                "home_abbr": "TB",
                 "away_abbr": "DAL",
                 "home_score": "3",
                 "away_score": "2",
                 "period": 2,
                 "clock": "12:34",
-                "home_logo_path": os.path.join(self.logo_dir, "TBL.png"),
+                "home_logo_path": os.path.join(self.logo_dir, "TB.png"),
                 "away_logo_path": os.path.join(self.logo_dir, "DAL.png"),
                 "game_time": "7:30 PM",
                 "game_date": "Apr 17"
             }
-            logging.info("[NHL] Initialized NHLLiveManager with test game: TBL vs DAL")
+            logging.info("[NHL] Initialized NHLLiveManager with test game: TB vs DAL")
         else:
             logging.info("[NHL] Initialized NHLLiveManager in live mode")
 
