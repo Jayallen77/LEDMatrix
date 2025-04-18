@@ -248,12 +248,17 @@ class BaseNHLManager:
             if away_logo:
                 self.logger.info(f"Away logo size: {away_logo.size}, mode: {away_logo.mode}")
 
-            # Create separate layers for each logo
+            # Create separate layers for each logo with glow effect
             home_layer = Image.new('RGBA', (self.display_width, self.display_height), (0, 0, 0, 0))
             away_layer = Image.new('RGBA', (self.display_width, self.display_height), (0, 0, 0, 0))
+            
+            # Create glow layers
+            home_glow = Image.new('RGBA', (self.display_width, self.display_height), (0, 0, 0, 0))
+            away_glow = Image.new('RGBA', (self.display_width, self.display_height), (0, 0, 0, 0))
 
-            # Draw home team logo (right side) with a blue tint
+            # Draw home team logo (right side) with a strong blue tint and glow
             if home_logo:
+                # Calculate positions with more spacing
                 home_x = 3 * self.display_width // 4 - home_logo.width // 2
                 home_y = self.display_height // 4 - home_logo.height // 2
                 self.logger.info(f"Home logo position: ({home_x}, {home_y})")
@@ -265,14 +270,27 @@ class BaseNHLManager:
                     for y in range(home_tinted.height):
                         r, g, b, a = home_tinted_data[x, y]
                         if a > 0:  # Only modify non-transparent pixels
-                            home_tinted_data[x, y] = (r, g, min(255, b + 50), a)
+                            # Strong blue tint
+                            home_tinted_data[x, y] = (r, g, min(255, b + 150), a)
                 
+                # Create glow effect
+                glow_draw = ImageDraw.Draw(home_glow)
+                glow_color = (0, 0, 255, 128)  # Semi-transparent blue
+                glow_draw.ellipse([
+                    home_x - 5, home_y - 5,
+                    home_x + home_logo.width + 5,
+                    home_y + home_logo.height + 5
+                ], fill=glow_color)
+                
+                # Paste glow first, then logo
+                home_layer.paste(home_glow, (0, 0), home_glow)
                 home_layer.paste(home_tinted, (home_x, home_y), home_tinted)
             else:
                 self.logger.error(f"Home logo is None for team {self.current_game['home_abbr']}")
 
-            # Draw away team logo (left side) with a red tint
+            # Draw away team logo (left side) with a strong red tint and glow
             if away_logo:
+                # Calculate positions with more spacing
                 away_x = self.display_width // 4 - away_logo.width // 2
                 away_y = self.display_height // 4 - away_logo.height // 2
                 self.logger.info(f"Away logo position: ({away_x}, {away_y})")
@@ -284,13 +302,25 @@ class BaseNHLManager:
                     for y in range(away_tinted.height):
                         r, g, b, a = away_tinted_data[x, y]
                         if a > 0:  # Only modify non-transparent pixels
-                            away_tinted_data[x, y] = (min(255, r + 50), g, b, a)
+                            # Strong red tint
+                            away_tinted_data[x, y] = (min(255, r + 150), g, b, a)
                 
+                # Create glow effect
+                glow_draw = ImageDraw.Draw(away_glow)
+                glow_color = (255, 0, 0, 128)  # Semi-transparent red
+                glow_draw.ellipse([
+                    away_x - 5, away_y - 5,
+                    away_x + away_logo.width + 5,
+                    away_y + away_logo.height + 5
+                ], fill=glow_color)
+                
+                # Paste glow first, then logo
+                away_layer.paste(away_glow, (0, 0), away_glow)
                 away_layer.paste(away_tinted, (away_x, away_y), away_tinted)
             else:
                 self.logger.error(f"Away logo is None for team {self.current_game['away_abbr']}")
 
-            # Composite the layers in sequence
+            # Composite the layers in sequence with alpha blending
             main_img = Image.alpha_composite(main_img, away_layer)
             main_img = Image.alpha_composite(main_img, home_layer)
 
