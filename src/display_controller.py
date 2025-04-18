@@ -24,7 +24,7 @@ class DisplayController:
         self.display_manager = DisplayManager(self.config)
         
         # Initialize display modes
-        self.clock = Clock(self.config, self.display_manager) if self.config['display'].get('clock_enabled', True) else None
+        self.clock = Clock(self.display_manager) if self.config['display'].get('clock_enabled', True) else None
         self.weather = WeatherManager(self.config, self.display_manager) if self.config['display'].get('weather_enabled', True) else None
         self.stocks = StockManager(self.config, self.display_manager) if self.config['display'].get('stocks_enabled', True) else None
         self.news = StockNewsManager(self.config, self.display_manager) if self.config['display'].get('news_enabled', True) else None
