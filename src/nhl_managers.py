@@ -541,11 +541,16 @@ class NHLRecentManager(BaseNHLManager):
                         for game in games:
                             print(f"  {game['away_abbr']} vs {game['home_abbr']}")
                     
-                    logging.info(f"[NHL] Rotating to recent game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
+                    if self.current_game:
+                        logging.info(f"[NHL] Rotating to recent game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
+                    else:
+                        logging.info("[NHL] No current game to display")
                 else:
                     logging.info("[NHL] No recent games found")
+                    self.current_game = None
             else:
                 logging.info("[NHL] No events found in the last few days")
+                self.current_game = None
 
     def display(self, force_clear: bool = False):
         """Display recent game information."""
@@ -667,9 +672,13 @@ class NHLUpcomingManager(BaseNHLManager):
                     for game in games:
                         print(f"  {game['away_abbr']} vs {game['home_abbr']}")
                 
-                logging.info(f"[NHL] Rotating to upcoming game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
+                if self.current_game:
+                    logging.info(f"[NHL] Rotating to upcoming game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
+                else:
+                    logging.info("[NHL] No current game to display")
             else:
                 logging.info("[NHL] No upcoming games found")
+                self.current_game = None
 
     def display(self, force_clear: bool = False):
         """Display upcoming game information."""
