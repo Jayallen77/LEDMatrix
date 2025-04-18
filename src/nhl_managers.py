@@ -256,11 +256,11 @@ class BaseNHLManager:
             home_glow = Image.new('RGBA', (self.display_width, self.display_height), (0, 0, 0, 0))
             away_glow = Image.new('RGBA', (self.display_width, self.display_height), (0, 0, 0, 0))
 
-            # Draw home team logo (right side) with a strong blue tint and glow
+            # Draw home team logo (far right)
             if home_logo:
-                # Calculate positions with more spacing
-                home_x = 3 * self.display_width // 4 - home_logo.width // 2
-                home_y = self.display_height // 4 - home_logo.height // 2
+                # Position home logo at the far right
+                home_x = self.display_width - home_logo.width - 5  # 5 pixels padding from right edge
+                home_y = (self.display_height - home_logo.height) // 2  # Vertically centered
                 self.logger.info(f"Home logo position: ({home_x}, {home_y})")
                 
                 # Create a blue-tinted version of the home logo
@@ -271,15 +271,15 @@ class BaseNHLManager:
                         r, g, b, a = home_tinted_data[x, y]
                         if a > 0:  # Only modify non-transparent pixels
                             # Strong blue tint
-                            home_tinted_data[x, y] = (r, g, min(255, b + 150), a)
+                            home_tinted_data[x, y] = (r, g, min(255, b + 200), a)
                 
-                # Create glow effect
+                # Create stronger glow effect
                 glow_draw = ImageDraw.Draw(home_glow)
-                glow_color = (0, 0, 255, 128)  # Semi-transparent blue
+                glow_color = (0, 0, 255, 180)  # More opaque blue glow
                 glow_draw.ellipse([
-                    home_x - 5, home_y - 5,
-                    home_x + home_logo.width + 5,
-                    home_y + home_logo.height + 5
+                    home_x - 10, home_y - 10,
+                    home_x + home_logo.width + 10,
+                    home_y + home_logo.height + 10
                 ], fill=glow_color)
                 
                 # Paste glow first, then logo
@@ -288,11 +288,11 @@ class BaseNHLManager:
             else:
                 self.logger.error(f"Home logo is None for team {self.current_game['home_abbr']}")
 
-            # Draw away team logo (left side) with a strong red tint and glow
+            # Draw away team logo (far left)
             if away_logo:
-                # Calculate positions with more spacing
-                away_x = self.display_width // 4 - away_logo.width // 2
-                away_y = self.display_height // 4 - away_logo.height // 2
+                # Position away logo at the far left
+                away_x = 5  # 5 pixels padding from left edge
+                away_y = (self.display_height - away_logo.height) // 2  # Vertically centered
                 self.logger.info(f"Away logo position: ({away_x}, {away_y})")
                 
                 # Create a red-tinted version of the away logo
@@ -303,15 +303,15 @@ class BaseNHLManager:
                         r, g, b, a = away_tinted_data[x, y]
                         if a > 0:  # Only modify non-transparent pixels
                             # Strong red tint
-                            away_tinted_data[x, y] = (min(255, r + 150), g, b, a)
+                            away_tinted_data[x, y] = (min(255, r + 200), g, b, a)
                 
-                # Create glow effect
+                # Create stronger glow effect
                 glow_draw = ImageDraw.Draw(away_glow)
-                glow_color = (255, 0, 0, 128)  # Semi-transparent red
+                glow_color = (255, 0, 0, 180)  # More opaque red glow
                 glow_draw.ellipse([
-                    away_x - 5, away_y - 5,
-                    away_x + away_logo.width + 5,
-                    away_y + away_logo.height + 5
+                    away_x - 10, away_y - 10,
+                    away_x + away_logo.width + 10,
+                    away_y + away_logo.height + 10
                 ], fill=glow_color)
                 
                 # Paste glow first, then logo
