@@ -56,7 +56,7 @@ class BaseNHLManager:
         try:
             # Try to load the 4x6 font for scores
             fonts['score'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 12)
-            fonts['time'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 10)
+            fonts['time'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 8)
             fonts['team'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 8)
             fonts['status'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 9)
             logging.info("[NHL] Successfully loaded 4x6 font for all text elements")
@@ -65,7 +65,7 @@ class BaseNHLManager:
             try:
                 # Try to load the PressStart2P font as a fallback
                 fonts['score'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 12)
-                fonts['time'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 10)
+                fonts['time'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
                 fonts['team'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
                 fonts['status'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 9)
                 logging.info("[NHL] Successfully loaded PressStart2P font for all text elements")
@@ -238,14 +238,14 @@ class BaseNHLManager:
             center_y = self.display_height // 2
 
             # Draw home team logo (far right, extending beyond screen)
-            home_x = self.display_width - home_logo.width + 20  # Move 20 pixels further right
+            home_x = self.display_width - home_logo.width + 15  # Moved 5 pixels back towards center
             home_y = center_y - (home_logo.height // 2)
             
             # Paste the home logo onto the overlay
             overlay.paste(home_logo, (home_x, home_y), home_logo)
 
             # Draw away team logo (far left, extending beyond screen)
-            away_x = -20  # Move 20 pixels further left
+            away_x = -15  # Moved 5 pixels back towards center
             away_y = center_y - (away_logo.height // 2)
             
             # Paste the away logo onto the overlay
@@ -294,7 +294,7 @@ class BaseNHLManager:
                 # Draw period and time
                 period = self.current_game.get("period", 0)
                 clock = self.current_game.get("clock", "0:00")
-                period_text = f"Period {period} {clock}"
+                period_text = f"P:{period} {clock}"
                 
                 # Calculate position for the period text (centered at the top)
                 period_width = draw.textlength(period_text, font=self.fonts['time'])
@@ -411,23 +411,6 @@ class NHLRecentManager(BaseNHLManager):
         self.logger.info("Initialized NHL Recent Manager")
         self.recent_hours = self.nhl_config.get("recent_game_hours", 48)  # Default 48 hours
         self.current_game = None
-        
-        if self.test_mode:
-            # Initialize with a test game
-            self.current_game = {
-                "home_abbr": "TBL",
-                "away_abbr": "DAL",
-                "home_score": "4",
-                "away_score": "2",
-                "status_text": "Final",
-                "home_logo_path": os.path.join(self.logo_dir, "TBL.png"),
-                "away_logo_path": os.path.join(self.logo_dir, "DAL.png"),
-                "game_time": "7:30 PM",
-                "game_date": "Apr 17"
-            }
-            logging.info("[NHL] Initialized NHLRecentManager with test game: TBL vs DAL")
-        else:
-            logging.info("[NHL] Initialized NHLRecentManager in live mode")
 
     def update(self):
         """Update recent game data."""
@@ -438,45 +421,40 @@ class NHLRecentManager(BaseNHLManager):
         if current_time - self.last_update >= interval:
             self.logger.debug("Updating recent game data")
             self.last_update = current_time
-            if self.test_mode:
-                # In test mode, just keep the test game
-                pass
-            else:
-                # Fetch data for the last 48 hours
-                cutoff_time = datetime.now(timezone.utc) - timedelta(hours=self.recent_hours)
-                data = self._fetch_data()
+            
+            # Fetch data for the last 48 hours
+            cutoff_time = datetime.now(timezone.utc) - timedelta(hours=self.recent_hours)
+            data = self._fetch_data()
+            
+            if data and "events" in data:
+                # Find the most recent completed game involving favorite teams
+                most_recent_game = None
+                most_recent_time = None
                 
-                if data and "events" in data:
-                    # Find the most recent completed game involving favorite teams
-                    most_recent_game = None
-                    most_recent_time = None
-                    
-                    for event in data["events"]:
-                        details = self._extract_game_details(event)
-                        if details and details["is_final"] and details["start_time_utc"]:
-                            # Check if game is within our time window
-                            if details["start_time_utc"] > cutoff_time:
-                                # Check if it involves favorite teams (if any are configured)
-                                if not self.favorite_teams or (
-                                    details["home_abbr"] in self.favorite_teams or 
-                                    details["away_abbr"] in self.favorite_teams
-                                ):
-                                    # Keep the most recent game
-                                    if most_recent_time is None or details["start_time_utc"] > most_recent_time:
-                                        most_recent_game = details
-                                        most_recent_time = details["start_time_utc"]
-                    
-                    self.current_game = most_recent_game
-                    if most_recent_game:
-                        logging.info(f"[NHL] Found recent game: {most_recent_game['away_abbr']} vs {most_recent_game['home_abbr']}")
-                    else:
-                        logging.info("[NHL] No recent games found")
+                for event in data["events"]:
+                    details = self._extract_game_details(event)
+                    if details and details["is_final"] and details["start_time_utc"]:
+                        # Check if game is within our time window
+                        if details["start_time_utc"] > cutoff_time:
+                            # Check if it involves favorite teams (if any are configured)
+                            if not self.favorite_teams or (
+                                details["home_abbr"] in self.favorite_teams or 
+                                details["away_abbr"] in self.favorite_teams
+                            ):
+                                # Keep the most recent game
+                                if most_recent_time is None or details["start_time_utc"] > most_recent_time:
+                                    most_recent_game = details
+                                    most_recent_time = details["start_time_utc"]
+                
+                self.current_game = most_recent_game
+                if most_recent_game:
+                    logging.info(f"[NHL] Found recent game: {most_recent_game['away_abbr']} vs {most_recent_game['home_abbr']}")
+                else:
+                    logging.info("[NHL] No recent games found")
 
     def display(self, force_clear: bool = False):
         """Display recent game information."""
-        self.logger.info("NHLRecentManager.display() called")
         if not self.current_game:
-            logging.warning("[NHL] No recent game data available to display")
             return
         super().display(force_clear)  # Call parent class's display method
 
@@ -489,22 +467,6 @@ class NHLUpcomingManager(BaseNHLManager):
         self.last_update = 0
         self.logger.info("Initialized NHL Upcoming Manager")
         self.current_game = None
-        
-        if self.test_mode:
-            # Initialize with a test game
-            self.current_game = {
-                "home_abbr": "TBL",
-                "away_abbr": "DAL",
-                "status_text": "7:30 PM ET",
-                "home_logo_path": os.path.join(self.logo_dir, "TBL.png"),
-                "away_logo_path": os.path.join(self.logo_dir, "DAL.png"),
-                "game_time": "7:30 PM",
-                "game_date": "Apr 17",
-                "is_upcoming": True  # Set this flag to indicate it's an upcoming game
-            }
-            logging.info("[NHL] Initialized NHLUpcomingManager with test game: TBL vs DAL")
-        else:
-            logging.info("[NHL] Initialized NHLUpcomingManager in live mode")
 
     def update(self):
         """Update upcoming game data."""
@@ -515,56 +477,51 @@ class NHLUpcomingManager(BaseNHLManager):
         if current_time - self.last_update >= interval:
             self.logger.debug("Updating upcoming game data")
             self.last_update = current_time
-            if self.test_mode:
-                # In test mode, just keep the test game
-                pass
+            
+            # Fetch today's and tomorrow's data
+            today = datetime.now(timezone.utc).date()
+            tomorrow = today + timedelta(days=1)
+            
+            # Format dates for API (YYYYMMDD)
+            today_str = today.strftime('%Y%m%d')
+            tomorrow_str = tomorrow.strftime('%Y%m%d')
+            
+            # Fetch data for both days
+            today_data = self._fetch_data(today_str)
+            tomorrow_data = self._fetch_data(tomorrow_str)
+            
+            # Combine events from both days
+            all_events = []
+            if today_data and "events" in today_data:
+                all_events.extend(today_data["events"])
+            if tomorrow_data and "events" in tomorrow_data:
+                all_events.extend(tomorrow_data["events"])
+            
+            # Find the next upcoming game involving favorite teams
+            next_game = None
+            next_game_time = None
+            
+            for event in all_events:
+                details = self._extract_game_details(event)
+                if details and details["is_upcoming"] and details["start_time_utc"]:
+                    # Check if it involves favorite teams (if any are configured)
+                    if not self.favorite_teams or (
+                        details["home_abbr"] in self.favorite_teams or 
+                        details["away_abbr"] in self.favorite_teams
+                    ):
+                        # Keep the soonest upcoming game
+                        if next_game_time is None or details["start_time_utc"] < next_game_time:
+                            next_game = details
+                            next_game_time = details["start_time_utc"]
+            
+            self.current_game = next_game
+            if next_game:
+                logging.info(f"[NHL] Found upcoming game: {next_game['away_abbr']} vs {next_game['home_abbr']}")
             else:
-                # Fetch today's and tomorrow's data
-                today = datetime.now(timezone.utc).date()
-                tomorrow = today + timedelta(days=1)
-                
-                # Format dates for API (YYYYMMDD)
-                today_str = today.strftime('%Y%m%d')
-                tomorrow_str = tomorrow.strftime('%Y%m%d')
-                
-                # Fetch data for both days
-                today_data = self._fetch_data(today_str)
-                tomorrow_data = self._fetch_data(tomorrow_str)
-                
-                # Combine events from both days
-                all_events = []
-                if today_data and "events" in today_data:
-                    all_events.extend(today_data["events"])
-                if tomorrow_data and "events" in tomorrow_data:
-                    all_events.extend(tomorrow_data["events"])
-                
-                # Find the next upcoming game involving favorite teams
-                next_game = None
-                next_game_time = None
-                
-                for event in all_events:
-                    details = self._extract_game_details(event)
-                    if details and details["is_upcoming"] and details["start_time_utc"]:
-                        # Check if it involves favorite teams (if any are configured)
-                        if not self.favorite_teams or (
-                            details["home_abbr"] in self.favorite_teams or 
-                            details["away_abbr"] in self.favorite_teams
-                        ):
-                            # Keep the soonest upcoming game
-                            if next_game_time is None or details["start_time_utc"] < next_game_time:
-                                next_game = details
-                                next_game_time = details["start_time_utc"]
-                
-                self.current_game = next_game
-                if next_game:
-                    logging.info(f"[NHL] Found upcoming game: {next_game['away_abbr']} vs {next_game['home_abbr']}")
-                else:
-                    logging.info("[NHL] No upcoming games found")
+                logging.info("[NHL] No upcoming games found")
 
     def display(self, force_clear: bool = False):
         """Display upcoming game information."""
-        self.logger.info("NHLUpcomingManager.display() called")
         if not self.current_game:
-            logging.warning("[NHL] No upcoming game data available to display")
             return
         super().display(force_clear)  # Call parent class's display method 
