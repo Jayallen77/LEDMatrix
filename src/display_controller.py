@@ -177,9 +177,10 @@ class DisplayController:
                         self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
                         self.current_display_mode = self.available_modes[self.current_mode_index]
                         logger.info(f"Switching to: {self.current_display_mode}")
+                        # Force clear when switching modes
+                        self.force_clear = True
                     
                     self.last_switch = current_time
-                    self.force_clear = True
 
                 # Display current mode frame
                 try:
