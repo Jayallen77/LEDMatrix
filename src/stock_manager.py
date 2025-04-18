@@ -45,45 +45,13 @@ class StockManager:
             
         # Set up the logo directory for external logos
         self.logo_dir = os.path.join('assets', 'stocks')
-        
-        # Check if we can use the logo directory, otherwise use temporary
-        try:
-            if not os.path.exists(self.logo_dir):
-                try:
-                    os.makedirs(self.logo_dir, mode=0o755, exist_ok=True)
-                    logger.info(f"Created logo directory: {self.logo_dir}")
-                except (PermissionError, OSError) as e:
-                    logger.warning(f"Cannot create logo directory '{self.logo_dir}': {str(e)}. Using temporary directory.")
-                    import tempfile
-                    self.logo_dir = tempfile.mkdtemp(prefix='stock_logos_')
-                    writable = False # Explicitly set writable to false if creation fails
-                else:
-                    writable = True # Assume writable if created successfully
-            else:
-                 # Directory exists, check if writable by trying to create a temp file
-                try:
-                    temp_file_path = os.path.join(self.logo_dir, "write_test_py.tmp")
-                    with open(temp_file_path, 'w') as f:
-                        f.write('test')
-                    os.remove(temp_file_path)
-                    writable = True
-                except (PermissionError, OSError) as e:
-                    logger.warning(f"Cannot write to logo directory '{self.logo_dir}' (write test failed): {e}. Using temporary directory.")
-                    writable = False
-
-            # If not writable, switch to a temporary directory
-            if not writable:
-                import tempfile
-                self.logo_dir = tempfile.mkdtemp(prefix='stock_logos_')
-                
-            logger.info(f"Using logo directory: {self.logo_dir}")
-                
-        except Exception as e:
-            logger.error(f"Error setting up logo directory: {str(e)}")
-            # Fall back to using a temporary directory
-            import tempfile
-            self.logo_dir = tempfile.mkdtemp(prefix='stock_logos_')
-            logger.info(f"Using temporary directory for logos: {self.logo_dir}")
+        if not os.path.exists(self.logo_dir):
+            try:
+                os.makedirs(self.logo_dir, mode=0o755, exist_ok=True)
+                logger.info(f"Created logo directory: {self.logo_dir}")
+            except (PermissionError, OSError) as e:
+                logger.error(f"Cannot create logo directory '{self.logo_dir}': {str(e)}")
+                self.logo_dir = None
         
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -225,35 +193,6 @@ class StockManager:
             logger.error(f"Unexpected error fetching data for {symbol}: {e}")
             return None
 
-    def _fetch_logo_data(self, symbol: str) -> bytes | None:
-        """Fetch logo image data from various sources."""
-        urls_to_try = [
-            f"https://logo.clearbit.com/{symbol.lower()}.com",
-            f"https://storage.googleapis.com/iex/api/logos/{symbol}.png"
-            # Add more URLs here if needed
-        ]
-        
-        for url in urls_to_try:
-            try:
-                response = requests.get(url, headers=self.headers, timeout=5)
-                if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
-                    try:
-                        # Verify it's a valid image before returning bytes
-                        from io import BytesIO
-                        img = Image.open(BytesIO(response.content))
-                        img.verify()
-                        logger.info(f"Successfully fetched logo data for {symbol} from {url}")
-                        return response.content
-                    except Exception as img_err:
-                        logger.warning(f"Invalid image data from {url} for {symbol}: {img_err}")
-                        continue # Try next URL
-            except requests.exceptions.RequestException as req_err:
-                logger.warning(f"Error fetching logo from {url} for {symbol}: {req_err}")
-                continue # Try next URL
-        
-        logger.warning(f"Could not fetch logo data for {symbol} from any source.")
-        return None
-
     def _draw_chart(self, symbol: str, data: Dict[str, Any]):
         """Draw a price chart for the stock."""
         if not data.get('price_history'):
@@ -367,49 +306,8 @@ class StockManager:
         else:
             logger.error("Failed to fetch data for any configured stocks")
 
-    def _download_stock_logo(self, symbol: str) -> str | None:
-        """Attempt to download and save stock logo, returning the path if successful.
-        
-        Checks if logo already exists. If not, fetches data using
-        _fetch_logo_data and attempts to save it to self.logo_dir.
-        
-        Args:
-            symbol: Stock symbol.
-            
-        Returns:
-            Path to the saved logo image if exists or saved successfully,
-            otherwise None.
-        """
-        filename = f"{symbol.lower()}.png"
-        filepath = os.path.join(self.logo_dir, filename)
-        
-        # Check if we already have the logo
-        if os.path.exists(filepath):
-            logger.debug(f"Found existing logo for {symbol} at {filepath}")
-            return filepath
-            
-        # If not found, try fetching the logo data
-        logger.info(f"Logo for {symbol} not found locally, attempting download.")
-        logo_bytes = self._fetch_logo_data(symbol)
-        
-        if not logo_bytes:
-            return None # Fetching failed
-            
-        # Try to save the fetched data
-        try:
-            with open(filepath, 'wb') as f:
-                f.write(logo_bytes)
-            logger.info(f"Saved new logo for {symbol} to {filepath}")
-            return filepath # Return path on successful save
-        except (PermissionError, OSError) as e:
-            logger.warning(f"Failed to save logo for {symbol} to '{filepath}': {e}. Logo will be loaded in-memory.")
-            return None # Return None indicates save failure
-        except Exception as e:
-            logger.error(f"Unexpected error saving logo for {symbol}: {e}")
-            return None # Return None indicates save failure
-
     def _get_stock_logo(self, symbol: str) -> Image.Image:
-        """Get stock logo image, first checking local ticker icons, then falling back to external sources.
+        """Get stock logo image from local ticker icons directory.
         
         Args:
             symbol: Stock symbol (e.g., 'AAPL', 'MSFT')
@@ -417,7 +315,7 @@ class StockManager:
         Returns:
             PIL Image of the logo or text-based fallback
         """
-        # First try to get the local ticker icon
+        # Try to get the local ticker icon
         try:
             icon_path = os.path.join(self.ticker_icons_dir, f"{symbol}.png")
             if os.path.exists(icon_path):
@@ -432,59 +330,9 @@ class StockManager:
                     return img.copy()
         except Exception as e:
             logger.warning(f"Error loading local ticker icon for {symbol}: {e}")
-        
-        # If local icon not found or failed to load, try external sources
-        logger.info(f"No local icon found for {symbol}, trying external sources")
-        
-        # Try to get the path to a saved logo (or save it)
-        logo_path = self._download_stock_logo(symbol)
-        
-        # If we have a path, try to load from disk
-        if logo_path:
-            try:
-                logo = Image.open(logo_path)
-                # Verify it's a valid image
-                logo.verify()
-                # Reopen after verify
-                logo = Image.open(logo_path)
-                
-                # Convert to RGBA if not already
-                if logo.mode != 'RGBA':
-                    logo = logo.convert('RGBA')
-                
-                # Resize to fit in the display
-                max_size = min(int(self.display_manager.matrix.width / 1.5), 
-                              int(self.display_manager.matrix.height / 1.5))
-                logo = logo.resize((max_size, max_size), Image.Resampling.LANCZOS)
-                
-                return logo
-            except Exception as e:
-                logger.warning(f"Error loading saved logo file '{logo_path}' for {symbol}: {e}. Attempting in-memory load.")
-                # If loading from disk fails, proceed to in-memory load below
-        
-        # If logo_path is None (save failed) or loading from disk failed, try loading into memory
-        logger.info(f"Attempting to load logo for {symbol} directly into memory.")
-        logo_bytes = self._fetch_logo_data(symbol)
-        if logo_bytes:
-            try:
-                from io import BytesIO
-                logo = Image.open(BytesIO(logo_bytes))
-                # Verify (redundant but safe)
-                logo.verify()
-                logo = Image.open(BytesIO(logo_bytes))
 
-                if logo.mode != 'RGBA':
-                    logo = logo.convert('RGBA')
-                
-                max_size = min(int(self.display_manager.matrix.width / 1.5), 
-                              int(self.display_manager.matrix.height / 1.5))
-                logo = logo.resize((max_size, max_size), Image.Resampling.LANCZOS)
-                return logo
-            except Exception as e:
-                logger.error(f"Error processing in-memory logo data for {symbol}: {e}")
-
-        # If all attempts fail, create a text-based fallback
-        logger.warning(f"Failed to obtain logo for {symbol} from any source. Using text fallback.")
+        # If local icon not found or failed to load, create text-based fallback
+        logger.warning(f"No local icon found for {symbol}. Using text fallback.")
         fallback = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
         draw = ImageDraw.Draw(fallback)
         try:
