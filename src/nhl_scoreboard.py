@@ -1190,8 +1190,6 @@ class NHLScoreboardManager:
             if os.path.exists(home_logo_path):
                 try:
                     home_logo = Image.open(home_logo_path)
-                    if home_logo.mode != 'RGBA':
-                        home_logo = home_logo.convert('RGBA')
                     # Resize maintaining aspect ratio
                     max_size = min(int(self.display_width / 3), int(self.display_height / 2))
                     home_logo.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
@@ -1203,8 +1201,6 @@ class NHLScoreboardManager:
             if os.path.exists(away_logo_path):
                 try:
                     away_logo = Image.open(away_logo_path)
-                    if away_logo.mode != 'RGBA':
-                        away_logo = away_logo.convert('RGBA')
                     # Resize maintaining aspect ratio
                     max_size = min(int(self.display_width / 3), int(self.display_height / 2))
                     away_logo.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
@@ -1219,12 +1215,12 @@ class NHLScoreboardManager:
             if home_logo:
                 home_x = width // 4 - home_logo.width // 2
                 home_y = height // 4 - home_logo.height // 2
-                draw.im.paste(home_logo, (home_x, home_y), home_logo)
+                draw.im.paste(home_logo, (home_x, home_y))
             
             if away_logo:
                 away_x = width // 4 - away_logo.width // 2
                 away_y = 3 * height // 4 - away_logo.height // 2
-                draw.im.paste(away_logo, (away_x, away_y), away_logo)
+                draw.im.paste(away_logo, (away_x, away_y))
             
             # Draw scores
             score_color = (255, 255, 255)
