@@ -369,7 +369,7 @@ class WeatherManager:
                 available_height_for_icon = bottom_text_y - top_text_height
                 # Ensure calculated y is not negative if space is very tight
                 calculated_y = top_text_height + (available_height_for_icon - icon_size) // 2
-                icon_y = (self.display_manager.matrix.height // 2) - 15
+                icon_y = (self.display_manager.matrix.height // 2) - 16
                 icon_x = center_x - icon_size // 2
                 WeatherIcons.draw_weather_icon(image, forecast['condition'], icon_x, icon_y, icon_size)
                 
@@ -439,12 +439,12 @@ class WeatherManager:
                     available_height_for_icon = bottom_text_y - top_text_height
                     # Ensure calculated y is not negative if space is very tight
                     calculated_y = top_text_height + (available_height_for_icon - icon_size) // 2
-                    icon_y = (self.display_manager.matrix.height // 2) - 15
+                    icon_y = (self.display_manager.matrix.height // 2) - 16
                     icon_x = center_x - icon_size // 2
                     WeatherIcons.draw_weather_icon(image, forecast['condition'], icon_x, icon_y, icon_size)
                     
                     # Draw high/low temperatures at bottom (without degree symbol)
-                    temp_text = f"{forecast['temp_low']}/{forecast['temp_high']}" # Removed degree symbols
+                    temp_text = f"{forecast['temp_low']} / {forecast['temp_high']}" # Removed degree symbols
                     temp_width = draw.textlength(temp_text, font=self.display_manager.extra_small_font)
                     temp_y = self.display_manager.matrix.height - 8  # Position at bottom with small margin
                     draw.text((center_x - temp_width // 2, temp_y),
