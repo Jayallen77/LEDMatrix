@@ -39,9 +39,9 @@ class WeatherManager:
         # Layout constants
         self.PADDING = 1
         self.ICON_SIZE = {
-            'extra_large': 32, # Changed from 30
-            'large': 28,
-            'medium': 20,
+            'extra_large': 40, # Changed from 30
+            'large': 32,
+            'medium': 24,
             'small': 14
         }
         self.COLORS = {
@@ -369,7 +369,7 @@ class WeatherManager:
                 available_height_for_icon = bottom_text_y - top_text_height
                 # Ensure calculated y is not negative if space is very tight
                 calculated_y = top_text_height + (available_height_for_icon - icon_size) // 2
-                icon_y = max(top_text_height, calculated_y - 6) # Shift up by 6 pixels
+                icon_y = max(top_text_height, calculated_y - 12) # Shift up by 6 pixels
                 icon_x = center_x - icon_size // 2
                 WeatherIcons.draw_weather_icon(image, forecast['condition'], icon_x, icon_y, icon_size)
                 
