@@ -12,6 +12,56 @@ from src.display_manager import DisplayManager
 # Constants
 ESPN_NHL_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard"
 
+class CacheManager:
+    """Manages caching of ESPN API responses."""
+    _instance = None
+    _cache = {}
+    _cache_timestamps = {}
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(CacheManager, cls).__new__(cls)
+        return cls._instance
+    
+    @classmethod
+    def get(cls, key: str, max_age: int = 60) -> Optional[Dict]:
+        """
+        Get data from cache if it exists and is not stale.
+        Args:
+            key: Cache key (usually the date string)
+            max_age: Maximum age of cached data in seconds
+        Returns:
+            Cached data if valid, None if missing or stale
+        """
+        if key not in cls._cache:
+            return None
+            
+        timestamp = cls._cache_timestamps.get(key, 0)
+        if time.time() - timestamp > max_age:
+            # Data is stale, remove it
+            del cls._cache[key]
+            del cls._cache_timestamps[key]
+            return None
+            
+        return cls._cache[key]
+    
+    @classmethod
+    def set(cls, key: str, data: Dict) -> None:
+        """
+        Store data in cache with current timestamp.
+        Args:
+            key: Cache key (usually the date string)
+            data: Data to cache
+        """
+        cls._cache[key] = data
+        cls._cache_timestamps[key] = time.time()
+    
+    @classmethod
+    def clear(cls) -> None:
+        """Clear all cached data."""
+        cls._cache.clear()
+        cls._cache_timestamps.clear()
+
 class BaseNHLManager:
     """Base class for NHL managers with common functionality."""
     # Class variables for warning tracking
@@ -145,10 +195,21 @@ class BaseNHLManager:
             params['dates'] = date_str
             
         try:
+            # Check cache first
+            cache_key = date_str if date_str else 'today'
+            cached_data = CacheManager.get(cache_key, max_age=self.update_interval)
+            if cached_data:
+                self.logger.info(f"[NHL] Using cached data for {cache_key}")
+                return cached_data
+                
+            # If not in cache or stale, fetch from API
             response = requests.get(url, params=params)
             response.raise_for_status()
             data = response.json()
-            logging.info(f"[NHL] Successfully fetched data from ESPN API")
+            self.logger.info(f"[NHL] Successfully fetched data from ESPN API")
+            
+            # Cache the response
+            CacheManager.set(cache_key, data)
             
             # If no date specified, fetch data from multiple days
             if not date_str:
@@ -164,22 +225,32 @@ class BaseNHLManager:
                 all_events = []
                 for fetch_date in dates_to_fetch:
                     if fetch_date != today.strftime('%Y%m%d'):  # Skip today as we already have it
+                        # Check cache for this date
+                        cached_date_data = CacheManager.get(fetch_date, max_age=self.update_interval)
+                        if cached_date_data:
+                            self.logger.info(f"[NHL] Using cached data for date {fetch_date}")
+                            if "events" in cached_date_data:
+                                all_events.extend(cached_date_data["events"])
+                            continue
+                            
                         params['dates'] = fetch_date
                         response = requests.get(url, params=params)
                         response.raise_for_status()
                         date_data = response.json()
                         if date_data and "events" in date_data:
                             all_events.extend(date_data["events"])
-                            logging.info(f"[NHL] Fetched {len(date_data['events'])} events for date {fetch_date}")
+                            self.logger.info(f"[NHL] Fetched {len(date_data['events'])} events for date {fetch_date}")
+                            # Cache the response
+                            CacheManager.set(fetch_date, date_data)
                 
                 # Combine events from all dates
                 if all_events:
                     data["events"].extend(all_events)
-                    logging.info(f"[NHL] Combined {len(data['events'])} total events from all dates")
+                    self.logger.info(f"[NHL] Combined {len(data['events'])} total events from all dates")
             
             return data
         except requests.exceptions.RequestException as e:
-            logging.error(f"[NHL] Error fetching data from ESPN: {e}")
+            self.logger.error(f"[NHL] Error fetching data from ESPN: {e}")
             return None
 
     def _extract_game_details(self, game_event: Dict) -> Optional[Dict]:
