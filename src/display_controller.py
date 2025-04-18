@@ -53,6 +53,8 @@ class DisplayController:
         if self.weather: self.available_modes.extend(['weather_current', 'weather_hourly', 'weather_daily'])
         if self.stocks: self.available_modes.append('stocks')
         if self.news: self.available_modes.append('stock_news')
+        
+        # Add NHL display modes if enabled
         if nhl_enabled:
             if self.nhl_live: self.available_modes.append('nhl_live')
             if self.nhl_recent: self.available_modes.append('nhl_recent')
