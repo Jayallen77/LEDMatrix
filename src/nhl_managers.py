@@ -532,11 +532,23 @@ class NHLRecentManager(BaseNHLManager):
                     
                     if new_recent_games:
                         logging.info(f"[NHL] Found {len(new_recent_games)} recent games for favorite teams")
+                        # Log all games in the list
+                        for i, game in enumerate(new_recent_games):
+                            logging.info(f"[NHL] Game {i+1}: {game['away_abbr']} vs {game['home_abbr']}")
+                        
                         # Sort games by start time (most recent first)
                         new_recent_games.sort(key=lambda x: x["start_time_utc"], reverse=True)
+                        logging.info("[NHL] Games after sorting:")
+                        for i, game in enumerate(new_recent_games):
+                            logging.info(f"[NHL] Game {i+1}: {game['away_abbr']} vs {game['home_abbr']}")
                         
                         # Only update the games list if we have new games
-                        if not self.games_list or set(game["away_abbr"] + game["home_abbr"] for game in new_recent_games) != set(game["away_abbr"] + game["home_abbr"] for game in self.games_list):
+                        current_games_set = set(game["away_abbr"] + game["home_abbr"] for game in self.games_list)
+                        new_games_set = set(game["away_abbr"] + game["home_abbr"] for game in new_recent_games)
+                        logging.info(f"[NHL] Current games set: {current_games_set}")
+                        logging.info(f"[NHL] New games set: {new_games_set}")
+                        
+                        if not self.games_list or current_games_set != new_games_set:
                             self.games_list = new_recent_games
                             # If we don't have a current game or it's not in the new list, start from the beginning
                             if not self.current_game or self.current_game not in self.games_list:
@@ -566,6 +578,10 @@ class NHLRecentManager(BaseNHLManager):
                     # Log the switch
                     logging.info(f"[NHL] Switching to recent game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
                     logging.info(f"[NHL] Current game index: {self.current_game_index}, Total games: {len(self.games_list)}")
+                    # Log all games in the list after switch
+                    logging.info("[NHL] Current games list:")
+                    for i, game in enumerate(self.games_list):
+                        logging.info(f"[NHL] Game {i+1}: {game['away_abbr']} vs {game['home_abbr']}")
 
     def display(self, force_clear: bool = False):
         """Display recent game information."""
