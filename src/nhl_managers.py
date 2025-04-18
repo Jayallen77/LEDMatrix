@@ -36,10 +36,6 @@ class BaseNHLManager:
         self.display_width = int(cols * chain)
         self.display_height = hardware_config.get("rows", 32)
         
-        # Load fonts
-        self.font = ImageFont.truetype("assets/fonts/4x6.bdf", 6)
-        self.small_font = ImageFont.truetype("assets/fonts/3x5.bdf", 5)
-        
         # Cache for loaded logos
         self._logo_cache = {}
         
@@ -51,16 +47,28 @@ class BaseNHLManager:
         """Load fonts used by the scoreboard."""
         fonts = {}
         try:
-            fonts['score'] = ImageFont.truetype("arial.ttf", 12)
-            fonts['time'] = ImageFont.truetype("arial.ttf", 10)
-            fonts['team'] = ImageFont.truetype("arial.ttf", 8)
-            fonts['status'] = ImageFont.truetype("arial.ttf", 9)
+            # Try to load the 4x6 font for scores
+            fonts['score'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 12)
+            fonts['time'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 10)
+            fonts['team'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 8)
+            fonts['status'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 9)
+            logging.info("[NHL] Successfully loaded 4x6 font for all text elements")
         except IOError:
-            logging.warning("[NHL] Arial font not found, using default PIL font.")
-            fonts['score'] = ImageFont.load_default()
-            fonts['time'] = ImageFont.load_default()
-            fonts['team'] = ImageFont.load_default()
-            fonts['status'] = ImageFont.load_default()
+            logging.warning("[NHL] 4x6 font not found, trying PressStart2P font.")
+            try:
+                # Try to load the PressStart2P font as a fallback
+                fonts['score'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 12)
+                fonts['time'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 10)
+                fonts['team'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
+                fonts['status'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 9)
+                logging.info("[NHL] Successfully loaded PressStart2P font for all text elements")
+            except IOError:
+                logging.warning("[NHL] PressStart2P font not found, using default PIL font.")
+                # Use default PIL font as a last resort
+                fonts['score'] = ImageFont.load_default()
+                fonts['time'] = ImageFont.load_default()
+                fonts['team'] = ImageFont.load_default()
+                fonts['status'] = ImageFont.load_default()
         return fonts
 
     def _load_and_resize_logo(self, team_abbrev: str) -> Optional[Image.Image]:
