@@ -210,11 +210,9 @@ class DisplayController:
                         
                 except Exception as e:
                     logger.error(f"Error updating display for mode {self.current_display_mode}: {e}", exc_info=True)
-                    time.sleep(1)
                     continue
 
                 self.force_clear = False
-                time.sleep(self.update_interval)
 
         except KeyboardInterrupt:
             logger.info("Display controller stopped by user")
