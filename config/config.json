@@ -17,7 +17,7 @@
             "pwm_bits": 8,
             "pwm_dither_bits": 1,
             "pwm_lsb_nanoseconds": 50,
-            "disable_hardware_pulsing": false,
+            "disable_hardware_pulsing": true,
             "inverse_colors": false,
             "show_refresh_rate": true,
             "limit_refresh_rate_hz": 100
