@@ -27,6 +27,7 @@ class BaseNHLManager:
         self.fonts = self._load_fonts()
         self.favorite_teams = self.nhl_config.get("favorite_teams", [])
         self.logger = logging.getLogger('NHL')
+        self.no_data_warning_logged = False  # Flag to track if we've already logged a warning
         
         # Get display dimensions from config
         display_config = config.get("display", {})
@@ -191,8 +192,13 @@ class BaseNHLManager:
     def display(self, force_clear: bool = False):
         """Display game information."""
         if not self.current_game:
-            logging.warning("[NHL] No game data available to display")
+            if not self.no_data_warning_logged:
+                logging.warning("[NHL] No game data available to display")
+                self.no_data_warning_logged = True
             return
+
+        # Reset the warning flag when we have data
+        self.no_data_warning_logged = False
 
         try:
             # Create a new black image
