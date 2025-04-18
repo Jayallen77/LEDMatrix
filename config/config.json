@@ -72,7 +72,7 @@
         "recent_update_interval": 3600,
         "upcoming_update_interval": 3600,
         "recent_game_hours": 48,
-        "favorite_teams": ["TBL", "DAL"],
+        "favorite_teams": ["TB", "DAL"],
         "logo_dir": "assets/sports/nhl_logos",
         "display_modes": {
             "nhl_live": true,
