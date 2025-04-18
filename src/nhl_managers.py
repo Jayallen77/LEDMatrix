@@ -478,19 +478,24 @@ class NHLRecentManager(BaseNHLManager):
                 # Fetch recent game data from ESPN API
                 data = self._fetch_data()
                 if data and "events" in data:
+                    logging.info(f"[NHL] Fetched {len(data['events'])} events from ESPN API")
                     # Find all completed games involving favorite teams
                     new_recent_games = []
                     for event in data["events"]:
                         details = self._extract_game_details(event)
-                        if details and details["is_final"] and details["is_within_window"]:
-                            if not self.favorite_teams or (
-                                details["home_abbr"] in self.favorite_teams or 
-                                details["away_abbr"] in self.favorite_teams
-                            ):
-                                new_recent_games.append(details)
-                                logging.info(f"[NHL] Found recent game: {details['away_abbr']} vs {details['home_abbr']}")
+                        if details:
+                            logging.debug(f"[NHL] Processing game: {details['away_abbr']} vs {details['home_abbr']}")
+                            logging.debug(f"[NHL] Game status: is_final={details['is_final']}, is_within_window={details['is_within_window']}")
+                            if details["is_final"] and details["is_within_window"]:
+                                if not self.favorite_teams or (
+                                    details["home_abbr"] in self.favorite_teams or 
+                                    details["away_abbr"] in self.favorite_teams
+                                ):
+                                    new_recent_games.append(details)
+                                    logging.info(f"[NHL] Found recent game: {details['away_abbr']} vs {details['home_abbr']}")
                     
                     if new_recent_games:
+                        logging.info(f"[NHL] Found {len(new_recent_games)} recent games for favorite teams")
                         # Sort games by start time (most recent first)
                         new_recent_games.sort(key=lambda x: x["start_time_utc"], reverse=True)
                         
@@ -507,7 +512,9 @@ class NHLRecentManager(BaseNHLManager):
                         # No recent games found
                         self.games_list = []
                         self.current_game = None
-                        logging.info("[NHL] No recent games found")
+                        logging.info("[NHL] No recent games found for favorite teams")
+                else:
+                    logging.warning("[NHL] No events found in ESPN API response")
                 
                 # Check if it's time to switch games
                 if len(self.games_list) > 1 and (current_time - self.last_game_switch) >= self.game_display_duration:
@@ -519,6 +526,8 @@ class NHLRecentManager(BaseNHLManager):
     def display(self, force_clear: bool = False):
         """Display recent game information."""
         if not self.current_game:
+            # Clear the display when there are no games
+            self.display_manager.clear()
             return
         super().display(force_clear)  # Call parent class's display method
 
