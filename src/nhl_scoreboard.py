@@ -1141,9 +1141,8 @@ class NHLScoreboardManager:
         # Draw Away Logo
         if game_details.get("away_logo_path"):
             try:
-                # Load and convert to RGBA first
+                # Load and resize logo
                 away_logo = Image.open(game_details["away_logo_path"]).convert("RGBA")
-                # Calculate aspect ratio preserving resize
                 aspect_ratio = away_logo.width / away_logo.height
                 if aspect_ratio > 1:  # wider than tall
                     new_width = min(logo_max_w, int(logo_max_h * aspect_ratio))
@@ -1155,15 +1154,9 @@ class NHLScoreboardManager:
                 away_logo = away_logo.resize((new_width, new_height), Image.Resampling.LANCZOS)
                 paste_y = (self.display_height - new_height) // 2
                 
-                # Create a new image with white background
-                temp_img = Image.new('RGB', img.size, (0, 0, 0))
-                # Convert logo to RGB with white background
-                away_logo_rgb = Image.new('RGB', away_logo.size, (0, 0, 0))
-                away_logo_rgb.paste(away_logo, mask=away_logo.split()[3])
-                # Paste the RGB logo
-                temp_img.paste(away_logo_rgb, (away_logo_x, paste_y))
-                # Copy the result to the main image
-                img.paste(temp_img)
+                # Convert to RGB before pasting
+                away_logo_rgb = away_logo.convert('RGB')
+                img.paste(away_logo_rgb, (away_logo_x, paste_y))
                 
                 logging.debug(f"[NHL] Successfully rendered away logo: {game_details['away_logo_path']}")
             except Exception as e:
@@ -1175,9 +1168,8 @@ class NHLScoreboardManager:
         # Draw Home Logo
         if game_details.get("home_logo_path"):
             try:
-                # Load and convert to RGBA first
+                # Load and resize logo
                 home_logo = Image.open(game_details["home_logo_path"]).convert("RGBA")
-                # Calculate aspect ratio preserving resize
                 aspect_ratio = home_logo.width / home_logo.height
                 if aspect_ratio > 1:  # wider than tall
                     new_width = min(logo_max_w, int(logo_max_h * aspect_ratio))
@@ -1189,15 +1181,9 @@ class NHLScoreboardManager:
                 home_logo = home_logo.resize((new_width, new_height), Image.Resampling.LANCZOS)
                 paste_y = (self.display_height - new_height) // 2
                 
-                # Create a new image with white background
-                temp_img = Image.new('RGB', img.size, (0, 0, 0))
-                # Convert logo to RGB with white background
-                home_logo_rgb = Image.new('RGB', home_logo.size, (0, 0, 0))
-                home_logo_rgb.paste(home_logo, mask=home_logo.split()[3])
-                # Paste the RGB logo
-                temp_img.paste(home_logo_rgb, (home_logo_x, paste_y))
-                # Copy the result to the main image
-                img.paste(temp_img)
+                # Convert to RGB before pasting
+                home_logo_rgb = home_logo.convert('RGB')
+                img.paste(home_logo_rgb, (home_logo_x, paste_y))
                 
                 logging.debug(f"[NHL] Successfully rendered home logo: {game_details['home_logo_path']}")
             except Exception as e:
@@ -1269,9 +1255,8 @@ class NHLScoreboardManager:
         away_logo_drawn_size = (0,0)
         if game_details.get("away_logo_path"):
             try:
-                # Load and convert to RGBA first
+                # Load and resize logo
                 away_logo = Image.open(game_details["away_logo_path"]).convert("RGBA")
-                # Calculate aspect ratio preserving resize
                 aspect_ratio = away_logo.width / away_logo.height
                 if aspect_ratio > 1:  # wider than tall
                     new_width = min(logo_max_w, int(logo_max_h * aspect_ratio))
@@ -1284,15 +1269,9 @@ class NHLScoreboardManager:
                 away_logo_drawn_size = (new_width, new_height)
                 paste_y = (self.display_height - new_height) // 2
                 
-                # Create a new image with white background
-                temp_img = Image.new('RGB', img.size, (0, 0, 0))
-                # Convert logo to RGB with white background
-                away_logo_rgb = Image.new('RGB', away_logo.size, (0, 0, 0))
-                away_logo_rgb.paste(away_logo, mask=away_logo.split()[3])
-                # Paste the RGB logo
-                temp_img.paste(away_logo_rgb, (away_logo_x, paste_y))
-                # Copy the result to the main image
-                img.paste(temp_img)
+                # Convert to RGB before pasting
+                away_logo_rgb = away_logo.convert('RGB')
+                img.paste(away_logo_rgb, (away_logo_x, paste_y))
                 
                 logging.debug(f"[NHL] Successfully rendered away logo: {game_details['away_logo_path']}")
             except Exception as e:
@@ -1308,9 +1287,8 @@ class NHLScoreboardManager:
         home_logo_drawn_size = (0,0)
         if game_details.get("home_logo_path"):
             try:
-                # Load and convert to RGBA first
+                # Load and resize logo
                 home_logo = Image.open(game_details["home_logo_path"]).convert("RGBA")
-                # Calculate aspect ratio preserving resize
                 aspect_ratio = home_logo.width / home_logo.height
                 if aspect_ratio > 1:  # wider than tall
                     new_width = min(logo_max_w, int(logo_max_h * aspect_ratio))
@@ -1323,15 +1301,9 @@ class NHLScoreboardManager:
                 home_logo_drawn_size = (new_width, new_height)
                 paste_y = (self.display_height - new_height) // 2
                 
-                # Create a new image with white background
-                temp_img = Image.new('RGB', img.size, (0, 0, 0))
-                # Convert logo to RGB with white background
-                home_logo_rgb = Image.new('RGB', home_logo.size, (0, 0, 0))
-                home_logo_rgb.paste(home_logo, mask=home_logo.split()[3])
-                # Paste the RGB logo
-                temp_img.paste(home_logo_rgb, (home_logo_x, paste_y))
-                # Copy the result to the main image
-                img.paste(temp_img)
+                # Convert to RGB before pasting
+                home_logo_rgb = home_logo.convert('RGB')
+                img.paste(home_logo_rgb, (home_logo_x, paste_y))
                 
                 logging.debug(f"[NHL] Successfully rendered home logo: {game_details['home_logo_path']}")
             except Exception as e:
