@@ -65,7 +65,7 @@
         "headlines_per_rotation": 2
     },
     "nhl_scoreboard": {
-        "enabled": true,
+        "enabled": false,
         "test_mode": false,
         "update_interval_seconds": 300,
         "live_update_interval": 60,
