@@ -291,16 +291,19 @@ class BaseNHLManager:
                 score_y = self.display_height - 15
                 draw.text((score_x, score_y), score_text, font=self.fonts['score'], fill=(255, 255, 255))
 
-                # Draw period and time
-                period = self.current_game.get("period", 0)
-                clock = self.current_game.get("clock", "0:00")
-                period_text = f"P:{period} {clock}"
+                # Draw period and time or Final
+                if self.current_game.get("is_final", False):
+                    status_text = "Final"
+                else:
+                    period = self.current_game.get("period", 0)
+                    clock = self.current_game.get("clock", "0:00")
+                    status_text = f"P:{period} {clock}"
                 
-                # Calculate position for the period text (centered at the top)
-                period_width = draw.textlength(period_text, font=self.fonts['time'])
-                period_x = (self.display_width - period_width) // 2
-                period_y = 5
-                draw.text((period_x, period_y), period_text, font=self.fonts['time'], fill=(255, 255, 255))
+                # Calculate position for the status text (centered at the top)
+                status_width = draw.textlength(status_text, font=self.fonts['time'])
+                status_x = (self.display_width - status_width) // 2
+                status_y = 5
+                draw.text((status_x, status_y), status_text, font=self.fonts['time'], fill=(255, 255, 255))
 
             # Display the image
             self.display_manager.image.paste(main_img, (0, 0))
