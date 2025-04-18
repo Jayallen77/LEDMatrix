@@ -165,6 +165,7 @@ class BaseNHLManager:
             # Parse game date/time
             try:
                 start_time_utc = datetime.fromisoformat(game_date_str.replace("Z", "+00:00"))
+                self.logger.debug(f"[NHL] Parsed game time: {start_time_utc}")
             except ValueError:
                 logging.warning(f"[NHL] Could not parse game date: {game_date_str}")
                 start_time_utc = None
@@ -186,6 +187,7 @@ class BaseNHLManager:
             if start_time_utc:
                 cutoff_time = datetime.now(timezone.utc) - timedelta(hours=self.recent_hours)
                 is_within_window = start_time_utc > cutoff_time
+                self.logger.debug(f"[NHL] Game time: {start_time_utc}, Cutoff time: {cutoff_time}, Within window: {is_within_window}")
 
             details = {
                 "start_time_utc": start_time_utc,
@@ -205,6 +207,10 @@ class BaseNHLManager:
                 "game_time": game_time,
                 "game_date": game_date
             }
+
+            # Log game details for debugging
+            self.logger.debug(f"[NHL] Extracted game details: {details['away_abbr']} vs {details['home_abbr']}")
+            self.logger.debug(f"[NHL] Game status: is_final={details['is_final']}, is_within_window={details['is_within_window']}")
 
             # Validate logo files
             for team in ["home", "away"]:
