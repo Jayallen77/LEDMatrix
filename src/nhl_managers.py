@@ -545,7 +545,7 @@ class NHLRecentManager(BaseNHLManager):
             self._draw_scorebug_layout(self.current_game, force_clear)
             
             # Update display
-            self.display_manager.update()
+            self.display_manager.update_display()
             
             # Move to next game
             self.current_game_index = (self.current_game_index + 1) % len(self.games_list)
@@ -617,7 +617,7 @@ class NHLUpcomingManager(BaseNHLManager):
             self._draw_scorebug_layout(self.current_game, force_clear)
             
             # Update display
-            self.display_manager.update()
+            self.display_manager.update_display()
             
             # Move to next game
             self.current_game_index = (self.current_game_index + 1) % len(self.games_list)
