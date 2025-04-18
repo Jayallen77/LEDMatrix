@@ -216,20 +216,6 @@ class BaseNHLManager:
             logging.error(f"[NHL] Error extracting game details: {e}")
             return None
 
-    def display(self, force_clear: bool = False) -> None:
-        """Common display method for all NHL managers"""
-        self.logger.info(f"BaseNHLManager.display() called with force_clear={force_clear}")
-        if not self.current_game:
-            current_time = time.time()
-            if not hasattr(self, '_last_warning_time'):
-                self._last_warning_time = 0
-            if current_time - self._last_warning_time > 300:  # 5 minutes cooldown
-                self.logger.warning("[NHL] No game data available to display")
-                self._last_warning_time = current_time
-            return
-            
-        self._draw_scorebug_layout()
-
     def _draw_scorebug_layout(self):
         """Draw the scorebug layout for the current game."""
         try:
@@ -254,29 +240,12 @@ class BaseNHLManager:
             home_x = self.display_width - home_logo.width - 10
             home_y = center_y - (home_logo.height // 2)
             
-            # Create glow effect for home logo
-            glow_draw = ImageDraw.Draw(overlay)
-            glow_color = (0, 0, 255, 180)
-            glow_draw.ellipse([
-                home_x - 10, home_y - 10,
-                home_x + home_logo.width + 10,
-                home_y + home_logo.height + 10
-            ], fill=glow_color)
-            
             # Paste the home logo onto the overlay
             overlay.paste(home_logo, (home_x, home_y), home_logo)
 
             # Draw away team logo (far left)
             away_x = 10
             away_y = center_y - (away_logo.height // 2)
-            
-            # Create glow effect for away logo
-            glow_color = (255, 0, 0, 180)
-            glow_draw.ellipse([
-                away_x - 10, away_y - 10,
-                away_x + away_logo.width + 10,
-                away_y + away_logo.height + 10
-            ], fill=glow_color)
             
             # Paste the away logo onto the overlay
             overlay.paste(away_logo, (away_x, away_y), away_logo)
@@ -312,6 +281,19 @@ class BaseNHLManager:
 
         except Exception as e:
             self.logger.error(f"Error displaying game: {e}", exc_info=True)
+
+    def display(self, force_clear: bool = False) -> None:
+        """Common display method for all NHL managers"""
+        if not self.current_game:
+            current_time = time.time()
+            if not hasattr(self, '_last_warning_time'):
+                self._last_warning_time = 0
+            if current_time - self._last_warning_time > 300:  # 5 minutes cooldown
+                self.logger.warning("[NHL] No game data available to display")
+                self._last_warning_time = current_time
+            return
+            
+        self._draw_scorebug_layout()
 
 class NHLLiveManager(BaseNHLManager):
     """Manager for live NHL games."""
@@ -388,9 +370,7 @@ class NHLLiveManager(BaseNHLManager):
 
     def display(self, force_clear: bool = False):
         """Display live game information."""
-        self.logger.info("NHLLiveManager.display() called")
         if not self.current_game:
-            logging.warning("[NHL] No game data available to display")
             return
         super().display(force_clear)  # Call parent class's display method
 
