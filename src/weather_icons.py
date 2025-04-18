@@ -163,12 +163,15 @@ class WeatherIcons:
              # to remove faint anti-aliasing pixels when pasting on black bg.
              # Pixels with alpha > 200 will be fully opaque, others fully transparent.
              try:
-                 alpha = icon_to_draw.getchannel('A')
-                 # Apply threshold: lambda function returns 255 if input > 200, else 0
-                 threshold_mask = alpha.point(lambda p: 255 if p > 200 else 0)
+                 # alpha = icon_to_draw.getchannel('A')
+                 # # Apply threshold: lambda function returns 255 if input > 200, else 0
+                 # threshold_mask = alpha.point(lambda p: 255 if p > 200 else 0)
                  
                  # Paste the icon using the thresholded mask
-                 image.paste(icon_to_draw, (x, y), threshold_mask)
+                 # image.paste(icon_to_draw, (x, y), threshold_mask)
+                 
+                 # Paste the icon directly with its original alpha channel
+                 image.paste(icon_to_draw, (x, y), icon_to_draw)
              except Exception as e:
                  print(f"Error processing or pasting icon for condition '{condition}' at ({x},{y}): {e}")
                  # Fallback or alternative handling if needed
