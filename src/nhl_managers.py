@@ -218,6 +218,7 @@ class BaseNHLManager:
 
     def display(self, force_clear: bool = False) -> None:
         """Common display method for all NHL managers"""
+        self.logger.info(f"BaseNHLManager.display() called with force_clear={force_clear}")
         if not self.current_game:
             current_time = time.time()
             if not hasattr(self, '_last_warning_time'):
@@ -441,6 +442,7 @@ class NHLLiveManager(BaseNHLManager):
 
     def display(self, force_clear: bool = False):
         """Display live game information."""
+        self.logger.info("NHLLiveManager.display() called")
         if not self.current_game:
             logging.warning("[NHL] No game data available to display")
             return
@@ -594,6 +596,7 @@ class NHLRecentManager(BaseNHLManager):
 
     def display(self, force_clear: bool = False):
         """Display recent game information."""
+        self.logger.info("NHLRecentManager.display() called")
         if not self.current_game:
             logging.warning("[NHL] No recent game data available to display")
             return
@@ -741,6 +744,7 @@ class NHLUpcomingManager(BaseNHLManager):
 
     def display(self, force_clear: bool = False):
         """Display upcoming game information."""
+        self.logger.info("NHLUpcomingManager.display() called")
         if not self.current_game:
             logging.warning("[NHL] No upcoming game data available to display")
             return

@@ -145,10 +145,13 @@ class DisplayController:
                         self.stocks.display_stocks(force_clear=self.force_clear)
                         
                     elif self.current_display_mode == 'nhl_live' and self.nhl_live:
+                        logger.info("Calling NHLLiveManager.display()")
                         self.nhl_live.display(force_clear=self.force_clear)
                     elif self.current_display_mode == 'nhl_recent' and self.nhl_recent:
+                        logger.info("Calling NHLRecentManager.display()")
                         self.nhl_recent.display(force_clear=self.force_clear)
                     elif self.current_display_mode == 'nhl_upcoming' and self.nhl_upcoming:
+                        logger.info("Calling NHLUpcomingManager.display()")
                         self.nhl_upcoming.display(force_clear=self.force_clear)
                         
                     elif self.current_display_mode == 'stock_news' and self.news:
