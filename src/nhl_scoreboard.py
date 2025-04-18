@@ -1157,7 +1157,8 @@ class NHLScoreboardManager:
                 # Create a new RGBA image for compositing
                 temp_img = Image.new('RGBA', img.size, (0, 0, 0, 0))
                 temp_img.paste(away_logo, (away_logo_x, paste_y))
-                img.paste(temp_img, (0, 0), temp_img)
+                # Convert to RGB before pasting to avoid alpha channel issues
+                img.paste(temp_img.convert('RGB'), (0, 0))
                 
                 logging.debug(f"[NHL] Successfully rendered away logo: {game_details['away_logo_path']}")
             except Exception as e:
@@ -1185,7 +1186,8 @@ class NHLScoreboardManager:
                 # Create a new RGBA image for compositing
                 temp_img = Image.new('RGBA', img.size, (0, 0, 0, 0))
                 temp_img.paste(home_logo, (home_logo_x, paste_y))
-                img.paste(temp_img, (0, 0), temp_img)
+                # Convert to RGB before pasting to avoid alpha channel issues
+                img.paste(temp_img.convert('RGB'), (0, 0))
                 
                 logging.debug(f"[NHL] Successfully rendered home logo: {game_details['home_logo_path']}")
             except Exception as e:
@@ -1274,7 +1276,8 @@ class NHLScoreboardManager:
                 # Create a new RGBA image for compositing
                 temp_img = Image.new('RGBA', img.size, (0, 0, 0, 0))
                 temp_img.paste(away_logo, (away_logo_x, paste_y))
-                img.paste(temp_img, (0, 0), temp_img)
+                # Convert to RGB before pasting to avoid alpha channel issues
+                img.paste(temp_img.convert('RGB'), (0, 0))
                 
                 logging.debug(f"[NHL] Successfully rendered away logo: {game_details['away_logo_path']}")
             except Exception as e:
@@ -1307,7 +1310,8 @@ class NHLScoreboardManager:
                 # Create a new RGBA image for compositing
                 temp_img = Image.new('RGBA', img.size, (0, 0, 0, 0))
                 temp_img.paste(home_logo, (home_logo_x, paste_y))
-                img.paste(temp_img, (0, 0), temp_img)
+                # Convert to RGB before pasting to avoid alpha channel issues
+                img.paste(temp_img.convert('RGB'), (0, 0))
                 
                 logging.debug(f"[NHL] Successfully rendered home logo: {game_details['home_logo_path']}")
             except Exception as e:
