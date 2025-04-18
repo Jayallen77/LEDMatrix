@@ -172,7 +172,7 @@ class BaseNHLManager:
             # Validate logo files
             for team in ["home", "away"]:
                 logo_path = details[f"{team}_logo_path"]
-                if not logo_path.is_file():
+                if not os.path.isfile(logo_path):
                     logging.warning(f"[NHL] {team.title()} logo not found: {logo_path}")
                     details[f"{team}_logo_path"] = None
                 else:
