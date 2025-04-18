@@ -7,7 +7,7 @@ from src.display_manager import DisplayManager
 from src.config_manager import ConfigManager
 from src.stock_manager import StockManager
 from src.stock_news_manager import StockNewsManager
-from src.nhl_scoreboard import NHLScoreboardManager
+from src.nhl_managers import NHLLiveManager, NHLRecentManager, NHLUpcomingManager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -24,30 +24,44 @@ class DisplayController:
         self.weather = WeatherManager(self.config, self.display_manager) if self.config.get('weather', {}).get('enabled', False) else None
         self.stocks = StockManager(self.config, self.display_manager) if self.config.get('stocks', {}).get('enabled', False) else None
         self.news = StockNewsManager(self.config, self.display_manager) if self.config.get('stock_news', {}).get('enabled', False) else None
-        self.nhl = NHLScoreboardManager(self.config, self.display_manager) if self.config.get('nhl_scoreboard', {}).get('enabled', False) else None
+        
+        # Initialize NHL managers if NHL is enabled
+        nhl_enabled = self.config.get('nhl_scoreboard', {}).get('enabled', False)
+        if nhl_enabled:
+            self.nhl_live = NHLLiveManager(self.config, self.display_manager)
+            self.nhl_recent = NHLRecentManager(self.config, self.display_manager)
+            self.nhl_upcoming = NHLUpcomingManager(self.config, self.display_manager)
+        else:
+            self.nhl_live = None
+            self.nhl_recent = None
+            self.nhl_upcoming = None
         
         # List of available display modes (adjust order as desired)
         self.available_modes = []
         if self.clock: self.available_modes.append('clock')
-        if self.weather: self.available_modes.extend(['weather_current', 'weather_hourly', 'weather_daily']) # Treat weather modes separately
+        if self.weather: self.available_modes.extend(['weather_current', 'weather_hourly', 'weather_daily'])
         if self.stocks: self.available_modes.append('stocks')
-        if self.news: self.available_modes.append('stock_news') # News after Stocks
-        if self.nhl: self.available_modes.append('nhl') # NHL after News
+        if self.news: self.available_modes.append('stock_news')
+        if nhl_enabled:
+            self.available_modes.extend(['nhl_live', 'nhl_recent', 'nhl_upcoming'])
         
         # Set initial display to first available mode
         self.current_mode_index = 0
-        self.current_display_mode = self.available_modes[0] if self.available_modes else 'none' # Default if nothing enabled
+        self.current_display_mode = self.available_modes[0] if self.available_modes else 'none'
         self.last_switch = time.time()
-        self.force_clear = True  # Start with a clear screen
-        self.update_interval = 0.1 # Faster check loop
-        # Update display durations to include NHL
+        self.force_clear = True
+        self.update_interval = 0.1
+        
+        # Update display durations to include NHL modes
         self.display_durations = self.config['display'].get('display_durations', {
             'clock': 15,
             'weather_current': 15,
             'weather_hourly': 15,
             'weather_daily': 15,
             'stocks': 45,
-            'nhl': 30, # Default NHL duration
+            'nhl_live': 30,  # Live games update more frequently
+            'nhl_recent': 20,  # Recent games
+            'nhl_upcoming': 20,  # Upcoming games
             'stock_news': 30
         })
         logger.info("DisplayController initialized with display_manager: %s", id(self.display_manager))
@@ -55,59 +69,53 @@ class DisplayController:
 
     def get_current_duration(self) -> int:
         """Get the duration for the current display mode."""
-        # Use the unified current_display_mode
         mode_key = self.current_display_mode
-        # Map weather sub-modes if needed for duration lookup
         if mode_key.startswith('weather_'):
-             duration_key = mode_key.split('_', 1)[1] # current, hourly, daily
-             if duration_key == 'current': duration_key = 'weather' # Match config key
-             elif duration_key == 'hourly': duration_key = 'hourly_forecast'
-             elif duration_key == 'daily': duration_key = 'daily_forecast'
-             else: duration_key = 'weather' # Fallback
-             return self.display_durations.get(duration_key, 15)
+            duration_key = mode_key.split('_', 1)[1]
+            if duration_key == 'current': duration_key = 'weather'
+            elif duration_key == 'hourly': duration_key = 'hourly_forecast'
+            elif duration_key == 'daily': duration_key = 'daily_forecast'
+            else: duration_key = 'weather'
+            return self.display_durations.get(duration_key, 15)
         
-        return self.display_durations.get(mode_key, 15) # Default duration 15s
+        return self.display_durations.get(mode_key, 15)
 
     def _update_modules(self):
         """Call update methods on active managers."""
-        # Update methods might have different frequencies, but call here for simplicity
-        # Could add timers per module later if needed
-        if self.weather: self.weather.get_weather() # weather update fetches data
-        if self.stocks: self.stocks.update_stock_data() # Correct method name
-        if self.news: self.news.update_news_data() # Correct method name
-        if self.nhl: self.nhl.update()
-        # Clock updates itself during display typically
+        if self.weather: self.weather.get_weather()
+        if self.stocks: self.stocks.update_stock_data()
+        if self.news: self.news.update_news_data()
+        
+        # Update NHL managers
+        if self.nhl_live: self.nhl_live.update()
+        if self.nhl_recent: self.nhl_recent.update()
+        if self.nhl_upcoming: self.nhl_upcoming.update()
 
     def run(self):
         """Run the display controller, switching between displays."""
         if not self.available_modes:
-             logger.warning("No display modes are enabled. Exiting.")
-             self.display_manager.cleanup()
-             return
+            logger.warning("No display modes are enabled. Exiting.")
+            self.display_manager.cleanup()
+            return
              
         try:
             while True:
                 current_time = time.time()
                 
-                # --- Update Data for Modules ---
-                # Call update method for all relevant modules periodically
-                # (Frequency can be optimized later if needed)
-                self._update_modules() 
+                # Update data for all modules
+                self._update_modules()
                 
-                # --- Check for Mode Switch ---
+                # Check for mode switch
                 if current_time - self.last_switch > self.get_current_duration():
                     self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
                     self.current_display_mode = self.available_modes[self.current_mode_index]
                     
                     logger.info(f"Switching display to: {self.current_display_mode}")
                     self.last_switch = current_time
-                    self.force_clear = True # Force clear on mode switch
-                    # Clearing is likely handled by the display method or display_manager now
-                    # self.display_manager.clear() 
+                    self.force_clear = True
 
-                # --- Display Current Mode Frame ---
+                # Display current mode frame
                 try:
-                    # Simplified display logic based on mode string
                     if self.current_display_mode == 'clock' and self.clock:
                         self.clock.display_time(force_clear=self.force_clear)
                         
@@ -121,23 +129,22 @@ class DisplayController:
                     elif self.current_display_mode == 'stocks' and self.stocks:
                         self.stocks.display_stocks(force_clear=self.force_clear)
                         
-                    elif self.current_display_mode == 'nhl' and self.nhl:
-                        self.nhl.display(force_clear=self.force_clear)
+                    elif self.current_display_mode == 'nhl_live' and self.nhl_live:
+                        self.nhl_live.display(force_clear=self.force_clear)
+                    elif self.current_display_mode == 'nhl_recent' and self.nhl_recent:
+                        self.nhl_recent.display(force_clear=self.force_clear)
+                    elif self.current_display_mode == 'nhl_upcoming' and self.nhl_upcoming:
+                        self.nhl_upcoming.display(force_clear=self.force_clear)
                         
                     elif self.current_display_mode == 'stock_news' and self.news:
-                        self.news.display_news() # Removed force_clear argument
+                        self.news.display_news()
                         
                 except Exception as e:
                     logger.error(f"Error updating display for mode {self.current_display_mode}: {e}", exc_info=True)
-                    # Avoid busy-looping on error, maybe skip frame or wait?
-                    time.sleep(1) 
-                    continue # Skip rest of loop iteration
+                    time.sleep(1)
+                    continue
 
-                # Reset force clear flag after the first successful display in a mode
-                self.force_clear = False 
-                
-                # Main loop delay - REMOVED for faster processing/scrolling
-                # time.sleep(self.update_interval) 
+                self.force_clear = False
 
         except KeyboardInterrupt:
             print("\nDisplay stopped by user")
