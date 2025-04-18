@@ -230,9 +230,11 @@ class WeatherManager:
             
             # --- Top Left: Icon ---
             condition = weather_data['weather'][0]['main']
-            icon_size = self.ICON_SIZE['extra_large'] # Use new extra_large size
+            icon_size = self.ICON_SIZE['extra_large'] # Use extra_large size
             icon_x = 1 # Small padding from left edge
-            icon_y = 1 # Small padding from top edge
+            # Center the icon vertically in the top two-thirds of the display
+            available_height = (self.display_manager.matrix.height * 2) // 3  # Use top 2/3 of screen
+            icon_y = (available_height - icon_size) // 2
             WeatherIcons.draw_weather_icon(image, condition, icon_x, icon_y, size=icon_size)
             
             # --- Top Right: Condition Text ---
