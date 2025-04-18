@@ -210,6 +210,9 @@ class StockNewsManager:
             current_x = 0
             screen_width_gap = width # Use a full screen width as the gap
             
+            # Add initial gap before the first headline
+            current_x += screen_width_gap
+            
             actual_total_width = 0
             for news in all_news:
                 news_text = f"{news['symbol']}: {news['title']}   "
