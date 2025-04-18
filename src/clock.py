@@ -113,7 +113,7 @@ class Clock:
             # Draw time (large, centered, near top)
             self.display_manager.draw_text(
                 time_str,
-                y=2,  # Move up slightly to make room for two lines of date
+                y=4,  # Move up slightly to make room for two lines of date
                 color=self.COLORS['time'],
                 small_font=True
             )
