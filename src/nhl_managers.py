@@ -224,19 +224,23 @@ class BaseNHLManager:
     def _draw_scorebug_layout(self):
         """Draw the scorebug layout for the current game."""
         try:
-            # Create a new black image
-            img = Image.new('RGB', (self.display_width, self.display_height), 'black')
-            draw = ImageDraw.Draw(img)
+            # Create a new black image for the main display
+            main_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
+            draw = ImageDraw.Draw(main_img)
 
             # Load logos once
             home_logo = self._load_and_resize_logo(self.current_game["home_abbr"])
             away_logo = self._load_and_resize_logo(self.current_game["away_abbr"])
 
+            # Create separate images for each logo
+            home_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
+            away_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
+
             # Draw home team logo (right side)
             if home_logo:
                 home_x = 3 * self.display_width // 4 - home_logo.width // 2
                 home_y = self.display_height // 4 - home_logo.height // 2
-                img.paste(home_logo, (home_x, home_y), home_logo)
+                home_img.paste(home_logo, (home_x, home_y), home_logo)
             else:
                 self.logger.warning(f"Home logo is None for team {self.current_game['home_abbr']}")
 
@@ -244,9 +248,14 @@ class BaseNHLManager:
             if away_logo:
                 away_x = self.display_width // 4 - away_logo.width // 2
                 away_y = self.display_height // 4 - away_logo.height // 2
-                img.paste(away_logo, (away_x, away_y), away_logo)
+                away_img.paste(away_logo, (away_x, away_y), away_logo)
             else:
                 self.logger.warning(f"Away logo is None for team {self.current_game['away_abbr']}")
+
+            # Combine the images
+            main_img = Image.alpha_composite(main_img.convert('RGBA'), home_img.convert('RGBA'))
+            main_img = Image.alpha_composite(main_img, away_img.convert('RGBA'))
+            main_img = main_img.convert('RGB')
 
             # Draw scores in the format "AWAY - HOME"
             home_score = str(self.current_game["home_score"])
@@ -261,6 +270,7 @@ class BaseNHLManager:
             score_y = 3 * self.display_height // 4 - 10
 
             # Draw the score text
+            draw = ImageDraw.Draw(main_img)
             draw.text((score_x, score_y), score_text, font=self.fonts['score'], fill=(255, 255, 255))
 
             # Draw game status (period and time or "FINAL")
@@ -272,7 +282,7 @@ class BaseNHLManager:
             draw.text((status_x, status_y), status_text, font=self.fonts['status'], fill=(255, 255, 255))
 
             # Display the image
-            self.display_manager.image.paste(img, (0, 0))
+            self.display_manager.image.paste(main_img, (0, 0))
             self.display_manager.update_display()
 
         except Exception as e:
