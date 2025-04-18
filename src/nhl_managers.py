@@ -196,7 +196,8 @@ class BaseNHLManager:
             draw.text((status_x, status_y), self.current_game["status_text"], font=self.fonts['status'], fill=(255, 255, 255))
 
             # Display the image
-            self.display_manager.display_image(img)
+            self.display_manager.image.paste(img, (0, 0))
+            self.display_manager.update_display()
             logging.debug("[NHL] Successfully displayed game")
 
         except Exception as e:
@@ -327,7 +328,8 @@ class NHLLiveManager(BaseNHLManager):
             draw.text((status_x, status_y), f"{period_str} {clock}", font=self.fonts['status'], fill=(255, 255, 255))
 
             # Display the image
-            self.display_manager.display_image(img)
+            self.display_manager.image.paste(img, (0, 0))
+            self.display_manager.update_display()
             logging.debug("[NHL] Successfully displayed test game")
 
         except Exception as e:
@@ -452,7 +454,8 @@ class NHLRecentManager(BaseNHLManager):
             draw.text((status_x, status_y), "FINAL", font=self.fonts['status'], fill=(255, 255, 255))
 
             # Display the image
-            self.display_manager.display_image(img)
+            self.display_manager.image.paste(img, (0, 0))
+            self.display_manager.update_display()
             logging.debug("[NHL] Successfully displayed recent game")
 
         except Exception as e:
@@ -574,7 +577,8 @@ class NHLUpcomingManager(BaseNHLManager):
             draw.text((status_x, status_y), self.current_game["status_text"], font=self.fonts['status'], fill=(255, 255, 255))
 
             # Display the image
-            self.display_manager.display_image(img)
+            self.display_manager.image.paste(img, (0, 0))
+            self.display_manager.update_display()
             logging.debug("[NHL] Successfully displayed upcoming game")
 
         except Exception as e:
