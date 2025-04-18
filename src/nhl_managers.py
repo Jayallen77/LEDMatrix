@@ -80,14 +80,14 @@ class BaseNHLManager:
 
     def _load_and_resize_logo(self, team_abbrev: str) -> Optional[Image.Image]:
         """Load and resize a team logo, with caching."""
-        self.logger.info(f"Loading logo for {team_abbrev}")
+        self.logger.debug(f"Loading logo for {team_abbrev}")
         
         if team_abbrev in self._logo_cache:
-            self.logger.info(f"Using cached logo for {team_abbrev}")
+            self.logger.debug(f"Using cached logo for {team_abbrev}")
             return self._logo_cache[team_abbrev]
             
         logo_path = os.path.join(self.logo_dir, f"{team_abbrev}.png")
-        self.logger.info(f"Logo path: {logo_path}")
+        self.logger.debug(f"Logo path: {logo_path}")
         
         try:
             # Create test logos if they don't exist
@@ -109,20 +109,20 @@ class BaseNHLManager:
                 self.logger.info(f"Created test logo at {logo_path}")
             
             logo = Image.open(logo_path)
-            self.logger.info(f"Opened logo for {team_abbrev}, size: {logo.size}, mode: {logo.mode}")
+            self.logger.debug(f"Opened logo for {team_abbrev}, size: {logo.size}, mode: {logo.mode}")
             
             # Convert to RGBA if not already
             if logo.mode != 'RGBA':
-                self.logger.info(f"Converting {team_abbrev} logo from {logo.mode} to RGBA")
+                self.logger.debug(f"Converting {team_abbrev} logo from {logo.mode} to RGBA")
                 logo = logo.convert('RGBA')
             
             # Calculate max size based on display dimensions
-            max_width = self.display_width // 4  # Quarter of display width
+            max_width = self.display_width // 4
             max_height = self.display_height // 2  # Half of display height
             
             # Resize maintaining aspect ratio
             logo.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
-            self.logger.info(f"Resized {team_abbrev} logo to {logo.size}")
+            self.logger.debug(f"Resized {team_abbrev} logo to {logo.size}")
             
             # Cache the resized logo
             self._logo_cache[team_abbrev] = logo
