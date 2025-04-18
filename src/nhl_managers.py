@@ -424,8 +424,8 @@ class NHLRecentManager(BaseNHLManager):
                 home_y = self.display_height // 4 - home_logo.height // 2
                 temp_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
                 temp_draw = ImageDraw.Draw(temp_img)
-                temp_draw.im.paste(home_logo, (home_x, home_y), home_logo)
-                draw.im.paste(temp_img, (0, 0))
+                temp_img.paste(home_logo, (home_x, home_y), home_logo)
+                img.paste(temp_img, (0, 0))
 
             # Draw away team logo
             if away_logo:
@@ -433,8 +433,8 @@ class NHLRecentManager(BaseNHLManager):
                 away_y = 3 * self.display_height // 4 - away_logo.height // 2
                 temp_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
                 temp_draw = ImageDraw.Draw(temp_img)
-                temp_draw.im.paste(away_logo, (away_x, away_y), away_logo)
-                draw.im.paste(temp_img, (0, 0))
+                temp_img.paste(away_logo, (away_x, away_y), away_logo)
+                img.paste(temp_img, (0, 0))
 
             # Draw scores
             home_score = str(self.current_game["home_score"])
@@ -559,8 +559,8 @@ class NHLUpcomingManager(BaseNHLManager):
                 home_y = self.display_height // 4 - home_logo.height // 2
                 temp_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
                 temp_draw = ImageDraw.Draw(temp_img)
-                temp_draw.im.paste(home_logo, (home_x, home_y), home_logo)
-                draw.im.paste(temp_img, (0, 0))
+                temp_img.paste(home_logo, (home_x, home_y), home_logo)
+                img.paste(temp_img, (0, 0))
 
             # Draw away team logo
             if away_logo:
@@ -568,8 +568,8 @@ class NHLUpcomingManager(BaseNHLManager):
                 away_y = 3 * self.display_height // 4 - away_logo.height // 2
                 temp_img = Image.new('RGB', (self.display_width, self.display_height), 'black')
                 temp_draw = ImageDraw.Draw(temp_img)
-                temp_draw.im.paste(away_logo, (away_x, away_y), away_logo)
-                draw.im.paste(temp_img, (0, 0))
+                temp_img.paste(away_logo, (away_x, away_y), away_logo)
+                img.paste(temp_img, (0, 0))
 
             # Draw game time
             status_x = self.display_width // 2 - 20
