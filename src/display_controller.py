@@ -52,8 +52,7 @@ class DisplayController:
         # Add NHL display modes if enabled
         if nhl_enabled:
             if self.nhl_live: self.available_modes.append('nhl_live')
-            if self.nhl_recent: self.available_modes.append('nhl_recent')
-            if self.nhl_upcoming: self.available_modes.append('nhl_upcoming')
+            # We'll handle recent and upcoming modes separately for team-based rotation
         
         # Set initial display to first available mode
         self.current_mode_index = 0
@@ -61,6 +60,11 @@ class DisplayController:
         self.last_switch = time.time()
         self.force_clear = True
         self.update_interval = 0.1
+        
+        # Track team-based rotation state
+        self.current_team_index = 0
+        self.showing_recent = True  # True for recent, False for upcoming
+        self.favorite_teams = self.config.get('nhl_scoreboard', {}).get('favorite_teams', [])
         
         # Update display durations to include NHL modes
         self.display_durations = self.config['display'].get('display_durations', {
@@ -76,6 +80,7 @@ class DisplayController:
         })
         logger.info("DisplayController initialized with display_manager: %s", id(self.display_manager))
         logger.info(f"Available display modes: {self.available_modes}")
+        logger.info(f"Favorite teams: {self.favorite_teams}")
 
     def get_current_duration(self) -> int:
         """Get the duration for the current display mode."""
@@ -106,6 +111,22 @@ class DisplayController:
         if not self.nhl_live:
             return False
         return bool(self.nhl_live.live_games)
+
+    def _get_team_games(self, team: str, is_recent: bool = True) -> bool:
+        """Get games for a specific team and update the current game."""
+        if is_recent and self.nhl_recent:
+            # Find recent games for this team
+            for game in self.nhl_recent.games_list:
+                if game["home_abbr"] == team or game["away_abbr"] == team:
+                    self.nhl_recent.current_game = game
+                    return True
+        elif not is_recent and self.nhl_upcoming:
+            # Find upcoming games for this team
+            for game in self.nhl_upcoming.games_list:
+                if game["home_abbr"] == team or game["away_abbr"] == team:
+                    self.nhl_upcoming.current_game = game
+                    return True
+        return False
 
     def run(self):
         """Run the display controller, switching between displays."""
@@ -141,9 +162,53 @@ class DisplayController:
                         self.current_display_mode = 'nhl_live'
                         logger.info("Live games available, switching to NHL live mode")
                     else:
-                        self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
-                        self.current_display_mode = self.available_modes[self.current_mode_index]
-                        logger.info(f"Switching display to: {self.current_display_mode}")
+                        # Handle team-based rotation for recent and upcoming games
+                        if self.current_display_mode in ['nhl_recent', 'nhl_upcoming']:
+                            if self.showing_recent:
+                                # Switch from recent to upcoming for current team
+                                self.showing_recent = False
+                                if self._get_team_games(self.favorite_teams[self.current_team_index], False):
+                                    self.current_display_mode = 'nhl_upcoming'
+                                    logger.info(f"Switching to upcoming game for {self.favorite_teams[self.current_team_index]}")
+                                else:
+                                    # No upcoming game, move to next team's recent game
+                                    self.current_team_index = (self.current_team_index + 1) % len(self.favorite_teams)
+                                    self.showing_recent = True
+                                    if self._get_team_games(self.favorite_teams[self.current_team_index], True):
+                                        self.current_display_mode = 'nhl_recent'
+                                        logger.info(f"Switching to recent game for {self.favorite_teams[self.current_team_index]}")
+                                    else:
+                                        # No recent game for next team, move to regular rotation
+                                        self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
+                                        self.current_display_mode = self.available_modes[self.current_mode_index]
+                                        logger.info(f"No games for team, switching to: {self.current_display_mode}")
+                            else:
+                                # Move to next team's recent game
+                                self.current_team_index = (self.current_team_index + 1) % len(self.favorite_teams)
+                                self.showing_recent = True
+                                if self._get_team_games(self.favorite_teams[self.current_team_index], True):
+                                    self.current_display_mode = 'nhl_recent'
+                                    logger.info(f"Switching to recent game for {self.favorite_teams[self.current_team_index]}")
+                                else:
+                                    # No recent game for next team, move to regular rotation
+                                    self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
+                                    self.current_display_mode = self.available_modes[self.current_mode_index]
+                                    logger.info(f"No games for team, switching to: {self.current_display_mode}")
+                        else:
+                            # Regular rotation for non-NHL modes
+                            self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
+                            self.current_display_mode = self.available_modes[self.current_mode_index]
+                            
+                            # If switching to NHL recent/upcoming, initialize team rotation
+                            if self.current_display_mode in ['nhl_recent', 'nhl_upcoming']:
+                                self.showing_recent = self.current_display_mode == 'nhl_recent'
+                                if self._get_team_games(self.favorite_teams[self.current_team_index], self.showing_recent):
+                                    logger.info(f"Starting team rotation with {self.current_display_mode} for {self.favorite_teams[self.current_team_index]}")
+                                else:
+                                    # No games for current team, move to next mode
+                                    self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
+                                    self.current_display_mode = self.available_modes[self.current_mode_index]
+                                    logger.info(f"No games for team, switching to: {self.current_display_mode}")
                     
                     self.last_switch = current_time
                     self.force_clear = True
