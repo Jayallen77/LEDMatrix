@@ -248,29 +248,51 @@ class BaseNHLManager:
             if away_logo:
                 self.logger.info(f"Away logo size: {away_logo.size}, mode: {away_logo.mode}")
 
-            # Create a single overlay image for both logos
-            overlay = Image.new('RGBA', (self.display_width, self.display_height), (0, 0, 0, 0))
+            # Create separate layers for each logo
+            home_layer = Image.new('RGBA', (self.display_width, self.display_height), (0, 0, 0, 0))
+            away_layer = Image.new('RGBA', (self.display_width, self.display_height), (0, 0, 0, 0))
 
-            # Draw home team logo (right side)
+            # Draw home team logo (right side) with a blue tint
             if home_logo:
                 home_x = 3 * self.display_width // 4 - home_logo.width // 2
                 home_y = self.display_height // 4 - home_logo.height // 2
                 self.logger.info(f"Home logo position: ({home_x}, {home_y})")
-                overlay.paste(home_logo, (home_x, home_y), home_logo)
+                
+                # Create a blue-tinted version of the home logo
+                home_tinted = home_logo.copy()
+                home_tinted_data = home_tinted.load()
+                for x in range(home_tinted.width):
+                    for y in range(home_tinted.height):
+                        r, g, b, a = home_tinted_data[x, y]
+                        if a > 0:  # Only modify non-transparent pixels
+                            home_tinted_data[x, y] = (r, g, min(255, b + 50), a)
+                
+                home_layer.paste(home_tinted, (home_x, home_y), home_tinted)
             else:
                 self.logger.error(f"Home logo is None for team {self.current_game['home_abbr']}")
 
-            # Draw away team logo (left side)
+            # Draw away team logo (left side) with a red tint
             if away_logo:
                 away_x = self.display_width // 4 - away_logo.width // 2
                 away_y = self.display_height // 4 - away_logo.height // 2
                 self.logger.info(f"Away logo position: ({away_x}, {away_y})")
-                overlay.paste(away_logo, (away_x, away_y), away_logo)
+                
+                # Create a red-tinted version of the away logo
+                away_tinted = away_logo.copy()
+                away_tinted_data = away_tinted.load()
+                for x in range(away_tinted.width):
+                    for y in range(away_tinted.height):
+                        r, g, b, a = away_tinted_data[x, y]
+                        if a > 0:  # Only modify non-transparent pixels
+                            away_tinted_data[x, y] = (min(255, r + 50), g, b, a)
+                
+                away_layer.paste(away_tinted, (away_x, away_y), away_tinted)
             else:
                 self.logger.error(f"Away logo is None for team {self.current_game['away_abbr']}")
 
-            # Composite the overlay with the main image
-            main_img = Image.alpha_composite(main_img, overlay)
+            # Composite the layers in sequence
+            main_img = Image.alpha_composite(main_img, away_layer)
+            main_img = Image.alpha_composite(main_img, home_layer)
 
             # Save debug image to check logo positions
             debug_path = os.path.join(os.path.dirname(self.logo_dir), "debug_layout.png")
