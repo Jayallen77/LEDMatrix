@@ -490,6 +490,8 @@ class NHLRecentManager(BaseNHLManager):
         self.last_update = 0
         self.update_interval = 300  # 5 minutes
         self.recent_hours = self.nhl_config.get("recent_game_hours", 48)
+        self.last_game_switch = 0
+        self.game_display_duration = 15  # Display each game for 15 seconds
         self.logger.info(f"Initialized NHLRecentManager with {len(self.favorite_teams)} favorite teams")
         
     def update(self):
@@ -541,15 +543,21 @@ class NHLRecentManager(BaseNHLManager):
             return
             
         try:
+            current_time = time.time()
+            
+            # Check if it's time to switch games
+            if current_time - self.last_game_switch >= self.game_display_duration:
+                # Move to next game
+                self.current_game_index = (self.current_game_index + 1) % len(self.games_list)
+                self.current_game = self.games_list[self.current_game_index]
+                self.last_game_switch = current_time
+                force_clear = True  # Force clear when switching games
+            
             # Draw the scorebug layout
             self._draw_scorebug_layout(self.current_game, force_clear)
             
             # Update display
             self.display_manager.update_display()
-            
-            # Move to next game
-            self.current_game_index = (self.current_game_index + 1) % len(self.games_list)
-            self.current_game = self.games_list[self.current_game_index]
             
         except Exception as e:
             self.logger.error(f"[NHL] Error displaying recent game: {e}", exc_info=True)
