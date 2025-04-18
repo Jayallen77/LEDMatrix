@@ -411,6 +411,9 @@ class NHLRecentManager(BaseNHLManager):
         self.logger.info("Initialized NHL Recent Manager")
         self.recent_hours = self.nhl_config.get("recent_game_hours", 48)  # Default 48 hours
         self.current_game = None
+        # Override test_mode to always use real data for recent games
+        self.test_mode = False
+        logging.info("[NHL] Initialized NHLRecentManager in live mode")
 
     def update(self):
         """Update recent game data."""
