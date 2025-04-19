@@ -114,7 +114,11 @@ class WeatherManager:
         try:
             # Fetch new data from OpenWeatherMap API
             api_key = self.weather_config.get('api_key')
-            location = self.weather_config.get('location')
+            location = self.location.get('city')  # Get city from location config
+            if not location:
+                self.logger.error("No location configured for weather")
+                return None
+                
             units = self.weather_config.get('units', 'imperial')
             
             # Fetch current weather
