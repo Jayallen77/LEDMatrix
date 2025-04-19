@@ -23,7 +23,7 @@
             "limit_refresh_rate_hz": 90
         },
         "runtime": {
-            "gpio_slowdown": 2
+            "gpio_slowdown": 3
         },
         "display_durations": {
             "clock": 15,
