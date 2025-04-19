@@ -11,7 +11,7 @@
             "cols": 64,
             "chain_length": 2,
             "parallel": 1,
-            "brightness": 85,
+            "brightness": 95,
             "hardware_mapping": "adafruit-hat-pwm",
             "scan_mode": 0,
             "pwm_bits": 9,
