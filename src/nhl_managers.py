@@ -404,7 +404,7 @@ class BaseNHLManager:
                 # For live/final games, show scores and period/time
                 home_score = str(game.get("home_score", "0"))
                 away_score = str(game.get("away_score", "0"))
-                score_text = f"{away_score} - {home_score}"
+                score_text = f"{away_score}-{home_score}"
                 
                 # Calculate position for the score text (centered at the bottom)
                 score_width = draw.textlength(score_text, font=self.fonts['score'])
