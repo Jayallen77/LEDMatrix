@@ -3,18 +3,10 @@
 # Exit on error
 set -e
 
-# Get the current user
-CURRENT_USER=$(whoami)
-
-echo "Installing LED Matrix Display Service for user: $CURRENT_USER..."
+echo "Installing LED Matrix Display Service..."
 
 # Copy the service file to the systemd directory
 sudo cp ledmatrix.service /etc/systemd/system/
-
-# Create a systemd override to set the user
-sudo mkdir -p /etc/systemd/system/ledmatrix.service.d/
-echo "[Service]" | sudo tee /etc/systemd/system/ledmatrix.service.d/override.conf
-echo "User=$CURRENT_USER" | sudo tee -a /etc/systemd/system/ledmatrix.service.d/override.conf
 
 # Reload systemd to recognize the new service
 sudo systemctl daemon-reload
