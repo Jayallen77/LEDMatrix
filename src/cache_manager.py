@@ -6,6 +6,7 @@ import pytz
 from typing import Any, Dict, Optional
 import logging
 import stat
+import threading
 
 class DateTimeEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -17,94 +18,100 @@ class CacheManager:
     def __init__(self, cache_dir: str = "cache"):
         self.logger = logging.getLogger(__name__)
         self.cache_dir = cache_dir
+        self._memory_cache = {}
+        self._memory_cache_timestamps = {}
+        self._cache_lock = threading.Lock()
         self._ensure_cache_dir()
 
     def _ensure_cache_dir(self) -> None:
-        """Ensure the cache directory exists with proper permissions."""
+        """Ensure cache directory exists."""
         if not os.path.exists(self.cache_dir):
-            try:
-                # If running as root, use /tmp by default
-                if os.geteuid() == 0:
-                    self.cache_dir = os.path.join("/tmp", "ledmatrix_cache")
-                    self.logger.info(f"Running as root, using temporary cache directory: {self.cache_dir}")
-                # Try to create in user's home directory if current directory fails
-                elif not os.access(os.getcwd(), os.W_OK):
-                    home_dir = os.path.expanduser("~")
-                    self.cache_dir = os.path.join(home_dir, ".ledmatrix_cache")
-                    self.logger.info(f"Using cache directory in home: {self.cache_dir}")
-                
-                # Create directory with 755 permissions (rwxr-xr-x)
-                os.makedirs(self.cache_dir, mode=0o755, exist_ok=True)
-                
-                # If running as sudo, change ownership to the real user
-                if os.geteuid() == 0:  # Check if running as root
-                    import pwd
-                    # Get the real user (not root)
-                    real_user = os.environ.get('SUDO_USER')
-                    if real_user:
-                        uid = pwd.getpwnam(real_user).pw_uid
-                        gid = pwd.getpwnam(real_user).pw_gid
-                        os.chown(self.cache_dir, uid, gid)
-                        self.logger.info(f"Changed cache directory ownership to {real_user}")
-            except Exception as e:
-                self.logger.error(f"Error setting up cache directory: {e}")
-                # Fall back to /tmp if all else fails
-                self.cache_dir = os.path.join("/tmp", "ledmatrix_cache")
-                try:
-                    os.makedirs(self.cache_dir, mode=0o755, exist_ok=True)
-                    self.logger.info(f"Using temporary cache directory: {self.cache_dir}")
-                except Exception as e:
-                    self.logger.error(f"Failed to create temporary cache directory: {e}")
-                    raise
+            os.makedirs(self.cache_dir)
 
-    def _get_cache_path(self, data_type: str) -> str:
-        """Get the path for a specific cache file."""
-        return os.path.join(self.cache_dir, f"{data_type}_cache.json")
+    def _get_cache_path(self, key: str) -> str:
+        """Get the path for a cache file."""
+        return os.path.join(self.cache_dir, f"{key}.json")
 
-    def load_cache(self, data_type: str) -> Optional[Dict[str, Any]]:
-        """Load cached data for a specific type."""
-        cache_path = self._get_cache_path(data_type)
+    def load_cache(self, key: str) -> Optional[Dict[str, Any]]:
+        """Load data from cache with memory caching."""
+        current_time = time.time()
+        
+        # Check memory cache first
+        if key in self._memory_cache:
+            if current_time - self._memory_cache_timestamps.get(key, 0) < 60:  # 1 minute TTL
+                return self._memory_cache[key]
+            else:
+                # Clear expired memory cache
+                del self._memory_cache[key]
+                del self._memory_cache_timestamps[key]
+
+        cache_path = self._get_cache_path(key)
+        if not os.path.exists(cache_path):
+            return None
+
         try:
-            if os.path.exists(cache_path):
+            with self._cache_lock:
                 with open(cache_path, 'r') as f:
-                    return json.load(f)
+                    data = json.load(f)
+                    # Update memory cache
+                    self._memory_cache[key] = data
+                    self._memory_cache_timestamps[key] = current_time
+                    return data
         except Exception as e:
-            self.logger.error(f"Error loading cache for {data_type}: {e}")
-        return None
+            self.logger.error(f"Error loading cache for {key}: {e}")
+            return None
 
-    def save_cache(self, data_type: str, data: Dict[str, Any]) -> bool:
-        """Save data to cache with proper permissions."""
-        cache_path = self._get_cache_path(data_type)
+    def save_cache(self, key: str, data: Dict[str, Any]) -> None:
+        """Save data to cache with memory caching."""
+        cache_path = self._get_cache_path(key)
+        current_time = time.time()
+
         try:
-            # Create a temporary file first
-            temp_path = cache_path + '.tmp'
-            with open(temp_path, 'w') as f:
-                json.dump(data, f, cls=DateTimeEncoder)
-            
-            # Set proper permissions (644 - rw-r--r--)
-            os.chmod(temp_path, 0o644)
-            
-            # If running as sudo, change ownership to the real user
-            if os.geteuid() == 0:  # Check if running as root
-                import pwd
-                real_user = os.environ.get('SUDO_USER')
-                if real_user:
-                    uid = pwd.getpwnam(real_user).pw_uid
-                    gid = pwd.getpwnam(real_user).pw_gid
-                    os.chown(temp_path, uid, gid)
-            
-            # Rename temp file to actual cache file (atomic operation)
-            os.replace(temp_path, cache_path)
-            return True
+            with self._cache_lock:
+                # Update memory cache first
+                self._memory_cache[key] = data
+                self._memory_cache_timestamps[key] = current_time
+
+                # Then save to disk
+                with open(cache_path, 'w') as f:
+                    json.dump(data, f)
         except Exception as e:
-            self.logger.error(f"Error saving cache for {data_type}: {e}")
-            # Clean up temp file if it exists
-            if os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except:
-                    pass
-            return False
+            self.logger.error(f"Error saving cache for {key}: {e}")
+
+    def get_cached_data(self, key: str) -> Optional[Dict[str, Any]]:
+        """Get cached data with memory cache priority."""
+        current_time = time.time()
+        
+        # Check memory cache first
+        if key in self._memory_cache:
+            if current_time - self._memory_cache_timestamps.get(key, 0) < 60:  # 1 minute TTL
+                return self._memory_cache[key]
+            else:
+                # Clear expired memory cache
+                del self._memory_cache[key]
+                del self._memory_cache_timestamps[key]
+
+        # Fall back to disk cache
+        return self.load_cache(key)
+
+    def clear_cache(self, key: Optional[str] = None) -> None:
+        """Clear cache for a specific key or all keys."""
+        with self._cache_lock:
+            if key:
+                # Clear specific key
+                if key in self._memory_cache:
+                    del self._memory_cache[key]
+                    del self._memory_cache_timestamps[key]
+                cache_path = self._get_cache_path(key)
+                if os.path.exists(cache_path):
+                    os.remove(cache_path)
+            else:
+                # Clear all keys
+                self._memory_cache.clear()
+                self._memory_cache_timestamps.clear()
+                for file in os.listdir(self.cache_dir):
+                    if file.endswith('.json'):
+                        os.remove(os.path.join(self.cache_dir, file))
 
     def has_data_changed(self, data_type: str, new_data: Dict[str, Any]) -> bool:
         """Check if data has changed from cached version."""
@@ -181,22 +188,4 @@ class CacheManager:
             'data': data,
             'timestamp': time.time()
         }
-        return self.save_cache(data_type, cache_data)
-
-    def get_cached_data(self, data_type: str) -> Optional[Dict[str, Any]]:
-        """Get cached data if it exists and is still valid."""
-        cached = self.load_cache(data_type)
-        if not cached:
-            return None
-
-        # Check if cache is still valid based on data type
-        if data_type == 'weather' and time.time() - cached['timestamp'] > 600:  # 10 minutes
-            return None
-        elif data_type == 'stocks' and time.time() - cached['timestamp'] > 300:  # 5 minutes
-            return None
-        elif data_type == 'stock_news' and time.time() - cached['timestamp'] > 800:  # ~13 minutes
-            return None
-        elif data_type == 'nhl' and time.time() - cached['timestamp'] > 60:  # 1 minute
-            return None
-
-        return cached['data'] 
+        return self.save_cache(data_type, cache_data) 

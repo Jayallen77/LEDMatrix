@@ -1,10 +1,12 @@
 import requests
 import time
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from PIL import Image, ImageDraw
 from .weather_icons import WeatherIcons
 from .cache_manager import CacheManager
+import logging
+import threading
 
 class WeatherManager:
     # Weather condition to larger colored icons (we'll use these as placeholders until you provide custom ones)
@@ -27,11 +29,17 @@ class WeatherManager:
     }
 
     def __init__(self, config: Dict[str, Any], display_manager):
+        self.logger = logging.getLogger(__name__)
         self.config = config
         self.display_manager = display_manager
         self.weather_config = config.get('weather', {})
         self.location = config.get('location', {})
-        self.last_update = 0
+        self._last_update = 0
+        self._update_interval = config.get('update_interval', 600)  # 10 minutes default
+        self._last_state = None
+        self._processing_lock = threading.Lock()
+        self._cached_processed_data = None
+        self._cache_timestamp = 0
         self.weather_data = None
         self.forecast_data = None
         self.hourly_forecast = None
@@ -60,140 +68,103 @@ class WeatherManager:
         self.last_hourly_state = None
         self.last_daily_state = None
 
-    def _fetch_weather(self) -> None:
-        """Fetch current weather and forecast data from OpenWeatherMap API."""
-        api_key = self.weather_config.get('api_key')
-        if not api_key:
-            print("No API key configured for weather")
-            return
-
-        # Try to get cached data first
-        cached_data = self.cache_manager.get_cached_data('weather')
-        if cached_data:
-            self.weather_data = cached_data.get('current')
-            self.forecast_data = cached_data.get('forecast')
-            if self.weather_data and self.forecast_data:
-                self._process_forecast_data(self.forecast_data)
-                self.last_update = time.time()
-                print("Using cached weather data")
-                return
-
-        city = self.location['city']
-        state = self.location['state']
-        country = self.location['country']
-        units = self.weather_config.get('units', 'imperial')
-
-        # First get coordinates using geocoding API
-        geo_url = f"http://api.openweathermap.org/geo/1.0/direct?q={city},{state},{country}&limit=1&appid={api_key}"
+    def _process_forecast_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Process forecast data with caching."""
+        current_time = time.time()
         
-        try:
-            # Get coordinates
-            response = requests.get(geo_url)
-            response.raise_for_status()
-            geo_data = response.json()
-            
-            if not geo_data:
-                print(f"Could not find coordinates for {city}, {state}")
-                return
-                
-            lat = geo_data[0]['lat']
-            lon = geo_data[0]['lon']
-            
-            # Get current weather and forecast using coordinates
-            weather_url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}&units={units}"
-            forecast_url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={api_key}&units={units}"
-            
-            # Fetch current weather
-            response = requests.get(weather_url)
-            response.raise_for_status()
-            self.weather_data = response.json()
+        # Check if we have valid cached processed data
+        if (self._cached_processed_data and 
+            current_time - self._cache_timestamp < 60):  # Cache for 1 minute
+            return self._cached_processed_data
 
-            # Fetch forecast
-            response = requests.get(forecast_url)
-            response.raise_for_status()
-            self.forecast_data = response.json()
+        with self._processing_lock:
+            # Double check after acquiring lock
+            if (self._cached_processed_data and 
+                current_time - self._cache_timestamp < 60):
+                return self._cached_processed_data
 
-            # Process forecast data
-            self._process_forecast_data(self.forecast_data)
-            
-            # Cache the new data
-            cache_data = {
-                'current': self.weather_data,
-                'forecast': self.forecast_data
-            }
-            self.cache_manager.update_cache('weather', cache_data)
-            
-            self.last_update = time.time()
-            print("Weather data updated successfully")
-        except Exception as e:
-            print(f"Error fetching weather data: {e}")
-            # If we have cached data, use it as fallback
-            if cached_data:
-                self.weather_data = cached_data.get('current')
-                self.forecast_data = cached_data.get('forecast')
-                if self.weather_data and self.forecast_data:
-                    self._process_forecast_data(self.forecast_data)
-                    print("Using cached weather data as fallback")
-            else:
-                self.weather_data = None
-                self.forecast_data = None
-
-    def _process_forecast_data(self, forecast_data: Dict[str, Any]) -> None:
-        """Process forecast data into hourly and daily forecasts."""
-        if not forecast_data:
-            return
-
-        # Process hourly forecast (next 5 hours)
-        hourly_list = forecast_data.get('list', [])[:5]  # Changed from 6 to 5 to match image
-        self.hourly_forecast = []
-        
-        for hour_data in hourly_list:
-            dt = datetime.fromtimestamp(hour_data['dt'])
-            temp = round(hour_data['main']['temp'])
-            condition = hour_data['weather'][0]['main']
-            self.hourly_forecast.append({
-                'hour': dt.strftime('%I:00 %p').lstrip('0'),  # Format as "2:00 PM"
-                'temp': temp,
-                'condition': condition
-            })
-
-        # Process daily forecast
-        daily_data = {}
-        full_forecast_list = forecast_data.get('list', []) # Use the full list
-        for item in full_forecast_list: # Iterate over the full list
-            date = datetime.fromtimestamp(item['dt']).strftime('%Y-%m-%d')
-            if date not in daily_data:
-                daily_data[date] = {
-                    'temps': [],
-                    'conditions': [],
-                    'date': datetime.fromtimestamp(item['dt'])
+            try:
+                # Process the data
+                processed_data = {
+                    'current': self._process_current_conditions(data.get('current', {})),
+                    'hourly': self._process_hourly_forecast(data.get('hourly', [])),
+                    'daily': self._process_daily_forecast(data.get('daily', []))
                 }
-            daily_data[date]['temps'].append(item['main']['temp'])
-            daily_data[date]['conditions'].append(item['weather'][0]['main'])
 
-        # Calculate daily summaries, excluding today
-        self.daily_forecast = []
-        today_str = datetime.now().strftime('%Y-%m-%d')
-        
-        # Sort data by date to ensure chronological order
-        sorted_daily_items = sorted(daily_data.items(), key=lambda item: item[1]['date'])
-        
-        # Filter out today's data and take the next 3 days
-        future_days_data = [item for item in sorted_daily_items if item[0] != today_str][:3]
+                # Cache the processed data
+                self._cached_processed_data = processed_data
+                self._cache_timestamp = current_time
+                return processed_data
+            except Exception as e:
+                self.logger.error(f"Error processing forecast data: {e}")
+                return {}
 
-        for date_str, data in future_days_data:
-            temps = data['temps']
-            temp_high = round(max(temps))
-            temp_low = round(min(temps))
-            condition = max(set(data['conditions']), key=data['conditions'].count)
-            
-            self.daily_forecast.append({
-                'date': data['date'].strftime('%a'),  # Day name (Mon, Tue, etc.)
-                'date_str': data['date'].strftime('%m/%d'),  # Date (4/8, 4/9, etc.)
-                'temp_high': temp_high,
-                'temp_low': temp_low,
-                'condition': condition
-            })
+    def _fetch_weather(self) -> Optional[Dict[str, Any]]:
+        """Fetch weather data with optimized caching."""
+        current_time = time.time()
+        
+        # Check if we need to update
+        if current_time - self._last_update < self._update_interval:
+            cached_data = self.cache_manager.get_cached_data('weather')
+            if cached_data:
+                self.logger.info("Using cached weather data")
+                return self._process_forecast_data(cached_data)
+            return None
+
+        try:
+            # Fetch new data
+            data = self._fetch_from_api()
+            if data:
+                self._last_update = current_time
+                self.cache_manager.save_cache('weather', data)
+                return self._process_forecast_data(data)
+        except Exception as e:
+            self.logger.error(f"Error fetching weather data: {e}")
+            # Try to use cached data as fallback
+            cached_data = self.cache_manager.get_cached_data('weather')
+            if cached_data:
+                self.logger.info("Using cached weather data as fallback")
+                return self._process_forecast_data(cached_data)
+        return None
+
+    def _process_current_conditions(self, current: Dict[str, Any]) -> Dict[str, Any]:
+        """Process current conditions with minimal processing."""
+        if not current:
+            return {}
+        
+        return {
+            'temp': current.get('temp', 0),
+            'feels_like': current.get('feels_like', 0),
+            'humidity': current.get('humidity', 0),
+            'wind_speed': current.get('wind_speed', 0),
+            'description': current.get('weather', [{}])[0].get('description', ''),
+            'icon': current.get('weather', [{}])[0].get('icon', '')
+        }
+
+    def _process_hourly_forecast(self, hourly: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Process hourly forecast with minimal processing."""
+        if not hourly:
+            return []
+        
+        return [{
+            'time': hour.get('dt', 0),
+            'temp': hour.get('temp', 0),
+            'description': hour.get('weather', [{}])[0].get('description', ''),
+            'icon': hour.get('weather', [{}])[0].get('icon', '')
+        } for hour in hourly[:24]]  # Only process next 24 hours
+
+    def _process_daily_forecast(self, daily: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Process daily forecast with minimal processing."""
+        if not daily:
+            return []
+        
+        return [{
+            'time': day.get('dt', 0),
+            'temp_min': day.get('temp', {}).get('min', 0),
+            'temp_max': day.get('temp', {}).get('max', 0),
+            'description': day.get('weather', [{}])[0].get('description', ''),
+            'icon': day.get('weather', [{}])[0].get('icon', '')
+        } for day in daily[:7]]  # Only process next 7 days
 
     def get_weather(self) -> Dict[str, Any]:
         """Get current weather data, fetching new data if needed."""
@@ -202,7 +173,7 @@ class WeatherManager:
         
         # Check if we need to update based on time or if we have no data
         if (not self.weather_data or 
-            current_time - self.last_update > update_interval):
+            current_time - self._last_update > update_interval):
             
             # Check if data has changed before fetching
             current_state = self._get_weather_state()
