@@ -51,6 +51,102 @@ class BaseNBAManager:
         self.logger.info(f"Initialized NBA manager with display dimensions: {self.display_width}x{self.display_height}")
         self.logger.info(f"Logo directory: {self.logo_dir}")
 
+    def _load_test_data(self) -> Dict:
+        """Load test data for development and testing."""
+        self.logger.info("[NBA] Loading test data")
+        
+        # Create test data with current time
+        now = datetime.now(timezone.utc)
+        
+        # Create test events for different scenarios
+        events = []
+        
+        # Live game
+        live_game = {
+            "date": now.isoformat(),
+            "competitions": [{
+                "status": {
+                    "type": {
+                        "state": "in",
+                        "shortDetail": "Q3 5:23"
+                    },
+                    "period": 3,
+                    "displayClock": "5:23"
+                },
+                "competitors": [
+                    {
+                        "homeAway": "home",
+                        "team": {"abbreviation": "LAL"},
+                        "score": "85"
+                    },
+                    {
+                        "homeAway": "away",
+                        "team": {"abbreviation": "GSW"},
+                        "score": "82"
+                    }
+                ]
+            }]
+        }
+        events.append(live_game)
+        
+        # Recent game (yesterday)
+        recent_game = {
+            "date": (now - timedelta(days=1)).isoformat(),
+            "competitions": [{
+                "status": {
+                    "type": {
+                        "state": "post",
+                        "shortDetail": "Final"
+                    },
+                    "period": 4,
+                    "displayClock": "0:00"
+                },
+                "competitors": [
+                    {
+                        "homeAway": "home",
+                        "team": {"abbreviation": "BOS"},
+                        "score": "112"
+                    },
+                    {
+                        "homeAway": "away",
+                        "team": {"abbreviation": "MIA"},
+                        "score": "108"
+                    }
+                ]
+            }]
+        }
+        events.append(recent_game)
+        
+        # Upcoming game (tomorrow)
+        upcoming_game = {
+            "date": (now + timedelta(days=1)).isoformat(),
+            "competitions": [{
+                "status": {
+                    "type": {
+                        "state": "pre",
+                        "shortDetail": "7:30 PM ET"
+                    },
+                    "period": 0,
+                    "displayClock": "0:00"
+                },
+                "competitors": [
+                    {
+                        "homeAway": "home",
+                        "team": {"abbreviation": "PHX"},
+                        "score": "0"
+                    },
+                    {
+                        "homeAway": "away",
+                        "team": {"abbreviation": "DEN"},
+                        "score": "0"
+                    }
+                ]
+            }]
+        }
+        events.append(upcoming_game)
+        
+        return {"events": events}
+
     def _load_fonts(self):
         """Load fonts used by the scoreboard."""
         fonts = {}
@@ -351,6 +447,10 @@ class BaseNBAManager:
                 # Draw period and time or Final
                 if game.get("is_final", False):
                     status_text = "Final"
+                    status_width = draw.textlength(status_text, font=self.fonts['time'])
+                    status_x = (self.display_width - status_width) // 2
+                    status_y = 5
+                    draw.text((status_x, status_y), status_text, font=self.fonts['time'], fill=(255, 255, 255))
                 else:
                     period = game.get("period", 0)
                     clock = game.get("clock", "0:00")
@@ -361,13 +461,17 @@ class BaseNBAManager:
                     else:
                         period_text = f"{period}{'st' if period == 1 else 'nd' if period == 2 else 'rd' if period == 3 else 'th'} Q"
                     
-                    status_text = f"{period_text} {clock}"
-                
-                # Calculate position for the status text (centered at the top)
-                status_width = draw.textlength(status_text, font=self.fonts['time'])
-                status_x = (self.display_width - status_width) // 2
-                status_y = 5
-                draw.text((status_x, status_y), status_text, font=self.fonts['time'], fill=(255, 255, 255))
+                    # Draw period text at the top
+                    period_width = draw.textlength(period_text, font=self.fonts['time'])
+                    period_x = (self.display_width - period_width) // 2
+                    period_y = 5
+                    draw.text((period_x, period_y), period_text, font=self.fonts['time'], fill=(255, 255, 255))
+                    
+                    # Draw clock below period
+                    clock_width = draw.textlength(clock, font=self.fonts['time'])
+                    clock_x = (self.display_width - clock_width) // 2
+                    clock_y = period_y + 10  # Position below period
+                    draw.text((clock_x, clock_y), clock, font=self.fonts['time'], fill=(255, 255, 255))
 
             # Display the image
             self.display_manager.image.paste(main_img, (0, 0))
