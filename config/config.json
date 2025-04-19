@@ -34,7 +34,10 @@
             "stock_news": 30,
             "nhl_live": 30,
             "nhl_recent": 20,
-            "nhl_upcoming": 20
+            "nhl_upcoming": 20,
+            "nba_live": 30,
+            "nba_recent": 20,
+            "nba_upcoming": 20
         }
     },
     "clock": {
@@ -80,5 +83,22 @@
             "nhl_upcoming": true
         },
         "live_game_duration": 20
+    },
+    "nba_scoreboard": {
+        "enabled": true,
+        "test_mode": false,
+        "update_interval_seconds": 300,
+        "live_update_interval": 20,
+        "recent_update_interval": 1800,
+        "upcoming_update_interval": 1800,
+        "recent_game_hours": 72,
+        "favorite_teams": ["LAL", "GSW"],
+        "logo_dir": "assets/sports/nba_logos",
+        "display_modes": {
+            "nba_live": true,
+            "nba_recent": true,
+            "nba_upcoming": true
+        },
+        "live_game_duration": 30
     }
 } 
