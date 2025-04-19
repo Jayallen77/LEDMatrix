@@ -305,18 +305,63 @@ class DisplayController:
                 
                 # Check for mode switch
                 if current_time - self.last_switch > self.get_current_duration():
-                    # If there are live games, switch to live mode for the appropriate sport
+                    # If there are live games, check if they involve favorite teams
                     if has_live_games:
-                        self.current_display_mode = f'{sport_type}_live'
-                        logger.info(f"Live games available, switching to {sport_type.upper()} live mode")
+                        if sport_type == 'nhl' and self.nhl_live:
+                            # Check if any live NHL games involve favorite teams
+                            favorite_teams_involved = any(
+                                game["home_abbr"] in self.nhl_favorite_teams or 
+                                game["away_abbr"] in self.nhl_favorite_teams 
+                                for game in self.nhl_live.live_games
+                            )
+                            if favorite_teams_involved:
+                                self.current_display_mode = 'nhl_live'
+                                logger.info("Live NHL games with favorite teams available")
+                            else:
+                                # No favorite teams in live games, check for team rotation
+                                if self._has_team_games('nhl'):
+                                    self._rotate_team_games('nhl')
+                                else:
+                                    # No favorite team games, continue with regular rotation
+                                    self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
+                                    self.current_display_mode = self.available_modes[self.current_mode_index]
+                                    logger.info(f"Switching to: {self.current_display_mode}")
+                                    
+                        elif sport_type == 'nba' and self.nba_live:
+                            # Check if any live NBA games involve favorite teams
+                            favorite_teams_involved = any(
+                                game["home_abbr"] in self.nba_favorite_teams or 
+                                game["away_abbr"] in self.nba_favorite_teams 
+                                for game in self.nba_live.live_games
+                            )
+                            if favorite_teams_involved:
+                                self.current_display_mode = 'nba_live'
+                                logger.info("Live NBA games with favorite teams available")
+                            else:
+                                # No favorite teams in live games, check for team rotation
+                                if self._has_team_games('nba'):
+                                    self._rotate_team_games('nba')
+                                else:
+                                    # No favorite team games, continue with regular rotation
+                                    self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
+                                    self.current_display_mode = self.available_modes[self.current_mode_index]
+                                    logger.info(f"Switching to: {self.current_display_mode}")
                     else:
-                        # Regular rotation for all modes
-                        self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
-                        self.current_display_mode = self.available_modes[self.current_mode_index]
-                        logger.info(f"Switching to: {self.current_display_mode}")
-                        # Force clear when switching modes
-                        self.force_clear = True
+                        # No live games, check for team rotation for both sports
+                        if self._has_team_games('nhl') and not self.in_nhl_rotation:
+                            self._rotate_team_games('nhl')
+                            logger.info("Starting NHL team rotation")
+                        elif self._has_team_games('nba') and not self.in_nba_rotation:
+                            self._rotate_team_games('nba')
+                            logger.info("Starting NBA team rotation")
+                        else:
+                            # No team games to rotate, continue with regular rotation
+                            self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
+                            self.current_display_mode = self.available_modes[self.current_mode_index]
+                            logger.info(f"Switching to: {self.current_display_mode}")
                     
+                    # Force clear when switching modes
+                    self.force_clear = True
                     self.last_switch = current_time
 
                 # Display current mode frame
