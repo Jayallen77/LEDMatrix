@@ -125,13 +125,13 @@ class CacheManager:
                 except:
                     pass
 
-    def get_cached_data(self, key: str) -> Optional[Dict[str, Any]]:
-        """Get cached data with memory cache priority."""
+    def get_cached_data(self, key: str, max_age: int = 60) -> Optional[Dict[str, Any]]:
+        """Get cached data with memory cache priority and max age check."""
         current_time = time.time()
         
         # Check memory cache first
         if key in self._memory_cache:
-            if current_time - self._memory_cache_timestamps.get(key, 0) < 60:  # 1 minute TTL
+            if current_time - self._memory_cache_timestamps.get(key, 0) < max_age:  # Use provided max_age
                 return self._memory_cache[key]
             else:
                 # Clear expired memory cache
@@ -139,7 +139,30 @@ class CacheManager:
                 del self._memory_cache_timestamps[key]
 
         # Fall back to disk cache
-        return self.load_cache(key)
+        cache_path = self._get_cache_path(key)
+        if not os.path.exists(cache_path):
+            return None
+
+        try:
+            with self._cache_lock:
+                with open(cache_path, 'r') as f:
+                    try:
+                        data = json.load(f)
+                        # Check if data is stale
+                        if current_time - data.get('timestamp', 0) > max_age:
+                            return None
+                        # Update memory cache
+                        self._memory_cache[key] = data['data']
+                        self._memory_cache_timestamps[key] = current_time
+                        return data['data']
+                    except json.JSONDecodeError as e:
+                        self.logger.error(f"Error parsing cache file for {key}: {e}")
+                        # If the file is corrupted, remove it
+                        os.remove(cache_path)
+                        return None
+        except Exception as e:
+            self.logger.error(f"Error loading cache for {key}: {e}")
+            return None
 
     def clear_cache(self, key: Optional[str] = None) -> None:
         """Clear cache for a specific key or all keys."""
