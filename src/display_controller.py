@@ -13,25 +13,35 @@ from src.nba_managers import NBALiveManager, NBARecentManager, NBAUpcomingManage
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s:%(name)s:%(message)s',
-    datefmt='%H:%M:%S'
+    format='%(asctime)s.%(msecs)03d - %(levelname)s:%(name)s:%(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
 )
 
 logger = logging.getLogger(__name__)
 
 class DisplayController:
     def __init__(self):
+        start_time = time.time()
+        logger.info("Starting DisplayController initialization")
+        
         self.config_manager = ConfigManager()
         self.config = self.config_manager.load_config()
+        logger.info("Config loaded in %.3f seconds", time.time() - start_time)
+        
+        config_time = time.time()
         self.display_manager = DisplayManager(self.config)
+        logger.info("DisplayManager initialized in %.3f seconds", time.time() - config_time)
         
         # Initialize display modes
+        init_time = time.time()
         self.clock = Clock(self.display_manager) if self.config.get('clock', {}).get('enabled', True) else None
         self.weather = WeatherManager(self.config, self.display_manager) if self.config.get('weather', {}).get('enabled', False) else None
         self.stocks = StockManager(self.config, self.display_manager) if self.config.get('stocks', {}).get('enabled', False) else None
         self.news = StockNewsManager(self.config, self.display_manager) if self.config.get('stock_news', {}).get('enabled', False) else None
+        logger.info("Display modes initialized in %.3f seconds", time.time() - init_time)
         
         # Initialize NHL managers if enabled
+        nhl_time = time.time()
         nhl_enabled = self.config.get('nhl_scoreboard', {}).get('enabled', False)
         nhl_display_modes = self.config.get('nhl_scoreboard', {}).get('display_modes', {})
         
@@ -108,6 +118,7 @@ class DisplayController:
         logger.info(f"Available display modes: {self.available_modes}")
         logger.info(f"NHL Favorite teams: {self.nhl_favorite_teams}")
         logger.info(f"NBA Favorite teams: {self.nba_favorite_teams}")
+        logger.info("NHL managers initialized in %.3f seconds", time.time() - nhl_time)
 
     def get_current_duration(self) -> int:
         """Get the duration for the current display mode."""

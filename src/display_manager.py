@@ -21,12 +21,18 @@ class DisplayManager:
         return cls._instance
 
     def __init__(self, config: Dict[str, Any] = None):
+        start_time = time.time()
         self.config = config or {}
         self._setup_matrix()
+        logger.info("Matrix setup completed in %.3f seconds", time.time() - start_time)
+        
+        font_time = time.time()
         self._load_fonts()
+        logger.info("Font loading completed in %.3f seconds", time.time() - font_time)
         
     def _setup_matrix(self):
         """Initialize the RGB matrix with configuration settings."""
+        setup_start = time.time()
         options = RGBMatrixOptions()
         
         # Hardware configuration
