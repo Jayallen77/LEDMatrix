@@ -452,7 +452,7 @@ class BaseNBAManager:
                 # Calculate position for the score text (centered at the bottom)
                 score_width = draw.textlength(score_text, font=self.fonts['score'])
                 score_x = (self.display_width - score_width) // 2
-                score_y = self.display_height - 15
+                score_y = self.display_height - 20
                 draw.text((score_x, score_y), score_text, font=self.fonts['score'], fill=(255, 255, 255))
 
                 # Draw period and time or Final
@@ -475,7 +475,7 @@ class BaseNBAManager:
                     # Draw period text at the top
                     period_width = draw.textlength(period_text, font=self.fonts['time'])
                     period_x = (self.display_width - period_width) // 2
-                    period_y = 5
+                    period_y = 1
                     draw.text((period_x, period_y), period_text, font=self.fonts['time'], fill=(255, 255, 255))
                     
                     # Draw clock below period
