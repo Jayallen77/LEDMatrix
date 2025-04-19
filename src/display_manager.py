@@ -30,25 +30,36 @@ class DisplayManager:
         options = RGBMatrixOptions()
         
         # Hardware configuration
-        hardware_config = self.config.get('hardware', {})
+        hardware_config = self.config.get('display', {}).get('hardware', {})
+        runtime_config = self.config.get('display', {}).get('runtime', {})
+        
+        # Basic hardware settings
         options.rows = hardware_config.get('rows', 32)
         options.cols = hardware_config.get('cols', 64)
         options.chain_length = hardware_config.get('chain_length', 2)
         options.parallel = hardware_config.get('parallel', 1)
         options.hardware_mapping = hardware_config.get('hardware_mapping', 'adafruit-hat-pwm')
         
-        # Balance performance and stability
-        options.brightness = 75
-        options.pwm_bits = 10  # Increased from 8 for better color depth
-        options.pwm_lsb_nanoseconds = 150  # Increased for better stability
-        options.led_rgb_sequence = 'RGB'
-        options.pixel_mapper_config = ''
-        options.row_address_type = 0
-        options.multiplexing = 0
-        options.disable_hardware_pulsing = False  # Set to True to run without root
-        options.show_refresh_rate = False
-        options.limit_refresh_rate_hz = 90  # Reduced from 120Hz for better stability
-        options.gpio_slowdown = 3  # Increased for better stability
+        # Performance and stability settings
+        options.brightness = hardware_config.get('brightness', 90)
+        options.pwm_bits = hardware_config.get('pwm_bits', 10)
+        options.pwm_lsb_nanoseconds = hardware_config.get('pwm_lsb_nanoseconds', 150)
+        options.led_rgb_sequence = hardware_config.get('led_rgb_sequence', 'RGB')
+        options.pixel_mapper_config = hardware_config.get('pixel_mapper_config', '')
+        options.row_address_type = hardware_config.get('row_address_type', 0)
+        options.multiplexing = hardware_config.get('multiplexing', 0)
+        options.disable_hardware_pulsing = hardware_config.get('disable_hardware_pulsing', False)
+        options.show_refresh_rate = hardware_config.get('show_refresh_rate', False)
+        options.limit_refresh_rate_hz = hardware_config.get('limit_refresh_rate_hz', 90)
+        options.gpio_slowdown = runtime_config.get('gpio_slowdown', 2)
+        
+        # Additional settings from config
+        if 'scan_mode' in hardware_config:
+            options.scan_mode = hardware_config.get('scan_mode')
+        if 'pwm_dither_bits' in hardware_config:
+            options.pwm_dither_bits = hardware_config.get('pwm_dither_bits')
+        if 'inverse_colors' in hardware_config:
+            options.inverse_colors = hardware_config.get('inverse_colors')
         
         # Initialize the matrix
         self.matrix = RGBMatrix(options=options)
