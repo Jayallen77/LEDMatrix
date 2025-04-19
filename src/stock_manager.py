@@ -413,7 +413,7 @@ class StockManager:
         start_y = (height - total_text_height) // 2
         
         # Position text elements centered between logo and chart
-        text_x = width // 4  # Changed from width//6 to width//4 to center between logo and chart
+        text_x = width // 3.5  # Changed from width//6 to width//4 to center between logo and chart
         
         # Draw symbol
         symbol_width = symbol_bbox[2] - symbol_bbox[0]
