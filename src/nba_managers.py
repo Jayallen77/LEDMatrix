@@ -13,6 +13,13 @@ from src.cache_manager import CacheManager
 # Constants
 ESPN_NBA_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
 
+# Configure logging to match main configuration
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s.%(msecs)03d - %(levelname)s:%(name)s:%(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
 class BaseNBAManager:
     """Base class for NBA managers with common functionality."""
     # Class variables for warning tracking
