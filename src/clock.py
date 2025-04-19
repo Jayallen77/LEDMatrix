@@ -6,8 +6,7 @@ from typing import Dict, Any
 from src.config_manager import ConfigManager
 from src.display_manager import DisplayManager
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Get logger without configuring
 logger = logging.getLogger(__name__)
 
 class Clock:

@@ -6,8 +6,12 @@ from src.display_manager import DisplayManager
 from src.font_test_manager import FontTestManager
 from src.config_manager import ConfigManager
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Configure logging to match main application
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s.%(msecs)03d - %(levelname)s:%(name)s:%(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 logger = logging.getLogger(__name__)
 
 def main():

@@ -15,8 +15,7 @@ from .cache_manager import CacheManager
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Get logger without configuring
 logger = logging.getLogger(__name__)
 
 class StockManager:

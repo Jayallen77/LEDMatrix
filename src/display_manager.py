@@ -7,8 +7,7 @@ import math
 from .weather_icons import WeatherIcons
 import os
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Get logger without configuring
 logger = logging.getLogger(__name__)
 
 class DisplayManager:
