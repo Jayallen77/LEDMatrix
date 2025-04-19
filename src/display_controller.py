@@ -83,11 +83,17 @@ class DisplayController:
         self.force_clear = True
         self.update_interval = 0.01  # Reduced from 0.1 to 0.01 for smoother scrolling
         
-        # Track team-based rotation state
-        self.current_team_index = 0
-        self.showing_recent = True  # True for recent, False for upcoming
-        self.favorite_teams = self.config.get('nhl_scoreboard', {}).get('favorite_teams', [])
+        # Track team-based rotation state for NHL
+        self.nhl_current_team_index = 0
+        self.nhl_showing_recent = True  # True for recent, False for upcoming
+        self.nhl_favorite_teams = self.config.get('nhl_scoreboard', {}).get('favorite_teams', [])
         self.in_nhl_rotation = False  # Track if we're in NHL rotation
+        
+        # Track team-based rotation state for NBA
+        self.nba_current_team_index = 0
+        self.nba_showing_recent = True  # True for recent, False for upcoming
+        self.nba_favorite_teams = self.config.get('nba_scoreboard', {}).get('favorite_teams', [])
+        self.in_nba_rotation = False  # Track if we're in NBA rotation
         
         # Update display durations to include NHL and NBA modes
         self.display_durations = self.config['display'].get('display_durations', {
@@ -100,7 +106,8 @@ class DisplayController:
         })
         logger.info("DisplayController initialized with display_manager: %s", id(self.display_manager))
         logger.info(f"Available display modes: {self.available_modes}")
-        logger.info(f"Favorite teams: {self.favorite_teams}")
+        logger.info(f"NHL Favorite teams: {self.nhl_favorite_teams}")
+        logger.info(f"NBA Favorite teams: {self.nba_favorite_teams}")
 
     def get_current_duration(self) -> int:
         """Get the duration for the current display mode."""
@@ -148,40 +155,136 @@ class DisplayController:
             
         return False, None
 
-    def _get_team_games(self, team: str, is_recent: bool = True) -> bool:
-        """Get games for a specific team and update the current game."""
-        if is_recent and self.nhl_recent:
-            # Find recent games for this team
-            for game in self.nhl_recent.games_list:
-                if game["home_abbr"] == team or game["away_abbr"] == team:
-                    self.nhl_recent.current_game = game
-                    return True
-        elif not is_recent and self.nhl_upcoming:
-            # Find upcoming games for this team
-            for game in self.nhl_upcoming.games_list:
-                if game["home_abbr"] == team or game["away_abbr"] == team:
-                    self.nhl_upcoming.current_game = game
-                    return True
+    def _get_team_games(self, team: str, sport: str = 'nhl', is_recent: bool = True) -> bool:
+        """
+        Get games for a specific team and update the current game.
+        Args:
+            team: Team abbreviation
+            sport: 'nhl' or 'nba'
+            is_recent: Whether to look for recent or upcoming games
+        Returns:
+            bool: True if games were found and set
+        """
+        if sport == 'nhl':
+            if is_recent and self.nhl_recent:
+                # Find recent games for this team
+                for game in self.nhl_recent.games_list:
+                    if game["home_abbr"] == team or game["away_abbr"] == team:
+                        self.nhl_recent.current_game = game
+                        return True
+            elif not is_recent and self.nhl_upcoming:
+                # Find upcoming games for this team
+                for game in self.nhl_upcoming.games_list:
+                    if game["home_abbr"] == team or game["away_abbr"] == team:
+                        self.nhl_upcoming.current_game = game
+                        return True
+        elif sport == 'nba':
+            if is_recent and self.nba_recent:
+                # Find recent games for this team
+                for game in self.nba_recent.games_list:
+                    if game["home_abbr"] == team or game["away_abbr"] == team:
+                        self.nba_recent.current_game = game
+                        return True
+            elif not is_recent and self.nba_upcoming:
+                # Find upcoming games for this team
+                for game in self.nba_upcoming.games_list:
+                    if game["home_abbr"] == team or game["away_abbr"] == team:
+                        self.nba_upcoming.current_game = game
+                        return True
         return False
 
-    def _has_team_games(self) -> bool:
-        """Check if there are any games available for favorite teams."""
-        if not self.favorite_teams:
+    def _has_team_games(self, sport: str = 'nhl') -> bool:
+        """
+        Check if there are any games available for favorite teams.
+        Args:
+            sport: 'nhl' or 'nba'
+        Returns:
+            bool: True if games are available
+        """
+        if sport == 'nhl':
+            favorite_teams = self.nhl_favorite_teams
+            recent_manager = self.nhl_recent
+            upcoming_manager = self.nhl_upcoming
+        else:
+            favorite_teams = self.nba_favorite_teams
+            recent_manager = self.nba_recent
+            upcoming_manager = self.nba_upcoming
+            
+        if not favorite_teams:
             return False
             
         # Check recent games
-        if self.nhl_recent and self.nhl_recent.games_list:
-            for game in self.nhl_recent.games_list:
-                if game["home_abbr"] in self.favorite_teams or game["away_abbr"] in self.favorite_teams:
+        if recent_manager and recent_manager.games_list:
+            for game in recent_manager.games_list:
+                if game["home_abbr"] in favorite_teams or game["away_abbr"] in favorite_teams:
                     return True
                     
         # Check upcoming games
-        if self.nhl_upcoming and self.nhl_upcoming.games_list:
-            for game in self.nhl_upcoming.games_list:
-                if game["home_abbr"] in self.favorite_teams or game["away_abbr"] in self.favorite_teams:
+        if upcoming_manager and upcoming_manager.games_list:
+            for game in upcoming_manager.games_list:
+                if game["home_abbr"] in favorite_teams or game["away_abbr"] in favorite_teams:
                     return True
                     
         return False
+
+    def _rotate_team_games(self, sport: str = 'nhl') -> None:
+        """
+        Rotate through games for favorite teams.
+        Args:
+            sport: 'nhl' or 'nba'
+        """
+        if sport == 'nhl':
+            current_team_index = self.nhl_current_team_index
+            showing_recent = self.nhl_showing_recent
+            favorite_teams = self.nhl_favorite_teams
+            in_rotation = self.in_nhl_rotation
+        else:
+            current_team_index = self.nba_current_team_index
+            showing_recent = self.nba_showing_recent
+            favorite_teams = self.nba_favorite_teams
+            in_rotation = self.in_nba_rotation
+            
+        if not favorite_teams:
+            return
+            
+        # Try to find games for current team
+        team = favorite_teams[current_team_index]
+        found_games = self._get_team_games(team, sport, showing_recent)
+        
+        if not found_games:
+            # If no games found for current team, try next team
+            current_team_index = (current_team_index + 1) % len(favorite_teams)
+            if sport == 'nhl':
+                self.nhl_current_team_index = current_team_index
+            else:
+                self.nba_current_team_index = current_team_index
+                
+            # If we've tried all teams, switch between recent and upcoming
+            if current_team_index == 0:
+                if sport == 'nhl':
+                    self.nhl_showing_recent = not self.nhl_showing_recent
+                else:
+                    self.nba_showing_recent = not self.nba_showing_recent
+                showing_recent = not showing_recent
+                
+            # Try again with new team
+            team = favorite_teams[current_team_index]
+            found_games = self._get_team_games(team, sport, showing_recent)
+            
+        if found_games:
+            # Set the appropriate display mode
+            if sport == 'nhl':
+                self.current_display_mode = 'nhl_recent' if showing_recent else 'nhl_upcoming'
+                self.in_nhl_rotation = True
+            else:
+                self.current_display_mode = 'nba_recent' if showing_recent else 'nba_upcoming'
+                self.in_nba_rotation = True
+        else:
+            # No games found for any team, exit rotation
+            if sport == 'nhl':
+                self.in_nhl_rotation = False
+            else:
+                self.in_nba_rotation = False
 
     def run(self):
         """Run the display controller, switching between displays."""
