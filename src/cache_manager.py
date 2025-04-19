@@ -8,6 +8,7 @@ import logging
 import stat
 import threading
 import tempfile
+from pathlib import Path
 
 class DateTimeEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -18,8 +19,14 @@ class DateTimeEncoder(json.JSONEncoder):
 class CacheManager:
     """Manages caching of API responses to reduce API calls."""
     
-    def __init__(self, cache_dir: str = "cache"):
-        self.cache_dir = cache_dir
+    def __init__(self):
+        # Determine the appropriate cache directory
+        if os.geteuid() == 0:  # Running as root/sudo
+            self.cache_dir = "/var/cache/ledmatrix"
+        else:
+            home_dir = os.path.expanduser('~')
+            self.cache_dir = os.path.join(home_dir, '.ledmatrix_cache')
+            
         self._ensure_cache_dir()
         self._memory_cache = {}  # In-memory cache for faster access
         self.logger = logging.getLogger(__name__)
@@ -27,9 +34,17 @@ class CacheManager:
         self._cache_lock = threading.Lock()
         
     def _ensure_cache_dir(self):
-        """Ensure the cache directory exists."""
-        if not os.path.exists(self.cache_dir):
-            os.makedirs(self.cache_dir)
+        """Ensure the cache directory exists with proper permissions."""
+        try:
+            os.makedirs(self.cache_dir, exist_ok=True)
+            # Set permissions to allow both root and the user to access
+            if os.geteuid() == 0:  # Running as root/sudo
+                os.chmod(self.cache_dir, 0o777)  # Full permissions for all users
+        except Exception as e:
+            self.logger.error(f"Failed to create cache directory: {e}")
+            # Fallback to temp directory if we can't create the cache directory
+            self.cache_dir = os.path.join(tempfile.gettempdir(), 'ledmatrix_cache')
+            os.makedirs(self.cache_dir, exist_ok=True)
             
     def _get_cache_path(self, key: str) -> str:
         """Get the path for a cache file."""
