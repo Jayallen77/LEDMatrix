@@ -392,13 +392,13 @@ class BaseNHLManager:
                 # Calculate position for the date text (centered horizontally, below "Next Game")
                 date_width = draw.textlength(game_date, font=self.fonts['time'])
                 date_x = (self.display_width - date_width) // 2
-                date_y = center_y  # Position in center
+                date_y = center_y - 5  # Position in center
                 draw.text((date_x, date_y), game_date, font=self.fonts['time'], fill=(255, 255, 255))
                 
                 # Calculate position for the time text (centered horizontally, in center)
                 time_width = draw.textlength(game_time, font=self.fonts['time'])
                 time_x = (self.display_width - time_width) // 2
-                time_y = date_y + 15  # Position below date
+                time_y = date_y + 5  # Position below date
                 draw.text((time_x, time_y), game_time, font=self.fonts['time'], fill=(255, 255, 255))
             else:
                 # For live/final games, show scores and period/time
