@@ -378,16 +378,21 @@ class BaseNHLManager:
             is_upcoming = game.get("is_upcoming", False)
             
             if is_upcoming:
-                # For upcoming games, show date and time
+                # For upcoming games, show date and time stacked in the center
                 game_date = game.get("game_date", "")
                 game_time = game.get("game_time", "")
-                date_time_text = f"{game_date} {game_time}"
                 
-                # Calculate position for the date/time text (centered at the bottom)
-                date_time_width = draw.textlength(date_time_text, font=self.fonts['time'])
-                date_time_x = (self.display_width - date_time_width) // 2
-                date_time_y = self.display_height - 15
-                draw.text((date_time_x, date_time_y), date_time_text, font=self.fonts['time'], fill=(255, 255, 255))
+                # Calculate position for the date text (centered horizontally, above center)
+                date_width = draw.textlength(game_date, font=self.fonts['time'])
+                date_x = (self.display_width - date_width) // 2
+                date_y = center_y - 15  # Position above center
+                draw.text((date_x, date_y), game_date, font=self.fonts['time'], fill=(255, 255, 255))
+                
+                # Calculate position for the time text (centered horizontally, below center)
+                time_width = draw.textlength(game_time, font=self.fonts['time'])
+                time_x = (self.display_width - time_width) // 2
+                time_y = center_y + 5  # Position below center
+                draw.text((time_x, time_y), game_time, font=self.fonts['time'], fill=(255, 255, 255))
                 
                 # Show "Next Game" at the top
                 status_text = "Next Game"
