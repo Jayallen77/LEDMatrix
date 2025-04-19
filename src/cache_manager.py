@@ -137,8 +137,11 @@ class CacheManager:
     def _has_news_changed(self, cached: Dict[str, Any], new: Dict[str, Any]) -> bool:
         """Check if news data has changed."""
         # Handle both dictionary and list formats
-        if isinstance(cached, list) and isinstance(new, list):
-            # If both are lists, compare their lengths and content
+        if isinstance(new, list):
+            # If new data is a list, cached data should also be a list
+            if not isinstance(cached, list):
+                return True
+            # Compare lengths and content
             if len(cached) != len(new):
                 return True
             # Compare titles since they're unique enough for our purposes
