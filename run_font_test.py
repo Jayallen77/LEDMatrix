@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+import time
+import json
+import logging
+from src.display_manager import DisplayManager
+from src.font_test_manager import FontTestManager
+from src.config_manager import ConfigManager
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def main():
+    """Run the font test display."""
+    try:
+        # Load configuration
+        config_manager = ConfigManager()
+        config = config_manager.load_config()
+        
+        # Initialize display manager
+        display_manager = DisplayManager(config)
+        
+        # Initialize font test manager
+        font_test_manager = FontTestManager(config, display_manager)
+        
+        logger.info("Starting font test display. Press Ctrl+C to exit.")
+        
+        # Run the font test display
+        try:
+            while True:
+                font_test_manager.update()
+                font_test_manager.display()
+                time.sleep(0.1)  # Small delay to prevent CPU hogging
+                
+        except KeyboardInterrupt:
+            logger.info("Font test display stopped by user.")
+        finally:
+            # Clean up
+            display_manager.clear()
+            display_manager.cleanup()
+            
+    except Exception as e:
+        logger.error(f"Error running font test display: {e}", exc_info=True)
+
+if __name__ == "__main__":
+    main() 
