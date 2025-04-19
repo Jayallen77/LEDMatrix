@@ -775,4 +775,25 @@ class NBAUpcomingManager(BaseNBAManager):
             self.logger.error(f"[NBA] Error updating upcoming games: {e}", exc_info=True)
             self.games_list = []
             self.current_game = None
-            self.last_update = current_time 
+            self.last_update = current_time
+
+    def display(self, force_clear=False):
+        """Display upcoming games."""
+        if not self.games_list:
+            self.logger.info("[NBA] No upcoming games to display")
+            self.display_manager.clear()
+            return
+            
+        try:
+            # Draw the scorebug layout
+            self._draw_scorebug_layout(self.current_game, force_clear)
+            
+            # Update display
+            self.display_manager.update_display()
+            
+            # Move to next game
+            self.current_game_index = (self.current_game_index + 1) % len(self.games_list)
+            self.current_game = self.games_list[self.current_game_index]
+            
+        except Exception as e:
+            self.logger.error(f"[NBA] Error displaying upcoming game: {e}", exc_info=True) 
