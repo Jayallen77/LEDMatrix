@@ -1,0 +1,17 @@
+[Unit]
+Description=LED Matrix Display Service
+After=network.target
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=/home/%i/LEDMatrix
+ExecStart=/usr/bin/sudo /usr/bin/python3 /home/%i/LEDMatrix/display_controller.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=ledmatrix
+
+[Install]
+WantedBy=multi-user.target 
