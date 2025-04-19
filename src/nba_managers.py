@@ -35,6 +35,7 @@ class BaseNBAManager:
         self.favorite_teams = self.nba_config.get("favorite_teams", [])
         self.logger = logging.getLogger('NBA')
         self.recent_hours = self.nba_config.get("recent_game_hours", 72)  # Default 72 hours
+        self.cache_manager = CacheManager()  # Create instance of CacheManager
         
         # Set logging level to INFO to reduce noise
         self.logger.setLevel(logging.INFO)
@@ -255,7 +256,7 @@ class BaseNBAManager:
         try:
             # Check cache first
             cache_key = date_str if date_str else 'today'
-            cached_data = CacheManager.get(cache_key, max_age=self.update_interval)
+            cached_data = self.cache_manager.get_cached_data(cache_key, max_age=self.update_interval)
             if cached_data:
                 self.logger.info(f"[NBA] Using cached data for {cache_key}")
                 return cached_data
@@ -267,7 +268,7 @@ class BaseNBAManager:
             self.logger.info(f"[NBA] Successfully fetched data from ESPN API")
             
             # Cache the response
-            CacheManager.set(cache_key, data)
+            self.cache_manager.save_cache(cache_key, data)
             
             # If no date specified, fetch data from multiple days
             if not date_str:
@@ -284,7 +285,7 @@ class BaseNBAManager:
                 for fetch_date in dates_to_fetch:
                     if fetch_date != today.strftime('%Y%m%d'):  # Skip today as we already have it
                         # Check cache for this date
-                        cached_date_data = CacheManager.get(fetch_date, max_age=self.update_interval)
+                        cached_date_data = self.cache_manager.get_cached_data(fetch_date, max_age=self.update_interval)
                         if cached_date_data:
                             self.logger.info(f"[NBA] Using cached data for date {fetch_date}")
                             if "events" in cached_date_data:
@@ -299,7 +300,7 @@ class BaseNBAManager:
                             all_events.extend(date_data["events"])
                             self.logger.info(f"[NBA] Fetched {len(date_data['events'])} events for date {fetch_date}")
                             # Cache the response
-                            CacheManager.set(fetch_date, date_data)
+                            self.cache_manager.save_cache(fetch_date, date_data)
                 
                 # Combine events from all dates
                 if all_events:
