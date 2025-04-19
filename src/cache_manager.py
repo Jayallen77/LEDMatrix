@@ -7,6 +7,12 @@ from typing import Any, Dict, Optional
 import logging
 import stat
 
+class DateTimeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
+
 class CacheManager:
     def __init__(self, cache_dir: str = "cache"):
         self.logger = logging.getLogger(__name__)
@@ -17,8 +23,12 @@ class CacheManager:
         """Ensure the cache directory exists with proper permissions."""
         if not os.path.exists(self.cache_dir):
             try:
+                # If running as root, use /tmp by default
+                if os.geteuid() == 0:
+                    self.cache_dir = os.path.join("/tmp", "ledmatrix_cache")
+                    self.logger.info(f"Running as root, using temporary cache directory: {self.cache_dir}")
                 # Try to create in user's home directory if current directory fails
-                if not os.access(os.getcwd(), os.W_OK):
+                elif not os.access(os.getcwd(), os.W_OK):
                     home_dir = os.path.expanduser("~")
                     self.cache_dir = os.path.join(home_dir, ".ledmatrix_cache")
                     self.logger.info(f"Using cache directory in home: {self.cache_dir}")
@@ -69,7 +79,7 @@ class CacheManager:
             # Create a temporary file first
             temp_path = cache_path + '.tmp'
             with open(temp_path, 'w') as f:
-                json.dump(data, f)
+                json.dump(data, f, cls=DateTimeEncoder)
             
             # Set proper permissions (644 - rw-r--r--)
             os.chmod(temp_path, 0o644)
