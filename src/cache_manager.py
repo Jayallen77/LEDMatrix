@@ -107,7 +107,7 @@ class CacheManager:
 
                 # Then save to disk
                 with open(cache_path, 'w') as f:
-                    json.dump(data, f)
+                    json.dump(data, f, cls=DateTimeEncoder)
         except Exception as e:
             self.logger.error(f"Error saving cache for {key}: {e}")
 
