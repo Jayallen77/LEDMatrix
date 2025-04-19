@@ -113,6 +113,48 @@ The LEDMatrix system includes a robust caching mechanism to optimize API calls a
 - Temporary files are used for safe updates
 - JSON serialization handles all data types including timestamps
 
+## NHL Scoreboard Display
+
+The LEDMatrix system includes a comprehensive NHL scoreboard display system with three display modes:
+
+### Display Modes
+- **Live Games**: Shows currently playing games with live scores and game status
+- **Recent Games**: Displays completed games from the last 48 hours (configurable)
+- **Upcoming Games**: Shows scheduled games for favorite teams
+
+### Features
+- Real-time score updates from ESPN API
+- Team logo display
+- Game status indicators (period, time remaining)
+- Power play and penalty information
+- Configurable favorite teams
+- Automatic game switching
+- Built-in caching to reduce API calls
+- Test mode for development
+
+### Configuration
+In `config.json`, under the `nhl_scoreboard` section:
+```json
+{
+    "nhl_scoreboard": {
+        "enabled": true,
+        "test_mode": false,
+        "update_interval_seconds": 300,
+        "live_update_interval": 60,
+        "recent_update_interval": 1800,
+        "upcoming_update_interval": 1800,
+        "recent_game_hours": 48,
+        "favorite_teams": ["TB", "DAL"],
+        "logo_dir": "assets/sports/nhl_logos",
+        "display_modes": {
+            "nhl_live": true,
+            "nhl_recent": true,
+            "nhl_upcoming": true
+        }
+    }
+}
+```
+
 ### Running without Sudo (Optional)
 
 To run the display script without `sudo`, the user executing the script needs access to GPIO pins. Add the user to the `gpio` group:
