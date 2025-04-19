@@ -720,6 +720,8 @@ class NBAUpcomingManager(BaseNBAManager):
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = 300  # 5 minutes
+        self.last_warning_time = 0
+        self.warning_cooldown = 300  # Only show warning every 5 minutes
         self.logger.info(f"Initialized NBAUpcomingManager with {len(self.favorite_teams)} favorite teams")
         
     def update(self):
@@ -732,8 +734,9 @@ class NBAUpcomingManager(BaseNBAManager):
             # Fetch data from ESPN API
             data = self._fetch_data()
             if not data or 'events' not in data:
-                if self._should_log("no_events", 300):
+                if current_time - self.last_warning_time > self.warning_cooldown:
                     self.logger.warning("[NBA] No events found in ESPN API response")
+                    self.last_warning_time = current_time
                 self.games_list = []
                 self.current_game = None
                 self.last_update = current_time
@@ -747,7 +750,7 @@ class NBAUpcomingManager(BaseNBAManager):
             self.upcoming_games = []
             for event in events:
                 game = self._extract_game_details(event)
-                if game and not game['is_final'] and game['is_within_window']:
+                if game and game['is_upcoming']:  # Only check is_upcoming, not is_within_window
                     self.upcoming_games.append(game)
                     self.logger.debug(f"Processing upcoming game: {game['away_abbr']} vs {game['home_abbr']}")
             
@@ -760,8 +763,9 @@ class NBAUpcomingManager(BaseNBAManager):
                 self.logger.info(f"[NBA] Found {len(team_games)} upcoming games for favorite teams")
             
             if not team_games:
-                if self._should_log("no_games", 300):
+                if current_time - self.last_warning_time > self.warning_cooldown:
                     self.logger.info("[NBA] No upcoming games found for favorite teams")
+                    self.last_warning_time = current_time
                 self.games_list = []
                 self.current_game = None
                 self.last_update = current_time
@@ -780,7 +784,9 @@ class NBAUpcomingManager(BaseNBAManager):
     def display(self, force_clear=False):
         """Display upcoming games."""
         if not self.games_list:
-            self.logger.info("[NBA] No upcoming games to display")
+            if time.time() - self.last_warning_time > self.warning_cooldown:
+                self.logger.info("[NBA] No upcoming games to display")
+                self.last_warning_time = time.time()
             self.display_manager.clear()
             return
             
