@@ -163,7 +163,7 @@ class BaseNBAManager:
         fonts = {}
         try:
             # Try to load the Press Start 2P font first
-            fonts['score'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 12)
+            fonts['score'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 10)
             fonts['time'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
             fonts['team'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
             fonts['status'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6)
