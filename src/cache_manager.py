@@ -20,6 +20,9 @@ class CacheManager:
     """Manages caching of API responses to reduce API calls."""
     
     def __init__(self):
+        # Initialize logger first
+        self.logger = logging.getLogger(__name__)
+        
         # Determine the appropriate cache directory
         if os.geteuid() == 0:  # Running as root/sudo
             self.cache_dir = "/var/cache/ledmatrix"
@@ -27,11 +30,12 @@ class CacheManager:
             home_dir = os.path.expanduser('~')
             self.cache_dir = os.path.join(home_dir, '.ledmatrix_cache')
             
-        self._ensure_cache_dir()
         self._memory_cache = {}  # In-memory cache for faster access
-        self.logger = logging.getLogger(__name__)
         self._memory_cache_timestamps = {}
         self._cache_lock = threading.Lock()
+        
+        # Ensure cache directory exists after logger is initialized
+        self._ensure_cache_dir()
         
     def _ensure_cache_dir(self):
         """Ensure the cache directory exists with proper permissions."""
@@ -44,7 +48,12 @@ class CacheManager:
             self.logger.error(f"Failed to create cache directory: {e}")
             # Fallback to temp directory if we can't create the cache directory
             self.cache_dir = os.path.join(tempfile.gettempdir(), 'ledmatrix_cache')
-            os.makedirs(self.cache_dir, exist_ok=True)
+            try:
+                os.makedirs(self.cache_dir, exist_ok=True)
+                self.logger.info(f"Using fallback cache directory: {self.cache_dir}")
+            except Exception as e:
+                self.logger.error(f"Failed to create fallback cache directory: {e}")
+                raise  # Re-raise if we can't create any cache directory
             
     def _get_cache_path(self, key: str) -> str:
         """Get the path for a cache file."""
