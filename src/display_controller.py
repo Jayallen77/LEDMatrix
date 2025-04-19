@@ -358,18 +358,10 @@ class DisplayController:
                                     self.current_display_mode = self.available_modes[self.current_mode_index]
                                     logger.info(f"Switching to: {self.current_display_mode}")
                     else:
-                        # No live games, check for team rotation for both sports
-                        if self._has_team_games('nhl') and not self.in_nhl_rotation:
-                            self._rotate_team_games('nhl')
-                            logger.info("Starting NHL team rotation")
-                        elif self._has_team_games('nba') and not self.in_nba_rotation:
-                            self._rotate_team_games('nba')
-                            logger.info("Starting NBA team rotation")
-                        else:
-                            # No team games to rotate, continue with regular rotation
-                            self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
-                            self.current_display_mode = self.available_modes[self.current_mode_index]
-                            logger.info(f"Switching to: {self.current_display_mode}")
+                        # No live games, continue with regular rotation
+                        self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
+                        self.current_display_mode = self.available_modes[self.current_mode_index]
+                        logger.info(f"Switching to: {self.current_display_mode}")
                     
                     # Force clear when switching modes
                     self.force_clear = True
