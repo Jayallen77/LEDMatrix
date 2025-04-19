@@ -23,14 +23,15 @@ def main():
         # Initialize font test manager
         font_test_manager = FontTestManager(config, display_manager)
         
-        logger.info("Starting font test display. Press Ctrl+C to exit.")
+        logger.info("Starting static font test display. Press Ctrl+C to exit.")
         
-        # Run the font test display
+        # Display all font sizes at once
+        font_test_manager.display()
+        
+        # Keep the display running until user interrupts
         try:
             while True:
-                font_test_manager.update()
-                font_test_manager.display()
-                time.sleep(0.1)  # Small delay to prevent CPU hogging
+                time.sleep(1)  # Sleep to prevent CPU hogging
                 
         except KeyboardInterrupt:
             logger.info("Font test display stopped by user.")

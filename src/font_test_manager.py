@@ -17,9 +17,6 @@ class FontTestManager:
         self.config = config
         self.font_path = "assets/fonts/PressStart2P-Regular.ttf"
         self.font_sizes = [4, 6, 8, 10, 12, 14, 16, 18]
-        self.current_size_index = 0
-        self.display_duration = 3  # Display each size for 3 seconds
-        self.last_update = 0
         self.logger = logging.getLogger('FontTest')
         
         # Verify font exists
@@ -30,49 +27,50 @@ class FontTestManager:
         self.logger.info(f"Initialized FontTestManager with {len(self.font_sizes)} font sizes to test")
     
     def update(self):
-        """Update the display with the current font size."""
-        current_time = time.time()
-        
-        # Check if it's time to switch to the next font size
-        if current_time - self.last_update >= self.display_duration:
-            self.current_size_index = (self.current_size_index + 1) % len(self.font_sizes)
-            self.last_update = current_time
-            self.logger.info(f"Switching to font size: {self.font_sizes[self.current_size_index]}")
+        """No update needed for static display."""
+        pass
     
     def display(self, force_clear: bool = False):
-        """Display the current font size test."""
+        """Display all font sizes at once across the screen."""
         try:
             # Clear the display
             self.display_manager.clear()
-            
-            # Get current font size
-            current_size = self.font_sizes[self.current_size_index]
-            
-            # Load the font at the current size
-            font = ImageFont.truetype(self.font_path, current_size)
-            
-            # Create text to display (the size number)
-            text = str(current_size)
             
             # Get display dimensions
             width = self.display_manager.matrix.width
             height = self.display_manager.matrix.height
             
-            # Get text dimensions
+            # Calculate spacing between font sizes
+            total_sizes = len(self.font_sizes)
+            spacing = width // (total_sizes + 1)  # Add 1 to account for edges
+            
+            # Draw each font size
             draw = ImageDraw.Draw(self.display_manager.image)
-            bbox = draw.textbbox((0, 0), text, font=font)
-            text_width = bbox[2] - bbox[0]
-            text_height = bbox[3] - bbox[1]
             
-            # Calculate position to center the text
-            x = (width - text_width) // 2
-            y = (height - text_height) // 2
+            for i, size in enumerate(self.font_sizes):
+                # Load the font at the current size
+                font = ImageFont.truetype(self.font_path, size)
+                
+                # Create text to display (the size number)
+                text = str(size)
+                
+                # Get text dimensions
+                bbox = draw.textbbox((0, 0), text, font=font)
+                text_width = bbox[2] - bbox[0]
+                text_height = bbox[3] - bbox[1]
+                
+                # Calculate position to center the text horizontally and vertically
+                x = spacing * (i + 1) - (text_width // 2)
+                y = (height - text_height) // 2
+                
+                # Draw the text
+                draw.text((x, y), text, font=font, fill=(255, 255, 255))
             
-            # Draw the text
-            draw.text((x, y), text, font=font, fill=(255, 255, 255))
-            
-            # Update the display
+            # Update the display once
             self.display_manager.update_display()
+            
+            # Log that display is complete
+            self.logger.info("Font size test display complete. All sizes shown at once.")
             
         except Exception as e:
             self.logger.error(f"Error displaying font test: {e}", exc_info=True) 
