@@ -8,6 +8,7 @@ from src.config_manager import ConfigManager
 from src.stock_manager import StockManager
 from src.stock_news_manager import StockNewsManager
 from src.nhl_managers import NHLLiveManager, NHLRecentManager, NHLUpcomingManager
+from src.nba_managers import NBALiveManager, NBARecentManager, NBAUpcomingManager
 
 # Configure logging
 logging.basicConfig(
@@ -42,6 +43,19 @@ class DisplayController:
             self.nhl_live = None
             self.nhl_recent = None
             self.nhl_upcoming = None
+            
+        # Initialize NBA managers if enabled
+        nba_enabled = self.config.get('nba_scoreboard', {}).get('enabled', False)
+        nba_display_modes = self.config.get('nba_scoreboard', {}).get('display_modes', {})
+        
+        if nba_enabled:
+            self.nba_live = NBALiveManager(self.config, self.display_manager) if nba_display_modes.get('nba_live', True) else None
+            self.nba_recent = NBARecentManager(self.config, self.display_manager) if nba_display_modes.get('nba_recent', True) else None
+            self.nba_upcoming = NBAUpcomingManager(self.config, self.display_manager) if nba_display_modes.get('nba_upcoming', True) else None
+        else:
+            self.nba_live = None
+            self.nba_recent = None
+            self.nba_upcoming = None
         
         # List of available display modes (adjust order as desired)
         self.available_modes = []
@@ -56,6 +70,12 @@ class DisplayController:
             if self.nhl_upcoming: self.available_modes.append('nhl_upcoming')
             # nhl_live is handled separately when live games are available
         
+        # Add NBA display modes if enabled
+        if nba_enabled:
+            if self.nba_recent: self.available_modes.append('nba_recent')
+            if self.nba_upcoming: self.available_modes.append('nba_upcoming')
+            # nba_live is handled separately when live games are available
+        
         # Set initial display to first available mode (clock)
         self.current_mode_index = 0
         self.current_display_mode = self.available_modes[0] if self.available_modes else 'none'
@@ -69,7 +89,7 @@ class DisplayController:
         self.favorite_teams = self.config.get('nhl_scoreboard', {}).get('favorite_teams', [])
         self.in_nhl_rotation = False  # Track if we're in NHL rotation
         
-        # Update display durations to include NHL modes
+        # Update display durations to include NHL and NBA modes
         self.display_durations = self.config['display'].get('display_durations', {
             'clock': 15,
             'weather_current': 15,
@@ -105,12 +125,28 @@ class DisplayController:
         if self.nhl_live: self.nhl_live.update()
         if self.nhl_recent: self.nhl_recent.update()
         if self.nhl_upcoming: self.nhl_upcoming.update()
+        
+        # Update NBA managers
+        if self.nba_live: self.nba_live.update()
+        if self.nba_recent: self.nba_recent.update()
+        if self.nba_upcoming: self.nba_upcoming.update()
 
-    def _check_live_games(self) -> bool:
-        """Check if there are any live games available."""
-        if not self.nhl_live:
-            return False
-        return bool(self.nhl_live.live_games)
+    def _check_live_games(self) -> tuple[bool, str]:
+        """
+        Check if there are any live games available.
+        Returns:
+            tuple[bool, str]: (has_live_games, sport_type)
+            sport_type will be 'nhl' or 'nba' or None
+        """
+        # Check NHL live games
+        if self.nhl_live and self.nhl_live.live_games:
+            return True, 'nhl'
+            
+        # Check NBA live games
+        if self.nba_live and self.nba_live.live_games:
+            return True, 'nba'
+            
+        return False, None
 
     def _get_team_games(self, team: str, is_recent: bool = True) -> bool:
         """Get games for a specific team and update the current game."""
@@ -162,14 +198,14 @@ class DisplayController:
                 self._update_modules()
                 
                 # Check for live games
-                has_live_games = self._check_live_games()
+                has_live_games, sport_type = self._check_live_games()
                 
                 # Check for mode switch
                 if current_time - self.last_switch > self.get_current_duration():
-                    # If there are live games, switch to live mode
+                    # If there are live games, switch to live mode for the appropriate sport
                     if has_live_games:
-                        self.current_display_mode = 'nhl_live'
-                        logger.info("Live games available, switching to NHL live mode")
+                        self.current_display_mode = f'{sport_type}_live'
+                        logger.info(f"Live games available, switching to {sport_type.upper()} live mode")
                     else:
                         # Regular rotation for all modes
                         self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
@@ -201,6 +237,13 @@ class DisplayController:
                         self.nhl_recent.display(force_clear=self.force_clear)
                     elif self.current_display_mode == 'nhl_upcoming' and self.nhl_upcoming:
                         self.nhl_upcoming.display(force_clear=self.force_clear)
+                        
+                    elif self.current_display_mode == 'nba_live' and self.nba_live:
+                        self.nba_live.display(force_clear=self.force_clear)
+                    elif self.current_display_mode == 'nba_recent' and self.nba_recent:
+                        self.nba_recent.display(force_clear=self.force_clear)
+                    elif self.current_display_mode == 'nba_upcoming' and self.nba_upcoming:
+                        self.nba_upcoming.display(force_clear=self.force_clear)
                         
                     elif self.current_display_mode == 'stock_news' and self.news:
                         self.news.display_news()

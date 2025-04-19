@@ -405,19 +405,19 @@ class NBALiveManager(BaseNBAManager):
         # Initialize with test game only if test mode is enabled
         if self.test_mode:
             self.current_game = {
-                "home_abbr": "LAL",
-                "away_abbr": "GSW",
+                "home_abbr": "DAL",
+                "away_abbr": "ATL",
                 "home_score": "105",
                 "away_score": "98",
                 "period": 4,
                 "clock": "2:34",
-                "home_logo_path": os.path.join(self.logo_dir, "LAL.png"),
-                "away_logo_path": os.path.join(self.logo_dir, "GSW.png"),
+                "home_logo_path": os.path.join(self.logo_dir, "DAL.png"),
+                "away_logo_path": os.path.join(self.logo_dir, "ATL.png"),
                 "game_time": "7:30 PM",
                 "game_date": "Apr 17"
             }
             self.live_games = [self.current_game]
-            logging.info("[NBA] Initialized NBALiveManager with test game: GSW vs LAL")
+            logging.info("[NBA] Initialized NBALiveManager with test game: ATL vs DAL")
         else:
             logging.info("[NBA] Initialized NBALiveManager in live mode")
 
