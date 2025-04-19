@@ -11,19 +11,19 @@
             "cols": 64,
             "chain_length": 2,
             "parallel": 1,
-            "brightness": 70,
+            "brightness": 85,
             "hardware_mapping": "adafruit-hat-pwm",
             "scan_mode": 0,
             "pwm_bits": 9,
-            "pwm_dither_bits": 0,
-            "pwm_lsb_nanoseconds": 200,
+            "pwm_dither_bits": 1,
+            "pwm_lsb_nanoseconds": 130,
             "disable_hardware_pulsing": false,
             "inverse_colors": false,
             "show_refresh_rate": false,
             "limit_refresh_rate_hz": 120
         },
         "runtime": {
-            "gpio_slowdown": 4
+            "gpio_slowdown": 3
         },
         "display_durations": {
             "clock": 15,
