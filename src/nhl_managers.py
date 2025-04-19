@@ -91,6 +91,7 @@ class BaseNHLManager:
         self.favorite_teams = self.nhl_config.get("favorite_teams", [])
         self.logger = logging.getLogger('NHL')
         self.recent_hours = self.nhl_config.get("recent_game_hours", 48)  # Default 48 hours
+        self.cache_manager = CacheManager()  # Initialize cache manager
         
         # Set logging level to INFO to reduce noise
         self.logger.setLevel(logging.INFO)
