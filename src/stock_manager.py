@@ -11,6 +11,7 @@ import re
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import hashlib
+from .cache_manager import CacheManager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -27,6 +28,7 @@ class StockManager:
         self.scroll_position = 0
         self.cached_text_image = None
         self.cached_text = None
+        self.cache_manager = CacheManager()
         
         # Get scroll settings from config with faster defaults
         self.scroll_speed = self.stocks_config.get('scroll_speed', 1)
@@ -125,6 +127,12 @@ class StockManager:
         
     def _fetch_stock_data(self, symbol: str) -> Dict[str, Any]:
         """Fetch stock data from Yahoo Finance public API."""
+        # Try to get cached data first
+        cached_data = self.cache_manager.get_cached_data('stocks')
+        if cached_data and symbol in cached_data:
+            logger.info(f"Using cached data for {symbol}")
+            return cached_data[symbol]
+
         try:
             # Use Yahoo Finance query1 API for chart data
             encoded_symbol = urllib.parse.quote(symbol)
@@ -174,7 +182,7 @@ class StockManager:
             
             logger.debug(f"Processed data for {symbol}: price={current_price}, change={change_pct}%")
             
-            return {
+            stock_data = {
                 "symbol": symbol,
                 "name": name,
                 "price": current_price,
@@ -183,8 +191,20 @@ class StockManager:
                 "price_history": price_history
             }
             
+            # Cache the new data
+            if cached_data is None:
+                cached_data = {}
+            cached_data[symbol] = stock_data
+            self.cache_manager.update_cache('stocks', cached_data)
+            
+            return stock_data
+            
         except requests.exceptions.RequestException as e:
             logger.error(f"Network error fetching data for {symbol}: {e}")
+            # Try to use cached data as fallback
+            if cached_data and symbol in cached_data:
+                logger.info(f"Using cached data as fallback for {symbol}")
+                return cached_data[symbol]
             return None
         except (ValueError, IndexError, KeyError) as e:
             logger.error(f"Error parsing data for {symbol}: {e}")
@@ -264,47 +284,42 @@ class StockManager:
             logger.info(f"Stock symbols changed. New symbols: {new_symbols}")
 
     def update_stock_data(self):
-        """Update stock data if enough time has passed."""
+        """Update stock data for all configured symbols."""
         current_time = time.time()
-        update_interval = self.stocks_config.get('update_interval', 60)
+        update_interval = self.stocks_config.get('update_interval', 300)
         
-        # If not enough time has passed, keep using existing data
-        if current_time - self.last_update < update_interval + random.uniform(0, 2):
-            return
+        # Check if we need to update based on time
+        if current_time - self.last_update > update_interval:
+            symbols = self.stocks_config.get('symbols', [])
+            if not symbols:
+                logger.warning("No stock symbols configured")
+                return
 
-        # Reload config to check for symbol changes
-        self._reload_config()
+            # Get cached data
+            cached_data = self.cache_manager.get_cached_data('stocks')
             
-        # Get symbols from config
-        symbols = self.stocks_config.get('symbols', [])
-        if not symbols:
-            logger.warning("No stock symbols configured")
-            return
-            
-        # If symbols is a list of strings, convert to list of dicts
-        if isinstance(symbols[0], str):
-            symbols = [{"symbol": symbol} for symbol in symbols]
-            
-        # Create temporary storage for new data
-        new_data = {}
-        success = False
-        
-        for stock in symbols:
-            symbol = stock['symbol']
-            # Add a small delay between requests to avoid rate limiting
-            time.sleep(random.uniform(0.1, 0.3))  # Reduced delay
-            data = self._fetch_stock_data(symbol)
-            if data:
-                new_data[symbol] = data
-                success = True
-                logger.info(f"Updated {symbol}: ${data['price']:.2f} ({data['change']:+.2f}%)")
-                
-        if success:
-            # Only update the displayed data when we have new data
-            self.stock_data.update(new_data)
+            # Check if market is open
+            if cached_data and not self.cache_manager._is_market_open():
+                logger.info("Market is closed, using cached data")
+                self.stock_data = cached_data
+                self.last_update = current_time
+                return
+
+            # Update each symbol
+            for symbol in symbols:
+                # Check if data has changed before fetching
+                if cached_data and symbol in cached_data:
+                    current_state = cached_data[symbol]
+                    if not self.cache_manager.has_data_changed('stocks', current_state):
+                        logger.info(f"Stock data hasn't changed for {symbol}, using existing data")
+                        self.stock_data[symbol] = current_state
+                        continue
+
+                data = self._fetch_stock_data(symbol)
+                if data:
+                    self.stock_data[symbol] = data
+
             self.last_update = current_time
-        else:
-            logger.error("Failed to fetch data for any configured stocks")
 
     def _get_stock_logo(self, symbol: str) -> Image.Image:
         """Get stock logo image from local ticker icons directory.

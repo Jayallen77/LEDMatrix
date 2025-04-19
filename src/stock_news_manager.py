@@ -10,6 +10,7 @@ import urllib.parse
 import re
 from src.config_manager import ConfigManager
 from PIL import Image, ImageDraw
+from .cache_manager import CacheManager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -28,7 +29,7 @@ class StockNewsManager:
         self.scroll_position = 0
         self.cached_text_image = None  # Cache for the text image
         self.cached_text = None  # Cache for the text string
-
+        self.cache_manager = CacheManager()
         
         # Get scroll settings from config with faster defaults
         self.scroll_speed = self.stock_news_config.get('scroll_speed', 1)
@@ -51,6 +52,12 @@ class StockNewsManager:
         
     def _fetch_news_for_symbol(self, symbol: str) -> List[Dict[str, Any]]:
         """Fetch news headlines for a stock symbol."""
+        # Try to get cached data first
+        cached_data = self.cache_manager.get_cached_data('stock_news')
+        if cached_data and symbol in cached_data:
+            logger.info(f"Using cached news data for {symbol}")
+            return cached_data[symbol]
+
         try:
             # Using Yahoo Finance API to get news
             encoded_symbol = urllib.parse.quote(symbol)
@@ -75,10 +82,21 @@ class StockNewsManager:
                 })
                 
             logger.info(f"Fetched {len(formatted_news)} news items for {symbol}")
+
+            # Cache the new data
+            if cached_data is None:
+                cached_data = {}
+            cached_data[symbol] = formatted_news
+            self.cache_manager.update_cache('stock_news', cached_data)
+            
             return formatted_news
             
         except requests.exceptions.RequestException as e:
             logger.error(f"Network error fetching news for {symbol}: {e}")
+            # Try to use cached data as fallback
+            if cached_data and symbol in cached_data:
+                logger.info(f"Using cached news data as fallback for {symbol}")
+                return cached_data[symbol]
             return []
         except (ValueError, IndexError, KeyError) as e:
             logger.error(f"Error parsing news data for {symbol}: {e}")
@@ -90,37 +108,46 @@ class StockNewsManager:
     def update_news_data(self):
         """Update news data for all configured stock symbols."""
         current_time = time.time()
-        update_interval = self.stock_news_config.get('update_interval', 300)  # Default to 5 minutes
+        update_interval = self.stock_news_config.get('update_interval', 300)
         
-        # If not enough time has passed, keep using existing data
-        if current_time - self.last_update < update_interval:
-            return
+        # Check if we need to update based on time
+        if current_time - self.last_update > update_interval:
+            symbols = self.stocks_config.get('symbols', [])
+            if not symbols:
+                logger.warning("No stock symbols configured for news")
+                return
+
+            # Get cached data
+            cached_data = self.cache_manager.get_cached_data('stock_news')
             
-        # Get symbols from config
-        symbols = self.stocks_config.get('symbols', [])
-        if not symbols:
-            logger.warning("No stock symbols configured for news")
-            return
+            # Update each symbol
+            new_data = {}
+            success = False
             
-        # Create temporary storage for new data
-        new_data = {}
-        success = False
-        
-        for symbol in symbols:
-            # Add a small delay between requests to avoid rate limiting
-            time.sleep(random.uniform(0.1, 0.3))
-            news_items = self._fetch_news_for_symbol(symbol)
-            if news_items:
-                new_data[symbol] = news_items
-                success = True
-                
-        if success:
-            # Only update the displayed data when we have new data
-            self.news_data = new_data
-            self.last_update = current_time
-            logger.info(f"Updated news data for {len(new_data)} symbols")
-        else:
-            logger.error("Failed to fetch news for any configured stocks")
+            for symbol in symbols:
+                # Check if data has changed before fetching
+                if cached_data and symbol in cached_data:
+                    current_state = cached_data[symbol]
+                    if not self.cache_manager.has_data_changed('stock_news', current_state):
+                        logger.info(f"News data hasn't changed for {symbol}, using existing data")
+                        new_data[symbol] = current_state
+                        success = True
+                        continue
+
+                # Add a small delay between requests to avoid rate limiting
+                time.sleep(random.uniform(0.1, 0.3))
+                news_items = self._fetch_news_for_symbol(symbol)
+                if news_items:
+                    new_data[symbol] = news_items
+                    success = True
+                    
+            if success:
+                # Only update the displayed data when we have new data
+                self.news_data = new_data
+                self.last_update = current_time
+                logger.info(f"Updated news data for {len(new_data)} symbols")
+            else:
+                logger.error("Failed to fetch news for any configured stocks")
             
     def _create_text_image(self, text: str, color: Tuple[int, int, int] = (255, 255, 255)) -> Image.Image:
         """Create an image containing the text for efficient scrolling."""

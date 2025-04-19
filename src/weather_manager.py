@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Dict, Any, List
 from PIL import Image, ImageDraw
 from .weather_icons import WeatherIcons
+from .cache_manager import CacheManager
 
 class WeatherManager:
     # Weather condition to larger colored icons (we'll use these as placeholders until you provide custom ones)
@@ -36,6 +37,7 @@ class WeatherManager:
         self.hourly_forecast = None
         self.daily_forecast = None
         self.last_draw_time = 0
+        self.cache_manager = CacheManager()
         # Layout constants
         self.PADDING = 1
         self.ICON_SIZE = {
@@ -64,6 +66,17 @@ class WeatherManager:
         if not api_key:
             print("No API key configured for weather")
             return
+
+        # Try to get cached data first
+        cached_data = self.cache_manager.get_cached_data('weather')
+        if cached_data:
+            self.weather_data = cached_data.get('current')
+            self.forecast_data = cached_data.get('forecast')
+            if self.weather_data and self.forecast_data:
+                self._process_forecast_data(self.forecast_data)
+                self.last_update = time.time()
+                print("Using cached weather data")
+                return
 
         city = self.location['city']
         state = self.location['state']
@@ -103,12 +116,27 @@ class WeatherManager:
             # Process forecast data
             self._process_forecast_data(self.forecast_data)
             
+            # Cache the new data
+            cache_data = {
+                'current': self.weather_data,
+                'forecast': self.forecast_data
+            }
+            self.cache_manager.update_cache('weather', cache_data)
+            
             self.last_update = time.time()
             print("Weather data updated successfully")
         except Exception as e:
             print(f"Error fetching weather data: {e}")
-            self.weather_data = None
-            self.forecast_data = None
+            # If we have cached data, use it as fallback
+            if cached_data:
+                self.weather_data = cached_data.get('current')
+                self.forecast_data = cached_data.get('forecast')
+                if self.weather_data and self.forecast_data:
+                    self._process_forecast_data(self.forecast_data)
+                    print("Using cached weather data as fallback")
+            else:
+                self.weather_data = None
+                self.forecast_data = None
 
     def _process_forecast_data(self, forecast_data: Dict[str, Any]) -> None:
         """Process forecast data into hourly and daily forecasts."""
@@ -170,9 +198,20 @@ class WeatherManager:
     def get_weather(self) -> Dict[str, Any]:
         """Get current weather data, fetching new data if needed."""
         current_time = time.time()
+        update_interval = self.weather_config.get('update_interval', 300)
+        
+        # Check if we need to update based on time or if we have no data
         if (not self.weather_data or 
-            current_time - self.last_update > self.weather_config.get('update_interval', 300)):
+            current_time - self.last_update > update_interval):
+            
+            # Check if data has changed before fetching
+            current_state = self._get_weather_state()
+            if current_state and not self.cache_manager.has_data_changed('weather', current_state):
+                print("Weather data hasn't changed, using existing data")
+                return self.weather_data
+                
             self._fetch_weather()
+            
         return self.weather_data
 
     def _get_weather_state(self) -> Dict[str, Any]:
