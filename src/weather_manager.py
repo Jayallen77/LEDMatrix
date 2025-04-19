@@ -401,7 +401,7 @@ class WeatherManager:
                 draw.text((center_x - hour_width // 2, 1),
                          hour_text,
                          font=self.display_manager.small_font,
-                         fill=self.COLORS['dim'])
+                         fill=self.COLORS['text'])
                 
                 # Draw weather icon centered vertically between top/bottom text
                 icon_size = self.ICON_SIZE['large'] # Changed from medium to large (28)
@@ -471,7 +471,7 @@ class WeatherManager:
                     draw.text((center_x - day_width // 2, 1),
                              day_text,
                              font=self.display_manager.small_font,
-                             fill=self.COLORS['extra_dim'])
+                             fill=self.COLORS['text'])
                     
                     # Draw weather icon centered vertically between top/bottom text
                     icon_size = self.ICON_SIZE['large'] # Changed from medium to large (28)
