@@ -12,6 +12,8 @@ from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import hashlib
 from .cache_manager import CacheManager
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -58,6 +60,18 @@ class StockManager:
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
+        
+        # Set up session with retry logic
+        self.session = requests.Session()
+        retry_strategy = Retry(
+            total=3,  # number of retries
+            backoff_factor=0.5,  # wait 0.5, 1, 2 seconds between retries
+            status_forcelist=[500, 502, 503, 504],  # HTTP status codes to retry on
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
+        
         # Initialize with first update
         self.update_stock_data()
         
@@ -142,7 +156,15 @@ class StockManager:
                 'range': '1d'      # 1 day of data
             }
             
-            response = requests.get(url, headers=self.headers, params=params, timeout=5)
+            # Use session with retry logic
+            response = self.session.get(
+                url,
+                headers=self.headers,
+                params=params,
+                timeout=10,  # Increased timeout
+                verify=True  # Enable SSL verification
+            )
+            
             if response.status_code != 200:
                 logger.error(f"Failed to fetch data for {symbol}: HTTP {response.status_code}")
                 return None
@@ -199,6 +221,13 @@ class StockManager:
             
             return stock_data
             
+        except requests.exceptions.SSLError as e:
+            logger.error(f"SSL error fetching data for {symbol}: {e}")
+            # Try to use cached data as fallback
+            if cached_data and symbol in cached_data:
+                logger.info(f"Using cached data as fallback for {symbol} after SSL error")
+                return cached_data[symbol]
+            return None
         except requests.exceptions.RequestException as e:
             logger.error(f"Network error fetching data for {symbol}: {e}")
             # Try to use cached data as fallback

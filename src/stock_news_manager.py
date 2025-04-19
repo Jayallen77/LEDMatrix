@@ -11,6 +11,8 @@ import re
 from src.config_manager import ConfigManager
 from PIL import Image, ImageDraw
 from .cache_manager import CacheManager
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -47,23 +49,48 @@ class StockNewsManager:
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
+        
+        # Set up session with retry logic
+        self.session = requests.Session()
+        retry_strategy = Retry(
+            total=3,  # number of retries
+            backoff_factor=0.5,  # wait 0.5, 1, 2 seconds between retries
+            status_forcelist=[500, 502, 503, 504],  # HTTP status codes to retry on
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
+        
         # Initialize with first update
         self.update_news_data()
         
-    def _fetch_news_for_symbol(self, symbol: str) -> List[Dict[str, Any]]:
-        """Fetch news headlines for a stock symbol."""
-        # Try to get cached data first
-        cached_data = self.cache_manager.get_cached_data('stock_news')
-        if cached_data and symbol in cached_data:
-            logger.info(f"Using cached news data for {symbol}")
-            return cached_data[symbol]
-
+    def _fetch_news(self, symbol: str) -> List[Dict[str, Any]]:
+        """Fetch news data for a stock from Yahoo Finance."""
         try:
-            # Using Yahoo Finance API to get news
-            encoded_symbol = urllib.parse.quote(symbol)
-            url = f"https://query1.finance.yahoo.com/v1/finance/search?q={encoded_symbol}&lang=en-US&region=US&quotesCount=0&newsCount={self.stock_news_config.get('max_headlines_per_symbol', 5)}"
+            # Use Yahoo Finance query1 API for news data
+            url = f"https://query1.finance.yahoo.com/v1/finance/search"
+            params = {
+                'q': symbol,
+                'lang': 'en-US',
+                'region': 'US',
+                'quotesCount': 0,
+                'newsCount': 10,
+                'enableFuzzyQuery': False,
+                'quotesQueryId': 'tss_match_phrase_query',
+                'multiQuoteQueryId': 'multi_quote_single_token_query',
+                'newsQueryId': 'news_cie_vespa',
+                'enableCb': True,
+            }
             
-            response = requests.get(url, headers=self.headers, timeout=5)
+            # Use session with retry logic
+            response = self.session.get(
+                url,
+                headers=self.headers,
+                params=params,
+                timeout=10,  # Increased timeout
+                verify=True  # Enable SSL verification
+            )
+            
             if response.status_code != 200:
                 logger.error(f"Failed to fetch news for {symbol}: HTTP {response.status_code}")
                 return []
@@ -71,34 +98,30 @@ class StockNewsManager:
             data = response.json()
             news_items = data.get('news', [])
             
-            # Process and format news items
-            formatted_news = []
+            processed_news = []
             for item in news_items:
-                formatted_news.append({
-                    "title": item.get('title', ''),
-                    "publisher": item.get('publisher', ''),
-                    "link": item.get('link', ''),
-                    "published": item.get('providerPublishTime', 0)
-                })
-                
-            logger.info(f"Fetched {len(formatted_news)} news items for {symbol}")
-
-            # Cache the new data
-            if cached_data is None:
-                cached_data = {}
-            cached_data[symbol] = formatted_news
-            self.cache_manager.update_cache('stock_news', cached_data)
+                try:
+                    processed_news.append({
+                        'title': item.get('title', ''),
+                        'link': item.get('link', ''),
+                        'publisher': item.get('publisher', ''),
+                        'published': datetime.fromtimestamp(item.get('providerPublishTime', 0)),
+                        'summary': item.get('summary', '')
+                    })
+                except (ValueError, TypeError) as e:
+                    logger.error(f"Error processing news item for {symbol}: {e}")
+                    continue
             
-            return formatted_news
+            logger.debug(f"Fetched {len(processed_news)} news items for {symbol}")
+            return processed_news
             
+        except requests.exceptions.SSLError as e:
+            logger.error(f"SSL error fetching news for {symbol}: {e}")
+            return []
         except requests.exceptions.RequestException as e:
             logger.error(f"Network error fetching news for {symbol}: {e}")
-            # Try to use cached data as fallback
-            if cached_data and symbol in cached_data:
-                logger.info(f"Using cached news data as fallback for {symbol}")
-                return cached_data[symbol]
             return []
-        except (ValueError, IndexError, KeyError) as e:
+        except (ValueError, KeyError) as e:
             logger.error(f"Error parsing news data for {symbol}: {e}")
             return []
         except Exception as e:
@@ -136,7 +159,7 @@ class StockNewsManager:
 
                 # Add a small delay between requests to avoid rate limiting
                 time.sleep(random.uniform(0.1, 0.3))
-                news_items = self._fetch_news_for_symbol(symbol)
+                news_items = self._fetch_news(symbol)
                 if news_items:
                     new_data[symbol] = news_items
                     success = True
