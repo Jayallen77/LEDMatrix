@@ -10,13 +10,7 @@ from src.stock_news_manager import StockNewsManager
 from src.nhl_managers import NHLLiveManager, NHLRecentManager, NHLUpcomingManager
 from src.nba_managers import NBALiveManager, NBARecentManager, NBAUpcomingManager
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s.%(msecs)03d - %(levelname)s:%(name)s:%(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-
+# Get logger without configuring
 logger = logging.getLogger(__name__)
 
 class DisplayController:
