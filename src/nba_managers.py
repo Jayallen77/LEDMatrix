@@ -656,6 +656,9 @@ class NBARecentManager(BaseNBAManager):
                 self.logger.info(f"[NBA] Found {len(team_games)} recent games for favorite teams")
                 if not team_games:
                     self.logger.info("[NBA] No recent games found for favorite teams")
+                    self.games_list = []
+                    self.current_game = None
+                    self.last_update = current_time
                     return
                 
             self.games_list = team_games
@@ -664,6 +667,8 @@ class NBARecentManager(BaseNBAManager):
             
         except Exception as e:
             self.logger.error(f"[NBA] Error updating recent games: {e}", exc_info=True)
+            self.games_list = []
+            self.current_game = None
 
     def display(self, force_clear=False):
         """Display recent games."""
@@ -737,6 +742,9 @@ class NBAUpcomingManager(BaseNBAManager):
                 self.logger.info(f"[NBA] Found {len(team_games)} upcoming games for favorite teams")
                 if not team_games:
                     self.logger.info("[NBA] No upcoming games found for favorite teams")
+                    self.games_list = []
+                    self.current_game = None
+                    self.last_update = current_time
                     return
                 
             self.games_list = team_games
@@ -745,24 +753,5 @@ class NBAUpcomingManager(BaseNBAManager):
             
         except Exception as e:
             self.logger.error(f"[NBA] Error updating upcoming games: {e}", exc_info=True)
-
-    def display(self, force_clear=False):
-        """Display upcoming games."""
-        if not self.games_list:
-            self.logger.info("[NBA] No upcoming games to display")
-            self.display_manager.clear()
-            return
-            
-        try:
-            # Draw the scorebug layout
-            self._draw_scorebug_layout(self.current_game, force_clear)
-            
-            # Update display
-            self.display_manager.update_display()
-            
-            # Move to next game
-            self.current_game_index = (self.current_game_index + 1) % len(self.games_list)
-            self.current_game = self.games_list[self.current_game_index]
-            
-        except Exception as e:
-            self.logger.error(f"[NBA] Error displaying upcoming game: {e}", exc_info=True) 
+            self.games_list = []
+            self.current_game = None 
