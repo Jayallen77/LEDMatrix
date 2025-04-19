@@ -10,12 +10,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class FontTestManager:
-    """Manager for testing different font sizes of PressStart2P-Regular."""
+    """Manager for testing different font sizes of 4x6 font."""
     
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         self.display_manager = display_manager
         self.config = config
-        self.font_path = "assets/fonts/PressStart2P-Regular.ttf"
+        self.font_path = "assets/fonts/4x6-font.ttf"
         self.font_sizes = [4, 6, 8, 10, 12, 14, 16, 18]
         self.logger = logging.getLogger('FontTest')
         
@@ -24,7 +24,7 @@ class FontTestManager:
             self.logger.error(f"Font file not found: {self.font_path}")
             raise FileNotFoundError(f"Font file not found: {self.font_path}")
         
-        self.logger.info(f"Initialized FontTestManager with {len(self.font_sizes)} font sizes to test")
+        self.logger.info(f"Initialized FontTestManager with {len(self.font_sizes)} font sizes to test using 4x6 font")
     
     def update(self):
         """No update needed for static display."""
