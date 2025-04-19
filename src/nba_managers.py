@@ -8,6 +8,7 @@ from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from src.display_manager import DisplayManager
+from src.cache_manager import CacheManager
 
 # Constants
 ESPN_NBA_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
