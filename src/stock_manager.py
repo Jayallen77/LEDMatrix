@@ -338,9 +338,9 @@ class StockManager:
                     # Convert to RGBA if not already
                     if img.mode != 'RGBA':
                         img = img.convert('RGBA')
-                    # Resize to fit in the display
-                    max_size = min(int(self.display_manager.matrix.width / 1.5), 
-                                  int(self.display_manager.matrix.height / 1.5))
+                    # Resize to fit in the display - increased size by reducing divisor from 1.5 to 1.2
+                    max_size = min(int(self.display_manager.matrix.width / 1.2), 
+                                  int(self.display_manager.matrix.height / 1.2))
                     img = img.resize((max_size, max_size), Image.Resampling.LANCZOS)
                     return img.copy()
         except Exception as e:
@@ -387,7 +387,7 @@ class StockManager:
         logo = self._get_stock_logo(symbol)
         if logo:
             # Position logo on the left side with minimal spacing
-            logo_x = 0  # Reduced from 2 to 0
+            logo_x = 0  # Already at 0, keeping it at the far left
             logo_y = (height - logo.height) // 2
             image.paste(logo, (logo_x, logo_y), logo)
         
@@ -422,9 +422,9 @@ class StockManager:
         # Calculate starting y position to center the text block
         start_y = (height - total_text_height) // 2
         
-        # Draw symbol - moved even closer to the logo
+        # Draw symbol - moved closer to the logo
         symbol_width = symbol_bbox[2] - symbol_bbox[0]
-        symbol_x = width // 4  # Moved from width//3 to width//4 to bring text even closer to logo
+        symbol_x = width // 2  # Moved from width//3 to width//2 to create more space between logo and text
         symbol_y = start_y
         draw.text((symbol_x, symbol_y), symbol_text, font=symbol_font, fill=(255, 255, 255))
         
@@ -578,8 +578,10 @@ class StockManager:
             full_image = Image.new('RGB', (total_width, height), (0, 0, 0))
             draw = ImageDraw.Draw(full_image)
             
+            # Add initial gap before the first stock
+            current_x = width  # Start with a full screen width gap
+            
             # Draw each stock in sequence with consistent spacing
-            current_x = 0
             for symbol in symbols:
                 data = self.stock_data[symbol]
                 
