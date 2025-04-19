@@ -38,17 +38,17 @@ class DisplayManager:
         options.hardware_mapping = hardware_config.get('hardware_mapping', 'adafruit-hat-pwm')
         
         # Balance performance and stability
-        options.brightness = 100
+        options.brightness = 75
         options.pwm_bits = 10  # Increased from 8 for better color depth
         options.pwm_lsb_nanoseconds = 150  # Increased for better stability
         options.led_rgb_sequence = 'RGB'
         options.pixel_mapper_config = ''
         options.row_address_type = 0
         options.multiplexing = 0
-        options.disable_hardware_pulsing = True  # Set to True to run without root
+        options.disable_hardware_pulsing = False  # Set to True to run without root
         options.show_refresh_rate = False
         options.limit_refresh_rate_hz = 90  # Reduced from 120Hz for better stability
-        options.gpio_slowdown = 2  # Increased for better stability
+        options.gpio_slowdown = 3  # Increased for better stability
         
         # Initialize the matrix
         self.matrix = RGBMatrix(options=options)
