@@ -366,17 +366,7 @@ class StockManager:
         return fallback
 
     def _create_stock_display(self, symbol: str, price: float, change: float, change_percent: float) -> Image.Image:
-        """Create a display image for a stock with logo, symbol, price, and change.
-        
-        Args:
-            symbol: Stock symbol (e.g., 'AAPL', 'MSFT')
-            price: Current stock price
-            change: Price change
-            change_percent: Percentage change
-            
-        Returns:
-            PIL Image of the stock display
-        """
+        """Create a display image for a stock with logo, symbol, price, and change."""
         # Create a wider image for scrolling
         width = self.display_manager.matrix.width * 2  # Reduced from 3x to 2x since we'll handle spacing in display_stocks
         height = self.display_manager.matrix.height
@@ -422,15 +412,17 @@ class StockManager:
         # Calculate starting y position to center the text block
         start_y = (height - total_text_height) // 2
         
-        # Draw symbol - moved closer to the logo
+        # Position text elements closer to the logo
+        text_x = width // 6  # Changed from width//3 to width//6 to move closer to logo
+        
+        # Draw symbol
         symbol_width = symbol_bbox[2] - symbol_bbox[0]
-        symbol_x = width // 2  # Moved from width//3 to width//2 to create more space between logo and text
         symbol_y = start_y
-        draw.text((symbol_x, symbol_y), symbol_text, font=symbol_font, fill=(255, 255, 255))
+        draw.text((text_x, symbol_y), symbol_text, font=symbol_font, fill=(255, 255, 255))
         
         # Draw price - aligned with symbol
         price_width = price_bbox[2] - price_bbox[0]
-        price_x = symbol_x + (symbol_width - price_width) // 2  # Center price under symbol
+        price_x = text_x + (symbol_width - price_width) // 2  # Center price under symbol
         price_y = symbol_y + symbol_height + 1  # 1 pixel spacing
         draw.text((price_x, price_y), price_text, font=price_font, fill=(255, 255, 255))
         
@@ -448,10 +440,10 @@ class StockManager:
                 # Extract prices from price history
                 chart_data = [p['price'] for p in price_history]
                 
-                # Calculate chart dimensions - 50% wider
-                chart_width = int(width // 2.5)  # Reduced from width//2 to width//2.5 (20% smaller)
+                # Calculate chart dimensions - make it slightly smaller
+                chart_width = int(width // 3)  # Reduced from width//2.5 to width//3 to prevent overlap
                 chart_height = height // 1.5
-                chart_x = width - chart_width + 5  # Keep the same right margin
+                chart_x = width - chart_width - 10  # Increased right margin to 10 pixels
                 chart_y = (height - chart_height) // 2
                 
                 # Find min and max prices for scaling
