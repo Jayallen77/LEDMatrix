@@ -23,11 +23,21 @@ class CacheManager:
         # Initialize logger first
         self.logger = logging.getLogger(__name__)
         
+        # Get the actual user's home directory, even when running with sudo
+        try:
+            # Try to get the real user's home directory
+            real_user = os.environ.get('SUDO_USER') or os.environ.get('USER')
+            if real_user:
+                home_dir = f"/home/{real_user}"
+            else:
+                home_dir = os.path.expanduser('~')
+        except Exception:
+            home_dir = os.path.expanduser('~')
+            
         # Determine the appropriate cache directory
         if os.geteuid() == 0:  # Running as root/sudo
             self.cache_dir = "/var/cache/ledmatrix"
         else:
-            home_dir = os.path.expanduser('~')
             self.cache_dir = os.path.join(home_dir, '.ledmatrix_cache')
             
         self._memory_cache = {}  # In-memory cache for faster access
@@ -44,6 +54,16 @@ class CacheManager:
             # Set permissions to allow both root and the user to access
             if os.geteuid() == 0:  # Running as root/sudo
                 os.chmod(self.cache_dir, 0o777)  # Full permissions for all users
+                # Also set ownership to the real user if we're running as root
+                real_user = os.environ.get('SUDO_USER')
+                if real_user:
+                    try:
+                        import pwd
+                        uid = pwd.getpwnam(real_user).pw_uid
+                        gid = pwd.getpwnam(real_user).pw_gid
+                        os.chown(self.cache_dir, uid, gid)
+                    except Exception as e:
+                        self.logger.warning(f"Could not set cache directory ownership: {e}")
         except Exception as e:
             self.logger.error(f"Failed to create cache directory: {e}")
             # Fallback to temp directory if we can't create the cache directory
