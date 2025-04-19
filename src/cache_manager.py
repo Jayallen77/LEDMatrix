@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 import logging
 import stat
 import threading
+import tempfile
 
 class DateTimeEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -15,51 +16,48 @@ class DateTimeEncoder(json.JSONEncoder):
         return super().default(obj)
 
 class CacheManager:
-    def __init__(self, cache_dir: str = "cache"):
+    def __init__(self, cache_dir: str = None):
         self.logger = logging.getLogger(__name__)
-        self.cache_dir = cache_dir
         self._memory_cache = {}
         self._memory_cache_timestamps = {}
         self._cache_lock = threading.Lock()
+        
+        # Try to determine the best cache directory location
+        if cache_dir:
+            self.cache_dir = cache_dir
+        else:
+            # Try user's home directory first
+            home_dir = os.path.expanduser("~")
+            if os.access(home_dir, os.W_OK):
+                self.cache_dir = os.path.join(home_dir, ".ledmatrix_cache")
+            else:
+                # Fall back to system temp directory
+                self.cache_dir = os.path.join(tempfile.gettempdir(), "ledmatrix_cache")
+        
         self._ensure_cache_dir()
 
     def _ensure_cache_dir(self) -> None:
         """Ensure cache directory exists with proper permissions."""
-        if not os.path.exists(self.cache_dir):
-            try:
-                # If running as root, use /tmp by default
-                if os.geteuid() == 0:
-                    self.cache_dir = os.path.join("/tmp", "ledmatrix_cache")
-                    self.logger.info(f"Running as root, using temporary cache directory: {self.cache_dir}")
-                # Try to create in user's home directory if current directory fails
-                elif not os.access(os.getcwd(), os.W_OK):
-                    home_dir = os.path.expanduser("~")
-                    self.cache_dir = os.path.join(home_dir, ".ledmatrix_cache")
-                    self.logger.info(f"Using cache directory in home: {self.cache_dir}")
-                
+        try:
+            if not os.path.exists(self.cache_dir):
                 # Create directory with 755 permissions (rwxr-xr-x)
                 os.makedirs(self.cache_dir, mode=0o755, exist_ok=True)
-
-                # If running as sudo, change ownership to the real user
-                if os.geteuid() == 0:  # Check if running as root
-                    import pwd
-                    # Get the real user (not root)
-                    real_user = os.environ.get('SUDO_USER')
-                    if real_user:
-                        uid = pwd.getpwnam(real_user).pw_uid
-                        gid = pwd.getpwnam(real_user).pw_gid
-                        os.chown(self.cache_dir, uid, gid)
-                        self.logger.info(f"Changed cache directory ownership to {real_user}")
+                self.logger.info(f"Created cache directory: {self.cache_dir}")
+            
+            # Verify we have write permissions
+            if not os.access(self.cache_dir, os.W_OK):
+                raise PermissionError(f"No write access to cache directory: {self.cache_dir}")
+                
+        except Exception as e:
+            self.logger.error(f"Error setting up cache directory: {e}")
+            # Fall back to system temp directory
+            self.cache_dir = os.path.join(tempfile.gettempdir(), "ledmatrix_cache")
+            try:
+                os.makedirs(self.cache_dir, mode=0o755, exist_ok=True)
+                self.logger.info(f"Using temporary cache directory: {self.cache_dir}")
             except Exception as e:
-                self.logger.error(f"Error setting up cache directory: {e}")
-                # Fall back to /tmp if all else fails
-                self.cache_dir = os.path.join("/tmp", "ledmatrix_cache")
-                try:
-                    os.makedirs(self.cache_dir, mode=0o755, exist_ok=True)
-                    self.logger.info(f"Using temporary cache directory: {self.cache_dir}")
-                except Exception as e:
-                    self.logger.error(f"Failed to create temporary cache directory: {e}")
-                    raise
+                self.logger.error(f"Failed to create temporary cache directory: {e}")
+                raise
 
     def _get_cache_path(self, key: str) -> str:
         """Get the path for a cache file."""
@@ -85,11 +83,17 @@ class CacheManager:
         try:
             with self._cache_lock:
                 with open(cache_path, 'r') as f:
-                    data = json.load(f)
-                    # Update memory cache
-                    self._memory_cache[key] = data
-                    self._memory_cache_timestamps[key] = current_time
-                    return data
+                    try:
+                        data = json.load(f)
+                        # Update memory cache
+                        self._memory_cache[key] = data
+                        self._memory_cache_timestamps[key] = current_time
+                        return data
+                    except json.JSONDecodeError as e:
+                        self.logger.error(f"Error parsing cache file for {key}: {e}")
+                        # If the file is corrupted, remove it
+                        os.remove(cache_path)
+                        return None
         except Exception as e:
             self.logger.error(f"Error loading cache for {key}: {e}")
             return None
@@ -105,11 +109,21 @@ class CacheManager:
                 self._memory_cache[key] = data
                 self._memory_cache_timestamps[key] = current_time
 
-                # Then save to disk
-                with open(cache_path, 'w') as f:
+                # Create a temporary file first
+                temp_path = f"{cache_path}.tmp"
+                with open(temp_path, 'w') as f:
                     json.dump(data, f, cls=DateTimeEncoder)
+                
+                # Atomic rename to avoid corruption
+                os.replace(temp_path, cache_path)
         except Exception as e:
             self.logger.error(f"Error saving cache for {key}: {e}")
+            # Clean up temp file if it exists
+            if os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except:
+                    pass
 
     def get_cached_data(self, key: str) -> Optional[Dict[str, Any]]:
         """Get cached data with memory cache priority."""
