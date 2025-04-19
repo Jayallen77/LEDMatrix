@@ -452,7 +452,7 @@ class BaseNBAManager:
                 # Calculate position for the score text (centered at the bottom)
                 score_width = draw.textlength(score_text, font=self.fonts['score'])
                 score_x = (self.display_width - score_width) // 2
-                score_y = self.display_height - 20
+                score_y = self.display_height - 5
                 draw.text((score_x, score_y), score_text, font=self.fonts['score'], fill=(255, 255, 255))
 
                 # Draw period and time or Final
