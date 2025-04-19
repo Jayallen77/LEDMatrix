@@ -251,7 +251,7 @@ class BaseNBAManager:
             return None
 
     def _fetch_data(self, date_str: str = None) -> Optional[Dict]:
-        """Fetch data from ESPN API."""
+        """Fetch data from ESPN API with caching."""
         if self.test_mode:
             return self._load_test_data()
             

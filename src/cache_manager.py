@@ -16,52 +16,80 @@ class DateTimeEncoder(json.JSONEncoder):
         return super().default(obj)
 
 class CacheManager:
-    def __init__(self, cache_dir: str = None):
+    """Manages caching of API responses to reduce API calls."""
+    
+    def __init__(self, cache_dir: str = "cache"):
+        self.cache_dir = cache_dir
+        self._ensure_cache_dir()
+        self._memory_cache = {}  # In-memory cache for faster access
         self.logger = logging.getLogger(__name__)
-        self._memory_cache = {}
         self._memory_cache_timestamps = {}
         self._cache_lock = threading.Lock()
         
-        # Try to determine the best cache directory location
-        if cache_dir:
-            self.cache_dir = cache_dir
-        else:
-            # Try user's home directory first
-            home_dir = os.path.expanduser("~")
-            if os.access(home_dir, os.W_OK):
-                self.cache_dir = os.path.join(home_dir, ".ledmatrix_cache")
-            else:
-                # Fall back to system temp directory
-                self.cache_dir = os.path.join(tempfile.gettempdir(), "ledmatrix_cache")
-        
-        self._ensure_cache_dir()
-
-    def _ensure_cache_dir(self) -> None:
-        """Ensure cache directory exists with proper permissions."""
-        try:
-            if not os.path.exists(self.cache_dir):
-                # Create directory with 755 permissions (rwxr-xr-x)
-                os.makedirs(self.cache_dir, mode=0o755, exist_ok=True)
-                self.logger.info(f"Created cache directory: {self.cache_dir}")
+    def _ensure_cache_dir(self):
+        """Ensure the cache directory exists."""
+        if not os.path.exists(self.cache_dir):
+            os.makedirs(self.cache_dir)
             
-            # Verify we have write permissions
-            if not os.access(self.cache_dir, os.W_OK):
-                raise PermissionError(f"No write access to cache directory: {self.cache_dir}")
-                
-        except Exception as e:
-            self.logger.error(f"Error setting up cache directory: {e}")
-            # Fall back to system temp directory
-            self.cache_dir = os.path.join(tempfile.gettempdir(), "ledmatrix_cache")
-            try:
-                os.makedirs(self.cache_dir, mode=0o755, exist_ok=True)
-                self.logger.info(f"Using temporary cache directory: {self.cache_dir}")
-            except Exception as e:
-                self.logger.error(f"Failed to create temporary cache directory: {e}")
-                raise
-
     def _get_cache_path(self, key: str) -> str:
         """Get the path for a cache file."""
         return os.path.join(self.cache_dir, f"{key}.json")
+        
+    def get_cached_data(self, key: str, max_age: int = 300) -> Optional[Dict]:
+        """
+        Get cached data if it exists and is not too old.
+        Args:
+            key: Cache key
+            max_age: Maximum age of cache in seconds
+        Returns:
+            Cached data or None if not found/too old
+        """
+        # Check memory cache first
+        if key in self._memory_cache:
+            data, timestamp = self._memory_cache[key]
+            if time.time() - timestamp <= max_age:
+                return data
+                
+        # Check file cache
+        cache_path = self._get_cache_path(key)
+        if not os.path.exists(cache_path):
+            return None
+            
+        try:
+            # Check file age
+            if time.time() - os.path.getmtime(cache_path) > max_age:
+                return None
+                
+            # Load and return cached data
+            with self._cache_lock:
+                with open(cache_path, 'r') as f:
+                    data = json.load(f)
+                    # Update memory cache
+                    self._memory_cache[key] = (data, time.time())
+                    return data
+                
+        except Exception:
+            return None
+            
+    def save_cache(self, key: str, data: Dict) -> None:
+        """
+        Save data to cache.
+        Args:
+            key: Cache key
+            data: Data to cache
+        """
+        try:
+            # Save to file
+            cache_path = self._get_cache_path(key)
+            with self._cache_lock:
+                with open(cache_path, 'w') as f:
+                    json.dump(data, f)
+                
+            # Update memory cache
+            self._memory_cache[key] = (data, time.time())
+            
+        except Exception:
+            pass  # Silently fail if cache save fails
 
     def load_cache(self, key: str) -> Optional[Dict[str, Any]]:
         """Load data from cache with memory caching."""
@@ -89,72 +117,6 @@ class CacheManager:
                         self._memory_cache[key] = data
                         self._memory_cache_timestamps[key] = current_time
                         return data
-                    except json.JSONDecodeError as e:
-                        self.logger.error(f"Error parsing cache file for {key}: {e}")
-                        # If the file is corrupted, remove it
-                        os.remove(cache_path)
-                        return None
-        except Exception as e:
-            self.logger.error(f"Error loading cache for {key}: {e}")
-            return None
-
-    def save_cache(self, key: str, data: Dict[str, Any]) -> None:
-        """Save data to cache with memory caching."""
-        cache_path = self._get_cache_path(key)
-        current_time = time.time()
-
-        try:
-            with self._cache_lock:
-                # Update memory cache first
-                self._memory_cache[key] = data
-                self._memory_cache_timestamps[key] = current_time
-
-                # Create a temporary file first
-                temp_path = f"{cache_path}.tmp"
-                with open(temp_path, 'w') as f:
-                    json.dump(data, f, cls=DateTimeEncoder)
-                
-                # Atomic rename to avoid corruption
-                os.replace(temp_path, cache_path)
-        except Exception as e:
-            self.logger.error(f"Error saving cache for {key}: {e}")
-            # Clean up temp file if it exists
-            if os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except:
-                    pass
-
-    def get_cached_data(self, key: str, max_age: int = 60) -> Optional[Dict[str, Any]]:
-        """Get cached data with memory cache priority and max age check."""
-        current_time = time.time()
-        
-        # Check memory cache first
-        if key in self._memory_cache:
-            if current_time - self._memory_cache_timestamps.get(key, 0) < max_age:  # Use provided max_age
-                return self._memory_cache[key]
-            else:
-                # Clear expired memory cache
-                del self._memory_cache[key]
-                del self._memory_cache_timestamps[key]
-
-        # Fall back to disk cache
-        cache_path = self._get_cache_path(key)
-        if not os.path.exists(cache_path):
-            return None
-
-        try:
-            with self._cache_lock:
-                with open(cache_path, 'r') as f:
-                    try:
-                        data = json.load(f)
-                        # Check if data is stale
-                        if current_time - data.get('timestamp', 0) > max_age:
-                            return None
-                        # Update memory cache
-                        self._memory_cache[key] = data['data']
-                        self._memory_cache_timestamps[key] = current_time
-                        return data['data']
                     except json.JSONDecodeError as e:
                         self.logger.error(f"Error parsing cache file for {key}: {e}")
                         # If the file is corrupted, remove it
