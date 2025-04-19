@@ -633,6 +633,9 @@ class NBARecentManager(BaseNBAManager):
             if not data or 'events' not in data:
                 if self._should_log("no_events", 300):
                     self.logger.warning("[NBA] No events found in ESPN API response")
+                self.games_list = []
+                self.current_game = None
+                self.last_update = current_time
                 return
                 
             events = data['events']
@@ -654,13 +657,15 @@ class NBARecentManager(BaseNBAManager):
             
             if self._should_log("team_games", 300):
                 self.logger.info(f"[NBA] Found {len(team_games)} recent games for favorite teams")
-                if not team_games:
+            
+            if not team_games:
+                if self._should_log("no_games", 300):
                     self.logger.info("[NBA] No recent games found for favorite teams")
-                    self.games_list = []
-                    self.current_game = None
-                    self.last_update = current_time
-                    return
-                
+                self.games_list = []
+                self.current_game = None
+                self.last_update = current_time
+                return
+            
             self.games_list = team_games
             self.current_game = team_games[0]
             self.last_update = current_time
@@ -669,6 +674,7 @@ class NBARecentManager(BaseNBAManager):
             self.logger.error(f"[NBA] Error updating recent games: {e}", exc_info=True)
             self.games_list = []
             self.current_game = None
+            self.last_update = current_time
 
     def display(self, force_clear=False):
         """Display recent games."""
@@ -719,6 +725,9 @@ class NBAUpcomingManager(BaseNBAManager):
             if not data or 'events' not in data:
                 if self._should_log("no_events", 300):
                     self.logger.warning("[NBA] No events found in ESPN API response")
+                self.games_list = []
+                self.current_game = None
+                self.last_update = current_time
                 return
                 
             events = data['events']
@@ -740,13 +749,15 @@ class NBAUpcomingManager(BaseNBAManager):
             
             if self._should_log("team_games", 300):
                 self.logger.info(f"[NBA] Found {len(team_games)} upcoming games for favorite teams")
-                if not team_games:
+            
+            if not team_games:
+                if self._should_log("no_games", 300):
                     self.logger.info("[NBA] No upcoming games found for favorite teams")
-                    self.games_list = []
-                    self.current_game = None
-                    self.last_update = current_time
-                    return
-                
+                self.games_list = []
+                self.current_game = None
+                self.last_update = current_time
+                return
+            
             self.games_list = team_games
             self.current_game = team_games[0]
             self.last_update = current_time
@@ -754,4 +765,5 @@ class NBAUpcomingManager(BaseNBAManager):
         except Exception as e:
             self.logger.error(f"[NBA] Error updating upcoming games: {e}", exc_info=True)
             self.games_list = []
-            self.current_game = None 
+            self.current_game = None
+            self.last_update = current_time 
