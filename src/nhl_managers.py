@@ -398,7 +398,7 @@ class BaseNHLManager:
                 # Calculate position for the time text (centered horizontally, in center)
                 time_width = draw.textlength(game_time, font=self.fonts['time'])
                 time_x = (self.display_width - time_width) // 2
-                time_y = date_y + 5  # Position below date
+                time_y = date_y + 10  # Position below date
                 draw.text((time_x, time_y), game_time, font=self.fonts['time'], fill=(255, 255, 255))
             else:
                 # For live/final games, show scores and period/time
