@@ -82,6 +82,37 @@ sudo nano /boot/firmware/cmdline.txt
 sudo reboot
 ```
 
+## Caching System
+
+The LEDMatrix system includes a robust caching mechanism to optimize API calls and reduce network traffic:
+
+### Cache Location
+- Default cache directory: `/tmp/ledmatrix_cache`
+- Cache files are stored with proper permissions (755 for directories, 644 for files)
+- When running as root/sudo, cache ownership is automatically adjusted to the real user
+
+### Cached Data Types
+- Weather data (current conditions and forecasts)
+- Stock prices and market data
+- Stock news headlines
+- NHL game information
+
+### Cache Behavior
+- Data is cached based on update intervals defined in `config.json`
+- Cache is automatically invalidated when:
+  - Update interval has elapsed
+  - Market is closed (for stock data)
+  - Data has changed significantly
+- Failed API calls fall back to cached data when available
+- Cache files use atomic operations to prevent corruption
+
+### Cache Management
+- Cache files are automatically created and managed
+- No manual intervention required
+- Cache directory is created with proper permissions on first run
+- Temporary files are used for safe updates
+- JSON serialization handles all data types including timestamps
+
 ### Running without Sudo (Optional)
 
 To run the display script without `sudo`, the user executing the script needs access to GPIO pins. Add the user to the `gpio` group:
