@@ -24,9 +24,42 @@ class CacheManager:
         self._ensure_cache_dir()
 
     def _ensure_cache_dir(self) -> None:
-        """Ensure cache directory exists."""
+        """Ensure cache directory exists with proper permissions."""
         if not os.path.exists(self.cache_dir):
-            os.makedirs(self.cache_dir)
+            try:
+                # If running as root, use /tmp by default
+                if os.geteuid() == 0:
+                    self.cache_dir = os.path.join("/tmp", "ledmatrix_cache")
+                    self.logger.info(f"Running as root, using temporary cache directory: {self.cache_dir}")
+                # Try to create in user's home directory if current directory fails
+                elif not os.access(os.getcwd(), os.W_OK):
+                    home_dir = os.path.expanduser("~")
+                    self.cache_dir = os.path.join(home_dir, ".ledmatrix_cache")
+                    self.logger.info(f"Using cache directory in home: {self.cache_dir}")
+                
+                # Create directory with 755 permissions (rwxr-xr-x)
+                os.makedirs(self.cache_dir, mode=0o755, exist_ok=True)
+
+                # If running as sudo, change ownership to the real user
+                if os.geteuid() == 0:  # Check if running as root
+                    import pwd
+                    # Get the real user (not root)
+                    real_user = os.environ.get('SUDO_USER')
+                    if real_user:
+                        uid = pwd.getpwnam(real_user).pw_uid
+                        gid = pwd.getpwnam(real_user).pw_gid
+                        os.chown(self.cache_dir, uid, gid)
+                        self.logger.info(f"Changed cache directory ownership to {real_user}")
+            except Exception as e:
+                self.logger.error(f"Error setting up cache directory: {e}")
+                # Fall back to /tmp if all else fails
+                self.cache_dir = os.path.join("/tmp", "ledmatrix_cache")
+                try:
+                    os.makedirs(self.cache_dir, mode=0o755, exist_ok=True)
+                    self.logger.info(f"Using temporary cache directory: {self.cache_dir}")
+                except Exception as e:
+                    self.logger.error(f"Failed to create temporary cache directory: {e}")
+                    raise
 
     def _get_cache_path(self, key: str) -> str:
         """Get the path for a cache file."""
