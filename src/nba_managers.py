@@ -18,6 +18,7 @@ class BaseNBAManager:
     _no_data_warning_logged = False
     _last_warning_time = 0
     _warning_cooldown = 60  # Only log warnings once per minute
+    _last_log_times = {}  # Track last log time for each message type
     
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         self.display_manager = display_manager
@@ -50,6 +51,16 @@ class BaseNBAManager:
         
         self.logger.info(f"Initialized NBA manager with display dimensions: {self.display_width}x{self.display_height}")
         self.logger.info(f"Logo directory: {self.logo_dir}")
+
+    def _should_log(self, message_type: str, cooldown: int = 300) -> bool:
+        """Check if a message should be logged based on cooldown period."""
+        current_time = time.time()
+        last_time = self._last_log_times.get(message_type, 0)
+        
+        if current_time - last_time >= cooldown:
+            self._last_log_times[message_type] = current_time
+            return True
+        return False
 
     def _load_test_data(self) -> Dict:
         """Load test data for development and testing."""
@@ -620,11 +631,13 @@ class NBARecentManager(BaseNBAManager):
             # Fetch data from ESPN API
             data = self._fetch_data()
             if not data or 'events' not in data:
-                self.logger.warning("[NBA] No events found in ESPN API response")
+                if self._should_log("no_events", 300):
+                    self.logger.warning("[NBA] No events found in ESPN API response")
                 return
                 
             events = data['events']
-            self.logger.info(f"[NBA] Successfully fetched {len(events)} events from ESPN API")
+            if self._should_log("fetch_success", 300):
+                self.logger.info(f"[NBA] Successfully fetched {len(events)} events from ESPN API")
             
             # Process games
             self.recent_games = []
@@ -639,10 +652,11 @@ class NBARecentManager(BaseNBAManager):
                          if game['home_abbr'] in self.favorite_teams or 
                             game['away_abbr'] in self.favorite_teams]
             
-            self.logger.info(f"[NBA] Found {len(team_games)} recent games for favorite teams")
-            if not team_games:
-                self.logger.info("[NBA] No recent games found for favorite teams")
-                return
+            if self._should_log("team_games", 300):
+                self.logger.info(f"[NBA] Found {len(team_games)} recent games for favorite teams")
+                if not team_games:
+                    self.logger.info("[NBA] No recent games found for favorite teams")
+                    return
                 
             self.games_list = team_games
             self.current_game = team_games[0]
@@ -698,11 +712,13 @@ class NBAUpcomingManager(BaseNBAManager):
             # Fetch data from ESPN API
             data = self._fetch_data()
             if not data or 'events' not in data:
-                self.logger.warning("[NBA] No events found in ESPN API response")
+                if self._should_log("no_events", 300):
+                    self.logger.warning("[NBA] No events found in ESPN API response")
                 return
                 
             events = data['events']
-            self.logger.info(f"[NBA] Successfully fetched {len(events)} events from ESPN API")
+            if self._should_log("fetch_success", 300):
+                self.logger.info(f"[NBA] Successfully fetched {len(events)} events from ESPN API")
             
             # Process games
             self.upcoming_games = []
@@ -717,10 +733,11 @@ class NBAUpcomingManager(BaseNBAManager):
                          if game['home_abbr'] in self.favorite_teams or 
                             game['away_abbr'] in self.favorite_teams]
             
-            self.logger.info(f"[NBA] Found {len(team_games)} upcoming games for favorite teams")
-            if not team_games:
-                self.logger.info("[NBA] No upcoming games found for favorite teams")
-                return
+            if self._should_log("team_games", 300):
+                self.logger.info(f"[NBA] Found {len(team_games)} upcoming games for favorite teams")
+                if not team_games:
+                    self.logger.info("[NBA] No upcoming games found for favorite teams")
+                    return
                 
             self.games_list = team_games
             self.current_game = team_games[0]
