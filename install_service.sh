@@ -3,10 +3,27 @@
 # Exit on error
 set -e
 
-echo "Installing LED Matrix Display Service..."
+# Get the actual user who invoked sudo
+if [ -n "$SUDO_USER" ]; then
+    ACTUAL_USER="$SUDO_USER"
+else
+    ACTUAL_USER=$(whoami)
+fi
+
+# Get the home directory of the actual user
+USER_HOME=$(eval echo ~$ACTUAL_USER)
+
+echo "Installing LED Matrix Display Service for user: $ACTUAL_USER"
+echo "Using home directory: $USER_HOME"
+
+# Create a temporary service file with the correct paths
+sed "s|/home/ledpi|$USER_HOME|g" ledmatrix.service > /tmp/ledmatrix.service.tmp
 
 # Copy the service file to the systemd directory
-sudo cp ledmatrix.service /etc/systemd/system/
+sudo cp /tmp/ledmatrix.service.tmp /etc/systemd/system/ledmatrix.service
+
+# Clean up
+rm /tmp/ledmatrix.service.tmp
 
 # Reload systemd to recognize the new service
 sudo systemctl daemon-reload

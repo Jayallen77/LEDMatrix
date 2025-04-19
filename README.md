@@ -225,3 +225,67 @@ LEDMatrix/
 ## Fonts
 You can add any font to the assets/fonts/ folder but they need to be .ttf and updated in display_manager.py
 
+## Systemd Service Installation
+
+The LEDMatrix can be installed as a systemd service to run automatically at boot and be managed easily. The service runs as root to ensure proper hardware timing access for the LED matrix.
+
+### Installing the Service
+
+1. Make the install script executable:
+```bash
+chmod +x install_service.sh
+```
+
+2. Run the install script with sudo:
+```bash
+sudo ./install_service.sh
+```
+
+The script will:
+- Detect your user account and home directory
+- Install the service file with the correct paths
+- Enable the service to start on boot
+- Start the service immediately
+
+### Managing the Service
+
+The following commands are available to manage the service:
+
+```bash
+# Stop the display
+sudo systemctl stop ledmatrix.service
+
+# Start the display
+sudo systemctl start ledmatrix.service
+
+# Check service status
+sudo systemctl status ledmatrix.service
+
+# View logs
+journalctl -u ledmatrix.service
+
+# Disable autostart
+sudo systemctl disable ledmatrix.service
+
+# Enable autostart
+sudo systemctl enable ledmatrix.service
+```
+
+### Convenience Scripts
+
+Two convenience scripts are provided for easy service management:
+
+- `start_display.sh` - Starts the LED matrix display service
+- `stop_display.sh` - Stops the LED matrix display service
+
+Make them executable with:
+```bash
+chmod +x start_display.sh stop_display.sh
+```
+
+Then use them to control the service:
+```bash
+sudo ./start_display.sh
+sudo ./stop_display.sh
+```
+
