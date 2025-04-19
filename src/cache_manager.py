@@ -9,14 +9,20 @@ import stat
 
 class CacheManager:
     def __init__(self, cache_dir: str = "cache"):
+        self.logger = logging.getLogger(__name__)
         self.cache_dir = cache_dir
         self._ensure_cache_dir()
-        self.logger = logging.getLogger(__name__)
 
     def _ensure_cache_dir(self) -> None:
         """Ensure the cache directory exists with proper permissions."""
         if not os.path.exists(self.cache_dir):
             try:
+                # Try to create in user's home directory if current directory fails
+                if not os.access(os.getcwd(), os.W_OK):
+                    home_dir = os.path.expanduser("~")
+                    self.cache_dir = os.path.join(home_dir, ".ledmatrix_cache")
+                    self.logger.info(f"Using cache directory in home: {self.cache_dir}")
+                
                 # Create directory with 755 permissions (rwxr-xr-x)
                 os.makedirs(self.cache_dir, mode=0o755, exist_ok=True)
                 
@@ -32,8 +38,14 @@ class CacheManager:
                         self.logger.info(f"Changed cache directory ownership to {real_user}")
             except Exception as e:
                 self.logger.error(f"Error setting up cache directory: {e}")
-                # Fall back to current directory if we can't create the cache directory
-                self.cache_dir = "."
+                # Fall back to /tmp if all else fails
+                self.cache_dir = os.path.join("/tmp", "ledmatrix_cache")
+                try:
+                    os.makedirs(self.cache_dir, mode=0o755, exist_ok=True)
+                    self.logger.info(f"Using temporary cache directory: {self.cache_dir}")
+                except Exception as e:
+                    self.logger.error(f"Failed to create temporary cache directory: {e}")
+                    raise
 
     def _get_cache_path(self, data_type: str) -> str:
         """Get the path for a specific cache file."""
