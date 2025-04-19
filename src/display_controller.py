@@ -12,7 +12,8 @@ from src.nhl_managers import NHLLiveManager, NHLRecentManager, NHLUpcomingManage
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(levelname)s:%(name)s:%(message)s'
+    format='%(asctime)s - %(levelname)s:%(name)s:%(message)s',
+    datefmt='%H:%M:%S'
 )
 
 logger = logging.getLogger(__name__)
