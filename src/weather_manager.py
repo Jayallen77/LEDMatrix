@@ -7,6 +7,9 @@ from .weather_icons import WeatherIcons
 from .cache_manager import CacheManager
 import logging
 import threading
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+from requests.exceptions import RequestException, SSLError, ConnectionError
 
 class WeatherManager:
     # Weather condition to larger colored icons (we'll use these as placeholders until you provide custom ones)
@@ -67,6 +70,17 @@ class WeatherManager:
         self.last_weather_state = None
         self.last_hourly_state = None
         self.last_daily_state = None
+        
+        # Configure retry strategy
+        self.session = requests.Session()
+        retry_strategy = Retry(
+            total=3,  # number of retries
+            backoff_factor=0.5,  # wait 0.5, 1, 2 seconds between retries
+            status_forcelist=[500, 502, 503, 504],  # HTTP status codes to retry on
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
 
     def _process_forecast_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Process forecast data with caching."""
@@ -129,15 +143,34 @@ class WeatherManager:
                 "units": units
             }
             
-            response = requests.get(current_url, params=params, timeout=10)
-            response.raise_for_status()
-            current_data = response.json()
+            try:
+                response = self.session.get(current_url, params=params, timeout=10)
+                response.raise_for_status()
+                current_data = response.json()
+            except (ConnectionError, RequestException) as e:
+                self.logger.error(f"Network error fetching current weather: {e}")
+                # Try to use cached data as fallback
+                cached_data = self.cache_manager.get_cached_data('weather', max_age=self._update_interval)
+                if cached_data:
+                    self.logger.info("Using cached weather data due to network error")
+                    return self._process_forecast_data(cached_data)
+                return None
             
             # Fetch forecast
             forecast_url = "https://api.openweathermap.org/data/2.5/forecast"
-            response = requests.get(forecast_url, params=params, timeout=10)
-            response.raise_for_status()
-            forecast_data = response.json()
+            try:
+                response = self.session.get(forecast_url, params=params, timeout=10)
+                response.raise_for_status()
+                forecast_data = response.json()
+            except (ConnectionError, RequestException) as e:
+                self.logger.error(f"Network error fetching forecast: {e}")
+                # If we have current data but forecast failed, use cached forecast if available
+                cached_data = self.cache_manager.get_cached_data('weather', max_age=self._update_interval)
+                if cached_data and 'hourly' in cached_data:
+                    self.logger.info("Using cached forecast data due to network error")
+                    forecast_data = {'list': cached_data['hourly']}
+                else:
+                    return None
             
             # Combine the data
             data = {
