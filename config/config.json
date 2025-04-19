@@ -82,11 +82,11 @@
             "nhl_recent": true,
             "nhl_upcoming": true
         },
-        "live_game_duration": 20
+        "live_game_duration": 30
     },
     "nba_scoreboard": {
         "enabled": true,
-        "test_mode": true,
+        "test_mode": false,
         "update_interval_seconds": 300,
         "live_update_interval": 20,
         "recent_update_interval": 1800,
