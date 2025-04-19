@@ -20,7 +20,7 @@
             "disable_hardware_pulsing": true,
             "inverse_colors": false,
             "show_refresh_rate": true,
-            "limit_refresh_rate_hz": 90
+            "limit_refresh_rate_hz": 120
         },
         "runtime": {
             "gpio_slowdown": 4
