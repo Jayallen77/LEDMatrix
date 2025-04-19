@@ -128,12 +128,27 @@ class WeatherManager:
         try:
             # Fetch new data from OpenWeatherMap API
             api_key = self.weather_config.get('api_key')
-            location = self.location.get('city')  # Get city from location config
-            if not location:
-                self.logger.error("No location configured for weather")
+            
+            # Construct full location string
+            city = self.location.get('city')
+            state = self.location.get('state')
+            country = self.location.get('country')
+            
+            if not city:
+                self.logger.error("No city configured for weather")
                 return None
                 
+            # Build location string with state and country if available
+            location = city
+            if state:
+                location += f",{state}"
+            if country:
+                location += f",{country}"
+                
             units = self.weather_config.get('units', 'imperial')
+            
+            # Log the parameters being used
+            self.logger.info(f"Fetching weather for location: {location}, units: {units}")
             
             # Fetch current weather
             current_url = "https://api.openweathermap.org/data/2.5/weather"
@@ -144,9 +159,11 @@ class WeatherManager:
             }
             
             try:
+                self.logger.debug(f"Making request to {current_url} with params: {params}")
                 response = self.session.get(current_url, params=params, timeout=10)
                 response.raise_for_status()
                 current_data = response.json()
+                self.logger.debug(f"Current weather response: {current_data}")
             except (ConnectionError, RequestException) as e:
                 self.logger.error(f"Network error fetching current weather: {e}")
                 # Try to use cached data as fallback
@@ -159,9 +176,11 @@ class WeatherManager:
             # Fetch forecast
             forecast_url = "https://api.openweathermap.org/data/2.5/forecast"
             try:
+                self.logger.debug(f"Making request to {forecast_url} with params: {params}")
                 response = self.session.get(forecast_url, params=params, timeout=10)
                 response.raise_for_status()
                 forecast_data = response.json()
+                self.logger.debug(f"Forecast response: {forecast_data}")
             except (ConnectionError, RequestException) as e:
                 self.logger.error(f"Network error fetching forecast: {e}")
                 # If we have current data but forecast failed, use cached forecast if available
