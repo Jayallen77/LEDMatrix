@@ -22,3 +22,6 @@ ENV/
 
 # Dependencies
 sports-reference/
+
+# Cache directory
+cache/
