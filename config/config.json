@@ -86,13 +86,13 @@
     },
     "nba_scoreboard": {
         "enabled": true,
-        "test_mode": false,
+        "test_mode": true,
         "update_interval_seconds": 300,
         "live_update_interval": 20,
         "recent_update_interval": 1800,
         "upcoming_update_interval": 1800,
         "recent_game_hours": 72,
-        "favorite_teams": ["LAL", "GSW"],
+        "favorite_teams": ["DAL", "ATL"],
         "logo_dir": "assets/sports/nba_logos",
         "display_modes": {
             "nba_live": true,
