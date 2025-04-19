@@ -412,8 +412,8 @@ class StockManager:
         # Calculate starting y position to center the text block
         start_y = (height - total_text_height) // 2
         
-        # Position text elements closer to the logo
-        text_x = width // 6  # Changed from width//3 to width//6 to move closer to logo
+        # Position text elements centered between logo and chart
+        text_x = width // 4  # Changed from width//6 to width//4 to center between logo and chart
         
         # Draw symbol
         symbol_width = symbol_bbox[2] - symbol_bbox[0]
