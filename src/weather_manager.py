@@ -120,10 +120,10 @@ class WeatherManager:
         # Check if we need to update
         if current_time - self._last_update < self._update_interval:
             cached_data = self.cache_manager.get_cached_data('weather', max_age=self._update_interval)
-            if cached_data:
-                self.logger.info("Using cached weather data")
+            if cached_data and self._is_valid_weather_data(cached_data):
                 return self._process_forecast_data(cached_data)
-            return None
+            # If cache is invalid, continue to fetch new data
+            self.logger.debug("Cache invalid or expired, fetching new weather data")
 
         try:
             # Fetch new data from OpenWeatherMap API
@@ -151,7 +151,7 @@ class WeatherManager:
                 self.logger.error(f"Network error fetching current weather: {e}")
                 # Try to use cached data as fallback
                 cached_data = self.cache_manager.get_cached_data('weather', max_age=self._update_interval)
-                if cached_data:
+                if cached_data and self._is_valid_weather_data(cached_data):
                     self.logger.info("Using cached weather data due to network error")
                     return self._process_forecast_data(cached_data)
                 return None
@@ -166,7 +166,7 @@ class WeatherManager:
                 self.logger.error(f"Network error fetching forecast: {e}")
                 # If we have current data but forecast failed, use cached forecast if available
                 cached_data = self.cache_manager.get_cached_data('weather', max_age=self._update_interval)
-                if cached_data and 'hourly' in cached_data:
+                if cached_data and 'hourly' in cached_data and self._is_valid_weather_data(cached_data):
                     self.logger.info("Using cached forecast data due to network error")
                     forecast_data = {'list': cached_data['hourly']}
                 else:
@@ -187,10 +187,42 @@ class WeatherManager:
             self.logger.error(f"Error fetching weather data: {e}")
             # Try to use cached data as fallback
             cached_data = self.cache_manager.get_cached_data('weather', max_age=self._update_interval)
-            if cached_data:
+            if cached_data and self._is_valid_weather_data(cached_data):
                 self.logger.info("Using cached weather data as fallback")
                 return self._process_forecast_data(cached_data)
             return None
+
+    def _is_valid_weather_data(self, data: Dict[str, Any]) -> bool:
+        """Validate weather data structure."""
+        try:
+            # Check if data has required fields
+            if not data or not isinstance(data, dict):
+                return False
+                
+            # Check current weather data
+            current = data.get('current')
+            if not current or not isinstance(current, dict):
+                return False
+                
+            # Check for required current weather fields
+            required_current_fields = ['temp', 'weather']
+            if not all(field in current for field in required_current_fields):
+                return False
+                
+            # Check weather description
+            weather = current.get('weather', [])
+            if not weather or not isinstance(weather, list) or not weather[0].get('description'):
+                return False
+                
+            # Check hourly forecast
+            hourly = data.get('hourly', [])
+            if not hourly or not isinstance(hourly, list):
+                return False
+                
+            return True
+        except Exception as e:
+            self.logger.debug(f"Error validating weather data: {e}")
+            return False
 
     def _process_current_conditions(self, current: Dict[str, Any]) -> Dict[str, Any]:
         """Process current conditions with minimal processing."""
