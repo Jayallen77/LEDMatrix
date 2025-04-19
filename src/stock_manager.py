@@ -441,7 +441,7 @@ class StockManager:
                 chart_data = [p['price'] for p in price_history]
                 
                 # Calculate chart dimensions - make it slightly smaller
-                chart_width = int(width // 3)  # Reduced from width//2.5 to width//3 to prevent overlap
+                chart_width = int(width // 2.5)  # Reduced from width//2.5 to width//3 to prevent overlap
                 chart_height = height // 1.5
                 chart_x = width - chart_width - 10  # Increased right margin to 10 pixels
                 chart_y = (height - chart_height) // 2
