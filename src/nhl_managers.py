@@ -109,7 +109,7 @@ class BaseNHLManager:
             fonts['score'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 12)
             fonts['time'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
             fonts['team'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
-            fonts['status'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 9)
+            fonts['status'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6)
             logging.info("[NHL] Successfully loaded Press Start 2P font for all text elements")
         except IOError:
             logging.warning("[NHL] Press Start 2P font not found, trying 4x6 font.")
