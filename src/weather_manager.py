@@ -147,8 +147,8 @@ class WeatherManager:
                 
             units = self.weather_config.get('units', 'imperial')
             
-            # Log the parameters being used
-            self.logger.info(f"Fetching weather for location: {location}, units: {units}")
+            # Only log at debug level since this happens frequently
+            self.logger.debug(f"Fetching weather for location: {location}, units: {units}")
             
             # Fetch current weather
             current_url = "https://api.openweathermap.org/data/2.5/weather"
@@ -169,7 +169,7 @@ class WeatherManager:
                 # Try to use cached data as fallback
                 cached_data = self.cache_manager.get_cached_data('weather', max_age=self._update_interval)
                 if cached_data and self._is_valid_weather_data(cached_data):
-                    self.logger.info("Using cached weather data due to network error")
+                    self.logger.debug("Using cached weather data due to network error")
                     return self._process_forecast_data(cached_data)
                 return None
             
@@ -186,7 +186,7 @@ class WeatherManager:
                 # If we have current data but forecast failed, use cached forecast if available
                 cached_data = self.cache_manager.get_cached_data('weather', max_age=self._update_interval)
                 if cached_data and 'hourly' in cached_data and self._is_valid_weather_data(cached_data):
-                    self.logger.info("Using cached forecast data due to network error")
+                    self.logger.debug("Using cached forecast data due to network error")
                     forecast_data = {'list': cached_data['hourly']}
                 else:
                     return None
@@ -207,7 +207,7 @@ class WeatherManager:
             # Try to use cached data as fallback
             cached_data = self.cache_manager.get_cached_data('weather', max_age=self._update_interval)
             if cached_data and self._is_valid_weather_data(cached_data):
-                self.logger.info("Using cached weather data as fallback")
+                self.logger.debug("Using cached weather data as fallback")
                 return self._process_forecast_data(cached_data)
             return None
 
