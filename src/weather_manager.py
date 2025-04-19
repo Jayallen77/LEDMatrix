@@ -128,6 +128,9 @@ class WeatherManager:
         try:
             # Fetch new data from OpenWeatherMap API
             api_key = self.weather_config.get('api_key')
+            if not api_key:
+                self.logger.error("No API key configured for OpenWeatherMap")
+                return None
             
             # Construct full location string
             city = self.location.get('city')
@@ -161,6 +164,9 @@ class WeatherManager:
             try:
                 self.logger.debug(f"Making request to {current_url} with params: {params}")
                 response = self.session.get(current_url, params=params, timeout=10)
+                if response.status_code == 401:
+                    self.logger.error("Invalid API key for OpenWeatherMap")
+                    return None
                 response.raise_for_status()
                 current_data = response.json()
                 self.logger.debug(f"Current weather response: {current_data}")
@@ -178,6 +184,9 @@ class WeatherManager:
             try:
                 self.logger.debug(f"Making request to {forecast_url} with params: {params}")
                 response = self.session.get(forecast_url, params=params, timeout=10)
+                if response.status_code == 401:
+                    self.logger.error("Invalid API key for OpenWeatherMap")
+                    return None
                 response.raise_for_status()
                 forecast_data = response.json()
                 self.logger.debug(f"Forecast response: {forecast_data}")
