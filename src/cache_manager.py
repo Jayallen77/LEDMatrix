@@ -136,9 +136,20 @@ class CacheManager:
 
     def _has_news_changed(self, cached: Dict[str, Any], new: Dict[str, Any]) -> bool:
         """Check if news data has changed."""
-        cached_headlines = set(h.get('id') for h in cached.get('headlines', []))
-        new_headlines = set(h.get('id') for h in new.get('headlines', []))
-        return not cached_headlines.issuperset(new_headlines)
+        # Handle both dictionary and list formats
+        if isinstance(cached, list) and isinstance(new, list):
+            # If both are lists, compare their lengths and content
+            if len(cached) != len(new):
+                return True
+            # Compare titles since they're unique enough for our purposes
+            cached_titles = set(item.get('title', '') for item in cached)
+            new_titles = set(item.get('title', '') for item in new)
+            return cached_titles != new_titles
+        else:
+            # Original dictionary format handling
+            cached_headlines = set(h.get('id') for h in cached.get('headlines', []))
+            new_headlines = set(h.get('id') for h in new.get('headlines', []))
+            return not cached_headlines.issuperset(new_headlines)
 
     def _has_nhl_changed(self, cached: Dict[str, Any], new: Dict[str, Any]) -> bool:
         """Check if NHL data has changed."""
