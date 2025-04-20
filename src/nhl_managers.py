@@ -206,7 +206,7 @@ class BaseNHLManager:
         try:
             # Check cache first
             cache_key = date_str if date_str else 'today'
-            cached_data = self.cache_manager.get_cached_data(cache_key, max_age=self.update_interval)
+            cached_data = self.cache_manager.get(cache_key, max_age=self.update_interval)
             if cached_data:
                 self.logger.info(f"[NHL] Using cached data for {cache_key}")
                 return cached_data
@@ -218,7 +218,7 @@ class BaseNHLManager:
             self.logger.info(f"[NHL] Successfully fetched data from ESPN API")
             
             # Cache the response
-            self.cache_manager.save_cache(cache_key, data)
+            self.cache_manager.set(cache_key, data)
             
             # If no date specified, fetch data from multiple days
             if not date_str:
@@ -235,7 +235,7 @@ class BaseNHLManager:
                 for fetch_date in dates_to_fetch:
                     if fetch_date != today.strftime('%Y%m%d'):  # Skip today as we already have it
                         # Check cache for this date
-                        cached_date_data = self.cache_manager.get_cached_data(fetch_date, max_age=self.update_interval)
+                        cached_date_data = self.cache_manager.get(fetch_date, max_age=self.update_interval)
                         if cached_date_data:
                             self.logger.info(f"[NHL] Using cached data for date {fetch_date}")
                             if "events" in cached_date_data:
@@ -250,7 +250,7 @@ class BaseNHLManager:
                             all_events.extend(date_data["events"])
                             self.logger.info(f"[NHL] Fetched {len(date_data['events'])} events for date {fetch_date}")
                             # Cache the response
-                            self.cache_manager.save_cache(fetch_date, date_data)
+                            self.cache_manager.set(fetch_date, date_data)
                 
                 # Combine events from all dates
                 if all_events:
