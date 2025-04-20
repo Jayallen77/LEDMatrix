@@ -80,39 +80,28 @@ class CacheManager:
         return os.path.join(self.cache_dir, f"{key}.json")
         
     def get_cached_data(self, key: str, max_age: int = 300) -> Optional[Dict]:
-        """
-        Get cached data if it exists and is not too old.
-        Args:
-            key: Cache key
-            max_age: Maximum age of cache in seconds
-        Returns:
-            Cached data or None if not found/too old
-        """
-        # Check memory cache first
-        if key in self._memory_cache:
-            data, timestamp = self._memory_cache[key]
-            if time.time() - timestamp <= max_age:
-                return data
-                
-        # Check file cache
-        cache_path = self._get_cache_path(key)
-        if not os.path.exists(cache_path):
+        """Get data from cache if it exists and is not stale."""
+        if key not in self._memory_cache:
             return None
             
-        try:
-            # Check file age
-            if time.time() - os.path.getmtime(cache_path) > max_age:
+        timestamp = self._memory_cache_timestamps.get(key)
+        if timestamp is None:
+            return None
+            
+        # Convert timestamp to float if it's a string
+        if isinstance(timestamp, str):
+            try:
+                timestamp = float(timestamp)
+            except ValueError:
+                self.logger.error(f"Invalid timestamp format for key {key}: {timestamp}")
                 return None
                 
-            # Load and return cached data
-            with self._cache_lock:
-                with open(cache_path, 'r') as f:
-                    data = json.load(f)
-                    # Update memory cache
-                    self._memory_cache[key] = (data, time.time())
-                    return data
-                
-        except Exception:
+        if time.time() - timestamp <= max_age:
+            return self._memory_cache[key]
+        else:
+            # Data is stale, remove it
+            self._memory_cache.pop(key, None)
+            self._memory_cache_timestamps.pop(key, None)
             return None
             
     def save_cache(self, key: str, data: Dict) -> None:
@@ -130,7 +119,8 @@ class CacheManager:
                     json.dump(data, f)
                 
             # Update memory cache
-            self._memory_cache[key] = (data, time.time())
+            self._memory_cache[key] = data
+            self._memory_cache_timestamps[key] = time.time()
             
         except Exception:
             pass  # Silently fail if cache save fails
