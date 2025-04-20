@@ -26,7 +26,9 @@ class BaseNBAManager:
     _no_data_warning_logged = False
     _last_warning_time = 0
     _warning_cooldown = 60  # Only log warnings once per minute
-    _last_log_times = {}  # Track last log time for each message type
+    _last_log_times = {}
+    _shared_data = None
+    _last_shared_update = 0
     
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         self.display_manager = display_manager
@@ -250,32 +252,40 @@ class BaseNBAManager:
             self.logger.error(f"Error loading logo for {team_abbrev}: {e}", exc_info=True)
             return None
 
-    def _fetch_data(self, date_str: str = None) -> Optional[Dict]:
-        """Fetch data from ESPN API with caching."""
-        if self.test_mode:
-            return self._load_test_data()
-            
-        url = ESPN_NBA_SCOREBOARD_URL
-        params = {}
-        if date_str:
-            params['dates'] = date_str
+    @classmethod
+    def _fetch_shared_data(cls, date_str: str = None) -> Optional[Dict]:
+        """Fetch and cache data for all managers to share."""
+        current_time = time.time()
+        
+        # If we have recent data, use it
+        if cls._shared_data and (current_time - cls._last_shared_update) < 300:  # 5 minutes
+            return cls._shared_data
             
         try:
             # Check cache first
             cache_key = date_str if date_str else 'today'
-            cached_data = self.cache_manager.get_cached_data(cache_key, max_age=self.update_interval)
+            cached_data = cls.cache_manager.get_cached_data(cache_key, max_age=300)  # 5 minutes cache
             if cached_data:
-                self.logger.info(f"[NBA] Using cached data for {cache_key}")
+                cls.logger.info(f"[NBA] Using cached data for {cache_key}")
+                cls._shared_data = cached_data
+                cls._last_shared_update = current_time
                 return cached_data
                 
             # If not in cache or stale, fetch from API
+            url = ESPN_NBA_SCOREBOARD_URL
+            params = {}
+            if date_str:
+                params['dates'] = date_str
+                
             response = requests.get(url, params=params)
             response.raise_for_status()
             data = response.json()
-            self.logger.info(f"[NBA] Successfully fetched data from ESPN API")
+            cls.logger.info(f"[NBA] Successfully fetched data from ESPN API")
             
             # Cache the response
-            self.cache_manager.save_cache(cache_key, data)
+            cls.cache_manager.save_cache(cache_key, data)
+            cls._shared_data = data
+            cls._last_shared_update = current_time
             
             # If no date specified, fetch data from multiple days
             if not date_str:
@@ -292,9 +302,9 @@ class BaseNBAManager:
                 for fetch_date in dates_to_fetch:
                     if fetch_date != today.strftime('%Y%m%d'):  # Skip today as we already have it
                         # Check cache for this date
-                        cached_date_data = self.cache_manager.get_cached_data(fetch_date, max_age=self.update_interval)
+                        cached_date_data = cls.cache_manager.get_cached_data(fetch_date, max_age=300)
                         if cached_date_data:
-                            self.logger.info(f"[NBA] Using cached data for date {fetch_date}")
+                            cls.logger.info(f"[NBA] Using cached data for date {fetch_date}")
                             if "events" in cached_date_data:
                                 all_events.extend(cached_date_data["events"])
                             continue
@@ -305,19 +315,43 @@ class BaseNBAManager:
                         date_data = response.json()
                         if date_data and "events" in date_data:
                             all_events.extend(date_data["events"])
-                            self.logger.info(f"[NBA] Fetched {len(date_data['events'])} events for date {fetch_date}")
+                            cls.logger.info(f"[NBA] Fetched {len(date_data['events'])} events for date {fetch_date}")
                             # Cache the response
-                            self.cache_manager.save_cache(fetch_date, date_data)
+                            cls.cache_manager.save_cache(fetch_date, date_data)
                 
                 # Combine events from all dates
                 if all_events:
                     data["events"].extend(all_events)
-                    self.logger.info(f"[NBA] Combined {len(data['events'])} total events from all dates")
+                    cls.logger.info(f"[NBA] Combined {len(data['events'])} total events from all dates")
+                    cls._shared_data = data
+                    cls._last_shared_update = current_time
             
             return data
         except requests.exceptions.RequestException as e:
-            self.logger.error(f"[NBA] Error fetching data from ESPN: {e}")
+            cls.logger.error(f"[NBA] Error fetching data from ESPN: {e}")
             return None
+
+    def _fetch_data(self, date_str: str = None) -> Optional[Dict]:
+        """Fetch data using shared data mechanism."""
+        # For live games, bypass the shared cache to ensure fresh data
+        if isinstance(self, NBALiveManager):
+            try:
+                url = ESPN_NBA_SCOREBOARD_URL
+                params = {}
+                if date_str:
+                    params['dates'] = date_str
+                    
+                response = requests.get(url, params=params)
+                response.raise_for_status()
+                data = response.json()
+                self.logger.info(f"[NBA] Successfully fetched live game data from ESPN API")
+                return data
+            except requests.exceptions.RequestException as e:
+                self.logger.error(f"[NBA] Error fetching live game data from ESPN: {e}")
+                return None
+        else:
+            # For non-live games, use the shared cache
+            return self._fetch_shared_data(date_str)
 
     def _extract_game_details(self, game_event: Dict) -> Optional[Dict]:
         """Extract relevant game details from ESPN API response."""
@@ -528,6 +562,7 @@ class NBALiveManager(BaseNBAManager):
         self.last_display_update = 0  # Track when we last updated the display
         self.last_log_time = 0
         self.log_interval = 300  # Only log status every 5 minutes
+        self.has_favorite_team_game = False  # Track if we have any favorite team games
         
         # Initialize with test game only if test mode is enabled
         if self.test_mode:
@@ -551,8 +586,12 @@ class NBALiveManager(BaseNBAManager):
     def update(self):
         """Update live game data."""
         current_time = time.time()
-        # Use longer interval if no game data
-        interval = self.no_data_interval if not self.live_games else self.update_interval
+        
+        # Determine update interval based on whether we have favorite team games
+        if self.has_favorite_team_game:
+            interval = self.update_interval  # 15 seconds for live favorite team games
+        else:
+            interval = self.no_data_interval  # 5 minutes when no favorite team games
         
         if current_time - self.last_update >= interval:
             self.last_update = current_time
@@ -581,6 +620,7 @@ class NBALiveManager(BaseNBAManager):
                 if data and "events" in data:
                     # Find all live games involving favorite teams
                     new_live_games = []
+                    has_favorite_team = False
                     for event in data["events"]:
                         details = self._extract_game_details(event)
                         if details and details["is_live"]:
@@ -589,12 +629,21 @@ class NBALiveManager(BaseNBAManager):
                                 details["away_abbr"] in self.favorite_teams
                             ):
                                 new_live_games.append(details)
+                                if self.favorite_teams and (
+                                    details["home_abbr"] in self.favorite_teams or 
+                                    details["away_abbr"] in self.favorite_teams
+                                ):
+                                    has_favorite_team = True
+                    
+                    # Update favorite team game status
+                    self.has_favorite_team_game = has_favorite_team
                     
                     # Only log if there's a change in games or enough time has passed
                     should_log = (
                         current_time - self.last_log_time >= self.log_interval or
                         len(new_live_games) != len(self.live_games) or
-                        not self.live_games  # Log if we had no games before
+                        not self.live_games or  # Log if we had no games before
+                        has_favorite_team != self.has_favorite_team_game  # Log if favorite team status changed
                     )
                     
                     if should_log:
@@ -602,6 +651,8 @@ class NBALiveManager(BaseNBAManager):
                             self.logger.info(f"[NBA] Found {len(new_live_games)} live games")
                             for game in new_live_games:
                                 self.logger.info(f"[NBA] Live game: {game['away_abbr']} vs {game['home_abbr']} - Q{game['period']}, {game['clock']}")
+                            if has_favorite_team:
+                                self.logger.info("[NBA] Found live game(s) for favorite team(s)")
                         else:
                             self.logger.info("[NBA] No live games found")
                         self.last_log_time = current_time
@@ -635,15 +686,7 @@ class NBALiveManager(BaseNBAManager):
                         # No live games found
                         self.live_games = []
                         self.current_game = None
-                
-                # Check if it's time to switch games
-                if len(self.live_games) > 1 and (current_time - self.last_game_switch) >= self.game_display_duration:
-                    self.current_game_index = (self.current_game_index + 1) % len(self.live_games)
-                    self.current_game = self.live_games[self.current_game_index]
-                    self.last_game_switch = current_time
-                    # Force display update when switching games
-                    self.display(force_clear=True)
-                    self.last_display_update = current_time
+                        self.has_favorite_team_game = False
 
     def display(self, force_clear: bool = False):
         """Display live game information."""
@@ -658,7 +701,7 @@ class NBARecentManager(BaseNBAManager):
         self.recent_games = []
         self.current_game_index = 0
         self.last_update = 0
-        self.update_interval = 300  # 5 minutes
+        self.update_interval = 3600  # 1 hour for recent games
         self.recent_hours = self.nba_config.get("recent_game_hours", 48)
         self.last_game_switch = 0
         self.game_display_duration = 15  # Display each game for 15 seconds
@@ -749,7 +792,7 @@ class NBAUpcomingManager(BaseNBAManager):
         self.upcoming_games = []
         self.current_game_index = 0
         self.last_update = 0
-        self.update_interval = 300  # 5 minutes
+        self.update_interval = 3600  # 1 hour for upcoming games
         self.last_warning_time = 0
         self.warning_cooldown = 300  # Only show warning every 5 minutes
         self.logger.info(f"Initialized NBAUpcomingManager with {len(self.favorite_teams)} favorite teams")
