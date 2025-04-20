@@ -193,7 +193,25 @@ class BaseNHLManager:
 
     def _fetch_data(self, date_str: str = None) -> Optional[Dict]:
         """Fetch data using shared data mechanism."""
-        return self._fetch_shared_data(date_str)
+        # For live games, bypass the shared cache to ensure fresh data
+        if isinstance(self, NHLLiveManager):
+            try:
+                url = ESPN_NHL_SCOREBOARD_URL
+                params = {}
+                if date_str:
+                    params['dates'] = date_str
+                    
+                response = requests.get(url, params=params)
+                response.raise_for_status()
+                data = response.json()
+                self.logger.info(f"[NHL] Successfully fetched live game data from ESPN API")
+                return data
+            except requests.exceptions.RequestException as e:
+                self.logger.error(f"[NHL] Error fetching live game data from ESPN: {e}")
+                return None
+        else:
+            # For non-live games, use the shared cache
+            return self._fetch_shared_data(date_str)
 
     def _load_fonts(self):
         """Load fonts used by the scoreboard."""
@@ -482,7 +500,7 @@ class NHLLiveManager(BaseNHLManager):
     """Manager for live NHL games."""
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         super().__init__(config, display_manager)
-        self.update_interval = self.nhl_config.get("live_update_interval", 30)  # 30 seconds for live games
+        self.update_interval = self.nhl_config.get("live_update_interval", 15)  # 15 seconds for live games
         self.no_data_interval = 300  # 5 minutes when no live games
         self.last_update = 0
         self.logger.info("Initialized NHL Live Manager")

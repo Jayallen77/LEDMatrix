@@ -71,7 +71,7 @@
         "enabled": true,
         "test_mode": false,
         "update_interval_seconds": 300,
-        "live_update_interval": 60,
+        "live_update_interval": 15,
         "recent_update_interval": 3600,
         "upcoming_update_interval": 3600,
         "recent_game_hours": 48,
