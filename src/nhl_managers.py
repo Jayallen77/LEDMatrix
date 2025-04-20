@@ -575,6 +575,18 @@ class NHLLiveManager(BaseNHLManager):
                                 self.logger.info(f"[NHL] Found live game: {details['away_abbr']} vs {details['home_abbr']} - Period {details['period']}, {details['clock']}")
                     
                     if new_live_games:
+                        # Update the current game with the latest data
+                        for new_game in new_live_games:
+                            if self.current_game and (
+                                (new_game["home_abbr"] == self.current_game["home_abbr"] and 
+                                 new_game["away_abbr"] == self.current_game["away_abbr"]) or
+                                (new_game["home_abbr"] == self.current_game["away_abbr"] and 
+                                 new_game["away_abbr"] == self.current_game["home_abbr"])
+                            ):
+                                self.current_game = new_game
+                                self.logger.info(f"[NHL] Updated current game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']} - Period {self.current_game['period']}, {self.current_game['clock']}")
+                                break
+                        
                         # Only update the games list if we have new games
                         if not self.live_games or set(game["away_abbr"] + game["home_abbr"] for game in new_live_games) != set(game["away_abbr"] + game["home_abbr"] for game in self.live_games):
                             self.live_games = new_live_games
