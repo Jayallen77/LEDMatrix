@@ -778,7 +778,7 @@ class NHLUpcomingManager(BaseNHLManager):
 
     def display(self, force_clear=False):
         """Display upcoming games."""
-        if not self.games_list:
+        if not self.upcoming_games:
             self.logger.info("[NHL] No upcoming games to display")
             self.display_manager.clear()
             return
@@ -791,8 +791,8 @@ class NHLUpcomingManager(BaseNHLManager):
             self.display_manager.update_display()
             
             # Move to next game
-            self.current_game_index = (self.current_game_index + 1) % len(self.games_list)
-            self.current_game = self.games_list[self.current_game_index]
+            self.current_game_index = (self.current_game_index + 1) % len(self.upcoming_games)
+            self.current_game = self.upcoming_games[self.current_game_index]
             
         except Exception as e:
             self.logger.error(f"[NHL] Error displaying upcoming game: {e}", exc_info=True) 
