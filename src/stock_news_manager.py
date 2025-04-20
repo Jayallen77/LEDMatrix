@@ -248,13 +248,15 @@ class StockNewsManager:
         self.last_generation_start = time.time()
         
         try:
-            # Estimate total width needed (adjust multiplier if needed)
-            # Average headline length guess + symbol + screen width gap
-            estimated_item_width = width * 3  # Estimate each item + gap needs ~3 screen widths
-            estimated_total_width = estimated_item_width * len(all_news)
-
-            # Create the full image with estimated width
-            full_image = Image.new('RGB', (max(estimated_total_width, width), height), (0, 0, 0))
+            # Log the number of headlines being displayed
+            logger.info(f"[StockNews] Generating image for {len(all_news)} headlines")
+            
+            # Calculate fixed width based on number of headlines
+            # Each headline gets 3 screen widths (2 for content, 1 for gap)
+            fixed_width = width * 3 * len(all_news)
+            
+            # Create the full image with fixed width
+            full_image = Image.new('RGB', (fixed_width, height), (0, 0, 0))
             draw = ImageDraw.Draw(full_image)
             
             current_x = 0
@@ -263,32 +265,15 @@ class StockNewsManager:
             # Add initial gap before the first headline
             current_x += screen_width_gap
             
-            actual_total_width = 0
             for news in all_news:
                 news_text = f"{news['symbol']}: {news['title']}   "
                 news_image = self._create_text_image(news_text)
                 
-                # Check if image needs resizing (should be rare with estimate)
-                if current_x + news_image.width > full_image.width:
-                    # Resize needed - this is less efficient but handles variability
-                    new_width = current_x + news_image.width + screen_width_gap * (len(all_news) - all_news.index(news))  # Estimate remaining needed
-                    new_full_image = Image.new('RGB', (new_width, height), (0, 0, 0))
-                    new_full_image.paste(full_image, (0, 0))
-                    full_image = new_full_image
-                    draw = ImageDraw.Draw(full_image)  # Update draw object
-                    logger.warning(f"[StockNews] Resized full_image to {new_width}px")
-
                 # Paste this news image into the full image
                 full_image.paste(news_image, (current_x, 0))
                 
                 # Move to next position: text width + screen width gap
                 current_x += news_image.width + screen_width_gap
-                
-            actual_total_width = current_x - screen_width_gap  # Remove trailing gap
-            
-            # Crop the image to the actual needed size
-            if actual_total_width > 0 and actual_total_width < full_image.width:
-                full_image = full_image.crop((0, 0, actual_total_width, height))
 
             # Store the generated image
             self.background_image = full_image
