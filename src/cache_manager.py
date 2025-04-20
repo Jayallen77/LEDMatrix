@@ -145,8 +145,10 @@ class CacheManager:
                 return self._memory_cache[key]
             else:
                 # Clear expired memory cache
-                del self._memory_cache[key]
-                del self._memory_cache_timestamps[key]
+                if key in self._memory_cache:
+                    del self._memory_cache[key]
+                if key in self._memory_cache_timestamps:
+                    del self._memory_cache_timestamps[key]
 
         cache_path = self._get_cache_path(key)
         if not os.path.exists(cache_path):
