@@ -327,13 +327,14 @@ class StockNewsManager:
         start_idx = self.current_rotation_index * self.headlines_per_rotation
         end_idx = min(start_idx + self.headlines_per_rotation, len(self.all_news_items))
         
-        # If we've reached the end, start over
+        # If we've reached the end, shuffle and start over
         if start_idx >= len(self.all_news_items):
             self.current_rotation_index = 0
+            random.shuffle(self.all_news_items)  # Reshuffle when we've shown all headlines
             start_idx = 0
             end_idx = min(self.headlines_per_rotation, len(self.all_news_items))
             self.rotation_complete = True
-            logger.info("Completed a full rotation of news headlines")
+            logger.info("Completed a full rotation of news headlines, reshuffling for next round")
         
         # Get the current batch of headlines
         current_news = self.all_news_items[start_idx:end_idx]
