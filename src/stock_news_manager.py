@@ -37,8 +37,13 @@ class StockNewsManager:
         self.scroll_speed = self.stock_news_config.get('scroll_speed', 1)
         self.scroll_delay = self.stock_news_config.get('scroll_delay', 0.001)  # Default to 1ms instead of 50ms
         
+        # Get headline settings from config
+        self.max_headlines_per_symbol = self.stock_news_config.get('max_headlines_per_symbol', 1)
+        self.headlines_per_rotation = self.stock_news_config.get('headlines_per_rotation', 2)
+        
         # Log the actual values being used
         logger.info(f"Scroll settings - Speed: {self.scroll_speed} pixels/frame, Delay: {self.scroll_delay*1000:.2f}ms")
+        logger.info(f"Headline settings - Max per symbol: {self.max_headlines_per_symbol}, Per rotation: {self.headlines_per_rotation}")
         
         # Initialize frame rate tracking
         self.frame_count = 0
@@ -51,6 +56,11 @@ class StockNewsManager:
         self.is_generating_image = False  # Flag to track if we're currently generating
         self.last_generation_start = 0  # When we started generating
         self.generation_timeout = 5  # Max seconds to spend generating
+        
+        # Rotation tracking
+        self.all_news_items = []  # Store all available news items
+        self.current_rotation_index = 0  # Track which rotation we're on
+        self.rotation_complete = False  # Flag to indicate when a full rotation is complete
         
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -303,31 +313,59 @@ class StockNewsManager:
             logger.warning("No news data available to display")
             return
             
-        # Get all news items from all symbols
-        all_news = []
-        for symbol, news_items in self.news_data.items():
-            for item in news_items:
-                all_news.append({
-                    "symbol": symbol,
-                    "title": item["title"],
-                    "publisher": item["publisher"]
-                })
+        # Get all news items from all symbols, respecting max_headlines_per_symbol
+        if not self.all_news_items:
+            self.all_news_items = []
+            for symbol, news_items in self.news_data.items():
+                # Limit the number of headlines per symbol
+                limited_items = news_items[:self.max_headlines_per_symbol]
+                for item in limited_items:
+                    self.all_news_items.append({
+                        "symbol": symbol,
+                        "title": item["title"],
+                        "publisher": item["publisher"]
+                    })
+            
+            # Shuffle the news items for variety
+            random.shuffle(self.all_news_items)
+            logger.info(f"Prepared {len(self.all_news_items)} news items for rotation")
                 
-        if not all_news:
+        if not self.all_news_items:
             return
 
+        # Get the current rotation of headlines
+        start_idx = self.current_rotation_index * self.headlines_per_rotation
+        end_idx = min(start_idx + self.headlines_per_rotation, len(self.all_news_items))
+        
+        # If we've reached the end, start over
+        if start_idx >= len(self.all_news_items):
+            self.current_rotation_index = 0
+            start_idx = 0
+            end_idx = min(self.headlines_per_rotation, len(self.all_news_items))
+            self.rotation_complete = True
+            logger.info("Completed a full rotation of news headlines")
+        
+        # Get the current batch of headlines
+        current_news = self.all_news_items[start_idx:end_idx]
+        
         # Define width and height here, so they are always available
         width = self.display_manager.matrix.width
         height = self.display_manager.matrix.height
 
         # Check if we need to generate a new image
-        if self.cached_text_image is None:
+        if self.cached_text_image is None or self.rotation_complete:
+            # Reset rotation complete flag
+            self.rotation_complete = False
+            
             # Try to generate the image in the background
-            if self._generate_background_image(all_news, width, height):
+            if self._generate_background_image(current_news, width, height):
                 # If generation completed successfully, use the background image
                 self.cached_text_image = self.background_image
                 self.scroll_position = 0
                 self.background_image = None  # Clear the background image
+                
+                # Move to next rotation for next time
+                self.current_rotation_index += 1
             else:
                 # If still generating or failed, show a simple message
                 self.display_manager.image.paste(Image.new('RGB', (width, height), (0, 0, 0)), (0, 0))
@@ -356,6 +394,9 @@ class StockNewsManager:
         self.scroll_position += self.scroll_speed
         if self.scroll_position >= total_width:
             self.scroll_position = 0 # Wrap around
+            # When we wrap around, move to next rotation
+            self.cached_text_image = None
+            return True
 
         # Calculate the visible portion
         # Handle wrap-around drawing
