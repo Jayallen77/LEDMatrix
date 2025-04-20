@@ -762,8 +762,7 @@ class NBARecentManager(BaseNBAManager):
         """Display recent games."""
         if not self.recent_games:
             self.logger.info("[NBA] No recent games to display")
-            self.display_manager.clear()
-            return
+            return  # Skip display update entirely
             
         try:
             current_time = time.time()
@@ -860,8 +859,7 @@ class NBAUpcomingManager(BaseNBAManager):
             if time.time() - self.last_warning_time > self.warning_cooldown:
                 self.logger.info("[NBA] No upcoming games to display")
                 self.last_warning_time = time.time()
-            self.display_manager.clear()
-            return
+            return  # Skip display update entirely
             
         try:
             # Draw the scorebug layout

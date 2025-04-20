@@ -692,8 +692,7 @@ class NHLRecentManager(BaseNHLManager):
         """Display recent games."""
         if not self.games_list:
             self.logger.info("[NHL] No recent games to display")
-            self.display_manager.clear()
-            return
+            return  # Skip display update entirely
             
         try:
             current_time = time.time()
@@ -725,6 +724,8 @@ class NHLUpcomingManager(BaseNHLManager):
         self.update_interval = 300  # 5 minutes
         self.last_log_time = 0
         self.log_interval = 300  # Only log status every 5 minutes
+        self.last_warning_time = 0
+        self.warning_cooldown = 300  # Only show warning every 5 minutes
         self.logger.info(f"Initialized NHLUpcomingManager with {len(self.favorite_teams)} favorite teams")
         
     def update(self):
@@ -779,9 +780,11 @@ class NHLUpcomingManager(BaseNHLManager):
     def display(self, force_clear=False):
         """Display upcoming games."""
         if not self.upcoming_games:
-            self.logger.info("[NHL] No upcoming games to display")
-            self.display_manager.clear()
-            return
+            current_time = time.time()
+            if current_time - self.last_warning_time > self.warning_cooldown:
+                self.logger.info("[NHL] No upcoming games to display")
+                self.last_warning_time = current_time
+            return  # Skip display update entirely
             
         try:
             # Draw the scorebug layout
