@@ -29,6 +29,8 @@ class BaseNBAManager:
     _last_log_times = {}
     _shared_data = None
     _last_shared_update = 0
+    cache_manager = CacheManager()  # Make cache_manager a class attribute
+    logger = logging.getLogger('NBA')  # Make logger a class attribute
     
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         self.display_manager = display_manager
@@ -42,9 +44,7 @@ class BaseNBAManager:
         self.current_game = None
         self.fonts = self._load_fonts()
         self.favorite_teams = self.nba_config.get("favorite_teams", [])
-        self.logger = logging.getLogger('NBA')
         self.recent_hours = self.nba_config.get("recent_game_hours", 72)  # Default 72 hours
-        self.cache_manager = CacheManager()  # Create instance of CacheManager
         
         # Set logging level to INFO to reduce noise
         self.logger.setLevel(logging.INFO)
