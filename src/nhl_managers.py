@@ -508,6 +508,7 @@ class NHLLiveManager(BaseNHLManager):
         self.current_game_index = 0  # Index to track which game to show
         self.last_game_switch = 0  # Track when we last switched games
         self.game_display_duration = self.nhl_config.get("live_game_duration", 20)  # Display each live game for 20 seconds
+        self.last_display_update = 0  # Track when we last updated the display
         
         # Initialize with test game only if test mode is enabled
         if self.test_mode:
@@ -593,6 +594,11 @@ class NHLLiveManager(BaseNHLManager):
                     self.current_game = self.live_games[self.current_game_index]
                     self.last_game_switch = current_time
                     logging.info(f"[NHL] Switching to live game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
+                
+                # Always update the display when we have new data
+                if self.current_game and current_time - self.last_display_update >= 1:  # Update display at most once per second
+                    self.display(force_clear=True)
+                    self.last_display_update = current_time
 
     def display(self, force_clear: bool = False):
         """Display live game information."""
