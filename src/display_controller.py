@@ -308,94 +308,67 @@ class DisplayController:
                 # Check for live games
                 has_live_games, sport_type = self._check_live_games()
                 
-                # If we have live games, update their display immediately
+                # If we have live games, cycle through them
                 if has_live_games:
-                    if sport_type == 'nhl' and self.nhl_live:
-                        self.nhl_live.display(force_clear=True)
-                    elif sport_type == 'nba' and self.nba_live:
-                        self.nba_live.display(force_clear=True)
-                
-                # Check for mode switch
-                if current_time - self.last_switch > self.get_current_duration():
-                    # If there are live games, check if they involve favorite teams
-                    if has_live_games:
-                        if sport_type == 'nhl' and self.nhl_live:
-                            # Check if any live NHL games involve favorite teams
-                            favorite_teams_involved = any(
-                                game["home_abbr"] in self.nhl_favorite_teams or 
-                                game["away_abbr"] in self.nhl_favorite_teams 
-                                for game in self.nhl_live.live_games
-                            )
-                            if favorite_teams_involved:
-                                self.current_display_mode = 'nhl_live'
-                                logger.info("Live NHL games with favorite teams available")
-                            else:
-                                # No favorite teams in live games, check for team rotation
-                                if self._has_team_games('nhl'):
-                                    self._rotate_team_games('nhl')
-                                else:
-                                    # No favorite team games, continue with regular rotation
-                                    self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
-                                    self.current_display_mode = self.available_modes[self.current_mode_index]
-                                    logger.info(f"Switching to: {self.current_display_mode}")
-                                    
-                        elif sport_type == 'nba' and self.nba_live:
-                            # Check if any live NBA games involve favorite teams
-                            favorite_teams_involved = any(
-                                game["home_abbr"] in self.nba_favorite_teams or 
-                                game["away_abbr"] in self.nba_favorite_teams 
-                                for game in self.nba_live.live_games
-                            )
-                            if favorite_teams_involved:
-                                self.current_display_mode = 'nba_live'
-                                logger.info("Live NBA games with favorite teams available")
-                            else:
-                                # No favorite teams in live games, check for team rotation
-                                if self._has_team_games('nba'):
-                                    self._rotate_team_games('nba')
-                                else:
-                                    # No favorite team games, continue with regular rotation
-                                    self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
-                                    self.current_display_mode = self.available_modes[self.current_mode_index]
-                                    logger.info(f"Switching to: {self.current_display_mode}")
-                    else:
-                        # No live games, continue with regular rotation
-                        self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
-                        self.current_display_mode = self.available_modes[self.current_mode_index]
-                        logger.info(f"Switching to: {self.current_display_mode}")
+                    # Check if it's time to switch live games
+                    if current_time - self.last_switch > self.get_current_duration():
+                        # Switch between NHL and NBA live games if both are available
+                        if sport_type == 'nhl' and self.nhl_live and self.nba_live and self.nba_live.live_games:
+                            sport_type = 'nba'
+                            self.last_switch = current_time
+                            self.force_clear = True
+                        elif sport_type == 'nba' and self.nba_live and self.nhl_live and self.nhl_live.live_games:
+                            sport_type = 'nhl'
+                            self.last_switch = current_time
+                            self.force_clear = True
                     
-                    # Force clear when switching modes
+                    # Display the current live game
+                    if sport_type == 'nhl' and self.nhl_live:
+                        self.nhl_live.update()  # Force update to get latest data
+                        self.nhl_live.display(force_clear=self.force_clear)
+                    elif sport_type == 'nba' and self.nba_live:
+                        self.nba_live.update()  # Force update to get latest data
+                        self.nba_live.display(force_clear=self.force_clear)
+                    
+                    self.force_clear = False
+                    continue  # Skip the rest of the loop to stay on live games
+                
+                # Only proceed with mode switching if no live games
+                if current_time - self.last_switch > self.get_current_duration():
+                    # No live games, continue with regular rotation
+                    self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
+                    self.current_display_mode = self.available_modes[self.current_mode_index]
+                    logger.info(f"Switching to: {self.current_display_mode}")
                     self.force_clear = True
                     self.last_switch = current_time
 
                 # Display current mode frame (only for non-live modes)
                 try:
-                    if self.current_display_mode != 'nhl_live' and self.current_display_mode != 'nba_live':
-                        if self.current_display_mode == 'clock' and self.clock:
-                            self.clock.display_time(force_clear=self.force_clear)
+                    if self.current_display_mode == 'clock' and self.clock:
+                        self.clock.display_time(force_clear=self.force_clear)
                             
-                        elif self.current_display_mode == 'weather_current' and self.weather:
-                            self.weather.display_weather(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'weather_hourly' and self.weather:
-                            self.weather.display_hourly_forecast(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'weather_daily' and self.weather:
-                            self.weather.display_daily_forecast(force_clear=self.force_clear)
+                    elif self.current_display_mode == 'weather_current' and self.weather:
+                        self.weather.display_weather(force_clear=self.force_clear)
+                    elif self.current_display_mode == 'weather_hourly' and self.weather:
+                        self.weather.display_hourly_forecast(force_clear=self.force_clear)
+                    elif self.current_display_mode == 'weather_daily' and self.weather:
+                        self.weather.display_daily_forecast(force_clear=self.force_clear)
                             
-                        elif self.current_display_mode == 'stocks' and self.stocks:
-                            self.stocks.display_stocks(force_clear=self.force_clear)
+                    elif self.current_display_mode == 'stocks' and self.stocks:
+                        self.stocks.display_stocks(force_clear=self.force_clear)
                             
-                        elif self.current_display_mode == 'nhl_recent' and self.nhl_recent:
-                            self.nhl_recent.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'nhl_upcoming' and self.nhl_upcoming:
-                            self.nhl_upcoming.display(force_clear=self.force_clear)
+                    elif self.current_display_mode == 'nhl_recent' and self.nhl_recent:
+                        self.nhl_recent.display(force_clear=self.force_clear)
+                    elif self.current_display_mode == 'nhl_upcoming' and self.nhl_upcoming:
+                        self.nhl_upcoming.display(force_clear=self.force_clear)
                             
-                        elif self.current_display_mode == 'nba_recent' and self.nba_recent:
-                            self.nba_recent.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'nba_upcoming' and self.nba_upcoming:
-                            self.nba_upcoming.display(force_clear=self.force_clear)
+                    elif self.current_display_mode == 'nba_recent' and self.nba_recent:
+                        self.nba_recent.display(force_clear=self.force_clear)
+                    elif self.current_display_mode == 'nba_upcoming' and self.nba_upcoming:
+                        self.nba_upcoming.display(force_clear=self.force_clear)
                             
-                        elif self.current_display_mode == 'stock_news' and self.news:
-                            self.news.display_news()
+                    elif self.current_display_mode == 'stock_news' and self.news:
+                        self.news.display_news()
                             
                 except Exception as e:
                     logger.error(f"Error updating display for mode {self.current_display_mode}: {e}", exc_info=True)
