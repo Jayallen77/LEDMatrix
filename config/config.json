@@ -61,7 +61,7 @@
     },
     "stock_news": {
         "enabled": true,
-        "update_interval": 800,
+        "update_interval": 3600,
         "scroll_speed": 1,
         "scroll_delay": 0.001,
         "max_headlines_per_symbol": 1,
