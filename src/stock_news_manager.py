@@ -46,6 +46,12 @@ class StockNewsManager:
         self.last_fps_log_time = time.time()
         self.frame_times = []  # Keep track of recent frame times for average FPS
         
+        # Background image generation
+        self.background_image = None  # The image being generated in background
+        self.is_generating_image = False  # Flag to track if we're currently generating
+        self.last_generation_start = 0  # When we started generating
+        self.generation_timeout = 5  # Max seconds to spend generating
+        
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
@@ -214,6 +220,76 @@ class StockNewsManager:
         self.last_frame_time = current_time
         self.frame_count += 1
 
+    def _generate_background_image(self, all_news, width, height):
+        """Generate the full image in the background without disrupting display."""
+        if self.is_generating_image:
+            # Check if we've been generating too long
+            if time.time() - self.last_generation_start > self.generation_timeout:
+                logger.warning("[StockNews] Background image generation timed out, resetting")
+                self.is_generating_image = False
+                self.background_image = None
+                return False
+                
+            # Still generating, return False to indicate not ready
+            return False
+            
+        # Start a new background generation
+        self.is_generating_image = True
+        self.last_generation_start = time.time()
+        
+        try:
+            # Estimate total width needed (adjust multiplier if needed)
+            # Average headline length guess + symbol + screen width gap
+            estimated_item_width = width * 3  # Estimate each item + gap needs ~3 screen widths
+            estimated_total_width = estimated_item_width * len(all_news)
+
+            # Create the full image with estimated width
+            full_image = Image.new('RGB', (max(estimated_total_width, width), height), (0, 0, 0))
+            draw = ImageDraw.Draw(full_image)
+            
+            current_x = 0
+            screen_width_gap = width  # Use a full screen width as the gap
+            
+            # Add initial gap before the first headline
+            current_x += screen_width_gap
+            
+            actual_total_width = 0
+            for news in all_news:
+                news_text = f"{news['symbol']}: {news['title']}   "
+                news_image = self._create_text_image(news_text)
+                
+                # Check if image needs resizing (should be rare with estimate)
+                if current_x + news_image.width > full_image.width:
+                    # Resize needed - this is less efficient but handles variability
+                    new_width = current_x + news_image.width + screen_width_gap * (len(all_news) - all_news.index(news))  # Estimate remaining needed
+                    new_full_image = Image.new('RGB', (new_width, height), (0, 0, 0))
+                    new_full_image.paste(full_image, (0, 0))
+                    full_image = new_full_image
+                    draw = ImageDraw.Draw(full_image)  # Update draw object
+                    logger.warning(f"[StockNews] Resized full_image to {new_width}px")
+
+                # Paste this news image into the full image
+                full_image.paste(news_image, (current_x, 0))
+                
+                # Move to next position: text width + screen width gap
+                current_x += news_image.width + screen_width_gap
+                
+            actual_total_width = current_x - screen_width_gap  # Remove trailing gap
+            
+            # Crop the image to the actual needed size
+            if actual_total_width > 0 and actual_total_width < full_image.width:
+                full_image = full_image.crop((0, 0, actual_total_width, height))
+
+            # Store the generated image
+            self.background_image = full_image
+            self.is_generating_image = False
+            return True
+            
+        except Exception as e:
+            logger.error(f"[StockNews] Error generating background image: {e}")
+            self.is_generating_image = False
+            return False
+
     def display_news(self):
         """Display news headlines by scrolling them across the screen."""
         if not self.stock_news_config.get('enabled', False):
@@ -244,64 +320,27 @@ class StockNewsManager:
         width = self.display_manager.matrix.width
         height = self.display_manager.matrix.height
 
-        # Create a continuous scrolling image if needed
+        # Check if we need to generate a new image
         if self.cached_text_image is None:
-            random.shuffle(all_news)
-            
-            # Estimate total width needed (adjust multiplier if needed)
-            # Average headline length guess + symbol + screen width gap
-            estimated_item_width = width * 3 # Estimate each item + gap needs ~3 screen widths
-            estimated_total_width = estimated_item_width * len(all_news)
-
-            # Create the full image with estimated width
-            full_image = Image.new('RGB', (max(estimated_total_width, width), height), (0, 0, 0))
-            draw = ImageDraw.Draw(full_image)
-            
-            current_x = 0
-            screen_width_gap = width # Use a full screen width as the gap
-            
-            # Add initial gap before the first headline
-            current_x += screen_width_gap
-            
-            actual_total_width = 0
-            for news in all_news:
-                news_text = f"{news['symbol']}: {news['title']}   "
-                news_image = self._create_text_image(news_text)
-                
-                # Check if image needs resizing (should be rare with estimate)
-                if current_x + news_image.width > full_image.width:
-                    # Resize needed - this is less efficient but handles variability
-                    new_width = current_x + news_image.width + screen_width_gap * (len(all_news) - all_news.index(news)) # Estimate remaining needed
-                    new_full_image = Image.new('RGB', (new_width, height), (0, 0, 0))
-                    new_full_image.paste(full_image, (0, 0))
-                    full_image = new_full_image
-                    draw = ImageDraw.Draw(full_image) # Update draw object
-                    logging.warning(f"[StockNews] Resized full_image to {new_width}px")
-
-                # Paste this news image into the full image
-                full_image.paste(news_image, (current_x, 0))
-                
-                # Move to next position: text width + screen width gap
-                current_x += news_image.width + screen_width_gap
-                
-            actual_total_width = current_x - screen_width_gap # Remove trailing gap
-            
-            # Crop the image to the actual needed size
-            if actual_total_width > 0 and actual_total_width < full_image.width:
-                 full_image = full_image.crop((0, 0, actual_total_width, height))
-
-            # Cache the full image
-            self.cached_text_image = full_image
-            self.scroll_position = 0
-            # Don't reset last_update time here, cache creation isn't a data update
-            # self.last_update = time.time()
+            # Try to generate the image in the background
+            if self._generate_background_image(all_news, width, height):
+                # If generation completed successfully, use the background image
+                self.cached_text_image = self.background_image
+                self.scroll_position = 0
+                self.background_image = None  # Clear the background image
+            else:
+                # If still generating or failed, show a simple message
+                self.display_manager.image.paste(Image.new('RGB', (width, height), (0, 0, 0)), (0, 0))
+                draw = ImageDraw.Draw(self.display_manager.image)
+                draw.text((width//4, height//2), "Loading news...", font=self.display_manager.small_font, fill=(255, 255, 255))
+                self.display_manager.update_display()
+                time.sleep(0.1)  # Short delay to prevent CPU hogging
+                return True
         
         # --- Scrolling logic remains the same --- 
-        # width = self.display_manager.matrix.width # Moved up
-        # Check if cached image exists before accessing width
         if self.cached_text_image is None:
             logger.warning("[StockNews] Cached image is None, cannot scroll.")
-            return False # Indicate nothing was displayed
+            return False
             
         total_width = self.cached_text_image.width
         
@@ -317,9 +356,6 @@ class StockNewsManager:
         self.scroll_position += self.scroll_speed
         if self.scroll_position >= total_width:
             self.scroll_position = 0 # Wrap around
-            # Optional: Force reload/reshuffle when wrapping
-            # self.cached_text_image = None 
-            # return True # Indicate wrap happened if needed by controller
 
         # Calculate the visible portion
         # Handle wrap-around drawing
