@@ -509,6 +509,8 @@ class NHLLiveManager(BaseNHLManager):
         self.last_game_switch = 0  # Track when we last switched games
         self.game_display_duration = self.nhl_config.get("live_game_duration", 20)  # Display each live game for 20 seconds
         self.last_display_update = 0  # Track when we last updated the display
+        self.last_log_time = 0
+        self.log_interval = 300  # Only log status every 5 minutes
         
         # Initialize with test game only if test mode is enabled
         if self.test_mode:
@@ -536,7 +538,6 @@ class NHLLiveManager(BaseNHLManager):
         interval = self.no_data_interval if not self.live_games else self.update_interval
         
         if current_time - self.last_update >= interval:
-            self.logger.info("[NHL] Fetching new live game data...")
             self.last_update = current_time
             
             if self.test_mode:
@@ -555,7 +556,6 @@ class NHLLiveManager(BaseNHLManager):
                             else:
                                 self.current_game["period"] = 1
                     self.current_game["clock"] = f"{minutes:02d}:{seconds:02d}"
-                    self.logger.info(f"[NHL] Updated test game clock: {self.current_game['clock']}")
                     # Always update display in test mode
                     self.display(force_clear=True)
             else:
@@ -572,7 +572,22 @@ class NHLLiveManager(BaseNHLManager):
                                 details["away_abbr"] in self.favorite_teams
                             ):
                                 new_live_games.append(details)
-                                self.logger.info(f"[NHL] Found live game: {details['away_abbr']} vs {details['home_abbr']} - Period {details['period']}, {details['clock']}")
+                    
+                    # Only log if there's a change in games or enough time has passed
+                    should_log = (
+                        current_time - self.last_log_time >= self.log_interval or
+                        len(new_live_games) != len(self.live_games) or
+                        not self.live_games  # Log if we had no games before
+                    )
+                    
+                    if should_log:
+                        if new_live_games:
+                            self.logger.info(f"[NHL] Found {len(new_live_games)} live games")
+                            for game in new_live_games:
+                                self.logger.info(f"[NHL] Live game: {game['away_abbr']} vs {game['home_abbr']} - Period {game['period']}, {game['clock']}")
+                        else:
+                            self.logger.info("[NHL] No live games found")
+                        self.last_log_time = current_time
                     
                     if new_live_games:
                         # Update the current game with the latest data
@@ -584,7 +599,6 @@ class NHLLiveManager(BaseNHLManager):
                                  new_game["away_abbr"] == self.current_game["home_abbr"])
                             ):
                                 self.current_game = new_game
-                                self.logger.info(f"[NHL] Updated current game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']} - Period {self.current_game['period']}, {self.current_game['clock']}")
                                 break
                         
                         # Only update the games list if we have new games
@@ -595,7 +609,6 @@ class NHLLiveManager(BaseNHLManager):
                                 self.current_game_index = 0
                                 self.current_game = self.live_games[0]
                                 self.last_game_switch = current_time
-                                self.logger.info(f"[NHL] Starting with live game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
                         
                         # Always update display when we have new data, but limit to once per second
                         if current_time - self.last_display_update >= 1.0:
@@ -605,14 +618,12 @@ class NHLLiveManager(BaseNHLManager):
                         # No live games found
                         self.live_games = []
                         self.current_game = None
-                        self.logger.info("[NHL] No live games found")
                 
                 # Check if it's time to switch games
                 if len(self.live_games) > 1 and (current_time - self.last_game_switch) >= self.game_display_duration:
                     self.current_game_index = (self.current_game_index + 1) % len(self.live_games)
                     self.current_game = self.live_games[self.current_game_index]
                     self.last_game_switch = current_time
-                    self.logger.info(f"[NHL] Switching to live game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']} - Period {self.current_game['period']}, {self.current_game['clock']}")
                     # Force display update when switching games
                     self.display(force_clear=True)
                     self.last_display_update = current_time
@@ -712,6 +723,8 @@ class NHLUpcomingManager(BaseNHLManager):
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = 300  # 5 minutes
+        self.last_log_time = 0
+        self.log_interval = 300  # Only log status every 5 minutes
         self.logger.info(f"Initialized NHLUpcomingManager with {len(self.favorite_teams)} favorite teams")
         
     def update(self):
@@ -728,28 +741,36 @@ class NHLUpcomingManager(BaseNHLManager):
                 return
                 
             events = data['events']
-            self.logger.info(f"[NHL] Successfully fetched {len(events)} events from ESPN API")
             
             # Process games
-            self.upcoming_games = []
+            new_upcoming_games = []
             for event in events:
                 game = self._extract_game_details(event)
                 if game and not game['is_final'] and game['is_within_window']:
-                    self.upcoming_games.append(game)
-                    self.logger.debug(f"Processing upcoming game: {game['away_abbr']} vs {game['home_abbr']}")
+                    new_upcoming_games.append(game)
             
             # Filter for favorite teams
-            team_games = [game for game in self.upcoming_games 
+            new_team_games = [game for game in new_upcoming_games 
                          if game['home_abbr'] in self.favorite_teams or 
                             game['away_abbr'] in self.favorite_teams]
             
-            self.logger.info(f"[NHL] Found {len(team_games)} upcoming games for favorite teams")
-            if not team_games:
-                self.logger.info("[NHL] No upcoming games found for favorite teams")
-                return
-                
-            self.games_list = team_games
-            self.current_game = team_games[0]
+            # Only log if there's a change in games or enough time has passed
+            should_log = (
+                current_time - self.last_log_time >= self.log_interval or
+                len(new_team_games) != len(self.upcoming_games) or
+                not self.upcoming_games  # Log if we had no games before
+            )
+            
+            if should_log:
+                if new_team_games:
+                    self.logger.info(f"[NHL] Found {len(new_team_games)} upcoming games for favorite teams")
+                else:
+                    self.logger.info("[NHL] No upcoming games found for favorite teams")
+                self.last_log_time = current_time
+            
+            self.upcoming_games = new_team_games
+            if self.upcoming_games:
+                self.current_game = self.upcoming_games[0]
             self.last_update = current_time
             
         except Exception as e:
