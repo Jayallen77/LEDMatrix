@@ -584,8 +584,11 @@ class NHLLiveManager(BaseNHLManager):
                                 self.current_game = self.live_games[0]
                                 self.last_game_switch = current_time
                                 logging.info(f"[NHL] Starting with live game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
-                        # Always update display when we have new data
-                        self.display(force_clear=True)
+                        
+                        # Always update display when we have new data, but limit to once per second
+                        if current_time - self.last_display_update >= 1.0:
+                            self.display(force_clear=True)
+                            self.last_display_update = current_time
                     else:
                         # No live games found
                         self.live_games = []
@@ -600,6 +603,7 @@ class NHLLiveManager(BaseNHLManager):
                     logging.info(f"[NHL] Switching to live game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
                     # Force display update when switching games
                     self.display(force_clear=True)
+                    self.last_display_update = current_time
 
     def display(self, force_clear: bool = False):
         """Display live game information."""
