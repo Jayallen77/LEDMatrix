@@ -856,7 +856,10 @@ class NBAUpcomingManager(BaseNBAManager):
     def display(self, force_clear=False):
         """Display upcoming games."""
         if not self.games_list:
-            self.logger.info("[NBA] No upcoming games to display")
+            current_time = time.time()
+            if current_time - self.last_warning_time > self.warning_cooldown:
+                self.logger.info("[NBA] No upcoming games to display")
+                self.last_warning_time = current_time
             return  # Skip display update entirely
             
         try:
