@@ -556,6 +556,8 @@ class NHLLiveManager(BaseNHLManager):
                                 self.current_game["period"] = 1
                     self.current_game["clock"] = f"{minutes:02d}:{seconds:02d}"
                     logging.debug(f"[NHL] Updated test game clock: {self.current_game['clock']}")
+                    # Always update display in test mode
+                    self.display(force_clear=True)
             else:
                 # Fetch live game data from ESPN API
                 data = self._fetch_data()
@@ -582,6 +584,8 @@ class NHLLiveManager(BaseNHLManager):
                                 self.current_game = self.live_games[0]
                                 self.last_game_switch = current_time
                                 logging.info(f"[NHL] Starting with live game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
+                        # Always update display when we have new data
+                        self.display(force_clear=True)
                     else:
                         # No live games found
                         self.live_games = []
@@ -594,11 +598,8 @@ class NHLLiveManager(BaseNHLManager):
                     self.current_game = self.live_games[self.current_game_index]
                     self.last_game_switch = current_time
                     logging.info(f"[NHL] Switching to live game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
-                
-                # Always update the display when we have new data
-                if self.current_game and current_time - self.last_display_update >= 1:  # Update display at most once per second
+                    # Force display update when switching games
                     self.display(force_clear=True)
-                    self.last_display_update = current_time
 
     def display(self, force_clear: bool = False):
         """Display live game information."""
