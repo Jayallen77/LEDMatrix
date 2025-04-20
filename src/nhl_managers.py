@@ -79,6 +79,7 @@ class BaseNHLManager:
     _shared_data = None
     _last_shared_update = 0
     cache_manager = CacheManager()  # Make cache_manager a class attribute
+    logger = logging.getLogger('NHL')  # Make logger a class attribute
     
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         self.display_manager = display_manager
@@ -92,7 +93,6 @@ class BaseNHLManager:
         self.current_game = None
         self.fonts = self._load_fonts()
         self.favorite_teams = self.nhl_config.get("favorite_teams", [])
-        self.logger = logging.getLogger('NHL')
         self.recent_hours = self.nhl_config.get("recent_game_hours", 48)  # Default 48 hours
         
         # Set logging level to INFO to reduce noise
