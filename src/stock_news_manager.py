@@ -251,24 +251,29 @@ class StockNewsManager:
             # Log the number of headlines being displayed
             logger.info(f"[StockNews] Generating image for {len(all_news)} headlines")
             
-            # Calculate fixed width based on number of headlines
-            # Each headline gets 3 screen widths (2 for content, 1 for gap)
-            fixed_width = width * 3 * len(all_news)
-            
-            # Create the full image with fixed width
-            full_image = Image.new('RGB', (fixed_width, height), (0, 0, 0))
-            draw = ImageDraw.Draw(full_image)
-            
-            current_x = 0
+            # First, create all news images to calculate total width needed
+            news_images = []
+            total_width = 0
             screen_width_gap = width  # Use a full screen width as the gap
             
-            # Add initial gap before the first headline
-            current_x += screen_width_gap
+            # Add initial gap
+            total_width += screen_width_gap
             
             for news in all_news:
                 news_text = f"{news['symbol']}: {news['title']}   "
                 news_image = self._create_text_image(news_text)
-                
+                news_images.append(news_image)
+                # Add width of news image plus gap
+                total_width += news_image.width + screen_width_gap
+            
+            # Create the full image with calculated width
+            full_image = Image.new('RGB', (total_width, height), (0, 0, 0))
+            draw = ImageDraw.Draw(full_image)
+            
+            # Now paste all news images with proper spacing
+            current_x = screen_width_gap  # Start after initial gap
+            
+            for news_image in news_images:
                 # Paste this news image into the full image
                 full_image.paste(news_image, (current_x, 0))
                 
