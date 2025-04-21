@@ -85,56 +85,70 @@ class CalendarManager:
             logging.error(f"Error fetching calendar events: {str(e)}")
             return []
     
-    def draw_event(self, event, y_position):
+    def draw_event(self, event, y_start=1):
         """Draw a single calendar event on the canvas."""
         try:
             # Get event details
             summary = event.get('summary', 'No Title')
-            start = event.get('start', {}).get('dateTime', event.get('start', {}).get('date'))
-            if start:
-                start_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
-                time_str = start_time.strftime('%H:%M')
-            else:
-                time_str = 'All Day'
+            time_str = self._format_event_time(event)
             
-            # Calculate available width (assuming 32x32 matrix)
-            available_width = self.matrix.width - 2  # Leave 1 pixel margin on each side
+            # Use display manager's font for wrapping
+            font = self.display_manager.small_font
+            available_width = self.display_manager.matrix.width - 4  # Leave 2 pixel margin on each side
             
-            # Draw time in green
-            self.display_manager.draw_text(time_str, y=y_position, color=self.date_color, small_font=True)
-            
-            # Draw title, wrapping if needed
-            title_lines = self._wrap_text(summary, available_width)
-            for i, line in enumerate(title_lines):
-                line_y = y_position + 8 + (i * 8)  # 8 pixels between lines
-                if line_y >= self.matrix.height - 8:  # Leave space at bottom
-                    break
-                self.display_manager.draw_text(line, y=line_y, color=self.text_color, small_font=True)
-            
-            # Return the next available y position
-            return y_position + 8 + (len(title_lines) * 8)
-        except Exception as e:
-            logging.error(f"Error drawing calendar event: {str(e)}")
-            return y_position
+            # Wrap title text
+            title_lines = self._wrap_text(summary, available_width, font)
 
-    def _wrap_text(self, text, max_width):
-        """Wrap text to fit within max_width using small font."""
+            # Calculate total height needed
+            time_height = 8 # Approximate height for time string with small font
+            title_height = len(title_lines) * 8 # Approximate height for title lines
+            total_height = time_height + title_height + (len(title_lines) * 2) # Add 2px spacing per title line
+            
+            # Calculate starting y position to center vertically
+            y_pos = (self.display_manager.matrix.height - total_height) // 2
+            y_pos = max(1, y_pos) # Ensure it doesn't start above the top edge
+
+            # Draw time in green
+            self.display_manager.draw_text(time_str, y=y_pos, color=self.date_color, small_font=True)
+            y_pos += time_height + 2 # Move down for the title, add 2px spacing
+            
+            # Draw title lines
+            for line in title_lines:
+                if y_pos >= self.display_manager.matrix.height - 8: # Stop if we run out of space
+                    break
+                self.display_manager.draw_text(line, y=y_pos, color=self.text_color, small_font=True)
+                y_pos += 8 + 2 # Move down for the next line, add 2px spacing
+
+        except Exception as e:
+            logging.error(f"Error drawing calendar event: {str(e)}", exc_info=True)
+
+    def _wrap_text(self, text, max_width, font):
+        """Wrap text to fit within max_width using the provided font."""
         if not text:
             return [""]
             
-        words = text.split()
         lines = []
+        words = text.split()
         current_line = []
-        
+
         for word in words:
-            # Test if adding this word would exceed max_width
             test_line = ' '.join(current_line + [word])
-            if len(test_line) * 4 <= max_width:  # Assuming small font is ~4 pixels wide
+            # Use textlength for accurate width calculation
+            text_width = self.display_manager.draw.textlength(test_line, font=font)
+            
+            if text_width <= max_width:
                 current_line.append(word)
             else:
-                if current_line:
+                # If the word itself is too long, add it on its own line (or handle differently if needed)
+                if not current_line:
+                    lines.append(word) 
+                else:
                     lines.append(' '.join(current_line))
                 current_line = [word]
+                # Recheck if the new line with just this word is too long
+                if self.display_manager.draw.textlength(word, font=font) > max_width:
+                     # Handle very long words if necessary (e.g., truncate)
+                     pass 
         
         if current_line:
             lines.append(' '.join(current_line))
@@ -176,6 +190,10 @@ class CalendarManager:
     def display(self):
         """Display calendar events on the matrix"""
         if not self.enabled or not self.events:
+            # Optionally display a 'No events' message here
+            # self.display_manager.clear()
+            # self.display_manager.draw_text("No Events", small_font=True)
+            # self.display_manager.update_display()
             return
 
         # Clear the display
@@ -186,8 +204,8 @@ class CalendarManager:
             self.current_event_index = 0
         event = self.events[self.current_event_index]
 
-        # Draw the event starting from the top with proper spacing
-        self.draw_event(event, 1)  # Start 1 pixel from top
+        # Draw the event centered vertically
+        self.draw_event(event)
 
         # Update the display
         self.display_manager.update_display()
