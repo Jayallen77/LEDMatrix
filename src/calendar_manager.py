@@ -230,21 +230,27 @@ class CalendarManager:
 
     def display(self):
         """Display the current calendar event on the matrix"""
+        logging.debug(f"CalendarManager display called. Enabled: {self.enabled}, Events count: {len(self.events) if self.events is not None else 'None'}")
         if not self.enabled:
+            logging.debug("CalendarManager display returning because not enabled.")
             return
             
         if not self.events:
             # Display "No Events" message if the list is empty
+            logging.debug("CalendarManager displaying 'No Events'.")
             self.display_manager.clear()
             self.display_manager.draw_text("No Events", small_font=True, color=self.text_color)
             self.display_manager.update_display()
+            logging.debug("CalendarManager 'No Events' display updated.")
             return
 
         # Clear the display before drawing the current event
+        logging.debug("CalendarManager clearing display for event.")
         self.display_manager.clear()
 
         # Get current event to display
         if self.current_event_index >= len(self.events):
+            logging.debug("Resetting calendar event index.")
             self.current_event_index = 0
         event = self.events[self.current_event_index]
 
@@ -253,6 +259,7 @@ class CalendarManager:
         self.draw_event(event)
 
         # Update the display
+        logging.debug("CalendarManager updating display with event.")
         self.display_manager.update_display()
 
         # Increment event index for the *next* time display is called within its duration
