@@ -244,26 +244,22 @@ class CalendarManager:
             logging.debug("CalendarManager 'No Events' display updated.")
             return
 
+        # Get the event to display
+        if self.current_event_index >= len(self.events):
+            self.current_event_index = 0 # Wrap around
+        event_to_display = self.events[self.current_event_index]
+        logging.debug(f"CalendarManager displaying event index {self.current_event_index}: {event_to_display.get('summary')}")
+        
         # Clear the display before drawing the current event
         logging.debug("CalendarManager clearing display for event.")
         self.display_manager.clear()
 
-        # Get current event to display
-        if self.current_event_index >= len(self.events):
-            logging.debug("Resetting calendar event index.")
-            self.current_event_index = 0
-        event = self.events[self.current_event_index]
-
-        # Draw the current event centered vertically
-        logging.debug(f"Displaying calendar event {self.current_event_index + 1}/{len(self.events)}: {event.get('summary')}")
-        self.draw_event(event)
-
+        # Draw the event
+        self.draw_event(event_to_display)
+        
         # Update the display
-        logging.debug("CalendarManager updating display with event.")
         self.display_manager.update_display()
-
-        # Increment event index for the *next* time display is called within its duration
-        # This logic might need adjustment depending on how often display() is called vs the mode duration
-        # For now, let's assume it cycles once per display call. If it needs to stay on one event
-        # for the full duration, this increment needs to move to the controller's mode switch logic.
+        logging.debug("CalendarManager event display updated.")
+        
+        # Increment index for next call
         self.current_event_index += 1 
