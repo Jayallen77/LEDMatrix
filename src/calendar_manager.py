@@ -97,8 +97,7 @@ class CalendarManager:
             return []
     
     def draw_event(self, event, y_start=1):
-        """Draw a single calendar event on the canvas."""
-        y_pos_at_start = y_start # Store the starting position
+        """Draw a single calendar event on the canvas. Returns True on success, False on error."""
         try:
             # Get event details
             summary = event.get('summary', 'No Title')
@@ -137,11 +136,11 @@ class CalendarManager:
                     break
                 self.display_manager.draw_text(line, y=y_pos, color=self.text_color, small_font=True)
                 y_pos += 8 + 2 # Move down for the next line, add 2px spacing
-            return y_pos # Return the final y position if successful
+            return True # Return True on successful drawing
 
         except Exception as e:
             logging.error(f"Error drawing calendar event: {str(e)}", exc_info=True)
-            return y_pos_at_start # Return the original starting position on error
+            return False # Return False on error
 
     def _wrap_text(self, text, max_width, font):
         """Wrap text to fit within max_width using the provided font."""
@@ -237,11 +236,10 @@ class CalendarManager:
             
         if not self.events:
             # Display "No Events" message if the list is empty
-            logging.debug("CalendarManager displaying 'No Events'.")
+            logging.debug("CalendarManager: No events found, displaying DEBUG message.")
             self.display_manager.clear()
-            self.display_manager.draw_text("No Events", small_font=True, color=self.text_color)
+            self.display_manager.draw_text("Calendar DEBUG", small_font=True, color=self.text_color)
             self.display_manager.update_display()
-            logging.debug("CalendarManager 'No Events' display updated.")
             return
 
         # Get the event to display
@@ -255,11 +253,18 @@ class CalendarManager:
         self.display_manager.clear()
 
         # Draw the event
-        self.draw_event(event_to_display)
-        
-        # Update the display
-        self.display_manager.update_display()
-        logging.debug("CalendarManager event display updated.")
+        draw_successful = self.draw_event(event_to_display)
+
+        if draw_successful:
+            # Update the display
+            self.display_manager.update_display()
+            logging.debug("CalendarManager event display updated.")
+        else:
+            # Draw failed (error logged in draw_event), show debug message
+            logging.debug("CalendarManager: draw_event failed, displaying DEBUG message.")
+            self.display_manager.clear() # Clear any partial drawing
+            self.display_manager.draw_text("Calendar DEBUG", small_font=True, color=self.text_color)
+            self.display_manager.update_display()
 
     def advance_event(self):
         """Advance to the next event. Called by DisplayManager when calendar display time is up."""
