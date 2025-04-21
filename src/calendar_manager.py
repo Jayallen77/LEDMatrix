@@ -236,7 +236,7 @@ class CalendarManager:
             
         if not self.events:
             # Display "No Events" message if the list is empty
-            logging.debug("CalendarManager: No events found, displaying DEBUG message.")
+            logging.info("--> CalendarManager: Attempting to draw DEBUG (no events).")
             self.display_manager.clear()
             self.display_manager.draw_text("Calendar DEBUG", small_font=True, color=self.text_color)
             self.display_manager.update_display()
@@ -261,7 +261,7 @@ class CalendarManager:
             logging.debug("CalendarManager event display updated.")
         else:
             # Draw failed (error logged in draw_event), show debug message
-            logging.debug("CalendarManager: draw_event failed, displaying DEBUG message.")
+            logging.info("--> CalendarManager: Attempting to draw DEBUG (draw_event failed).")
             self.display_manager.clear() # Clear any partial drawing
             self.display_manager.draw_text("Calendar DEBUG", small_font=True, color=self.text_color)
             self.display_manager.update_display()
