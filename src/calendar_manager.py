@@ -177,26 +177,21 @@ class CalendarManager:
         return lines
 
     def update(self, current_time):
-        """Update calendar display if needed."""
+        """Update calendar events if needed."""
         if not self.enabled:
             return
         
+        # Only fetch new events if the update interval has passed
         if current_time - self.last_update >= self.update_interval:
+            logging.info("Fetching new calendar events...")
             self.events = self.get_events()
             self.last_update = current_time
-            
-            # Clear the display
-            self.display_manager.clear()
-            
-            # Draw each event
-            y_pos = 1
-            for event in self.events:
-                y_pos = self.draw_event(event, y_pos)
-                if y_pos >= self.matrix.height - 8:  # Leave some space at the bottom
-                    break
-            
-            # Update the display
-            self.display_manager.update_display()
+            if not self.events:
+                 logging.info("No upcoming calendar events found.")
+            else:
+                 logging.info(f"Fetched {len(self.events)} calendar events.")
+            # Reset index if events change
+            self.current_event_index = 0 
 
     def _format_event_date(self, event):
         """Format event date for display"""
@@ -234,15 +229,18 @@ class CalendarManager:
             return "Invalid Time"
 
     def display(self):
-        """Display calendar events on the matrix"""
-        if not self.enabled or not self.events:
-            # Optionally display a 'No events' message here
-            # self.display_manager.clear()
-            # self.display_manager.draw_text("No Events", small_font=True)
-            # self.display_manager.update_display()
+        """Display the current calendar event on the matrix"""
+        if not self.enabled:
+            return
+            
+        if not self.events:
+            # Display "No Events" message if the list is empty
+            self.display_manager.clear()
+            self.display_manager.draw_text("No Events", small_font=True, color=self.text_color)
+            self.display_manager.update_display()
             return
 
-        # Clear the display
+        # Clear the display before drawing the current event
         self.display_manager.clear()
 
         # Get current event to display
@@ -250,11 +248,15 @@ class CalendarManager:
             self.current_event_index = 0
         event = self.events[self.current_event_index]
 
-        # Draw the event centered vertically
+        # Draw the current event centered vertically
+        logging.debug(f"Displaying calendar event {self.current_event_index + 1}/{len(self.events)}: {event.get('summary')}")
         self.draw_event(event)
 
         # Update the display
         self.display_manager.update_display()
 
-        # Increment event index for next display
+        # Increment event index for the *next* time display is called within its duration
+        # This logic might need adjustment depending on how often display() is called vs the mode duration
+        # For now, let's assume it cycles once per display call. If it needs to stay on one event
+        # for the full duration, this increment needs to move to the controller's mode switch logic.
         self.current_event_index += 1 
