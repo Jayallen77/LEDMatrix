@@ -74,7 +74,7 @@
         "token_file": "token.pickle",
         "update_interval": 300,
         "max_events": 3,
-        "calendars": ["primary"]
+        "calendars": ["birthdays"]
     },
     "nhl_scoreboard": {
         "enabled": true,
