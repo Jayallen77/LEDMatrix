@@ -26,15 +26,16 @@ class CalendarManager:
         self.events = []
         self.service = None
         
-        # Load font
-        self.font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6)
+        # Get display manager instance
+        from src.display_manager import DisplayManager
+        self.display_manager = DisplayManager._instance
         
         if self.enabled:
             self.authenticate()
         
         # Display properties
-        self.text_color = graphics.Color(255, 255, 255)
-        self.date_color = graphics.Color(0, 255, 0)
+        self.text_color = (255, 255, 255)  # White
+        self.date_color = (0, 255, 0)      # Green
         
         # State management
         self.current_event_index = 0
@@ -99,9 +100,8 @@ class CalendarManager:
             # Create text to display
             text = f"{time_str} {summary}"
             
-            # Draw text
-            draw = ImageDraw.Draw(self.canvas)
-            draw.text((1, y_position), text, font=self.font, fill=(255, 255, 255))
+            # Draw text using display manager
+            self.display_manager.draw_text(text, y=y_position, color=self.text_color, small_font=True)
             
             return y_position + 8  # Return next y position
         except Exception as e:
@@ -117,8 +117,8 @@ class CalendarManager:
             self.events = self.get_events()
             self.last_update = current_time
             
-            # Clear the canvas
-            self.canvas.Clear()
+            # Clear the display
+            self.display_manager.clear()
             
             # Draw each event
             y_pos = 1
@@ -128,7 +128,7 @@ class CalendarManager:
                     break
             
             # Update the display
-            self.matrix.SwapOnVSync(self.canvas)
+            self.display_manager.update_display()
 
     def _format_event_time(self, event):
         """Format event time for display"""
@@ -145,8 +145,8 @@ class CalendarManager:
         if not self.enabled or not self.events:
             return
 
-        # Clear the canvas
-        self.canvas.Clear()
+        # Clear the display
+        self.display_manager.clear()
 
         # Get current event to display
         if self.current_event_index >= len(self.events):
@@ -155,7 +155,7 @@ class CalendarManager:
 
         # Display event time
         time_str = self._format_event_time(event)
-        graphics.DrawText(self.canvas, self.font, 1, 12, self.date_color, time_str)
+        self.display_manager.draw_text(time_str, y=12, color=self.date_color, small_font=True)
 
         # Display event title (with scrolling if needed)
         title = event['summary']
@@ -163,7 +163,10 @@ class CalendarManager:
             # Add scrolling logic here
             pass
         else:
-            graphics.DrawText(self.canvas, self.font, 1, 25, self.text_color, title)
+            self.display_manager.draw_text(title, y=25, color=self.text_color, small_font=True)
+
+        # Update the display
+        self.display_manager.update_display()
 
         # Increment event index for next display
         self.current_event_index += 1 
