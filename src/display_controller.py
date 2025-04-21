@@ -32,6 +32,7 @@ class DisplayController:
         self.weather = WeatherManager(self.config, self.display_manager) if self.config.get('weather', {}).get('enabled', False) else None
         self.stocks = StockManager(self.config, self.display_manager) if self.config.get('stocks', {}).get('enabled', False) else None
         self.news = StockNewsManager(self.config, self.display_manager) if self.config.get('stock_news', {}).get('enabled', False) else None
+        self.calendar = self.display_manager.calendar_manager if self.config.get('calendar', {}).get('enabled', False) else None
         logger.info("Display modes initialized in %.3f seconds", time.time() - init_time)
         
         # Initialize NHL managers if enabled
@@ -67,6 +68,7 @@ class DisplayController:
         if self.weather: self.available_modes.extend(['weather_current', 'weather_hourly', 'weather_daily'])
         if self.stocks: self.available_modes.append('stocks')
         if self.news: self.available_modes.append('stock_news')
+        if self.calendar: self.available_modes.append('calendar')
         
         # Add NHL display modes if enabled
         if nhl_enabled:
@@ -106,7 +108,8 @@ class DisplayController:
             'weather_hourly': 15,
             'weather_daily': 15,
             'stocks': 45,
-            'stock_news': 30
+            'stock_news': 30,
+            'calendar': 30
         })
         logger.info("DisplayController initialized with display_manager: %s", id(self.display_manager))
         logger.info(f"Available display modes: {self.available_modes}")
@@ -132,6 +135,7 @@ class DisplayController:
         if self.weather: self.weather.get_weather()
         if self.stocks: self.stocks.update_stock_data()
         if self.news: self.news.update_news_data()
+        if self.calendar: self.calendar.update(time.time())
         
         # Update NHL managers
         if self.nhl_live: self.nhl_live.update()
@@ -369,6 +373,9 @@ class DisplayController:
                             
                     elif self.current_display_mode == 'stock_news' and self.news:
                         self.news.display_news()
+                            
+                    elif self.current_display_mode == 'calendar' and self.calendar:
+                        self.calendar.display()
                             
                 except Exception as e:
                     logger.error(f"Error updating display for mode {self.current_display_mode}: {e}", exc_info=True)
