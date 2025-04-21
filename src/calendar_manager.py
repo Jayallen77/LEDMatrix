@@ -11,6 +11,7 @@ from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 from rgbmatrix import graphics
 import pytz
+from src.config_manager import ConfigManager
 
 class CalendarManager:
     def __init__(self, matrix, canvas, config):
@@ -29,6 +30,15 @@ class CalendarManager:
         # Get display manager instance
         from src.display_manager import DisplayManager
         self.display_manager = DisplayManager._instance
+        
+        # Get timezone from config
+        self.config_manager = ConfigManager()
+        timezone_str = self.config_manager.get_timezone()
+        try:
+            self.timezone = pytz.timezone(timezone_str)
+        except pytz.UnknownTimeZoneError:
+            logging.warning(f"Unknown timezone '{timezone_str}' in config, defaulting to UTC.")
+            self.timezone = pytz.utc
         
         if self.enabled:
             self.authenticate()
@@ -197,11 +207,13 @@ class CalendarManager:
                 dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
             else:
                 dt = datetime.strptime(start, '%Y-%m-%d')
+                # Make date object timezone-aware (assume UTC if no tz info)
+                dt = pytz.utc.localize(dt)
             
-            local_dt = dt.astimezone(pytz.local)
+            local_dt = dt.astimezone(self.timezone) # Use configured timezone
             return local_dt.strftime("%a %-m/%-d") # e.g., "Mon 4/21"
-        except ValueError:
-            logging.error(f"Could not parse date string: {start}")
+        except ValueError as e:
+            logging.error(f"Could not parse date string: {start} - {e}")
             return ""
 
     def _format_event_time(self, event):
@@ -210,9 +222,13 @@ class CalendarManager:
         if not start or 'T' not in start: # Only show time for dateTime events
             return "All Day"
             
-        dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
-        local_dt = dt.astimezone(pytz.local)
-        return local_dt.strftime("%I:%M %p")
+        try:
+            dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
+            local_dt = dt.astimezone(self.timezone) # Use configured timezone
+            return local_dt.strftime("%I:%M %p")
+        except ValueError as e:
+            logging.error(f"Could not parse time string: {start} - {e}")
+            return "Invalid Time"
 
     def display(self):
         """Display calendar events on the matrix"""
