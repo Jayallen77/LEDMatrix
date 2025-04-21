@@ -361,6 +361,12 @@ class DisplayController:
                     elif self.current_display_mode == 'stocks' and self.stocks:
                         self.stocks.display_stocks(force_clear=self.force_clear)
                             
+                    elif self.current_display_mode == 'stock_news' and self.news:
+                        self.news.display_news()
+                            
+                    elif self.current_display_mode == 'calendar' and self.calendar:
+                        self.calendar.display()
+                            
                     elif self.current_display_mode == 'nhl_recent' and self.nhl_recent:
                         self.nhl_recent.display(force_clear=self.force_clear)
                     elif self.current_display_mode == 'nhl_upcoming' and self.nhl_upcoming:
@@ -370,12 +376,6 @@ class DisplayController:
                         self.nba_recent.display(force_clear=self.force_clear)
                     elif self.current_display_mode == 'nba_upcoming' and self.nba_upcoming:
                         self.nba_upcoming.display(force_clear=self.force_clear)
-                            
-                    elif self.current_display_mode == 'stock_news' and self.news:
-                        self.news.display_news()
-                            
-                    elif self.current_display_mode == 'calendar' and self.calendar:
-                        self.calendar.display()
                             
                 except Exception as e:
                     logger.error(f"Error updating display for mode {self.current_display_mode}: {e}", exc_info=True)
