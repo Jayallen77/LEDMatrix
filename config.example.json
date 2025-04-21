@@ -43,9 +43,10 @@
     "calendar": {
         "enabled": true,
         "credentials_file": "credentials.json",
-        "token_file": "token.json",
+        "token_file": "token.pickle",
         "update_interval": 300,
-        "max_events": 3
+        "max_events": 3,
+        "calendars": ["primary"]
     },
     "mqtt": {
         "broker": "homeassistant.local",

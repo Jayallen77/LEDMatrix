@@ -37,7 +37,8 @@
             "nhl_upcoming": 20,
             "nba_live": 30,
             "nba_recent": 20,
-            "nba_upcoming": 20
+            "nba_upcoming": 20,
+            "calendar": 30
         }
     },
     "clock": {
@@ -66,6 +67,14 @@
         "scroll_delay": 0.001,
         "max_headlines_per_symbol": 1,
         "headlines_per_rotation": 2
+    },
+    "calendar": {
+        "enabled": true,
+        "credentials_file": "credentials.json",
+        "token_file": "token.pickle",
+        "update_interval": 300,
+        "max_events": 3,
+        "calendars": ["primary"]
     },
     "nhl_scoreboard": {
         "enabled": true,

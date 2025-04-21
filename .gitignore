@@ -6,6 +6,7 @@ __pycache__/
 # Secrets
 config/config_secrets.json
 credentials.json
+token.pickle
 
 # Environment
 .env
