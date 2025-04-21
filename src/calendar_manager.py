@@ -260,6 +260,12 @@ class CalendarManager:
         # Update the display
         self.display_manager.update_display()
         logging.debug("CalendarManager event display updated.")
-        
-        # Increment index for next call
-        self.current_event_index += 1 
+
+    def advance_event(self):
+        """Advance to the next event. Called by DisplayManager when calendar display time is up."""
+        if not self.events:
+            return
+        self.current_event_index += 1
+        if self.current_event_index >= len(self.events):
+            self.current_event_index = 0
+        logging.debug(f"CalendarManager advanced to event index {self.current_event_index}") 

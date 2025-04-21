@@ -346,6 +346,8 @@ class DisplayController:
                     logger.info(f"Switching to: {self.current_display_mode}")
                     self.force_clear = True
                     self.last_switch = current_time
+                    if self.current_display_mode != 'calendar' and self.calendar:
+                        self.calendar.advance_event()
 
                 # Display current mode frame (only for non-live modes)
                 try:
