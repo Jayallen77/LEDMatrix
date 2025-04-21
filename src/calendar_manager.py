@@ -97,17 +97,50 @@ class CalendarManager:
             else:
                 time_str = 'All Day'
             
-            # Create text to display
-            text = f"{time_str} {summary}"
+            # Calculate available width (assuming 32x32 matrix)
+            available_width = self.matrix.width - 2  # Leave 1 pixel margin on each side
             
-            # Draw text using display manager
-            self.display_manager.draw_text(text, y=y_position, color=self.text_color, small_font=True)
+            # Draw time in green
+            self.display_manager.draw_text(time_str, y=y_position, color=self.date_color, small_font=True)
             
-            return y_position + 8  # Return next y position
+            # Draw title, wrapping if needed
+            title_lines = self._wrap_text(summary, available_width)
+            for i, line in enumerate(title_lines):
+                line_y = y_position + 8 + (i * 8)  # 8 pixels between lines
+                if line_y >= self.matrix.height - 8:  # Leave space at bottom
+                    break
+                self.display_manager.draw_text(line, y=line_y, color=self.text_color, small_font=True)
+            
+            # Return the next available y position
+            return y_position + 8 + (len(title_lines) * 8)
         except Exception as e:
             logging.error(f"Error drawing calendar event: {str(e)}")
             return y_position
-    
+
+    def _wrap_text(self, text, max_width):
+        """Wrap text to fit within max_width using small font."""
+        if not text:
+            return [""]
+            
+        words = text.split()
+        lines = []
+        current_line = []
+        
+        for word in words:
+            # Test if adding this word would exceed max_width
+            test_line = ' '.join(current_line + [word])
+            if len(test_line) * 4 <= max_width:  # Assuming small font is ~4 pixels wide
+                current_line.append(word)
+            else:
+                if current_line:
+                    lines.append(' '.join(current_line))
+                current_line = [word]
+        
+        if current_line:
+            lines.append(' '.join(current_line))
+            
+        return lines
+
     def update(self, current_time):
         """Update calendar display if needed."""
         if not self.enabled:
@@ -153,17 +186,8 @@ class CalendarManager:
             self.current_event_index = 0
         event = self.events[self.current_event_index]
 
-        # Display event time
-        time_str = self._format_event_time(event)
-        self.display_manager.draw_text(time_str, y=12, color=self.date_color, small_font=True)
-
-        # Display event title (with scrolling if needed)
-        title = event['summary']
-        if len(title) > 10:  # Implement scrolling for long titles
-            # Add scrolling logic here
-            pass
-        else:
-            self.display_manager.draw_text(title, y=25, color=self.text_color, small_font=True)
+        # Draw the event starting from the top with proper spacing
+        self.draw_event(event, 1)  # Start 1 pixel from top
 
         # Update the display
         self.display_manager.update_display()
