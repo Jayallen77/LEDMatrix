@@ -35,7 +35,8 @@ class CalendarManager:
         
         # Display properties
         self.text_color = (255, 255, 255)  # White
-        self.date_color = (0, 255, 0)      # Green
+        self.time_color = (0, 255, 0)      # Green
+        self.date_color = (200, 200, 200)  # Light Grey
         
         # State management
         self.current_event_index = 0
@@ -91,6 +92,7 @@ class CalendarManager:
             # Get event details
             summary = event.get('summary', 'No Title')
             time_str = self._format_event_time(event)
+            date_str = self._format_event_date(event)
             
             # Use display manager's font for wrapping
             font = self.display_manager.small_font
@@ -100,17 +102,23 @@ class CalendarManager:
             title_lines = self._wrap_text(summary, available_width, font)
 
             # Calculate total height needed
-            time_height = 8 # Approximate height for time string with small font
+            date_height = 8 # Approximate height for date string
+            time_height = 8 # Approximate height for time string
             title_height = len(title_lines) * 8 # Approximate height for title lines
-            total_height = time_height + title_height + (len(title_lines) * 2) # Add 2px spacing per title line
+            # Height = date + time + title + spacing between each
+            total_height = date_height + time_height + title_height + ( (1 + len(title_lines)) * 2 ) 
             
             # Calculate starting y position to center vertically
             y_pos = (self.display_manager.matrix.height - total_height) // 2
             y_pos = max(1, y_pos) # Ensure it doesn't start above the top edge
 
+            # Draw date in grey
+            self.display_manager.draw_text(date_str, y=y_pos, color=self.date_color, small_font=True)
+            y_pos += date_height + 2 # Move down for the time
+
             # Draw time in green
-            self.display_manager.draw_text(time_str, y=y_pos, color=self.date_color, small_font=True)
-            y_pos += time_height + 2 # Move down for the title, add 2px spacing
+            self.display_manager.draw_text(time_str, y=y_pos, color=self.time_color, small_font=True)
+            y_pos += time_height + 2 # Move down for the title
             
             # Draw title lines
             for line in title_lines:
@@ -177,15 +185,34 @@ class CalendarManager:
             # Update the display
             self.display_manager.update_display()
 
+    def _format_event_date(self, event):
+        """Format event date for display"""
+        start = event.get('start', {}).get('dateTime', event.get('start', {}).get('date'))
+        if not start:
+            return ""
+            
+        try:
+            # Handle both date and dateTime formats
+            if 'T' in start:
+                dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
+            else:
+                dt = datetime.strptime(start, '%Y-%m-%d')
+            
+            local_dt = dt.astimezone(pytz.local)
+            return local_dt.strftime("%a %-m/%-d") # e.g., "Mon 4/21"
+        except ValueError:
+            logging.error(f"Could not parse date string: {start}")
+            return ""
+
     def _format_event_time(self, event):
         """Format event time for display"""
-        start = event['start'].get('dateTime', event['start'].get('date'))
-        if 'T' in start:  # DateTime
-            dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
-            local_dt = dt.astimezone(pytz.local)
-            return local_dt.strftime("%I:%M %p")
-        else:  # All-day event
+        start = event.get('start', {}).get('dateTime', event.get('start', {}).get('date'))
+        if not start or 'T' not in start: # Only show time for dateTime events
             return "All Day"
+            
+        dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
+        local_dt = dt.astimezone(pytz.local)
+        return local_dt.strftime("%I:%M %p")
 
     def display(self):
         """Display calendar events on the matrix"""
