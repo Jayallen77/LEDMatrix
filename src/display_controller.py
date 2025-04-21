@@ -33,6 +33,7 @@ class DisplayController:
         self.stocks = StockManager(self.config, self.display_manager) if self.config.get('stocks', {}).get('enabled', False) else None
         self.news = StockNewsManager(self.config, self.display_manager) if self.config.get('stock_news', {}).get('enabled', False) else None
         self.calendar = self.display_manager.calendar_manager if self.config.get('calendar', {}).get('enabled', False) else None
+        logger.info(f"Calendar Manager initialized: {'Object' if self.calendar else 'None'}")
         logger.info("Display modes initialized in %.3f seconds", time.time() - init_time)
         
         # Initialize NHL managers if enabled
