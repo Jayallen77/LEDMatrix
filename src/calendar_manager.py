@@ -1,9 +1,14 @@
+import os
+import json
+import logging
 from datetime import datetime, timedelta
-import pickle
-import os.path
 from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
+import pickle
+from PIL import Image, ImageDraw, ImageFont
+import numpy as np
 from rgbmatrix import graphics
 import pytz
 
@@ -11,60 +16,58 @@ class CalendarManager:
     def __init__(self, matrix, canvas, config):
         self.matrix = matrix
         self.canvas = canvas
-        self.config = config.get('calendar', {})
-        self.enabled = self.config.get('enabled', False)
-        self.update_interval = self.config.get('update_interval', 300)
-        self.max_events = self.config.get('max_events', 3)
-        self.token_file = self.config.get('token_file', 'token.pickle')
+        self.config = config
+        self.calendar_config = config.get('calendar', {})
+        self.enabled = self.calendar_config.get('enabled', False)
+        self.update_interval = self.calendar_config.get('update_interval', 300)
+        self.max_events = self.calendar_config.get('max_events', 3)
+        self.calendars = self.calendar_config.get('calendars', ['primary'])
+        self.last_update = 0
+        self.events = []
+        self.service = None
+        
+        # Load font
+        self.font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6)
+        
+        if self.enabled:
+            self.authenticate()
         
         # Display properties
-        self.font = graphics.Font()
-        self.font.LoadFont("assets/fonts/7x13.bdf")
         self.text_color = graphics.Color(255, 255, 255)
         self.date_color = graphics.Color(0, 255, 0)
         
         # State management
-        self.last_update = None
-        self.events = []
-        self.service = None
         self.current_event_index = 0
+
+    def authenticate(self):
+        """Authenticate with Google Calendar API."""
+        creds = None
+        token_file = self.calendar_config.get('token_file', 'token.pickle')
         
-        # Initialize the calendar service
-        self._initialize_service()
-
-    def _initialize_service(self):
-        """Initialize the Google Calendar service with stored credentials"""
-        if not os.path.exists(self.token_file):
-            print(f"No token file found at {self.token_file}")
-            print("Please run calendar_registration.py first")
-            self.enabled = False
-            return
-
-        try:
-            with open(self.token_file, 'rb') as token:
+        if os.path.exists(token_file):
+            with open(token_file, 'rb') as token:
                 creds = pickle.load(token)
-
-            if not creds or not creds.valid:
-                if creds and creds.expired and creds.refresh_token:
-                    creds.refresh(Request())
-                    # Save the refreshed credentials
-                    with open(self.token_file, 'wb') as token:
-                        pickle.dump(creds, token)
-                else:
-                    print("Invalid credentials. Please run calendar_registration.py")
-                    self.enabled = False
-                    return
-
+        
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                logging.error("Calendar credentials not found or invalid. Please run calendar_registration.py first.")
+                self.enabled = False
+                return
+        
+        try:
             self.service = build('calendar', 'v3', credentials=creds)
+            logging.info("Successfully authenticated with Google Calendar")
         except Exception as e:
-            print(f"Error initializing calendar service: {e}")
+            logging.error(f"Error building calendar service: {str(e)}")
             self.enabled = False
-
-    def _fetch_events(self):
-        """Fetch upcoming events from Google Calendar"""
-        if not self.service:
+    
+    def get_events(self):
+        """Fetch upcoming calendar events."""
+        if not self.enabled or not self.service:
             return []
-
+        
         try:
             now = datetime.utcnow().isoformat() + 'Z'
             events_result = self.service.events().list(
@@ -74,21 +77,58 @@ class CalendarManager:
                 singleEvents=True,
                 orderBy='startTime'
             ).execute()
-            return events_result.get('items', [])
+            
+            events = events_result.get('items', [])
+            return events
         except Exception as e:
-            print(f"Error fetching calendar events: {e}")
+            logging.error(f"Error fetching calendar events: {str(e)}")
             return []
-
-    def update(self):
-        """Update calendar events if needed"""
+    
+    def draw_event(self, event, y_position):
+        """Draw a single calendar event on the canvas."""
+        try:
+            # Get event details
+            summary = event.get('summary', 'No Title')
+            start = event.get('start', {}).get('dateTime', event.get('start', {}).get('date'))
+            if start:
+                start_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                time_str = start_time.strftime('%H:%M')
+            else:
+                time_str = 'All Day'
+            
+            # Create text to display
+            text = f"{time_str} {summary}"
+            
+            # Draw text
+            draw = ImageDraw.Draw(self.canvas)
+            draw.text((1, y_position), text, font=self.font, fill=(255, 255, 255))
+            
+            return y_position + 8  # Return next y position
+        except Exception as e:
+            logging.error(f"Error drawing calendar event: {str(e)}")
+            return y_position
+    
+    def update(self, current_time):
+        """Update calendar display if needed."""
         if not self.enabled:
             return
-
-        current_time = datetime.now()
-        if (self.last_update is None or 
-            (current_time - self.last_update).seconds > self.update_interval):
-            self.events = self._fetch_events()
+        
+        if current_time - self.last_update >= self.update_interval:
+            self.events = self.get_events()
             self.last_update = current_time
+            
+            # Clear the canvas
+            self.canvas.Clear()
+            
+            # Draw each event
+            y_pos = 1
+            for event in self.events:
+                y_pos = self.draw_event(event, y_pos)
+                if y_pos >= self.matrix.height - 8:  # Leave some space at the bottom
+                    break
+            
+            # Update the display
+            self.matrix.SwapOnVSync(self.canvas)
 
     def _format_event_time(self, event):
         """Format event time for display"""
