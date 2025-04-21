@@ -707,6 +707,8 @@ class NBARecentManager(BaseNBAManager):
         self.game_display_duration = 15  # Display each game for 15 seconds
         self.last_log_time = 0
         self.log_interval = 300  # Only log status every 5 minutes
+        self.last_warning_time = 0
+        self.warning_cooldown = 300  # Only show warning every 5 minutes
         self.logger.info(f"Initialized NBARecentManager with {len(self.favorite_teams)} favorite teams")
         
     def update(self):
@@ -761,7 +763,10 @@ class NBARecentManager(BaseNBAManager):
     def display(self, force_clear=False):
         """Display recent games."""
         if not self.recent_games:
-            self.logger.info("[NBA] No recent games to display")
+            current_time = time.time()
+            if current_time - self.last_warning_time > self.warning_cooldown:
+                self.logger.info("[NBA] No recent games to display")
+                self.last_warning_time = current_time
             return  # Skip display update entirely
             
         try:
