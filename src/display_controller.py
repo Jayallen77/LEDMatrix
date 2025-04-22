@@ -347,6 +347,10 @@ class DisplayController:
                 # Only proceed with mode switching if no live games
                 if current_time - self.last_switch > self.get_current_duration():
                     # No live games, continue with regular rotation
+                    # If we're currently on calendar, advance to next event before switching modes
+                    if self.current_display_mode == 'calendar' and self.calendar:
+                        self.calendar.advance_event()
+                    
                     self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
                     self.current_display_mode = self.available_modes[self.current_mode_index]
                     logger.info(f"Switching to: {self.current_display_mode}")

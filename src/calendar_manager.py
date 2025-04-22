@@ -297,9 +297,6 @@ class CalendarManager:
             # Update the display
             self.display_manager.update_display()
             logger.debug("CalendarManager event display updated.")
-            
-            # Advance to next event for next display
-            self.advance_event()
         else:
             # Draw failed (error logged in draw_event), show debug message
             logger.warning("Failed to draw calendar event")
