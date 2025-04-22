@@ -100,7 +100,7 @@ class WeatherManager:
             lon = geo_data[0]['lon']
             
             # Get current weather and daily forecast using One Call API
-            one_call_url = f"https://api.openweathermap.org/data/3.0/onecall?lat={lat}&lon={lon}&exclude=minutely,hourly,alerts&appid={api_key}&units={units}"
+            one_call_url = f"https://api.openweathermap.org/data/3.0/onecall?lat={lat}&lon={lon}&exclude=minutely,alerts&appid={api_key}&units={units}"
             
             # Fetch current weather and daily forecast
             response = requests.get(one_call_url)
