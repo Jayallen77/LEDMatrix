@@ -376,6 +376,9 @@ class DisplayController:
                         self.news.display_news()
                             
                     elif self.current_display_mode == 'calendar' and self.calendar:
+                        # Update calendar data if needed
+                        self.calendar.update(current_time)
+                        # Always display the calendar, with force_clear only on mode switch
                         self.calendar.display(force_clear=self.force_clear)
                             
                     elif self.current_display_mode == 'nhl_recent' and self.nhl_recent:

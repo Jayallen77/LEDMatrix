@@ -266,8 +266,9 @@ class CalendarManager:
             logger.debug("Calendar manager is disabled, skipping display")
             return
             
-        # Always clear the display before drawing new content
-        self.display_manager.clear()
+        # Only clear if force_clear is True (mode switch) or no events are drawn
+        if force_clear:
+            self.display_manager.clear()
             
         if not self.events:
             # Display "No Events" message if the list is empty
@@ -287,6 +288,8 @@ class CalendarManager:
         # Only log at INFO level when switching to calendar or when force_clear is True
         if force_clear:
             logger.info(f"CalendarManager displaying event index {self.current_event_index}: {event_to_display.get('summary')}")
+            logger.info(f"CalendarManager displaying event: {event_to_display.get('summary')}")
+            logger.info(f"Event details - Date: {self._format_event_date(event_to_display)}, Time: {self._format_event_time(event_to_display)}, Summary: {event_to_display.get('summary', 'No Title')}")
         else:
             logger.debug(f"CalendarManager displaying event index {self.current_event_index}: {event_to_display.get('summary')}")
 
