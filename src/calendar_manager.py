@@ -35,12 +35,12 @@ class CalendarManager:
         
         # Scrolling state
         self.scroll_position = 0
-        self.scroll_direction = 1  # 1 for down, -1 for up
         self.scroll_speed = 1  # pixels per frame
         self.scroll_delay = 0.1  # seconds between scroll updates
         self.last_scroll_time = 0
         self.scroll_enabled = False
-        self.scroll_reset_time = 3  # seconds to wait before resetting scroll position
+        self.scroll_pause_time = 2.0  # seconds to pause at top before starting scroll
+        self.last_reset_time = 0
         
         logger.info(f"Calendar configuration: enabled={self.enabled}, update_interval={self.update_interval}, max_events={self.max_events}, calendars={self.calendars}")
         
@@ -324,6 +324,7 @@ class CalendarManager:
             self.display_manager.clear()
             self.scroll_position = 0
             self.last_scroll_time = time.time()
+            self.last_reset_time = time.time()
             
         if not self.events:
             # Display "No Events" message if the list is empty
@@ -351,18 +352,16 @@ class CalendarManager:
         # Handle scrolling if enabled
         current_time = time.time()
         if self.scroll_enabled:
-            if current_time - self.last_scroll_time >= self.scroll_delay:
-                self.scroll_position += self.scroll_speed * self.scroll_direction
-                
-                # Check if we need to reverse direction
-                if self.scroll_position <= 0:
-                    self.scroll_direction = 1
-                    self.scroll_position = 0
-                elif self.scroll_position >= self.display_manager.matrix.height:
-                    self.scroll_direction = -1
-                    self.scroll_position = self.display_manager.matrix.height
-                
-                self.last_scroll_time = current_time
+            # Check if we should start scrolling (after pause at top)
+            if current_time - self.last_reset_time >= self.scroll_pause_time:
+                if current_time - self.last_scroll_time >= self.scroll_delay:
+                    self.scroll_position += self.scroll_speed
+                    self.last_scroll_time = current_time
+                    
+                    # If we've scrolled past the bottom, reset to top with pause
+                    if self.scroll_position >= self.display_manager.matrix.height:
+                        self.scroll_position = 0
+                        self.last_reset_time = current_time
 
         # Draw the event
         draw_successful = self.draw_event(event_to_display)
