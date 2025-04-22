@@ -269,11 +269,12 @@ class CalendarManager:
             logger.debug("Calendar manager is disabled, skipping display")
             return
             
+        # Always clear the display before drawing new content
+        self.display_manager.clear()
+            
         if not self.events:
             # Display "No Events" message if the list is empty
             logger.debug("No calendar events to display")
-            if force_clear:
-                self.display_manager.clear()
             self.display_manager.draw_text("No Events", small_font=True, color=self.text_color)
             self.display_manager.update_display()
             return
@@ -291,10 +292,6 @@ class CalendarManager:
             logger.info(f"CalendarManager displaying event index {self.current_event_index}: {event_to_display.get('summary')}")
         else:
             logger.debug(f"CalendarManager displaying event index {self.current_event_index}: {event_to_display.get('summary')}")
-        
-        # Only clear if forced or if this is a new event
-        if force_clear:
-            self.display_manager.clear()
 
         # Draw the event
         draw_successful = self.draw_event(event_to_display)
@@ -309,8 +306,6 @@ class CalendarManager:
         else:
             # Draw failed (error logged in draw_event), show debug message
             logger.warning("Failed to draw calendar event")
-            if force_clear:
-                self.display_manager.clear()
             self.display_manager.draw_text("Calendar Error", small_font=True, color=self.text_color)
             self.display_manager.update_display()
 
