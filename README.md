@@ -3,9 +3,10 @@
 A modular LED matrix display system for sports information using Raspberry Pi and RGB LED matrices.
 
 ## Hardware Requirements
-- Raspberry Pi 3 or newer
+- Raspberry Pi 4 or older
 - Adafruit RGB Matrix Bonnet/HAT
-- LED Matrix panels (64x32)
+- 2x LED Matrix panels (64x32)
+- DC Power Supply for Adafruit RGB HAT
 
 ## Installation
 
