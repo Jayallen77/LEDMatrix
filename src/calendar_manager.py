@@ -124,22 +124,23 @@ class CalendarManager:
             time_str = self._format_event_time(event)
             date_str = self._format_event_date(event)
             
-            # Use display manager's font for wrapping
-            font = self.display_manager.small_font
+            # Use different fonts for header and summary
+            header_font = self.display_manager.small_font
+            summary_font = self.display_manager.extra_small_font
             available_width = self.display_manager.matrix.width - 4  # Leave 2 pixel margin on each side
             
             # Draw date and time on top line
             datetime_str = f"{date_str} {time_str}"
             self.display_manager.draw_text(datetime_str, y=2, color=self.text_color, small_font=True)
             
-            # Wrap summary text for two lines
-            title_lines = self._wrap_text(summary, available_width, font, max_lines=2)
+            # Wrap summary text for two lines using extra small font
+            title_lines = self._wrap_text(summary, available_width, summary_font, max_lines=2)
             
             # Draw summary lines
             y_pos = 12  # Start position for summary (below date/time)
             for line in title_lines:
-                self.display_manager.draw_text(line, y=y_pos, color=self.text_color, small_font=True)
-                y_pos += 8  # Move down for next line
+                self.display_manager.draw_text(line, y=y_pos, color=self.text_color, extra_small_font=True)
+                y_pos += 6  # Move down less for extra small font
                 
             return True
 
@@ -153,53 +154,58 @@ class CalendarManager:
             return [""]
             
         lines = []
-        words = text.split()
         current_line = []
-
+        words = text.split()
+        
         for word in words:
-            test_line = ' '.join(current_line + [word])
-            # Use textbbox for accurate width calculation
+            # Try adding the word to the current line
+            test_line = ' '.join(current_line + [word]) if current_line else word
             bbox = self.display_manager.draw.textbbox((0, 0), test_line, font=font)
             text_width = bbox[2] - bbox[0]
             
             if text_width <= max_width:
+                # Word fits, add it to current line
                 current_line.append(word)
             else:
+                # Word doesn't fit, start a new line
                 if current_line:
                     lines.append(' '.join(current_line))
                     current_line = [word]
                 else:
-                    # Word is too long for the line, truncate it
-                    lines.append(word[:10] + "...")
-                
-            # Check if we've reached max lines
-            if len(lines) >= max_lines - 1 and current_line:
-                # For the last line, add ellipsis if there are more words
-                test_line = ' '.join(current_line + [word])
-                if len(words) > words.index(word) + 1:
-                    test_line += "..."
-                
-                # Check if the line with ellipsis fits
-                bbox = self.display_manager.draw.textbbox((0, 0), test_line, font=font)
-                if bbox[2] - bbox[0] <= max_width:
-                    lines.append(test_line)
-                else:
-                    # If it doesn't fit, truncate the last line
-                    last_line = ' '.join(current_line)
-                    if len(last_line) > 10:
-                        last_line = last_line[:10] + "..."
-                    lines.append(last_line)
+                    # Single word too long, truncate it
+                    truncated = word
+                    while len(truncated) > 0:
+                        bbox = self.display_manager.draw.textbbox((0, 0), truncated + "...", font=font)
+                        if bbox[2] - bbox[0] <= max_width:
+                            lines.append(truncated + "...")
+                            break
+                        truncated = truncated[:-1]
+                    if not truncated:
+                        lines.append(word[:10] + "...")
+            
+            # Check if we've filled all lines
+            if len(lines) >= max_lines:
                 break
         
-        # Add the last line if we haven't hit max_lines
+        # Handle any remaining text in current_line
         if current_line and len(lines) < max_lines:
-            lines.append(' '.join(current_line))
-            
-        # If we only have one line, pad with an empty line
-        if len(lines) == 1:
+            remaining_text = ' '.join(current_line)
+            if len(words) > len(current_line):  # More words remain
+                # Try to fit with ellipsis
+                while len(remaining_text) > 0:
+                    bbox = self.display_manager.draw.textbbox((0, 0), remaining_text + "...", font=font)
+                    if bbox[2] - bbox[0] <= max_width:
+                        lines.append(remaining_text + "...")
+                        break
+                    remaining_text = remaining_text[:-1]
+            else:
+                lines.append(remaining_text)
+        
+        # Ensure we have exactly max_lines
+        while len(lines) < max_lines:
             lines.append("")
             
-        return lines
+        return lines[:max_lines]
 
     def update(self, current_time):
         """Update calendar events if needed."""
