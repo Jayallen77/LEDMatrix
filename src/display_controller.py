@@ -342,7 +342,6 @@ class DisplayController:
                         self.nba_live.display(force_clear=self.force_clear)
                     
                     self.force_clear = False
-                    time.sleep(0.1)  # Small delay to prevent CPU overuse
                     continue  # Skip the rest of the loop to stay on live games
                 
                 # Only proceed with mode switching if no live games
