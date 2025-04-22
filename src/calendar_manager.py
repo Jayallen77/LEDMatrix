@@ -29,6 +29,7 @@ class CalendarManager:
         self.max_events = self.calendar_config.get('max_events', 3)
         self.calendars = self.calendar_config.get('calendars', ['birthdays'])
         self.last_update = 0
+        self.last_debug_log = 0  # Add timestamp for debug message throttling
         self.events = []
         self.service = None
         
@@ -208,7 +209,10 @@ class CalendarManager:
             # Reset index if events change
             self.current_event_index = 0 
         else:
-            logger.debug("Skipping calendar update - not enough time has passed")
+            # Only log debug message every 5 seconds
+            if current_time - self.last_debug_log > 5:
+                logger.debug("Skipping calendar update - not enough time has passed")
+                self.last_debug_log = current_time
 
     def _format_event_date(self, event):
         """Format event date for display"""
