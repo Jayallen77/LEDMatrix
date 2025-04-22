@@ -149,6 +149,18 @@ class DisplayManager:
             self.small_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
             logger.info("Press Start 2P small font loaded successfully")
 
+            # Load MatrixChunky6 font for calendar events
+            try:
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                relative_font_path = os.path.join(script_dir, "../assets/fonts/MatrixChunky6.ttf")
+                font_path = os.path.abspath(relative_font_path)
+                logger.info(f"Attempting to load MatrixChunky6 font from: {font_path} at size 8")
+                self.calendar_font = ImageFont.truetype(font_path, 8)
+                logger.info(f"MatrixChunky6 calendar font loaded successfully from {font_path}")
+            except Exception as font_err:
+                logger.error(f"Failed to load MatrixChunky6 font: {font_err}. Falling back to small font.")
+                self.calendar_font = self.small_font
+
             # Load 4x6 font as extra_small_font
             try:
                 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -168,6 +180,7 @@ class DisplayManager:
             # Fallback to default font
             self.regular_font = ImageFont.load_default()
             self.small_font = self.regular_font
+            self.calendar_font = self.regular_font
             # Ensure extra_small_font exists even if regular/small fail
             if not hasattr(self, 'extra_small_font'): 
                 self.extra_small_font = self.regular_font
