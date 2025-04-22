@@ -13,8 +13,9 @@ from rgbmatrix import graphics
 import pytz
 from src.config_manager import ConfigManager
 
-# Get logger without configuring
+# Configure logger for this module
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)  # Set to DEBUG to see all messages
 
 class CalendarManager:
     def __init__(self, matrix, canvas, config):
@@ -43,11 +44,13 @@ class CalendarManager:
         try:
             self.timezone = pytz.timezone(timezone_str)
         except pytz.UnknownTimeZoneError:
-            logging.warning(f"Unknown timezone '{timezone_str}' in config, defaulting to UTC.")
+            logger.warning(f"Unknown timezone '{timezone_str}' in config, defaulting to UTC.")
             self.timezone = pytz.utc
         
         if self.enabled:
             self.authenticate()
+        else:
+            logger.warning("Calendar manager is disabled in configuration")
         
         # Display properties
         self.text_color = (255, 255, 255)  # White
