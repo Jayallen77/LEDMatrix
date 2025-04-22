@@ -392,8 +392,7 @@ class DisplayController:
                     continue
 
                 self.force_clear = False
-                # Add a small delay to prevent CPU overuse and ensure display stays visible
-                time.sleep(0.1)
+
 
         except KeyboardInterrupt:
             logger.info("Display controller stopped by user")
