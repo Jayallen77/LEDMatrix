@@ -19,10 +19,9 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)  # Set to INFO to reduce noise
 
 class CalendarManager:
-    def __init__(self, matrix, canvas, config):
+    def __init__(self, display_manager, config):
         logger.info("Initializing CalendarManager")
-        self.matrix = matrix
-        self.canvas = canvas
+        self.display_manager = display_manager
         self.config = config
         self.calendar_config = config.get('calendar', {})
         self.enabled = self.calendar_config.get('enabled', False)
@@ -35,10 +34,6 @@ class CalendarManager:
         self.service = None
         
         logger.info(f"Calendar configuration: enabled={self.enabled}, update_interval={self.update_interval}, max_events={self.max_events}, calendars={self.calendars}")
-        
-        # Get display manager instance
-        from src.display_manager import DisplayManager
-        self.display_manager = DisplayManager._instance
         
         # Get timezone from config
         self.config_manager = ConfigManager()
