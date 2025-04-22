@@ -184,8 +184,9 @@ class CalendarManager:
 
         for word in words:
             test_line = ' '.join(current_line + [word])
-            # Use textlength for accurate width calculation
-            text_width = self.display_manager.draw.textlength(test_line, font=font)
+            # Use textbbox for accurate width calculation
+            bbox = self.display_manager.draw.textbbox((0, 0), test_line, font=font)
+            text_width = bbox[2] - bbox[0]
             
             if text_width <= max_width:
                 current_line.append(word)
@@ -197,7 +198,8 @@ class CalendarManager:
                     lines.append(' '.join(current_line))
                 current_line = [word]
                 # Recheck if the new line with just this word is too long
-                if self.display_manager.draw.textlength(word, font=font) > max_width:
+                bbox = self.display_manager.draw.textbbox((0, 0), word, font=font)
+                if bbox[2] - bbox[0] > max_width:
                      # Handle very long words if necessary (e.g., truncate)
                      pass 
         
