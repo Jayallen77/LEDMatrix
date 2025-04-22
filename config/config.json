@@ -38,7 +38,8 @@
             "nba_live": 30,
             "nba_recent": 20,
             "nba_upcoming": 20,
-            "calendar": 30
+            "calendar": 30,
+            "youtube": 20
         }
     },
     "clock": {
@@ -109,5 +110,9 @@
             "nba_upcoming": true
         },
         "live_game_duration": 30
+    },
+    "youtube": {
+        "enabled": true,
+        "update_interval": 3600
     }
 } 
