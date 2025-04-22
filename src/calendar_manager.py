@@ -124,23 +124,22 @@ class CalendarManager:
             time_str = self._format_event_time(event)
             date_str = self._format_event_date(event)
             
-            # Use different fonts for header and summary
-            header_font = self.display_manager.small_font
-            summary_font = self.display_manager.extra_small_font
+            # Use display manager's font for wrapping
+            font = self.display_manager.small_font
             available_width = self.display_manager.matrix.width - 4  # Leave 2 pixel margin on each side
             
             # Draw date and time on top line
             datetime_str = f"{date_str} {time_str}"
             self.display_manager.draw_text(datetime_str, y=2, color=self.text_color, small_font=True)
             
-            # Wrap summary text for two lines using extra small font
-            title_lines = self._wrap_text(summary, available_width, summary_font, max_lines=2)
+            # Wrap summary text for two lines
+            title_lines = self._wrap_text(summary, available_width, font, max_lines=2)
             
             # Draw summary lines
             y_pos = 12  # Start position for summary (below date/time)
             for line in title_lines:
-                self.display_manager.draw_text(line, y=y_pos, color=self.text_color, extra_small_font=True)
-                y_pos += 6  # Move down less for extra small font
+                self.display_manager.draw_text(line, y=y_pos, color=self.text_color, small_font=True)
+                y_pos += 8  # Move down for next line
                 
             return True
 
