@@ -61,6 +61,7 @@ class CalendarManager:
         
         # State management
         self.current_event_index = 0
+        self.force_clear = False
 
     def authenticate(self):
         """Authenticate with Google Calendar API."""
@@ -116,8 +117,8 @@ class CalendarManager:
     def draw_event(self, event, y_start=1):
         """Draw a single calendar event on the canvas. Returns True on success, False on error."""
         try:
-            # Only log event details at INFO level when first drawing
-            if self.current_event_index == 0:
+            # Only log event details at INFO level when first drawing or when force_clear is True
+            if self.current_event_index == 0 or self.force_clear:
                 logger.info(f"Drawing event: {event.get('summary', 'No title')}")
                 logger.info(f"Event details - Date: {self._format_event_date(event)}, Time: {self._format_event_time(event)}, Summary: {event.get('summary', 'No Title')}")
             else:
@@ -281,6 +282,9 @@ class CalendarManager:
         if self.current_event_index >= len(self.events):
             self.current_event_index = 0 # Wrap around
         event_to_display = self.events[self.current_event_index]
+        
+        # Set force_clear flag for logging
+        self.force_clear = force_clear
         
         # Only log at INFO level when switching to calendar or when force_clear is True
         if force_clear:
