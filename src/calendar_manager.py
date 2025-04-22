@@ -16,7 +16,7 @@ import time
 
 # Configure logger for this module
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)  # Set to DEBUG to see all messages
+logger.setLevel(logging.INFO)  # Set to INFO to reduce noise
 
 class CalendarManager:
     def __init__(self, matrix, canvas, config):
