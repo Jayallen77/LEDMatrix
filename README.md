@@ -96,6 +96,7 @@ The LEDMatrix system includes a robust caching mechanism to optimize API calls a
 - Stock prices and market data
 - Stock news headlines
 - NHL game information
+- NBA game information
 
 ### Cache Behavior
 - Data is cached based on update intervals defined in `config.json`
@@ -113,9 +114,9 @@ The LEDMatrix system includes a robust caching mechanism to optimize API calls a
 - Temporary files are used for safe updates
 - JSON serialization handles all data types including timestamps
 
-## NHL Scoreboard Display
+## NHL, NBA Scoreboard Display
 
-The LEDMatrix system includes a comprehensive NHL scoreboard display system with three display modes:
+The LEDMatrix system includes a comprehensive NHL, NBA scoreboard display system with three display modes:
 
 ### Display Modes
 - **Live Games**: Shows currently playing games with live scores and game status
