@@ -130,7 +130,7 @@ class CalendarManager:
             
             # Draw date and time on top line
             datetime_str = f"{date_str} {time_str}"
-            self.display_manager.draw_text(datetime_str, y=2, color=self.time_color, small_font=True)
+            self.display_manager.draw_text(datetime_str, y=2, color=self.text_color, small_font=True)
             
             # Wrap summary text for two lines
             title_lines = self._wrap_text(summary, available_width, font, max_lines=2)
