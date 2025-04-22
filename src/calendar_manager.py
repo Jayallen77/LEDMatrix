@@ -13,8 +13,12 @@ from rgbmatrix import graphics
 import pytz
 from src.config_manager import ConfigManager
 
+# Get logger without configuring
+logger = logging.getLogger(__name__)
+
 class CalendarManager:
     def __init__(self, matrix, canvas, config):
+        logger.info("Initializing CalendarManager")
         self.matrix = matrix
         self.canvas = canvas
         self.config = config
@@ -26,6 +30,8 @@ class CalendarManager:
         self.last_update = 0
         self.events = []
         self.service = None
+        
+        logger.info(f"Calendar configuration: enabled={self.enabled}, update_interval={self.update_interval}, max_events={self.max_events}, calendars={self.calendars}")
         
         # Get display manager instance
         from src.display_manager import DisplayManager
@@ -53,27 +59,33 @@ class CalendarManager:
 
     def authenticate(self):
         """Authenticate with Google Calendar API."""
+        logger.info("Starting calendar authentication")
         creds = None
         token_file = self.calendar_config.get('token_file', 'token.pickle')
         
         if os.path.exists(token_file):
+            logger.info(f"Loading credentials from {token_file}")
             with open(token_file, 'rb') as token:
                 creds = pickle.load(token)
-        
+                
         if not creds or not creds.valid:
+            logger.info("Credentials not found or invalid")
             if creds and creds.expired and creds.refresh_token:
+                logger.info("Refreshing expired credentials")
                 creds.refresh(Request())
             else:
-                logging.error("Calendar credentials not found or invalid. Please run calendar_registration.py first.")
-                self.enabled = False
-                return
-        
-        try:
-            self.service = build('calendar', 'v3', credentials=creds)
-            logging.info("Successfully authenticated with Google Calendar")
-        except Exception as e:
-            logging.error(f"Error building calendar service: {str(e)}")
-            self.enabled = False
+                logger.info("Requesting new credentials")
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    self.calendar_config.get('credentials_file', 'credentials.json'),
+                    ['https://www.googleapis.com/auth/calendar.readonly'])
+                creds = flow.run_local_server(port=0)
+                
+            logger.info(f"Saving credentials to {token_file}")
+            with open(token_file, 'wb') as token:
+                pickle.dump(creds, token)
+                
+        self.service = build('calendar', 'v3', credentials=creds)
+        logger.info("Calendar service built successfully")
     
     def get_events(self):
         """Fetch upcoming calendar events."""
@@ -99,6 +111,7 @@ class CalendarManager:
     def draw_event(self, event, y_start=1):
         """Draw a single calendar event on the canvas. Returns True on success, False on error."""
         try:
+            logger.debug(f"Drawing event: {event.get('summary', 'No title')}")
             # Get event details
             summary = event.get('summary', 'No Title')
             time_str = self._format_event_time(event)
@@ -139,7 +152,7 @@ class CalendarManager:
             return True # Return True on successful drawing
 
         except Exception as e:
-            logging.error(f"Error drawing calendar event: {str(e)}", exc_info=True)
+            logger.error(f"Error drawing calendar event: {str(e)}", exc_info=True)
             return False # Return False on error
 
     def _wrap_text(self, text, max_width, font):
@@ -178,19 +191,21 @@ class CalendarManager:
     def update(self, current_time):
         """Update calendar events if needed."""
         if not self.enabled:
+            logger.debug("Calendar manager is disabled, skipping update")
             return
         
-        # Only fetch new events if the update interval has passed
-        if current_time - self.last_update >= self.update_interval:
-            logging.info("Fetching new calendar events...")
+        if current_time - self.last_update > self.update_interval:
+            logger.info("Updating calendar events")
             self.events = self.get_events()
             self.last_update = current_time
             if not self.events:
-                 logging.info("No upcoming calendar events found.")
+                 logger.info("No upcoming calendar events found.")
             else:
-                 logging.info(f"Fetched {len(self.events)} calendar events.")
+                 logger.info(f"Fetched {len(self.events)} calendar events.")
             # Reset index if events change
             self.current_event_index = 0 
+        else:
+            logger.debug("Skipping calendar update - not enough time has passed")
 
     def _format_event_date(self, event):
         """Format event date for display"""
@@ -229,14 +244,13 @@ class CalendarManager:
 
     def display(self):
         """Display the current calendar event on the matrix"""
-        logging.debug(f"CalendarManager display called. Enabled: {self.enabled}, Events count: {len(self.events) if self.events is not None else 'None'}")
         if not self.enabled:
-            logging.debug("CalendarManager display returning because not enabled.")
+            logger.debug("Calendar manager is disabled, skipping display")
             return
             
         if not self.events:
             # Display "No Events" message if the list is empty
-            logging.info("--> CalendarManager: Attempting to draw DEBUG (no events).")
+            logger.info("--> CalendarManager: Attempting to draw DEBUG (no events).")
             self.display_manager.clear()
             self.display_manager.draw_text("Calendar DEBUG", small_font=True, color=self.text_color)
             self.display_manager.update_display()
@@ -246,10 +260,10 @@ class CalendarManager:
         if self.current_event_index >= len(self.events):
             self.current_event_index = 0 # Wrap around
         event_to_display = self.events[self.current_event_index]
-        logging.debug(f"CalendarManager displaying event index {self.current_event_index}: {event_to_display.get('summary')}")
+        logger.debug(f"CalendarManager displaying event index {self.current_event_index}: {event_to_display.get('summary')}")
         
         # Clear the display before drawing the current event
-        logging.debug("CalendarManager clearing display for event.")
+        logger.debug("CalendarManager clearing display for event.")
         self.display_manager.clear()
 
         # Draw the event
@@ -258,19 +272,20 @@ class CalendarManager:
         if draw_successful:
             # Update the display
             self.display_manager.update_display()
-            logging.debug("CalendarManager event display updated.")
+            logger.debug("CalendarManager event display updated.")
         else:
             # Draw failed (error logged in draw_event), show debug message
-            logging.info("--> CalendarManager: Attempting to draw DEBUG (draw_event failed).")
+            logger.info("--> CalendarManager: Attempting to draw DEBUG (draw_event failed).")
             self.display_manager.clear() # Clear any partial drawing
             self.display_manager.draw_text("Calendar DEBUG", small_font=True, color=self.text_color)
             self.display_manager.update_display()
 
     def advance_event(self):
         """Advance to the next event. Called by DisplayManager when calendar display time is up."""
-        if not self.events:
+        if not self.enabled:
+            logger.debug("Calendar manager is disabled, skipping event advance")
             return
         self.current_event_index += 1
         if self.current_event_index >= len(self.events):
             self.current_event_index = 0
-        logging.debug(f"CalendarManager advanced to event index {self.current_event_index}") 
+        logger.debug(f"CalendarManager advanced to event index {self.current_event_index}") 
