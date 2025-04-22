@@ -62,6 +62,10 @@ def main():
     x = (matrix.width - text_width) // 2
     y = (matrix.height - text_height) // 2
 
+    # Ensure text is fully visible
+    x = max(0, min(x, matrix.width - text_width))
+    y = max(0, min(y, matrix.height - text_height))
+
     # Draw the text
     draw.text((x, y), text, font=font, fill=(255, 255, 255))
 
