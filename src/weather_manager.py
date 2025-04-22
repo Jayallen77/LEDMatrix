@@ -99,20 +99,30 @@ class WeatherManager:
             lat = geo_data[0]['lat']
             lon = geo_data[0]['lon']
             
-            # Get current weather and forecast using coordinates
-            weather_url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}&units={units}"
-            forecast_url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={api_key}&units={units}"
+            # Get current weather and daily forecast using One Call API
+            one_call_url = f"https://api.openweathermap.org/data/3.0/onecall?lat={lat}&lon={lon}&exclude=minutely,hourly,alerts&appid={api_key}&units={units}"
             
-            # Fetch current weather
-            response = requests.get(weather_url)
+            # Fetch current weather and daily forecast
+            response = requests.get(one_call_url)
             response.raise_for_status()
-            self.weather_data = response.json()
+            one_call_data = response.json()
+            
+            # Store current weather data
+            self.weather_data = {
+                'main': {
+                    'temp': one_call_data['current']['temp'],
+                    'temp_max': one_call_data['daily'][0]['temp']['max'],
+                    'temp_min': one_call_data['daily'][0]['temp']['min'],
+                    'humidity': one_call_data['current']['humidity'],
+                    'pressure': one_call_data['current']['pressure']
+                },
+                'weather': one_call_data['current']['weather'],
+                'wind': one_call_data['current'].get('wind', {})
+            }
 
-            # Fetch forecast
-            response = requests.get(forecast_url)
-            response.raise_for_status()
-            self.forecast_data = response.json()
-
+            # Store forecast data (for hourly and daily forecasts)
+            self.forecast_data = one_call_data
+            
             # Process forecast data
             self._process_forecast_data(self.forecast_data)
             
@@ -144,12 +154,12 @@ class WeatherManager:
             return
 
         # Process hourly forecast (next 5 hours)
-        hourly_list = forecast_data.get('list', [])[:5]  # Changed from 6 to 5 to match image
+        hourly_list = forecast_data.get('hourly', [])[:5]  # Get next 5 hours
         self.hourly_forecast = []
         
         for hour_data in hourly_list:
             dt = datetime.fromtimestamp(hour_data['dt'])
-            temp = round(hour_data['main']['temp'])
+            temp = round(hour_data['temp'])
             condition = hour_data['weather'][0]['main']
             self.hourly_forecast.append({
                 'hour': dt.strftime('%I:00 %p').lstrip('0'),  # Format as "2:00 PM"
@@ -158,38 +168,18 @@ class WeatherManager:
             })
 
         # Process daily forecast
-        daily_data = {}
-        full_forecast_list = forecast_data.get('list', []) # Use the full list
-        for item in full_forecast_list: # Iterate over the full list
-            date = datetime.fromtimestamp(item['dt']).strftime('%Y-%m-%d')
-            if date not in daily_data:
-                daily_data[date] = {
-                    'temps': [],
-                    'conditions': [],
-                    'date': datetime.fromtimestamp(item['dt'])
-                }
-            daily_data[date]['temps'].append(item['main']['temp'])
-            daily_data[date]['conditions'].append(item['weather'][0]['main'])
-
-        # Calculate daily summaries, excluding today
+        daily_list = forecast_data.get('daily', [])[1:4]  # Skip today (index 0) and get next 3 days
         self.daily_forecast = []
-        today_str = datetime.now().strftime('%Y-%m-%d')
         
-        # Sort data by date to ensure chronological order
-        sorted_daily_items = sorted(daily_data.items(), key=lambda item: item[1]['date'])
-        
-        # Filter out today's data and take the next 3 days
-        future_days_data = [item for item in sorted_daily_items if item[0] != today_str][:3]
-
-        for date_str, data in future_days_data:
-            temps = data['temps']
-            temp_high = round(max(temps))
-            temp_low = round(min(temps))
-            condition = max(set(data['conditions']), key=data['conditions'].count)
+        for day_data in daily_list:
+            dt = datetime.fromtimestamp(day_data['dt'])
+            temp_high = round(day_data['temp']['max'])
+            temp_low = round(day_data['temp']['min'])
+            condition = day_data['weather'][0]['main']
             
             self.daily_forecast.append({
-                'date': data['date'].strftime('%a'),  # Day name (Mon, Tue, etc.)
-                'date_str': data['date'].strftime('%m/%d'),  # Date (4/8, 4/9, etc.)
+                'date': dt.strftime('%a'),  # Day name (Mon, Tue, etc.)
+                'date_str': dt.strftime('%m/%d'),  # Date (4/8, 4/9, etc.)
                 'temp_high': temp_high,
                 'temp_low': temp_low,
                 'condition': condition
