@@ -241,6 +241,27 @@ class BaseNHLManager:
                 fonts['status'] = ImageFont.load_default()
         return fonts
 
+    def _draw_text_with_outline(self, draw, text, position, font, fill=(255, 255, 255), outline_color=(0, 0, 0)):
+        """
+        Draw text with a black outline for better readability.
+        
+        Args:
+            draw: ImageDraw object
+            text: Text to draw
+            position: (x, y) position to draw the text
+            font: Font to use
+            fill: Text color (default: white)
+            outline_color: Outline color (default: black)
+        """
+        x, y = position
+        
+        # Draw the outline by drawing the text in black at 8 positions around the text
+        for dx, dy in [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]:
+            draw.text((x + dx, y + dy), text, font=font, fill=outline_color)
+        
+        # Draw the text in the specified color
+        draw.text((x, y), text, font=font, fill=fill)
+
     def _load_and_resize_logo(self, team_abbrev: str) -> Optional[Image.Image]:
         """Load and resize a team logo, with caching."""
         self.logger.debug(f"Loading logo for {team_abbrev}")
@@ -430,19 +451,19 @@ class BaseNHLManager:
                 status_width = draw.textlength(status_text, font=self.fonts['status'])
                 status_x = (self.display_width - status_width) // 2
                 status_y = 2
-                draw.text((status_x, status_y), status_text, font=self.fonts['status'], fill=(255, 255, 255))
+                self._draw_text_with_outline(draw, status_text, (status_x, status_y), self.fonts['status'])
                 
                 # Calculate position for the date text (centered horizontally, below "Next Game")
                 date_width = draw.textlength(game_date, font=self.fonts['time'])
                 date_x = (self.display_width - date_width) // 2
                 date_y = center_y - 5  # Position in center
-                draw.text((date_x, date_y), game_date, font=self.fonts['time'], fill=(255, 255, 255))
+                self._draw_text_with_outline(draw, game_date, (date_x, date_y), self.fonts['time'])
                 
                 # Calculate position for the time text (centered horizontally, in center)
                 time_width = draw.textlength(game_time, font=self.fonts['time'])
                 time_x = (self.display_width - time_width) // 2
                 time_y = date_y + 10  # Position below date
-                draw.text((time_x, time_y), game_time, font=self.fonts['time'], fill=(255, 255, 255))
+                self._draw_text_with_outline(draw, game_time, (time_x, time_y), self.fonts['time'])
             else:
                 # For live/final games, show scores and period/time
                 home_score = str(game.get("home_score", "0"))
@@ -453,7 +474,7 @@ class BaseNHLManager:
                 score_width = draw.textlength(score_text, font=self.fonts['score'])
                 score_x = (self.display_width - score_width) // 2
                 score_y = self.display_height - 15
-                draw.text((score_x, score_y), score_text, font=self.fonts['score'], fill=(255, 255, 255))
+                self._draw_text_with_outline(draw, score_text, (score_x, score_y), self.fonts['score'])
 
                 # Draw period and time or Final
                 if game.get("is_final", False):
@@ -474,7 +495,7 @@ class BaseNHLManager:
                 status_width = draw.textlength(status_text, font=self.fonts['time'])
                 status_x = (self.display_width - status_width) // 2
                 status_y = 5
-                draw.text((status_x, status_y), status_text, font=self.fonts['time'], fill=(255, 255, 255))
+                self._draw_text_with_outline(draw, status_text, (status_x, status_y), self.fonts['time'])
 
             # Display the image
             self.display_manager.image.paste(main_img, (0, 0))

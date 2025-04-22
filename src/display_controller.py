@@ -9,6 +9,8 @@ from src.stock_manager import StockManager
 from src.stock_news_manager import StockNewsManager
 from src.nhl_managers import NHLLiveManager, NHLRecentManager, NHLUpcomingManager
 from src.nba_managers import NBALiveManager, NBARecentManager, NBAUpcomingManager
+from src.youtube_display import YouTubeDisplay
+from src.calendar_manager import CalendarManager
 
 # Get logger without configuring
 logger = logging.getLogger(__name__)
@@ -32,7 +34,8 @@ class DisplayController:
         self.weather = WeatherManager(self.config, self.display_manager) if self.config.get('weather', {}).get('enabled', False) else None
         self.stocks = StockManager(self.config, self.display_manager) if self.config.get('stocks', {}).get('enabled', False) else None
         self.news = StockNewsManager(self.config, self.display_manager) if self.config.get('stock_news', {}).get('enabled', False) else None
-        self.calendar = self.display_manager.calendar_manager if self.config.get('calendar', {}).get('enabled', False) else None
+        self.calendar = CalendarManager(self.display_manager, self.config) if self.config.get('calendar', {}).get('enabled', False) else None
+        self.youtube = YouTubeDisplay(self.display_manager, self.config) if self.config.get('youtube', {}).get('enabled', False) else None
         logger.info(f"Calendar Manager initialized: {'Object' if self.calendar else 'None'}")
         logger.info("Display modes initialized in %.3f seconds", time.time() - init_time)
         
@@ -70,6 +73,7 @@ class DisplayController:
         if self.stocks: self.available_modes.append('stocks')
         if self.news: self.available_modes.append('stock_news')
         if self.calendar: self.available_modes.append('calendar')
+        if self.youtube: self.available_modes.append('youtube')
         
         # Add NHL display modes if enabled
         if nhl_enabled:
@@ -110,7 +114,8 @@ class DisplayController:
             'weather_daily': 15,
             'stocks': 45,
             'stock_news': 30,
-            'calendar': 30
+            'calendar': 30,
+            'youtube': 30
         })
         logger.info("DisplayController initialized with display_manager: %s", id(self.display_manager))
         logger.info(f"Available display modes: {self.available_modes}")
@@ -137,6 +142,7 @@ class DisplayController:
         if self.stocks: self.stocks.update_stock_data()
         if self.news: self.news.update_news_data()
         if self.calendar: self.calendar.update(time.time())
+        if self.youtube: self.youtube.update()
         
         # Update NHL managers
         if self.nhl_live: self.nhl_live.update()
@@ -341,13 +347,15 @@ class DisplayController:
                 # Only proceed with mode switching if no live games
                 if current_time - self.last_switch > self.get_current_duration():
                     # No live games, continue with regular rotation
+                    # If we're currently on calendar, advance to next event before switching modes
+                    if self.current_display_mode == 'calendar' and self.calendar:
+                        self.calendar.advance_event()
+                    
                     self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
                     self.current_display_mode = self.available_modes[self.current_mode_index]
                     logger.info(f"Switching to: {self.current_display_mode}")
                     self.force_clear = True
                     self.last_switch = current_time
-                    if self.current_display_mode != 'calendar' and self.calendar:
-                        self.calendar.advance_event()
 
                 # Display current mode frame (only for non-live modes)
                 try:
@@ -368,7 +376,10 @@ class DisplayController:
                         self.news.display_news()
                             
                     elif self.current_display_mode == 'calendar' and self.calendar:
-                        self.calendar.display()
+                        # Update calendar data if needed
+                        self.calendar.update(current_time)
+                        # Always display the calendar, with force_clear only on mode switch
+                        self.calendar.display(force_clear=self.force_clear)
                             
                     elif self.current_display_mode == 'nhl_recent' and self.nhl_recent:
                         self.nhl_recent.display(force_clear=self.force_clear)
@@ -380,11 +391,15 @@ class DisplayController:
                     elif self.current_display_mode == 'nba_upcoming' and self.nba_upcoming:
                         self.nba_upcoming.display(force_clear=self.force_clear)
                             
+                    elif self.current_display_mode == 'youtube' and self.youtube:
+                        self.youtube.display(force_clear=self.force_clear)
+                            
                 except Exception as e:
                     logger.error(f"Error updating display for mode {self.current_display_mode}: {e}", exc_info=True)
                     continue
 
                 self.force_clear = False
+
 
         except KeyboardInterrupt:
             logger.info("Display controller stopped by user")

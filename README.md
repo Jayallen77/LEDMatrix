@@ -3,9 +3,10 @@
 A modular LED matrix display system for sports information using Raspberry Pi and RGB LED matrices.
 
 ## Hardware Requirements
-- Raspberry Pi 3 or newer
+- Raspberry Pi 4 or older
 - Adafruit RGB Matrix Bonnet/HAT
-- LED Matrix panels (64x32)
+- 2x LED Matrix panels (64x32)
+- DC Power Supply for Adafruit RGB HAT
 
 ## Installation
 
@@ -30,6 +31,72 @@ cp config/config.example.json config/config.json
 ```
 
 2. Edit `config/config.json` with your preferences
+
+### YouTube Display Configuration
+
+The YouTube display module shows channel statistics for a specified YouTube channel. To configure it:
+
+1. In `config/config.json`, add the following section:
+```json
+{
+    "youtube": {
+        "enabled": true,
+        "update_interval": 300  // Update interval in seconds (default: 300)
+    }
+}
+```
+
+2. In `config/config_secrets.json`, add your YouTube API credentials:
+```json
+{
+    "youtube": {
+        "api_key": "YOUR_YOUTUBE_API_KEY",
+        "channel_id": "YOUR_CHANNEL_ID"
+    }
+}
+```
+
+To get these credentials:
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Enable the YouTube Data API v3
+4. Create credentials (API key)
+5. For the channel ID, you can find it in your YouTube channel URL or use the YouTube Data API to look it up
+
+### Calendar Display Configuration
+
+The calendar display module shows upcoming events from your Google Calendar. To configure it:
+
+1. In `config/config.json`, add the following section:
+```json
+{
+    "calendar": {
+        "enabled": true,
+        "update_interval": 300,  // Update interval in seconds (default: 300)
+        "max_events": 3,         // Maximum number of events to display
+        "calendars": ["primary"] // List of calendar IDs to display
+    }
+}
+```
+
+2. Set up Google Calendar API access:
+   1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
+   2. Create a new project or select an existing one
+   3. Enable the Google Calendar API
+   4. Create OAuth 2.0 credentials:
+      - Application type: Desktop app
+      - Download the credentials file as `credentials.json`
+   5. Place the `credentials.json` file in your project root directory
+
+3. On first run, the application will:
+   - Open a browser window for Google authentication
+   - Request calendar read-only access
+   - Save the authentication token as `token.pickle`
+
+The calendar display will show:
+- Event date and time
+- Event title (wrapped to fit the display)
+- Up to 3 upcoming events (configurable)
 
 ## API Keys
 
@@ -96,6 +163,7 @@ The LEDMatrix system includes a robust caching mechanism to optimize API calls a
 - Stock prices and market data
 - Stock news headlines
 - NHL game information
+- NBA game information
 
 ### Cache Behavior
 - Data is cached based on update intervals defined in `config.json`
@@ -113,9 +181,9 @@ The LEDMatrix system includes a robust caching mechanism to optimize API calls a
 - Temporary files are used for safe updates
 - JSON serialization handles all data types including timestamps
 
-## NHL Scoreboard Display
+## NHL, NBA Scoreboard Display
 
-The LEDMatrix system includes a comprehensive NHL scoreboard display system with three display modes:
+The LEDMatrix system includes a comprehensive NHL, NBA scoreboard display system with three display modes:
 
 ### Display Modes
 - **Live Games**: Shows currently playing games with live scores and game status
