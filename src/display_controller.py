@@ -10,6 +10,7 @@ from src.stock_news_manager import StockNewsManager
 from src.nhl_managers import NHLLiveManager, NHLRecentManager, NHLUpcomingManager
 from src.nba_managers import NBALiveManager, NBARecentManager, NBAUpcomingManager
 from src.youtube_display import YouTubeDisplay
+from src.calendar_manager import CalendarManager
 
 # Get logger without configuring
 logger = logging.getLogger(__name__)
@@ -33,7 +34,7 @@ class DisplayController:
         self.weather = WeatherManager(self.config, self.display_manager) if self.config.get('weather', {}).get('enabled', False) else None
         self.stocks = StockManager(self.config, self.display_manager) if self.config.get('stocks', {}).get('enabled', False) else None
         self.news = StockNewsManager(self.config, self.display_manager) if self.config.get('stock_news', {}).get('enabled', False) else None
-        self.calendar = self.display_manager.calendar_manager if self.config.get('calendar', {}).get('enabled', False) else None
+        self.calendar = CalendarManager(self.display_manager.matrix, self.display_manager.current_canvas, self.config) if self.config.get('calendar', {}).get('enabled', False) else None
         self.youtube = YouTubeDisplay() if self.config.get('youtube', {}).get('enabled', False) else None
         logger.info(f"Calendar Manager initialized: {'Object' if self.calendar else 'None'}")
         logger.info("Display modes initialized in %.3f seconds", time.time() - init_time)

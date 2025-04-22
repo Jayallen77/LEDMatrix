@@ -5,7 +5,6 @@ from typing import Dict, Any, List, Tuple
 import logging
 import math
 from .weather_icons import WeatherIcons
-from .calendar_manager import CalendarManager
 import os
 
 # Get logger without configuring
@@ -31,7 +30,7 @@ class DisplayManager:
         logger.info("Font loading completed in %.3f seconds", time.time() - font_time)
         
         # Initialize managers
-        self.calendar_manager = CalendarManager(self.matrix, self.current_canvas, self.config)
+        # Calendar manager is now initialized by DisplayController
         
     def _setup_matrix(self):
         """Initialize the RGB matrix with configuration settings."""
