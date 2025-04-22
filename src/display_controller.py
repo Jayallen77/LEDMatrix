@@ -342,6 +342,7 @@ class DisplayController:
                         self.nba_live.display(force_clear=self.force_clear)
                     
                     self.force_clear = False
+                    time.sleep(0.1)  # Small delay to prevent CPU overuse
                     continue  # Skip the rest of the loop to stay on live games
                 
                 # Only proceed with mode switching if no live games
@@ -352,8 +353,6 @@ class DisplayController:
                     logger.info(f"Switching to: {self.current_display_mode}")
                     self.force_clear = True
                     self.last_switch = current_time
-                    if self.current_display_mode != 'calendar' and self.calendar:
-                        self.calendar.advance_event()
 
                 # Display current mode frame (only for non-live modes)
                 try:
@@ -394,6 +393,8 @@ class DisplayController:
                     continue
 
                 self.force_clear = False
+                # Add a small delay to prevent CPU overuse and ensure display stays visible
+                time.sleep(0.1)
 
         except KeyboardInterrupt:
             logger.info("Display controller stopped by user")
