@@ -22,7 +22,7 @@ class CalendarManager:
         self.enabled = self.calendar_config.get('enabled', False)
         self.update_interval = self.calendar_config.get('update_interval', 300)
         self.max_events = self.calendar_config.get('max_events', 3)
-        self.calendars = self.calendar_config.get('calendars', ['primary'])
+        self.calendars = self.calendar_config.get('calendars', ['birthdays'])
         self.last_update = 0
         self.events = []
         self.service = None
