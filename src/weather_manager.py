@@ -117,7 +117,10 @@ class WeatherManager:
                     'pressure': one_call_data['current']['pressure']
                 },
                 'weather': one_call_data['current']['weather'],
-                'wind': one_call_data['current'].get('wind', {})
+                'wind': {
+                    'speed': one_call_data['current'].get('wind_speed', 0),
+                    'deg': one_call_data['current'].get('wind_deg', 0)
+                }
             }
 
             # Store forecast data (for hourly and daily forecasts)
@@ -330,7 +333,7 @@ class WeatherManager:
 
             # --- Wind (Section 3) ---
             wind_speed = weather_data['wind']['speed']
-            wind_deg = weather_data.get('wind', {}).get('deg', 0)
+            wind_deg = weather_data['wind']['deg']
             wind_dir = self._get_wind_direction(wind_deg)
             wind_text = f"W:{wind_speed:.0f}{wind_dir}"
             wind_width = draw.textlength(wind_text, font=font)
