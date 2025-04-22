@@ -116,13 +116,17 @@ class CalendarManager:
     def draw_event(self, event, y_start=1):
         """Draw a single calendar event on the canvas. Returns True on success, False on error."""
         try:
-            logger.debug(f"Drawing event: {event.get('summary', 'No title')}")
+            # Only log event details at INFO level when first drawing
+            if self.current_event_index == 0:
+                logger.info(f"Drawing event: {event.get('summary', 'No title')}")
+                logger.info(f"Event details - Date: {self._format_event_date(event)}, Time: {self._format_event_time(event)}, Summary: {event.get('summary', 'No Title')}")
+            else:
+                logger.debug(f"Drawing event: {event.get('summary', 'No title')}")
+            
             # Get event details
             summary = event.get('summary', 'No Title')
             time_str = self._format_event_time(event)
             date_str = self._format_event_date(event)
-            
-            logger.debug(f"Event details - Date: {date_str}, Time: {time_str}, Summary: {summary}")
             
             # Use display manager's font for wrapping
             font = self.display_manager.small_font
@@ -277,7 +281,12 @@ class CalendarManager:
         if self.current_event_index >= len(self.events):
             self.current_event_index = 0 # Wrap around
         event_to_display = self.events[self.current_event_index]
-        logger.debug(f"CalendarManager displaying event index {self.current_event_index}: {event_to_display.get('summary')}")
+        
+        # Only log at INFO level when switching to calendar or when force_clear is True
+        if force_clear:
+            logger.info(f"CalendarManager displaying event index {self.current_event_index}: {event_to_display.get('summary')}")
+        else:
+            logger.debug(f"CalendarManager displaying event index {self.current_event_index}: {event_to_display.get('summary')}")
         
         # Only clear if forced or if this is a new event
         if force_clear:
