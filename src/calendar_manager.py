@@ -33,15 +33,6 @@ class CalendarManager:
         self.events = []
         self.service = None
         
-        # Scrolling state
-        self.scroll_position = 0
-        self.scroll_speed = 1  # pixels per frame
-        self.scroll_delay = 0.1  # seconds between scroll updates
-        self.last_scroll_time = 0
-        self.scroll_enabled = False
-        self.scroll_pause_time = 2.0  # seconds to pause at top before starting scroll
-        self.last_reset_time = 0
-        
         logger.info(f"Calendar configuration: enabled={self.enabled}, update_interval={self.update_interval}, max_events={self.max_events}, calendars={self.calendars}")
         
         # Get timezone from config
@@ -137,58 +128,26 @@ class CalendarManager:
             font = self.display_manager.small_font
             available_width = self.display_manager.matrix.width - 4  # Leave 2 pixel margin on each side
             
-            # Wrap title text
-            title_lines = self._wrap_text(summary, available_width, font)
-            logger.debug(f"Wrapped title into {len(title_lines)} lines: {title_lines}")
-
-            # Calculate total height needed
-            date_height = 8 # Approximate height for date string
-            time_height = 8 # Approximate height for time string
-            title_height = len(title_lines) * 8 # Approximate height for title lines
-            # Height = date + time + title + spacing between each
-            total_height = date_height + time_height + title_height + ( (1 + len(title_lines)) * 2 ) 
+            # Draw date and time on top line
+            datetime_str = f"{date_str} {time_str}"
+            self.display_manager.draw_text(datetime_str, y=2, color=self.time_color, small_font=True)
             
-            # Calculate starting y position to center vertically
-            y_pos = (self.display_manager.matrix.height - total_height) // 2
-            y_pos = max(1, y_pos) # Ensure it doesn't start above the top edge
+            # Wrap summary text for two lines
+            title_lines = self._wrap_text(summary, available_width, font, max_lines=2)
             
-            # Apply scroll offset
-            y_pos -= self.scroll_position
-            
-            # Check if scrolling is needed
-            if total_height > self.display_manager.matrix.height:
-                self.scroll_enabled = True
-            else:
-                self.scroll_enabled = False
-                self.scroll_position = 0
-
-            logger.debug(f"Starting y position: {y_pos}, Total height: {total_height}")
-
-            # Draw date in grey
-            logger.debug(f"Drawing date at y={y_pos}: {date_str}")
-            self.display_manager.draw_text(date_str, y=y_pos, color=self.date_color, small_font=True)
-            y_pos += date_height + 2 # Move down for the time
-
-            # Draw time in green
-            logger.debug(f"Drawing time at y={y_pos}: {time_str}")
-            self.display_manager.draw_text(time_str, y=y_pos, color=self.time_color, small_font=True)
-            y_pos += time_height + 2 # Move down for the title
-            
-            # Draw title lines
-            for i, line in enumerate(title_lines):
-                logger.debug(f"Drawing title line {i+1} at y={y_pos}: {line}")
-                if y_pos >= self.display_manager.matrix.height - 8: # Stop if we run out of space
-                    logger.debug("Stopping title drawing - reached bottom of display")
-                    break
+            # Draw summary lines
+            y_pos = 12  # Start position for summary (below date/time)
+            for line in title_lines:
                 self.display_manager.draw_text(line, y=y_pos, color=self.text_color, small_font=True)
-                y_pos += 8 + 2 # Move down for the next line, add 2px spacing
-            return True # Return True on successful drawing
+                y_pos += 8  # Move down for next line
+                
+            return True
 
         except Exception as e:
             logger.error(f"Error drawing calendar event: {str(e)}", exc_info=True)
-            return False # Return False on error
+            return False
 
-    def _wrap_text(self, text, max_width, font):
+    def _wrap_text(self, text, max_width, font, max_lines=2):
         """Wrap text to fit within max_width using the provided font."""
         if not text:
             return [""]
@@ -196,7 +155,6 @@ class CalendarManager:
         lines = []
         words = text.split()
         current_line = []
-        max_lines = 3  # Maximum number of lines to display
 
         for word in words:
             test_line = ' '.join(current_line + [word])
@@ -207,52 +165,39 @@ class CalendarManager:
             if text_width <= max_width:
                 current_line.append(word)
             else:
-                # If the word itself is too long, split it
-                if not current_line:
-                    # Check if the word itself is too long
-                    bbox = self.display_manager.draw.textbbox((0, 0), word, font=font)
-                    if bbox[2] - bbox[0] > max_width:
-                        # Split long word into chunks that fit
-                        chunks = []
-                        current_chunk = ""
-                        for char in word:
-                            test_chunk = current_chunk + char
-                            bbox = self.display_manager.draw.textbbox((0, 0), test_chunk, font=font)
-                            if bbox[2] - bbox[0] <= max_width:
-                                current_chunk = test_chunk
-                            else:
-                                chunks.append(current_chunk)
-                                current_chunk = char
-                        if current_chunk:
-                            chunks.append(current_chunk)
-                        lines.extend(chunks)
-                    else:
-                        lines.append(word)
-                else:
+                if current_line:
                     lines.append(' '.join(current_line))
-                current_line = [word]
+                    current_line = [word]
+                else:
+                    # Word is too long for the line, truncate it
+                    lines.append(word[:10] + "...")
                 
-                # If we've reached the maximum number of lines, add ellipsis to the last line
-                if len(lines) >= max_lines:
-                    last_line = lines[-1]
-                    # Add ellipsis if there's room
-                    bbox = self.display_manager.draw.textbbox((0, 0), last_line + "...", font=font)
-                    if bbox[2] - bbox[0] <= max_width:
-                        lines[-1] = last_line + "..."
-                    else:
-                        # If no room for ellipsis, remove last word and add ellipsis
-                        words = last_line.split()
-                        while words:
-                            test_line = ' '.join(words[:-1]) + "..."
-                            bbox = self.display_manager.draw.textbbox((0, 0), test_line, font=font)
-                            if bbox[2] - bbox[0] <= max_width:
-                                lines[-1] = test_line
-                                break
-                            words = words[:-1]
-                    break
+            # Check if we've reached max lines
+            if len(lines) >= max_lines - 1 and current_line:
+                # For the last line, add ellipsis if there are more words
+                test_line = ' '.join(current_line + [word])
+                if len(words) > words.index(word) + 1:
+                    test_line += "..."
+                
+                # Check if the line with ellipsis fits
+                bbox = self.display_manager.draw.textbbox((0, 0), test_line, font=font)
+                if bbox[2] - bbox[0] <= max_width:
+                    lines.append(test_line)
+                else:
+                    # If it doesn't fit, truncate the last line
+                    last_line = ' '.join(current_line)
+                    if len(last_line) > 10:
+                        last_line = last_line[:10] + "..."
+                    lines.append(last_line)
+                break
         
+        # Add the last line if we haven't hit max_lines
         if current_line and len(lines) < max_lines:
             lines.append(' '.join(current_line))
+            
+        # If we only have one line, pad with an empty line
+        if len(lines) == 1:
+            lines.append("")
             
         return lines
 
@@ -322,9 +267,6 @@ class CalendarManager:
         # Only clear if force_clear is True (mode switch) or no events are drawn
         if force_clear:
             self.display_manager.clear()
-            self.scroll_position = 0
-            self.last_scroll_time = time.time()
-            self.last_reset_time = time.time()
             
         if not self.events:
             # Display "No Events" message if the list is empty
@@ -341,28 +283,6 @@ class CalendarManager:
         # Set force_clear flag for logging
         self.force_clear = force_clear
         
-        # Only log at INFO level when switching to calendar or when force_clear is True
-        if force_clear:
-            logger.info(f"CalendarManager displaying event index {self.current_event_index}: {event_to_display.get('summary')}")
-            logger.info(f"CalendarManager displaying event: {event_to_display.get('summary')}")
-            logger.info(f"Event details - Date: {self._format_event_date(event_to_display)}, Time: {self._format_event_time(event_to_display)}, Summary: {event_to_display.get('summary', 'No Title')}")
-        else:
-            logger.debug(f"CalendarManager displaying event index {self.current_event_index}: {event_to_display.get('summary')}")
-
-        # Handle scrolling if enabled
-        current_time = time.time()
-        if self.scroll_enabled:
-            # Check if we should start scrolling (after pause at top)
-            if current_time - self.last_reset_time >= self.scroll_pause_time:
-                if current_time - self.last_scroll_time >= self.scroll_delay:
-                    self.scroll_position += self.scroll_speed
-                    self.last_scroll_time = current_time
-                    
-                    # If we've scrolled past the bottom, reset to top with pause
-                    if self.scroll_position >= self.display_manager.matrix.height:
-                        self.scroll_position = 0
-                        self.last_reset_time = current_time
-
         # Draw the event
         draw_successful = self.draw_event(event_to_display)
 
