@@ -41,7 +41,8 @@ def main():
     text = " Chuck Builds"
 
     # Find the largest font size that fits
-    while True:
+    max_font_size = 100  # Set a reasonable maximum font size
+    while font_size <= max_font_size:
         bbox = draw.textbbox((0, 0), text, font=font)
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
@@ -50,6 +51,10 @@ def main():
             font = ImageFont.truetype(font_path, font_size)
             break
         font_size += 1
+    else:
+        # If the loop exits without breaking, use the maximum font size
+        font_size = max_font_size
+        font = ImageFont.truetype(font_path, font_size)
 
     # Center the text
     x = (matrix.width - text_width) // 2
