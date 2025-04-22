@@ -41,7 +41,9 @@ def main():
     text = " Chuck Builds"
 
     # Find the largest font size that fits
-    max_font_size = 100  # Set a reasonable maximum font size
+    min_font_size = 6
+    max_font_size = 36
+    font_size = min_font_size
     while font_size <= max_font_size:
         bbox = draw.textbbox((0, 0), text, font=font)
         text_width = bbox[2] - bbox[0]
