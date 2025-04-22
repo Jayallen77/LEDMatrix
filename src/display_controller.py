@@ -372,7 +372,7 @@ class DisplayController:
                         self.news.display_news()
                             
                     elif self.current_display_mode == 'calendar' and self.calendar:
-                        self.calendar.display()
+                        self.calendar.display(force_clear=self.force_clear)
                             
                     elif self.current_display_mode == 'nhl_recent' and self.nhl_recent:
                         self.nhl_recent.display(force_clear=self.force_clear)

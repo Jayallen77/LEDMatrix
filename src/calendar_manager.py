@@ -258,7 +258,7 @@ class CalendarManager:
             logging.error(f"Could not parse time string: {start} - {e}")
             return "Invalid Time"
 
-    def display(self):
+    def display(self, force_clear=False):
         """Display the current calendar event on the matrix"""
         if not self.enabled:
             logger.debug("Calendar manager is disabled, skipping display")
@@ -266,9 +266,10 @@ class CalendarManager:
             
         if not self.events:
             # Display "No Events" message if the list is empty
-            logger.info("--> CalendarManager: Attempting to draw DEBUG (no events).")
-            self.display_manager.clear()
-            self.display_manager.draw_text("Calendar DEBUG", small_font=True, color=self.text_color)
+            logger.debug("No calendar events to display")
+            if force_clear:
+                self.display_manager.clear()
+            self.display_manager.draw_text("No Events", small_font=True, color=self.text_color)
             self.display_manager.update_display()
             return
 
@@ -278,24 +279,23 @@ class CalendarManager:
         event_to_display = self.events[self.current_event_index]
         logger.debug(f"CalendarManager displaying event index {self.current_event_index}: {event_to_display.get('summary')}")
         
-        # Clear the display before drawing the current event
-        logger.debug("CalendarManager clearing display for event.")
-        self.display_manager.clear()
+        # Only clear if forced or if this is a new event
+        if force_clear:
+            self.display_manager.clear()
 
         # Draw the event
         draw_successful = self.draw_event(event_to_display)
 
         if draw_successful:
-            # Add a small delay to ensure the content stays visible
-            time.sleep(0.1)  # 100ms delay
             # Update the display
             self.display_manager.update_display()
             logger.debug("CalendarManager event display updated.")
         else:
             # Draw failed (error logged in draw_event), show debug message
-            logger.info("--> CalendarManager: Attempting to draw DEBUG (draw_event failed).")
-            self.display_manager.clear() # Clear any partial drawing
-            self.display_manager.draw_text("Calendar DEBUG", small_font=True, color=self.text_color)
+            logger.warning("Failed to draw calendar event")
+            if force_clear:
+                self.display_manager.clear()
+            self.display_manager.draw_text("Calendar Error", small_font=True, color=self.text_color)
             self.display_manager.update_display()
 
     def advance_event(self):
