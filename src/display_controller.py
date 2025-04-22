@@ -35,7 +35,7 @@ class DisplayController:
         self.stocks = StockManager(self.config, self.display_manager) if self.config.get('stocks', {}).get('enabled', False) else None
         self.news = StockNewsManager(self.config, self.display_manager) if self.config.get('stock_news', {}).get('enabled', False) else None
         self.calendar = CalendarManager(self.display_manager.matrix, self.display_manager.current_canvas, self.config) if self.config.get('calendar', {}).get('enabled', False) else None
-        self.youtube = YouTubeDisplay() if self.config.get('youtube', {}).get('enabled', False) else None
+        self.youtube = YouTubeDisplay(self.display_manager, self.config_manager.config_path, self.config_manager.secrets_path) if self.config.get('youtube', {}).get('enabled', False) else None
         logger.info(f"Calendar Manager initialized: {'Object' if self.calendar else 'None'}")
         logger.info("Display modes initialized in %.3f seconds", time.time() - init_time)
         
@@ -142,7 +142,7 @@ class DisplayController:
         if self.stocks: self.stocks.update_stock_data()
         if self.news: self.news.update_news_data()
         if self.calendar: self.calendar.update(time.time())
-        if self.youtube: self.youtube.run()
+        if self.youtube: self.youtube.update()
         
         # Update NHL managers
         if self.nhl_live: self.nhl_live.update()
@@ -385,7 +385,7 @@ class DisplayController:
                         self.nba_upcoming.display(force_clear=self.force_clear)
                             
                     elif self.current_display_mode == 'youtube' and self.youtube:
-                        self.youtube.display()
+                        self.youtube.display(force_clear=self.force_clear)
                             
                 except Exception as e:
                     logger.error(f"Error updating display for mode {self.current_display_mode}: {e}", exc_info=True)

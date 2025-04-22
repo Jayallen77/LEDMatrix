@@ -1,19 +1,28 @@
 #!/usr/bin/env python3
 import json
 import time
+import logging
 from PIL import Image, ImageDraw, ImageFont
 import requests
 from rgbmatrix import RGBMatrix, RGBMatrixOptions
 import os
+from typing import Dict, Any
+
+# Get logger without configuring
+logger = logging.getLogger(__name__)
 
 class YouTubeDisplay:
-    def __init__(self, config_path='config/config.json', secrets_path='config/config_secrets.json'):
+    def __init__(self, display_manager, config_path='config/config.json', secrets_path='config/config_secrets.json'):
         self.config = self._load_config(config_path)
         self.secrets = self._load_config(secrets_path)
         self.matrix = self._setup_matrix()
         self.canvas = self.matrix.CreateFrameCanvas()
         self.font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
         self.youtube_logo = Image.open("assets/youtube_logo.png")
+        self.display_manager = display_manager
+        self.last_update = 0
+        self.update_interval = self.config.get('youtube', {}).get('update_interval', 300)  # Default 5 minutes
+        self.channel_stats = None
         
     def _load_config(self, config_path):
         with open(config_path, 'r') as f:
@@ -53,7 +62,7 @@ class YouTubeDisplay:
                     'views': int(channel['statistics']['viewCount'])
                 }
         except Exception as e:
-            print(f"Error fetching YouTube stats: {e}")
+            logger.error(f"Error fetching YouTube stats: {e}")
             return None
             
     def _create_display(self, channel_stats):
@@ -91,19 +100,30 @@ class YouTubeDisplay:
         
         return image
         
-    def run(self):
+    def update(self):
+        """Update YouTube channel stats if needed."""
+        current_time = time.time()
+        if current_time - self.last_update >= self.update_interval:
+            channel_id = self.secrets['youtube']['channel_id']
+            self.channel_stats = self._get_channel_stats(channel_id)
+            self.last_update = current_time
+            
+    def display(self, force_clear: bool = False):
+        """Display YouTube channel stats."""
         if not self.config.get('youtube', {}).get('enabled', False):
             return
             
-        channel_id = self.secrets['youtube']['channel_id']
-        duration = self.config['display']['display_durations']['youtube']
-        channel_stats = self._get_channel_stats(channel_id)
-        
-        if channel_stats:
-            display_image = self._create_display(channel_stats)
+        if not self.channel_stats:
+            self.update()
+            
+        if self.channel_stats:
+            if force_clear:
+                self.matrix.Clear()
+                
+            display_image = self._create_display(self.channel_stats)
             self.canvas.SetImage(display_image)
             self.matrix.SwapOnVSync(self.canvas)
-            time.sleep(duration)
+            time.sleep(self.update_interval)
             
     def cleanup(self):
         self.matrix.Clear()
@@ -111,5 +131,5 @@ class YouTubeDisplay:
 if __name__ == "__main__":
     # Example usage
     youtube_display = YouTubeDisplay()
-    youtube_display.run()
+    youtube_display.display()
     youtube_display.cleanup() 
