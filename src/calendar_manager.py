@@ -12,6 +12,7 @@ import numpy as np
 from rgbmatrix import graphics
 import pytz
 from src.config_manager import ConfigManager
+import time
 
 # Configure logger for this module
 logger = logging.getLogger(__name__)
@@ -121,12 +122,15 @@ class CalendarManager:
             time_str = self._format_event_time(event)
             date_str = self._format_event_date(event)
             
+            logger.debug(f"Event details - Date: {date_str}, Time: {time_str}, Summary: {summary}")
+            
             # Use display manager's font for wrapping
             font = self.display_manager.small_font
             available_width = self.display_manager.matrix.width - 4  # Leave 2 pixel margin on each side
             
             # Wrap title text
             title_lines = self._wrap_text(summary, available_width, font)
+            logger.debug(f"Wrapped title into {len(title_lines)} lines: {title_lines}")
 
             # Calculate total height needed
             date_height = 8 # Approximate height for date string
@@ -138,18 +142,23 @@ class CalendarManager:
             # Calculate starting y position to center vertically
             y_pos = (self.display_manager.matrix.height - total_height) // 2
             y_pos = max(1, y_pos) # Ensure it doesn't start above the top edge
+            logger.debug(f"Starting y position: {y_pos}, Total height: {total_height}")
 
             # Draw date in grey
+            logger.debug(f"Drawing date at y={y_pos}: {date_str}")
             self.display_manager.draw_text(date_str, y=y_pos, color=self.date_color, small_font=True)
             y_pos += date_height + 2 # Move down for the time
 
             # Draw time in green
+            logger.debug(f"Drawing time at y={y_pos}: {time_str}")
             self.display_manager.draw_text(time_str, y=y_pos, color=self.time_color, small_font=True)
             y_pos += time_height + 2 # Move down for the title
             
             # Draw title lines
-            for line in title_lines:
+            for i, line in enumerate(title_lines):
+                logger.debug(f"Drawing title line {i+1} at y={y_pos}: {line}")
                 if y_pos >= self.display_manager.matrix.height - 8: # Stop if we run out of space
+                    logger.debug("Stopping title drawing - reached bottom of display")
                     break
                 self.display_manager.draw_text(line, y=y_pos, color=self.text_color, small_font=True)
                 y_pos += 8 + 2 # Move down for the next line, add 2px spacing
@@ -277,6 +286,8 @@ class CalendarManager:
         draw_successful = self.draw_event(event_to_display)
 
         if draw_successful:
+            # Add a small delay to ensure the content stays visible
+            time.sleep(0.1)  # 100ms delay
             # Update the display
             self.display_manager.update_display()
             logger.debug("CalendarManager event display updated.")
