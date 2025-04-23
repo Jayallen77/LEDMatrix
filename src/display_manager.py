@@ -166,16 +166,14 @@ class DisplayManager:
             # Load 4x6 font as extra_small_font
             try:
                 script_dir = os.path.dirname(os.path.abspath(__file__))
-                # Construct path relative to this script to the 4x6 TTF font
                 relative_font_path = os.path.join(script_dir, "../assets/fonts/4x6-font.ttf")
                 font_path = os.path.abspath(relative_font_path)
                 logger.info(f"Attempting to load 4x6 TTF font from: {font_path} at size 6")
-                self.extra_small_font = ImageFont.truetype(font_path, 6) # Assuming size 6 is appropriate
+                self.extra_small_font = ImageFont.truetype(font_path, 6)
                 logger.info(f"4x6 TTF extra small font loaded successfully from {font_path}")
             except Exception as font_err:
                 logger.error(f"Failed to load 4x6 TTF font: {font_err}. Falling back.")
-                # Fallback to the small font if 4x6 fails
-                self.extra_small_font = self.small_font 
+                self.extra_small_font = self.small_font
 
         except Exception as e:
             logger.error(f"Error in font loading: {e}")
@@ -183,9 +181,13 @@ class DisplayManager:
             self.regular_font = ImageFont.load_default()
             self.small_font = self.regular_font
             self.calendar_font = self.regular_font
-            # Ensure extra_small_font exists even if regular/small fail
             if not hasattr(self, 'extra_small_font'): 
                 self.extra_small_font = self.regular_font
+
+    def get_text_width(self, text, font):
+        """Get the width of text when rendered with the given font."""
+        bbox = self.draw.textbbox((0, 0), text, font=font)
+        return bbox[2] - bbox[0]
 
     def draw_text(self, text: str, x: int = None, y: int = None, color: tuple = (255, 255, 255), 
                  small_font: bool = False, font: ImageFont = None):

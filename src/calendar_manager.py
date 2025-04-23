@@ -132,25 +132,23 @@ class CalendarManager:
             time_str = self._format_event_time(event)
             date_str = self._format_event_date(event)
             
-            # Use display manager's small font for date/time and calendar font for summary
-            datetime_font = self.display_manager.small_font
-            summary_font = self.display_manager.calendar_font
-            logger.debug(f"Using datetime font: {datetime_font} (type: {type(datetime_font)})")
-            logger.debug(f"Using summary font: {summary_font} (type: {type(summary_font)})")
+            # Use tom-thumb font for both date/time and summary
+            calendar_font = self.display_manager.calendar_font
+            logger.debug(f"Using calendar font: {calendar_font} (type: {type(calendar_font)})")
             available_width = self.display_manager.matrix.width - 4  # Leave 2 pixel margin on each side
             
             # Draw date and time on top line
             datetime_str = f"{date_str} {time_str}"
-            self.display_manager.draw_text(datetime_str, y=2, color=self.text_color, font=datetime_font)
+            self.display_manager.draw_text(datetime_str, y=2, color=self.text_color, font=calendar_font)
             
             # Wrap summary text for two lines using calendar font
-            title_lines = self._wrap_text(summary, available_width, summary_font, max_lines=2)
+            title_lines = self._wrap_text(summary, available_width, calendar_font, max_lines=2)
             
             # Draw summary lines
             y_pos = 12  # Start position for summary (below date/time)
             for line in title_lines:
-                # Use draw_text with custom font for summary
-                self.display_manager.draw_text(line, y=y_pos, color=self.text_color, font=summary_font)
+                # Use draw_text with calendar font for summary
+                self.display_manager.draw_text(line, y=y_pos, color=self.text_color, font=calendar_font)
                 y_pos += 8  # Move down for next line
                 
             return True
@@ -171,8 +169,8 @@ class CalendarManager:
         for word in words:
             # Try adding the word to the current line
             test_line = ' '.join(current_line + [word]) if current_line else word
-            bbox = self.display_manager.draw.textbbox((0, 0), test_line, font=font)
-            text_width = bbox[2] - bbox[0]
+            # Use display_manager's draw_text method to measure text width
+            text_width = self.display_manager.get_text_width(test_line, font)
             
             if text_width <= max_width:
                 # Word fits, add it to current line
@@ -186,8 +184,7 @@ class CalendarManager:
                     # Single word too long, truncate it
                     truncated = word
                     while len(truncated) > 0:
-                        bbox = self.display_manager.draw.textbbox((0, 0), truncated + "...", font=font)
-                        if bbox[2] - bbox[0] <= max_width:
+                        if self.display_manager.get_text_width(truncated + "...", font) <= max_width:
                             lines.append(truncated + "...")
                             break
                         truncated = truncated[:-1]
@@ -204,8 +201,7 @@ class CalendarManager:
             if len(words) > len(current_line):  # More words remain
                 # Try to fit with ellipsis
                 while len(remaining_text) > 0:
-                    bbox = self.display_manager.draw.textbbox((0, 0), remaining_text + "...", font=font)
-                    if bbox[2] - bbox[0] <= max_width:
+                    if self.display_manager.get_text_width(remaining_text + "...", font) <= max_width:
                         lines.append(remaining_text + "...")
                         break
                     remaining_text = remaining_text[:-1]
