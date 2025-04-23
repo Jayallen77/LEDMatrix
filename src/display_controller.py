@@ -1,6 +1,16 @@
 import time
 import logging
+import sys
 from typing import Dict, Any
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s.%(msecs)03d - %(levelname)s:%(name)s:%(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    stream=sys.stdout
+)
+
 from src.clock import Clock
 from src.weather_manager import WeatherManager
 from src.display_manager import DisplayManager
