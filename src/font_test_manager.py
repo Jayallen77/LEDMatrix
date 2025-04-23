@@ -17,7 +17,7 @@ class FontTestManager:
         self.config = config
         self.fonts = {
             "4x6": "assets/fonts/4x6-font.ttf",
-            "MatrixChunky6": "assets/fonts/MatrixChunky6.ttf"
+            "M3x6": "assets/fonts/M3x6.ttf"
         }
         self.font_sizes = [4]
         self.logger = logging.getLogger('FontTest')
