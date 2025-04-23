@@ -417,7 +417,7 @@ class StockManager:
             logo_y = (height - logo.height) // 2
             image.paste(logo, (logo_x, logo_y), logo)
         
-        # Draw symbol, price, and change in the center
+        # Draw symbol, price, and change in a centered column
         # Use the fonts from display_manager
         regular_font = self.display_manager.regular_font
         small_font = self.display_manager.small_font
@@ -446,18 +446,24 @@ class StockManager:
         # Calculate starting y position to center all text
         start_y = (height - total_text_height) // 2
         
-        # Draw symbol - position closer to logo
-        symbol_x = logo_x + logo.width + 4  # 4px gap after logo
+        # Calculate center x position for the column
+        column_x = width // 2
+        
+        # Draw symbol
+        symbol_width = symbol_bbox[2] - symbol_bbox[0]
+        symbol_x = column_x - (symbol_width // 2)
         draw.text((symbol_x, start_y), symbol_text, font=symbol_font, fill=(255, 255, 255))
         
         # Draw price
-        price_x = symbol_x
-        price_y = start_y + (symbol_bbox[3] - symbol_bbox[1])
+        price_width = price_bbox[2] - price_bbox[0]
+        price_x = column_x - (price_width // 2)
+        price_y = start_y + (symbol_bbox[3] - symbol_bbox[1]) + 2  # Small gap after symbol
         draw.text((price_x, price_y), price_text, font=price_font, fill=(255, 255, 255))
         
         # Draw change with color based on value
-        change_x = symbol_x
-        change_y = price_y + (price_bbox[3] - price_bbox[1])
+        change_width = change_bbox[2] - change_bbox[0]
+        change_x = column_x - (change_width // 2)
+        change_y = price_y + (price_bbox[3] - price_bbox[1]) + 2  # Small gap after price
         change_color = (0, 255, 0) if change >= 0 else (255, 0, 0)
         draw.text((change_x, change_y), change_text, font=small_font, fill=change_color)
         
