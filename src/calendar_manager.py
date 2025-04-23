@@ -16,7 +16,7 @@ import time
 
 # Configure logger for this module
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)  # Set to DEBUG to see font details
+logger.setLevel(logging.INFO)  # Set to INFO level
 
 class CalendarManager:
     def __init__(self, display_manager, config):
@@ -33,9 +33,13 @@ class CalendarManager:
         self.events = []
         self.service = None
         
-        # Log font information during initialization only
-        if self.enabled:
-            logger.info(f"Calendar configuration: enabled={self.enabled}, update_interval={self.update_interval}, max_events={self.max_events}, calendars={self.calendars}")
+        # Log font information during initialization
+        logger.info(f"Display Manager fonts:")
+        logger.info(f"  Small font: {self.display_manager.small_font}")
+        logger.info(f"  Calendar font: {self.display_manager.calendar_font}")
+        logger.info(f"  Font types - Small: {type(self.display_manager.small_font)}, Calendar: {type(self.display_manager.calendar_font)}")
+        
+        logger.info(f"Calendar configuration: enabled={self.enabled}, update_interval={self.update_interval}, max_events={self.max_events}, calendars={self.calendars}")
         
         # Get timezone from config
         self.config_manager = ConfigManager()

@@ -10,6 +10,7 @@ import freetype
 
 # Get logger without configuring
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)  # Set to INFO level
 
 class DisplayManager:
     _instance = None
