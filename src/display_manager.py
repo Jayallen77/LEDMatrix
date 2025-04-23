@@ -192,10 +192,14 @@ class DisplayManager:
             # Select font based on parameters
             if font:
                 current_font = font
-                logger.debug(f"Using custom font: {font}")
+                if not hasattr(self, '_last_font') or self._last_font != font:
+                    logger.debug(f"Using custom font: {font}")
+                    self._last_font = font
             else:
                 current_font = self.small_font if small_font else self.regular_font
-                logger.debug(f"Using {'small' if small_font else 'regular'} font: {current_font}")
+                if not hasattr(self, '_last_font') or self._last_font != current_font:
+                    logger.debug(f"Using {'small' if small_font else 'regular'} font: {current_font}")
+                    self._last_font = current_font
             
             # Calculate x position if not provided (center text)
             if x is None:
