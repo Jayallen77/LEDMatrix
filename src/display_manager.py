@@ -167,7 +167,7 @@ class DisplayManager:
         """Load fonts with proper error handling."""
         try:
             # Load Press Start 2P font
-            self.regular_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 10)
+            self.regular_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
             logger.info("Press Start 2P font loaded successfully")
             
             # Use the same font for small text, just at a smaller size
