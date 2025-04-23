@@ -67,10 +67,13 @@ class FontTestManager:
                 for i in range(bitmap.rows):
                     for j in range(bitmap.width):
                         try:
-                            # Calculate the correct buffer index based on pitch
-                            index = i * bitmap.pitch + j
-                            if index < len(bitmap.buffer) and bitmap.buffer[index]:
-                                draw.point((x + j, y + i), fill=(255, 255, 255))
+                            # Get the byte containing the pixel
+                            byte_index = i * bitmap.pitch + (j // 8)
+                            if byte_index < len(bitmap.buffer):
+                                byte = bitmap.buffer[byte_index]
+                                # Check if the specific bit is set
+                                if byte & (1 << (7 - (j % 8))):
+                                    draw.point((x + j, y + i), fill=(255, 255, 255))
                         except IndexError:
                             self.logger.warning(f"Index out of range for char '{char}' at position ({i}, {j})")
                             continue
