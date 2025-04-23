@@ -401,7 +401,7 @@ class StockManager:
     def _create_stock_display(self, symbol: str, price: float, change: float, change_percent: float, is_crypto: bool = False) -> Image.Image:
         """Create a display image for a stock or crypto with logo, symbol, price, and change."""
         # Create a wider image for scrolling
-        width = self.display_manager.matrix.width * 2  # Reduced from 3x to 2x since we'll handle spacing in display_stocks
+        width = self.display_manager.matrix.width * 2
         height = self.display_manager.matrix.height
         image = Image.new('RGB', (width, height), color=(0, 0, 0))
         draw = ImageDraw.Draw(image)
@@ -409,8 +409,8 @@ class StockManager:
         # Draw large stock/crypto logo on the left
         logo = self._get_stock_logo(symbol, is_crypto)
         if logo:
-            # Position logo on the left side with minimal spacing
-            logo_x = 0  # Already at 0, keeping it at the far left
+            # Position logo on the left side
+            logo_x = 0
             logo_y = (height - logo.height) // 2
             image.paste(logo, (logo_x, logo_y), logo)
         
@@ -421,9 +421,9 @@ class StockManager:
         
         # Create smaller versions of the fonts for symbol and price
         symbol_font = ImageFont.truetype(self.display_manager.regular_font.path, 
-                                       int(self.display_manager.regular_font.size * 0.8))  # 80% of regular size
+                                       int(self.display_manager.regular_font.size * 0.8))
         price_font = ImageFont.truetype(self.display_manager.regular_font.path, 
-                                      int(self.display_manager.regular_font.size * 0.8))  # 80% of regular size
+                                      int(self.display_manager.regular_font.size * 0.8))
         
         # Calculate text dimensions for proper spacing
         symbol_text = symbol
@@ -461,14 +461,14 @@ class StockManager:
         # Draw mini chart on the right
         if symbol in self.stock_data and 'price_history' in self.stock_data[symbol]:
             price_history = self.stock_data[symbol]['price_history']
-            if len(price_history) >= 2:  # Need at least 2 points to draw a line
+            if len(price_history) >= 2:
                 # Extract prices from price history
                 chart_data = [p['price'] for p in price_history]
                 
-                # Calculate chart dimensions - make it slightly smaller
-                chart_width = int(width // 2.5)  # Reduced from width//2.5 to width//3 to prevent overlap
-                chart_height = height // 1.5
-                chart_x = width - chart_width - 10  # Increased right margin to 10 pixels
+                # Calculate chart dimensions
+                chart_width = int(width // 3)  # Reduced from width//2.5 to prevent overlap
+                chart_height = height // 2
+                chart_x = width - chart_width - 5  # Added 5px margin
                 chart_y = (height - chart_height) // 2
                 
                 # Find min and max prices for scaling
@@ -477,7 +477,7 @@ class StockManager:
                 
                 # Add padding to avoid flat lines when prices are very close
                 price_range = max_price - min_price
-                if price_range < 0.01:  # If prices are very close
+                if price_range < 0.01:
                     min_price -= 0.01
                     max_price += 0.01
                     price_range = 0.02
@@ -486,20 +486,18 @@ class StockManager:
                 points = []
                 for i, price in enumerate(chart_data):
                     x = chart_x + (i * chart_width) // (len(chart_data) - 1)
-                    # Invert y-axis (higher price = lower y value)
-                    y = chart_y + chart_height - ((price - min_price) / price_range * chart_height)
+                    y = chart_y + chart_height - int(((price - min_price) / price_range) * chart_height)
                     points.append((x, y))
                 
                 # Draw the line
                 if len(points) >= 2:
-                    draw.line(points, fill=(0, 255, 0) if change >= 0 else (255, 0, 0), width=1)
+                    draw.line(points, fill=change_color, width=1)
                     
-                    # Draw dots at each point
-                    for point in points:
+                    # Draw dots at start and end points only
+                    for point in [points[0], points[-1]]:
                         draw.ellipse([point[0]-1, point[1]-1, point[0]+1, point[1]+1], 
-                                    fill=(0, 255, 0) if change >= 0 else (255, 0, 0))
+                                   fill=change_color)
         
-        # Return the full image without cropping
         return image
 
     def _update_stock_display(self, symbol: str, data: Dict[str, Any], width: int, height: int) -> None:

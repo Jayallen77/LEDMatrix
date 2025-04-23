@@ -28,7 +28,7 @@
         "display_durations": {
             "clock": 15,
             "weather": 15,
-            "stocks": 20,
+            "stocks": 30,
             "hourly_forecast": 15,
             "daily_forecast": 15,
             "stock_news": 20,
