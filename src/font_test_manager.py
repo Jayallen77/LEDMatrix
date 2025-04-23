@@ -17,7 +17,6 @@ class FontTestManager:
         self.display_manager = display_manager
         self.config = config
         self.font_path = "assets/fonts/tom-thumb.bdf"
-        self.font_size = 8  # Default size for BDF font
         self.logger = logging.getLogger('FontTest')
         
         # Verify font exists
@@ -27,7 +26,6 @@ class FontTestManager:
         
         # Load the font
         self.face = freetype.Face(self.font_path)
-        self.face.set_char_size(self.font_size * 64)  # Size is in 1/64th of points
         
         self.logger.info("Initialized FontTestManager with tom-thumb font")
     
@@ -54,7 +52,7 @@ class FontTestManager:
             
             # Calculate starting position
             x = 10  # Start 10 pixels from the left
-            y = (height - self.font_size) // 2  # Center vertically
+            y = (height - self.face.size.height) // 2  # Center vertically using font's natural height
             
             # Draw each character
             for char in sample_text:
