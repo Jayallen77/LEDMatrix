@@ -245,17 +245,18 @@ class CalendarManager:
         try:
             # Handle both date and dateTime formats
             if 'T' in start:
-                dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
-                logger.debug(f"Parsed datetime from event: {dt} (UTC)")
+                # The datetime string already includes timezone info (-05:00)
+                dt = datetime.fromisoformat(start)
+                logger.debug(f"Parsed datetime from event: {dt}")
             else:
                 dt = datetime.strptime(start, '%Y-%m-%d')
                 # Make date object timezone-aware (assume UTC if no tz info)
                 dt = pytz.utc.localize(dt)
-                logger.debug(f"Parsed date from event: {dt} (UTC)")
+                logger.debug(f"Parsed date from event: {dt}")
             
-            local_dt = dt.astimezone(self.timezone) # Use configured timezone
-            logger.debug(f"Converted to local timezone: {local_dt} ({self.timezone})")
-            return local_dt.strftime("%a %-m/%-d") # e.g., "Mon 4/21"
+            # No need to convert timezone since it's already in the correct one
+            logger.debug(f"Using event timezone: {dt}")
+            return dt.strftime("%a %-m/%-d") # e.g., "Mon 4/21"
         except ValueError as e:
             logging.error(f"Could not parse date string: {start} - {e}")
             return ""
@@ -267,11 +268,12 @@ class CalendarManager:
             return "All Day"
             
         try:
-            dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
-            logger.debug(f"Parsed time from event: {dt} (UTC)")
-            local_dt = dt.astimezone(self.timezone) # Use configured timezone
-            logger.debug(f"Converted to local timezone: {local_dt} ({self.timezone})")
-            return local_dt.strftime("%I:%M %p")
+            # The datetime string already includes timezone info (-05:00)
+            dt = datetime.fromisoformat(start)
+            logger.debug(f"Parsed time from event: {dt}")
+            # No need to convert timezone since it's already in the correct one
+            logger.debug(f"Using event timezone: {dt}")
+            return dt.strftime("%I:%M %p")
         except ValueError as e:
             logging.error(f"Could not parse time string: {start} - {e}")
             return "Invalid Time"
