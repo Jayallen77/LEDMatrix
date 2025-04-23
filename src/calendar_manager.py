@@ -120,25 +120,30 @@ class CalendarManager:
     def draw_event(self, event, y_position=2):
         """Draw a single calendar event."""
         try:
-            # Get time and summary
-            time_text = self._format_event_time(event)
+            # Get date, time, and summary
+            date_text = self._format_event_date(event)
+            time_text = self._format_event_time(event).replace(" ", "")  # Remove space between time and AM/PM
+            datetime_text = f"{date_text} {time_text}"
             summary = event.get('summary', 'No Title')
             
-            # Use regular font (PressStart2P) for time and date
-            time_width = self.display_manager.get_text_width(time_text, self.display_manager.regular_font)
+            # Use regular font (PressStart2P) for date/time
+            datetime_width = self.display_manager.get_text_width(datetime_text, self.display_manager.regular_font)
+            datetime_x = (self.display_manager.matrix.width - datetime_width) // 2
             
-            # Use calendar font (4x6) for summary
-            available_width = self.display_manager.matrix.width - time_width - 10  # 10 pixels padding
-            title_lines = self._wrap_text(summary, available_width, self.display_manager.calendar_font, max_lines=2)
-            
-            # Draw time with regular font
-            self.display_manager.draw_text(time_text, 0, y_position, 
+            # Draw centered date/time with regular font
+            self.display_manager.draw_text(datetime_text, datetime_x, y_position, 
                                         color=self.time_color,
                                         font=self.display_manager.regular_font)
             
-            # Draw summary with calendar font
+            # Use calendar font (4x6) for summary
+            available_width = self.display_manager.matrix.width - 4  # 2 pixel margin on each side
+            title_lines = self._wrap_text(summary, available_width, self.display_manager.calendar_font, max_lines=2)
+            
+            # Draw centered summary with calendar font
             for i, line in enumerate(title_lines):
-                self.display_manager.draw_text(line, time_width + 10, y_position + (i * 8),
+                line_width = self.display_manager.get_text_width(line, self.display_manager.calendar_font)
+                line_x = (self.display_manager.matrix.width - line_width) // 2
+                self.display_manager.draw_text(line, line_x, y_position + 12 + (i * 8),
                                             color=self.text_color,
                                             font=self.display_manager.calendar_font)
             
