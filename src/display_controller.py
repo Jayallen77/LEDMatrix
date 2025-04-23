@@ -5,7 +5,7 @@ from typing import Dict, Any
 
 # Configure logging
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s.%(msecs)03d - %(levelname)s:%(name)s:%(message)s',
     datefmt='%H:%M:%S',
     stream=sys.stdout
