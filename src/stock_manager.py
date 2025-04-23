@@ -412,8 +412,8 @@ class StockManager:
         # Draw large stock/crypto logo on the left
         logo = self._get_stock_logo(symbol, is_crypto)
         if logo:
-            # Position logo on the left side
-            logo_x = 0
+            # Position logo on the left side with minimal spacing
+            logo_x = 2  # Small margin from left edge
             logo_y = (height - logo.height) // 2
             image.paste(logo, (logo_x, logo_y), logo)
         
@@ -446,17 +446,17 @@ class StockManager:
         # Calculate starting y position to center all text
         start_y = (height - total_text_height) // 2
         
-        # Draw symbol
-        symbol_x = (width - (symbol_bbox[2] - symbol_bbox[0])) // 2
+        # Draw symbol - position closer to logo
+        symbol_x = logo_x + logo.width + 4  # 4px gap after logo
         draw.text((symbol_x, start_y), symbol_text, font=symbol_font, fill=(255, 255, 255))
         
         # Draw price
-        price_x = (width - (price_bbox[2] - price_bbox[0])) // 2
+        price_x = symbol_x
         price_y = start_y + (symbol_bbox[3] - symbol_bbox[1])
         draw.text((price_x, price_y), price_text, font=price_font, fill=(255, 255, 255))
         
         # Draw change with color based on value
-        change_x = (width - (change_bbox[2] - change_bbox[0])) // 2
+        change_x = symbol_x
         change_y = price_y + (price_bbox[3] - price_bbox[1])
         change_color = (0, 255, 0) if change >= 0 else (255, 0, 0)
         draw.text((change_x, change_y), change_text, font=small_font, fill=change_color)
@@ -471,7 +471,7 @@ class StockManager:
                 # Calculate chart dimensions
                 chart_width = int(width // 3)  # Reduced from width//2.5 to prevent overlap
                 chart_height = height // 2
-                chart_x = width - chart_width - 5  # Added 5px margin
+                chart_x = width - chart_width - 2  # 2px margin from right edge
                 chart_y = (height - chart_height) // 2
                 
                 # Find min and max prices for scaling
