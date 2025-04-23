@@ -157,6 +157,8 @@ class DisplayManager:
                 logger.info(f"Attempting to load tom-thumb font from: {font_path}")
                 self.calendar_font = ImageFont.load(font_path)
                 logger.info(f"tom-thumb calendar font loaded successfully from {font_path}")
+                logger.info(f"Calendar font type: {type(self.calendar_font)}")
+                logger.info(f"Calendar font size: {self.calendar_font.size}")
             except Exception as font_err:
                 logger.error(f"Failed to load tom-thumb font: {font_err}. Falling back to small font.")
                 self.calendar_font = self.small_font

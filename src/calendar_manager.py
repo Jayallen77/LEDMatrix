@@ -129,8 +129,8 @@ class CalendarManager:
             # Use display manager's small font for date/time and calendar font for summary
             datetime_font = self.display_manager.small_font
             summary_font = self.display_manager.calendar_font
-            logger.debug(f"Using datetime font: {datetime_font}")
-            logger.debug(f"Using summary font: {summary_font}")
+            logger.debug(f"Using datetime font: {datetime_font} (type: {type(datetime_font)})")
+            logger.debug(f"Using summary font: {summary_font} (type: {type(summary_font)})")
             available_width = self.display_manager.matrix.width - 4  # Leave 2 pixel margin on each side
             
             # Draw date and time on top line
