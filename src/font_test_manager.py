@@ -19,7 +19,7 @@ class FontTestManager:
             "4x6": "assets/fonts/4x6-font.ttf",
             "MatrixChunky6": "assets/fonts/MatrixChunky6.ttf"
         }
-        self.font_sizes = [6, 8, 10, 12, 14, 16, 18, 20]
+        self.font_sizes = [6]
         self.logger = logging.getLogger('FontTest')
         
         # Verify fonts exist
