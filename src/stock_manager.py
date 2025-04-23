@@ -450,7 +450,7 @@ class StockManager:
         start_y = (height - total_text_height) // 2
         
         # Calculate center x position for the column
-        column_x = width // 2
+        column_x = width // 2.5
         
         # Draw symbol
         symbol_width = symbol_bbox[2] - symbol_bbox[0]
