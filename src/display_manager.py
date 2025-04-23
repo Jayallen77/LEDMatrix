@@ -174,26 +174,26 @@ class DisplayManager:
             self.small_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
             logger.info("Press Start 2P small font loaded successfully")
 
-            # Load tom-thumb BDF font for calendar events
+            # Load 4x6 BDF font for calendar events
             try:
                 script_dir = os.path.dirname(os.path.abspath(__file__))
-                relative_font_path = os.path.join(script_dir, "../assets/fonts/tom-thumb.bdf")
+                relative_font_path = os.path.join(script_dir, "../assets/fonts/4x6.bdf")
                 self.calendar_font_path = os.path.abspath(relative_font_path)
-                logger.info(f"Attempting to load tom-thumb font from: {self.calendar_font_path}")
+                logger.info(f"Attempting to load 4x6 font from: {self.calendar_font_path}")
                 
                 if not os.path.exists(self.calendar_font_path):
                     raise FileNotFoundError(f"Font file not found at {self.calendar_font_path}")
                 
                 # Load with freetype for proper BDF handling
                 face = freetype.Face(self.calendar_font_path)
-                logger.info(f"tom-thumb calendar font loaded successfully from {self.calendar_font_path}")
+                logger.info(f"4x6 calendar font loaded successfully from {self.calendar_font_path}")
                 logger.info(f"Calendar font size: {face.size.height >> 6} pixels")
                 
                 # Store the face for later use
                 self.calendar_font = face
                     
             except Exception as font_err:
-                logger.error(f"Failed to load tom-thumb font: {str(font_err)}", exc_info=True)
+                logger.error(f"Failed to load 4x6 font: {str(font_err)}", exc_info=True)
                 logger.error("Falling back to small font")
                 self.calendar_font = self.small_font
 
