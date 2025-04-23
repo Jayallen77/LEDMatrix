@@ -431,7 +431,8 @@ class StockManager:
                                       int(self.display_manager.regular_font.size))
         
         # Calculate text dimensions for proper spacing
-        symbol_text = symbol
+        display_symbol = symbol.replace('-USD', '') if is_crypto else symbol
+        symbol_text = display_symbol
         price_text = f"${price:.2f}"
         change_text = f"{change:+.2f} ({change_percent:+.1f}%)"
         
