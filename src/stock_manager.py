@@ -424,9 +424,9 @@ class StockManager:
         
         # Create smaller versions of the fonts for symbol and price
         symbol_font = ImageFont.truetype(self.display_manager.regular_font.path, 
-                                       int(self.display_manager.regular_font.size * 0.8))
+                                       int(self.display_manager.regular_font.size))
         price_font = ImageFont.truetype(self.display_manager.regular_font.path, 
-                                      int(self.display_manager.regular_font.size * 0.8))
+                                      int(self.display_manager.regular_font.size))
         
         # Calculate text dimensions for proper spacing
         symbol_text = symbol
