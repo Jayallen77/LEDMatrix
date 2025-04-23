@@ -16,7 +16,7 @@ import time
 
 # Configure logger for this module
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)  # Set to INFO to reduce noise
+logger.setLevel(logging.DEBUG)  # Set to DEBUG to see font details
 
 class CalendarManager:
     def __init__(self, display_manager, config):
@@ -32,6 +32,12 @@ class CalendarManager:
         self.last_debug_log = 0  # Add timestamp for debug message throttling
         self.events = []
         self.service = None
+        
+        # Log font information during initialization
+        logger.debug(f"Display Manager fonts:")
+        logger.debug(f"  Small font: {self.display_manager.small_font}")
+        logger.debug(f"  Calendar font: {self.display_manager.calendar_font}")
+        logger.debug(f"  Font types - Small: {type(self.display_manager.small_font)}, Calendar: {type(self.display_manager.calendar_font)}")
         
         logger.info(f"Calendar configuration: enabled={self.enabled}, update_interval={self.update_interval}, max_events={self.max_events}, calendars={self.calendars}")
         
