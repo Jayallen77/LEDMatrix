@@ -117,7 +117,7 @@ class CalendarManager:
             logging.error(f"Error fetching calendar events: {str(e)}")
             return []
     
-    def draw_event(self, event, y_position):
+    def draw_event(self, event, y_position=2):
         """Draw a single calendar event."""
         try:
             # Get time and summary
@@ -293,8 +293,8 @@ class CalendarManager:
         # Set force_clear flag for logging
         self.force_clear = force_clear
         
-        # Draw the event
-        draw_successful = self.draw_event(event_to_display)
+        # Draw the event starting at y=2
+        draw_successful = self.draw_event(event_to_display, y_position=2)
 
         if draw_successful:
             # Update the display
