@@ -185,9 +185,10 @@ class DisplayManager:
             if not hasattr(self, 'extra_small_font'): 
                 self.extra_small_font = self.regular_font
 
-    def draw_text(self, text: str, x: int = None, y: int = None, color: Tuple[int, int, int] = (255, 255, 255), small_font: bool = False) -> None:
+    def draw_text(self, text: str, x: int = None, y: int = None, color: Tuple[int, int, int] = (255, 255, 255), small_font: bool = False, font: ImageFont = None) -> None:
         """Draw text on the display with improved clarity."""
-        font = self.small_font if small_font else self.regular_font
+        # Use provided font if specified, otherwise use small_font or regular_font
+        font = font if font else (self.small_font if small_font else self.regular_font)
         
         # Get text dimensions including ascenders and descenders
         bbox = self.draw.textbbox((0, 0), text, font=font)
@@ -210,7 +211,7 @@ class DisplayManager:
             y = min(y, max_y)
             y = max(y, padding)  # Ensure text doesn't get cut off at top
         
-        # Press Start 2P is pixel-perfect, so we can draw directly without any adjustments
+        # Draw the text
         self.draw.text((x, y), text, font=font, fill=color)
 
     def draw_sun(self, x: int, y: int, size: int = 16):

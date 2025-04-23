@@ -139,11 +139,8 @@ class CalendarManager:
             # Draw summary lines
             y_pos = 12  # Start position for summary (below date/time)
             for line in title_lines:
-                # Use direct drawing with calendar font for summary
-                bbox = self.display_manager.draw.textbbox((0, 0), line, font=summary_font)
-                text_width = bbox[2] - bbox[0]
-                x = (self.display_manager.matrix.width - text_width) // 2
-                self.display_manager.draw.text((x, y_pos), line, font=summary_font, fill=self.text_color)
+                # Use draw_text with custom font for summary
+                self.display_manager.draw_text(line, y=y_pos, color=self.text_color, font=summary_font)
                 y_pos += 8  # Move down for next line
                 
             return True
