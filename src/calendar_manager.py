@@ -117,44 +117,34 @@ class CalendarManager:
             logging.error(f"Error fetching calendar events: {str(e)}")
             return []
     
-    def draw_event(self, event, y_start=1):
-        """Draw a single calendar event on the canvas. Returns True on success, False on error."""
+    def draw_event(self, event, y_position):
+        """Draw a single calendar event."""
         try:
-            # Only log event details at INFO level when first switching to calendar display
-            if self.force_clear:
-                logger.info(f"CalendarManager displaying event: {event.get('summary', 'No title')}")
-                logger.info(f"Event details - Date: {self._format_event_date(event)}, Time: {self._format_event_time(event)}, Summary: {event.get('summary', 'No Title')}")
-            else:
-                logger.debug(f"Drawing event: {event.get('summary', 'No title')}")
-            
-            # Get event details
+            # Get time and summary
+            time_text = self._format_event_time(event)
             summary = event.get('summary', 'No Title')
-            time_str = self._format_event_time(event)
-            date_str = self._format_event_date(event)
             
-            # Use tom-thumb font for both date/time and summary
-            calendar_font = self.display_manager.calendar_font
-            logger.debug(f"Using calendar font: {calendar_font} (type: {type(calendar_font)})")
-            available_width = self.display_manager.matrix.width - 4  # Leave 2 pixel margin on each side
+            # Use regular font (PressStart2P) for time and date
+            time_width = self.display_manager.get_text_width(time_text, self.display_manager.regular_font)
             
-            # Draw date and time on top line
-            datetime_str = f"{date_str} {time_str}"
-            self.display_manager.draw_text(datetime_str, y=2, color=self.text_color, font=calendar_font)
+            # Use calendar font (4x6) for summary
+            available_width = self.display_manager.matrix.width - time_width - 10  # 10 pixels padding
+            title_lines = self._wrap_text(summary, available_width, self.display_manager.calendar_font, max_lines=2)
             
-            # Wrap summary text for two lines using calendar font
-            title_lines = self._wrap_text(summary, available_width, calendar_font, max_lines=2)
+            # Draw time with regular font
+            self.display_manager.draw_text(time_text, 0, y_position, 
+                                        color=self.config['calendar']['time_color'],
+                                        font=self.display_manager.regular_font)
             
-            # Draw summary lines
-            y_pos = 12  # Start position for summary (below date/time)
-            for line in title_lines:
-                # Use draw_text with calendar font for summary
-                self.display_manager.draw_text(line, y=y_pos, color=self.text_color, font=calendar_font)
-                y_pos += 8  # Move down for next line
-                
+            # Draw summary with calendar font
+            for i, line in enumerate(title_lines):
+                self.display_manager.draw_text(line, time_width + 10, y_position + (i * 8),
+                                            color=self.config['calendar']['text_color'],
+                                            font=self.display_manager.calendar_font)
+            
             return True
-
         except Exception as e:
-            logger.error(f"Error drawing calendar event: {str(e)}", exc_info=True)
+            logger.error(f"Error drawing calendar event: {e}", exc_info=True)
             return False
 
     def _wrap_text(self, text, max_width, font, max_lines=2):
