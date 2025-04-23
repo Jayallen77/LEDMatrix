@@ -112,6 +112,20 @@ class CalendarManager:
             ).execute()
             
             events = events_result.get('items', [])
+            
+            # Log event details
+            if events:
+                logger.info(f"Found {len(events)} calendar events:")
+                for event in events:
+                    summary = event.get('summary', 'No Title')
+                    start = event.get('start', {}).get('dateTime', event.get('start', {}).get('date'))
+                    end = event.get('end', {}).get('dateTime', event.get('end', {}).get('date'))
+                    logger.info(f"  Event: {summary}")
+                    logger.info(f"    Start: {start}")
+                    logger.info(f"    End: {end}")
+            else:
+                logger.info("No upcoming calendar events found")
+                
             return events
         except Exception as e:
             logging.error(f"Error fetching calendar events: {str(e)}")
@@ -269,42 +283,36 @@ class CalendarManager:
             return "Invalid Time"
 
     def display(self, force_clear=False):
-        """Display the current calendar event on the matrix"""
-        if not self.enabled:
-            logger.debug("Calendar manager is disabled, skipping display")
+        """Display calendar events on the LED matrix."""
+        if not self.enabled or not self.events:
             return
             
-        # Only clear if force_clear is True (mode switch) or no events are drawn
-        if force_clear:
-            self.display_manager.clear()
+        try:
+            if force_clear:
+                self.display_manager.clear()
+                self.force_clear = True
+                
+            if self.current_event_index >= len(self.events):
+                self.current_event_index = 0
+                
+            event = self.events[self.current_event_index]
             
-        if not self.events:
-            # Display "No Events" message if the list is empty
-            logger.debug("No calendar events to display")
-            self.display_manager.draw_text("No Events", small_font=True, color=self.text_color)
-            self.display_manager.update_display()
-            return
-
-        # Get the event to display
-        if self.current_event_index >= len(self.events):
-            self.current_event_index = 0 # Wrap around
-        event_to_display = self.events[self.current_event_index]
-        
-        # Set force_clear flag for logging
-        self.force_clear = force_clear
-        
-        # Draw the event starting at y=2
-        draw_successful = self.draw_event(event_to_display, y_position=2)
-
-        if draw_successful:
+            # Log the event being displayed
+            summary = event.get('summary', 'No Title')
+            date_text = self._format_event_date(event)
+            time_text = self._format_event_time(event)
+            logger.info(f"Displaying calendar event: {summary}")
+            logger.info(f"  Date: {date_text}")
+            logger.info(f"  Time: {time_text}")
+            
+            # Draw the event
+            self.draw_event(event)
+            
             # Update the display
             self.display_manager.update_display()
-            logger.debug("CalendarManager event display updated.")
-        else:
-            # Draw failed (error logged in draw_event), show debug message
-            logger.warning("Failed to draw calendar event")
-            self.display_manager.draw_text("Calendar Error", small_font=True, color=self.text_color)
-            self.display_manager.update_display()
+            
+        except Exception as e:
+            logger.error(f"Error displaying calendar event: {e}", exc_info=True)
 
     def advance_event(self):
         """Advance to the next event. Called by DisplayManager when calendar display time is up."""
