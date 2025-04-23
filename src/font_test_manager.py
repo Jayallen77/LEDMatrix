@@ -16,6 +16,7 @@ class FontTestManager:
         self.display_manager = display_manager
         self.config = config
         self.font_path = "assets/fonts/tom-thumb.bdf"
+        self.font_size = 8  # Default size for BDF font
         self.logger = logging.getLogger('FontTest')
         
         # Verify font exists
@@ -40,7 +41,7 @@ class FontTestManager:
             height = self.display_manager.matrix.height
             
             # Load the BDF font
-            font = ImageFont.load(self.font_path)
+            font = ImageFont.truetype(self.font_path, self.font_size)
             
             # Draw font name at the top
             self.display_manager.draw_text("tom-thumb", y=2, color=(255, 255, 255))
