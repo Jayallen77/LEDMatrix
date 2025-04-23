@@ -6,6 +6,7 @@ import logging
 import math
 from .weather_icons import WeatherIcons
 import os
+import freetype
 
 # Get logger without configuring
 logger = logging.getLogger(__name__)
@@ -138,6 +139,30 @@ class DisplayManager:
         except Exception as e:
             logger.error(f"Error clearing display: {e}")
 
+    def _draw_bdf_text(self, text, x, y, color=(255, 255, 255)):
+        """Draw text using BDF font with proper bitmap handling."""
+        try:
+            face = freetype.Face(self.calendar_font_path)
+            
+            for char in text:
+                face.load_char(char)
+                bitmap = face.glyph.bitmap
+                
+                # Draw the character
+                for i in range(bitmap.rows):
+                    for j in range(bitmap.width):
+                        byte_index = i * bitmap.pitch + (j // 8)
+                        if byte_index < len(bitmap.buffer):
+                            byte = bitmap.buffer[byte_index]
+                            if byte & (1 << (7 - (j % 8))):
+                                self.draw.point((x + j, y + i), fill=color)
+                
+                # Move to next character
+                x += face.glyph.advance.x >> 6
+                
+        except Exception as e:
+            logger.error(f"Error drawing BDF text: {e}", exc_info=True)
+
     def _load_fonts(self):
         """Load fonts with proper error handling."""
         try:
@@ -153,20 +178,19 @@ class DisplayManager:
             try:
                 script_dir = os.path.dirname(os.path.abspath(__file__))
                 relative_font_path = os.path.join(script_dir, "../assets/fonts/tom-thumb.bdf")
-                font_path = os.path.abspath(relative_font_path)
-                logger.info(f"Attempting to load tom-thumb font from: {font_path}")
+                self.calendar_font_path = os.path.abspath(relative_font_path)
+                logger.info(f"Attempting to load tom-thumb font from: {self.calendar_font_path}")
                 
-                if not os.path.exists(font_path):
-                    raise FileNotFoundError(f"Font file not found at {font_path}")
+                if not os.path.exists(self.calendar_font_path):
+                    raise FileNotFoundError(f"Font file not found at {self.calendar_font_path}")
                 
-                self.calendar_font = ImageFont.load(font_path)
-                logger.info(f"tom-thumb calendar font loaded successfully from {font_path}")
-                logger.info(f"Calendar font type: {type(self.calendar_font)}")
-                logger.info(f"Calendar font size: {self.calendar_font.size}")
+                # Load with freetype for proper BDF handling
+                face = freetype.Face(self.calendar_font_path)
+                logger.info(f"tom-thumb calendar font loaded successfully from {self.calendar_font_path}")
+                logger.info(f"Calendar font size: {face.size.height >> 6} pixels")
                 
-                # Verify it's a BDF font
-                if not isinstance(self.calendar_font, ImageFont.BdfFont):
-                    raise TypeError(f"Expected BDF font, got {type(self.calendar_font)}")
+                # Store the face for later use
+                self.calendar_font = face
                     
             except Exception as font_err:
                 logger.error(f"Failed to load tom-thumb font: {str(font_err)}", exc_info=True)
@@ -221,13 +245,20 @@ class DisplayManager:
                     # For TTF fonts, use textlength
                     text_width = self.draw.textlength(text, font=current_font)
                 else:
-                    # For BDF fonts, use textbbox
-                    bbox = self.draw.textbbox((0, 0), text, font=current_font)
-                    text_width = bbox[2] - bbox[0]
+                    # For BDF fonts, use freetype to calculate width
+                    face = freetype.Face(self.calendar_font_path)
+                    width = 0
+                    for char in text:
+                        face.load_char(char)
+                        width += face.glyph.advance.x >> 6
+                    text_width = width
                 x = (self.matrix.width - text_width) // 2
             
             # Draw the text
-            self.draw.text((x, y), text, font=current_font, fill=color)
+            if isinstance(current_font, freetype.Face):
+                self._draw_bdf_text(text, x, y, color)
+            else:
+                self.draw.text((x, y), text, font=current_font, fill=color)
             
         except Exception as e:
             logger.error(f"Error drawing text: {e}", exc_info=True)
