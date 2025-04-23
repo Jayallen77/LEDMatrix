@@ -10,32 +10,28 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class FontTestManager:
-    """Manager for testing different font sizes of multiple fonts."""
+    """Manager for testing different font sizes of m3x6 font."""
     
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         self.display_manager = display_manager
         self.config = config
-        self.fonts = {
-            "4x6": "assets/fonts/4x6-font.ttf",
-            "m3x6": "assets/fonts/m3x6.ttf"
-        }
-        self.font_sizes = [3,4,5,6,7,8]
+        self.font_path = "assets/fonts/m3x6.ttf"
+        self.font_sizes = [3, 4, 5, 6, 7, 8]
         self.logger = logging.getLogger('FontTest')
         
-        # Verify fonts exist
-        for font_name, font_path in self.fonts.items():
-            if not os.path.exists(font_path):
-                self.logger.error(f"Font file not found: {font_path}")
-                raise FileNotFoundError(f"Font file not found: {font_path}")
+        # Verify font exists
+        if not os.path.exists(self.font_path):
+            self.logger.error(f"Font file not found: {self.font_path}")
+            raise FileNotFoundError(f"Font file not found: {self.font_path}")
         
-        self.logger.info(f"Initialized FontTestManager with {len(self.font_sizes)} font sizes to test using {len(self.fonts)} fonts")
+        self.logger.info(f"Initialized FontTestManager with {len(self.font_sizes)} font sizes to test using m3x6 font")
     
     def update(self):
         """No update needed for static display."""
         pass
     
     def display(self, force_clear: bool = False):
-        """Display all font sizes at once across the screen for each font."""
+        """Display all font sizes at once across the screen."""
         try:
             # Clear the display
             self.display_manager.clear()
@@ -48,34 +44,31 @@ class FontTestManager:
             total_sizes = len(self.font_sizes)
             spacing = width // (total_sizes + 1)  # Add 1 to account for edges
             
-            # Draw each font
+            # Draw font name at the top
+            self.display_manager.draw_text("m3x6", y=2, color=(255, 255, 255))
+            
+            # Draw each font size
             draw = ImageDraw.Draw(self.display_manager.image)
             
-            for font_name, font_path in self.fonts.items():
-                # Draw font name at the top
-                font_name_y = 2 if font_name == "4x6" else height - 10
-                self.display_manager.draw_text(font_name, y=font_name_y, color=(255, 255, 255))
+            for i, size in enumerate(self.font_sizes):
+                # Load the font at the current size
+                font = ImageFont.truetype(self.font_path, size)
                 
-                # Draw each font size
-                for i, size in enumerate(self.font_sizes):
-                    # Load the font at the current size
-                    font = ImageFont.truetype(font_path, size)
-                    
-                    # Create text to display (the size number)
-                    text = str(size)
-                    
-                    # Get text dimensions
-                    bbox = draw.textbbox((0, 0), text, font=font)
-                    text_width = bbox[2] - bbox[0]
-                    text_height = bbox[3] - bbox[1]
-                    
-                    # Calculate position to center the text horizontally
-                    x = spacing * (i + 1) - (text_width // 2)
-                    # Position vertically based on font type
-                    y = 10 if font_name == "4x6" else height - 20
-                    
-                    # Draw the text
-                    draw.text((x, y), text, font=font, fill=(255, 255, 255))
+                # Create text to display (the size number)
+                text = str(size)
+                
+                # Get text dimensions
+                bbox = draw.textbbox((0, 0), text, font=font)
+                text_width = bbox[2] - bbox[0]
+                text_height = bbox[3] - bbox[1]
+                
+                # Calculate position to center the text horizontally
+                x = spacing * (i + 1) - (text_width // 2)
+                # Position vertically in the middle of the screen
+                y = (height - text_height) // 2
+                
+                # Draw the text
+                draw.text((x, y), text, font=font, fill=(255, 255, 255))
             
             # Update the display once
             self.display_manager.update_display()
