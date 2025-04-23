@@ -1,0 +1,70 @@
+""" Pasted from cursor chat to be able to use bdf fonts easier in the future """
+
+
+
+
+""" Font Loading """
+import freetype
+face = freetype.Face("path/to/font.bdf")
+
+""" rendering the character """
+# Load the character
+face.load_char(char)
+
+# Get the bitmap data
+bitmap = face.glyph.bitmap
+
+# The bitmap data is stored in a packed format where:
+# - Each byte represents 8 pixels
+# - bitmap.pitch is the number of bytes per row
+# - bitmap.width is the width in pixels
+# - bitmap.rows is the height in pixels
+
+" Drawing the character "
+#For each row in the bitmap
+for i in range(bitmap.rows):
+    # For each pixel in the row
+    for j in range(bitmap.width):
+        # Calculate which byte contains this pixel
+        byte_index = i * bitmap.pitch + (j // 8)
+        
+        # Get the byte
+        byte = bitmap.buffer[byte_index]
+        
+        # Check if the specific bit is set (1 = draw pixel)
+        if byte & (1 << (7 - (j % 8))):
+            # Draw the pixel at (x + j, y + i)
+            draw.point((x + j, y + i), fill=(255, 255, 255))
+
+" Character Spacing "
+# Move to next character position using the font's advance
+x += face.glyph.advance.x >> 6  # Advance is in 1/64th of pixels
+
+
+""" Key Points:
+BDF fonts are bitmap fonts, so they have a fixed size
+The bitmap data is stored in a packed format (8 pixels per byte)
+Each bit in a byte represents whether a pixel should be drawn (1) or not (0)
+The pitch value tells you how many bytes are in each row
+The advance value tells you how far to move for the next character
+Example Usage: """
+
+
+def draw_bdf_text(draw, text, x, y, font_path):
+    face = freetype.Face(font_path)
+    
+    for char in text:
+        face.load_char(char)
+        bitmap = face.glyph.bitmap
+        
+        # Draw the character
+        for i in range(bitmap.rows):
+            for j in range(bitmap.width):
+                byte_index = i * bitmap.pitch + (j // 8)
+                if byte_index < len(bitmap.buffer):
+                    byte = bitmap.buffer[byte_index]
+                    if byte & (1 << (7 - (j % 8))):
+                        draw.point((x + j, y + i), fill=(255, 255, 255))
+        
+        # Move to next character
+        x += face.glyph.advance.x >> 6
