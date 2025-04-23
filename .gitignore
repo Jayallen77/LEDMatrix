@@ -21,8 +21,5 @@ ENV/
 *.swp
 *.swo 
 
-# Dependencies
-sports-reference/
-
 # Cache directory
 cache/
