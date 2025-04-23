@@ -155,12 +155,22 @@ class DisplayManager:
                 relative_font_path = os.path.join(script_dir, "../assets/fonts/tom-thumb.bdf")
                 font_path = os.path.abspath(relative_font_path)
                 logger.info(f"Attempting to load tom-thumb font from: {font_path}")
+                
+                if not os.path.exists(font_path):
+                    raise FileNotFoundError(f"Font file not found at {font_path}")
+                
                 self.calendar_font = ImageFont.load(font_path)
                 logger.info(f"tom-thumb calendar font loaded successfully from {font_path}")
                 logger.info(f"Calendar font type: {type(self.calendar_font)}")
                 logger.info(f"Calendar font size: {self.calendar_font.size}")
+                
+                # Verify it's a BDF font
+                if not isinstance(self.calendar_font, ImageFont.BdfFont):
+                    raise TypeError(f"Expected BDF font, got {type(self.calendar_font)}")
+                    
             except Exception as font_err:
-                logger.error(f"Failed to load tom-thumb font: {font_err}. Falling back to small font.")
+                logger.error(f"Failed to load tom-thumb font: {str(font_err)}", exc_info=True)
+                logger.error("Falling back to small font")
                 self.calendar_font = self.small_font
 
             # Load 4x6 font as extra_small_font
@@ -176,7 +186,7 @@ class DisplayManager:
                 self.extra_small_font = self.small_font
 
         except Exception as e:
-            logger.error(f"Error in font loading: {e}")
+            logger.error(f"Error in font loading: {e}", exc_info=True)
             # Fallback to default font
             self.regular_font = ImageFont.load_default()
             self.small_font = self.regular_font
