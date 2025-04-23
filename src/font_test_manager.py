@@ -1,6 +1,7 @@
 import os
 import time
-from PIL import Image, ImageDraw, ImageFont
+import freetype
+from PIL import Image, ImageDraw
 import logging
 from typing import Dict, Any
 from src.display_manager import DisplayManager
@@ -24,6 +25,10 @@ class FontTestManager:
             self.logger.error(f"Font file not found: {self.font_path}")
             raise FileNotFoundError(f"Font file not found: {self.font_path}")
         
+        # Load the font
+        self.face = freetype.Face(self.font_path)
+        self.face.set_char_size(self.font_size * 64)  # Size is in 1/64th of points
+        
         self.logger.info("Initialized FontTestManager with tom-thumb font")
     
     def update(self):
@@ -40,9 +45,6 @@ class FontTestManager:
             width = self.display_manager.matrix.width
             height = self.display_manager.matrix.height
             
-            # Load the BDF font
-            font = ImageFont.truetype(self.font_path, self.font_size)
-            
             # Draw font name at the top
             self.display_manager.draw_text("tom-thumb", y=2, color=(255, 255, 255))
             
@@ -50,17 +52,24 @@ class FontTestManager:
             draw = ImageDraw.Draw(self.display_manager.image)
             sample_text = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
             
-            # Get text dimensions
-            bbox = draw.textbbox((0, 0), sample_text, font=font)
-            text_width = bbox[2] - bbox[0]
-            text_height = bbox[3] - bbox[1]
+            # Calculate starting position
+            x = 10  # Start 10 pixels from the left
+            y = (height - self.font_size) // 2  # Center vertically
             
-            # Calculate position to center the text
-            x = (width - text_width) // 2
-            y = (height - text_height) // 2
-            
-            # Draw the text
-            draw.text((x, y), sample_text, font=font, fill=(255, 255, 255))
+            # Draw each character
+            for char in sample_text:
+                # Load the glyph
+                self.face.load_char(char)
+                bitmap = self.face.glyph.bitmap
+                
+                # Draw the glyph
+                for i in range(bitmap.rows):
+                    for j in range(bitmap.width):
+                        if bitmap.buffer[i * bitmap.width + j]:
+                            draw.point((x + j, y + i), fill=(255, 255, 255))
+                
+                # Move to next character position
+                x += self.face.glyph.advance.x >> 6
             
             # Update the display once
             self.display_manager.update_display()
