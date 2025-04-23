@@ -59,8 +59,8 @@ class CalendarManager:
         
         # Display properties
         self.text_color = (255, 255, 255)  # White
-        self.time_color = (0, 255, 0)      # Green
-        self.date_color = (200, 200, 200)  # Light Grey
+        self.time_color = (255, 255, 255)  # White
+        self.date_color = (255, 255, 255)  # White
         
         # State management
         self.current_event_index = 0
@@ -133,13 +133,13 @@ class CalendarManager:
             
             # Draw time with regular font
             self.display_manager.draw_text(time_text, 0, y_position, 
-                                        color=self.config['calendar']['time_color'],
+                                        color=self.time_color,
                                         font=self.display_manager.regular_font)
             
             # Draw summary with calendar font
             for i, line in enumerate(title_lines):
                 self.display_manager.draw_text(line, time_width + 10, y_position + (i * 8),
-                                            color=self.config['calendar']['text_color'],
+                                            color=self.text_color,
                                             font=self.display_manager.calendar_font)
             
             return True
