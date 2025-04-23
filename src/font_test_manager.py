@@ -60,11 +60,20 @@ class FontTestManager:
                 self.face.load_char(char)
                 bitmap = self.face.glyph.bitmap
                 
+                # Log bitmap details for debugging
+                self.logger.debug(f"Bitmap for '{char}': width={bitmap.width}, rows={bitmap.rows}, pitch={bitmap.pitch}")
+                
                 # Draw the glyph
                 for i in range(bitmap.rows):
                     for j in range(bitmap.width):
-                        if bitmap.buffer[i * bitmap.width + j]:
-                            draw.point((x + j, y + i), fill=(255, 255, 255))
+                        try:
+                            # Calculate the correct buffer index based on pitch
+                            index = i * bitmap.pitch + j
+                            if index < len(bitmap.buffer) and bitmap.buffer[index]:
+                                draw.point((x + j, y + i), fill=(255, 255, 255))
+                        except IndexError:
+                            self.logger.warning(f"Index out of range for char '{char}' at position ({i}, {j})")
+                            continue
                 
                 # Move to next character position
                 x += self.face.glyph.advance.x >> 6
