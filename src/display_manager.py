@@ -149,16 +149,16 @@ class DisplayManager:
             self.small_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
             logger.info("Press Start 2P small font loaded successfully")
 
-            # Load MatrixChunky6 font for calendar events
+            # Load tom-thumb BDF font for calendar events
             try:
                 script_dir = os.path.dirname(os.path.abspath(__file__))
-                relative_font_path = os.path.join(script_dir, "../assets/fonts/MatrixChunky6.ttf")
+                relative_font_path = os.path.join(script_dir, "../assets/fonts/tom-thumb.bdf")
                 font_path = os.path.abspath(relative_font_path)
-                logger.info(f"Attempting to load MatrixChunky6 font from: {font_path} at size 8")
-                self.calendar_font = ImageFont.truetype(font_path, 8)
-                logger.info(f"MatrixChunky6 calendar font loaded successfully from {font_path}")
+                logger.info(f"Attempting to load tom-thumb font from: {font_path}")
+                self.calendar_font = ImageFont.load(font_path)
+                logger.info(f"tom-thumb calendar font loaded successfully from {font_path}")
             except Exception as font_err:
-                logger.error(f"Failed to load MatrixChunky6 font: {font_err}. Falling back to small font.")
+                logger.error(f"Failed to load tom-thumb font: {font_err}. Falling back to small font.")
                 self.calendar_font = self.small_font
 
             # Load 4x6 font as extra_small_font
@@ -185,34 +185,32 @@ class DisplayManager:
             if not hasattr(self, 'extra_small_font'): 
                 self.extra_small_font = self.regular_font
 
-    def draw_text(self, text: str, x: int = None, y: int = None, color: Tuple[int, int, int] = (255, 255, 255), small_font: bool = False, font: ImageFont = None) -> None:
-        """Draw text on the display with improved clarity."""
-        # Use provided font if specified, otherwise use small_font or regular_font
-        font = font if font else (self.small_font if small_font else self.regular_font)
-        
-        # Get text dimensions including ascenders and descenders
-        bbox = self.draw.textbbox((0, 0), text, font=font)
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-        
-        # Add padding to prevent cutoff
-        padding = 1  # Reduced padding since Press Start 2P has built-in spacing
-        
-        # Center text horizontally if x not specified
-        if x is None:
-            x = (self.matrix.width - text_width) // 2
-        
-        # Center text vertically if y not specified, with padding
-        if y is None:
-            y = (self.matrix.height - text_height) // 2
-        else:
-            # Ensure text doesn't get cut off at bottom
-            max_y = self.matrix.height - text_height - padding
-            y = min(y, max_y)
-            y = max(y, padding)  # Ensure text doesn't get cut off at top
-        
-        # Draw the text
-        self.draw.text((x, y), text, font=font, fill=color)
+    def draw_text(self, text: str, x: int = None, y: int = None, color: tuple = (255, 255, 255), 
+                 small_font: bool = False, font: ImageFont = None):
+        """Draw text on the canvas with optional font selection."""
+        try:
+            # Select font based on parameters
+            if font:
+                current_font = font
+            else:
+                current_font = self.small_font if small_font else self.regular_font
+            
+            # Calculate x position if not provided (center text)
+            if x is None:
+                if isinstance(current_font, ImageFont.FreeTypeFont):
+                    # For TTF fonts, use textlength
+                    text_width = self.draw.textlength(text, font=current_font)
+                else:
+                    # For BDF fonts, use textbbox
+                    bbox = self.draw.textbbox((0, 0), text, font=current_font)
+                    text_width = bbox[2] - bbox[0]
+                x = (self.matrix.width - text_width) // 2
+            
+            # Draw the text
+            self.draw.text((x, y), text, font=current_font, fill=color)
+            
+        except Exception as e:
+            logger.error(f"Error drawing text: {e}", exc_info=True)
 
     def draw_sun(self, x: int, y: int, size: int = 16):
         """Draw a sun icon using yellow circles and lines."""
