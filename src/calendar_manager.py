@@ -38,8 +38,10 @@ class CalendarManager:
         # Get timezone from config
         self.config_manager = ConfigManager()
         timezone_str = self.config_manager.get_timezone()
+        logger.info(f"Loading timezone from config: {timezone_str}")
         try:
             self.timezone = pytz.timezone(timezone_str)
+            logger.info(f"Successfully loaded timezone: {self.timezone}")
         except pytz.UnknownTimeZoneError:
             logger.warning(f"Unknown timezone '{timezone_str}' in config, defaulting to UTC.")
             self.timezone = pytz.utc
@@ -242,12 +244,15 @@ class CalendarManager:
             # Handle both date and dateTime formats
             if 'T' in start:
                 dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                logger.debug(f"Parsed datetime from event: {dt} (UTC)")
             else:
                 dt = datetime.strptime(start, '%Y-%m-%d')
                 # Make date object timezone-aware (assume UTC if no tz info)
                 dt = pytz.utc.localize(dt)
+                logger.debug(f"Parsed date from event: {dt} (UTC)")
             
             local_dt = dt.astimezone(self.timezone) # Use configured timezone
+            logger.debug(f"Converted to local timezone: {local_dt} ({self.timezone})")
             return local_dt.strftime("%a %-m/%-d") # e.g., "Mon 4/21"
         except ValueError as e:
             logging.error(f"Could not parse date string: {start} - {e}")
@@ -261,7 +266,9 @@ class CalendarManager:
             
         try:
             dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
+            logger.debug(f"Parsed time from event: {dt} (UTC)")
             local_dt = dt.astimezone(self.timezone) # Use configured timezone
+            logger.debug(f"Converted to local timezone: {local_dt} ({self.timezone})")
             return local_dt.strftime("%I:%M %p")
         except ValueError as e:
             logging.error(f"Could not parse time string: {start} - {e}")
