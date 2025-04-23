@@ -254,6 +254,10 @@ class DisplayManager:
                     text_width = width
                 x = (self.matrix.width - text_width) // 2
             
+            # Set default y position if not provided
+            if y is None:
+                y = 0  # Default to top of display
+            
             # Draw the text
             if isinstance(current_font, freetype.Face):
                 self._draw_bdf_text(text, x, y, color)
