@@ -23,6 +23,7 @@ class StockManager:
         self.config = config
         self.display_manager = display_manager
         self.stocks_config = config.get('stocks', {})
+        self.crypto_config = config.get('crypto', {})
         self.last_update = 0
         self.stock_data = {}
         self.current_stock_index = 0
@@ -45,6 +46,11 @@ class StockManager:
         self.ticker_icons_dir = os.path.join('assets', 'stocks', 'ticker_icons')
         if not os.path.exists(self.ticker_icons_dir):
             logger.warning(f"Ticker icons directory not found: {self.ticker_icons_dir}")
+            
+        # Set up the crypto icons directory
+        self.crypto_icons_dir = os.path.join('assets', 'stocks', 'crypto_icons')
+        if not os.path.exists(self.crypto_icons_dir):
+            logger.warning(f"Crypto icons directory not found: {self.crypto_icons_dir}")
             
         # Set up the logo directory for external logos
         self.logo_dir = os.path.join('assets', 'stocks')
@@ -138,17 +144,22 @@ class StockManager:
             logger.error(f"Error extracting JSON data: {e}")
             return {}
         
-    def _fetch_stock_data(self, symbol: str) -> Dict[str, Any]:
-        """Fetch stock data from Yahoo Finance public API."""
+    def _fetch_stock_data(self, symbol: str, is_crypto: bool = False) -> Dict[str, Any]:
+        """Fetch stock or crypto data from Yahoo Finance public API."""
         # Try to get cached data first
-        cached_data = self.cache_manager.get_cached_data('stocks')
+        cache_key = 'crypto' if is_crypto else 'stocks'
+        cached_data = self.cache_manager.get_cached_data(cache_key)
         if cached_data and symbol in cached_data:
             logger.info(f"Using cached data for {symbol}")
             return cached_data[symbol]
 
         try:
-            # Use Yahoo Finance query1 API for chart data
-            encoded_symbol = urllib.parse.quote(symbol)
+            # For crypto, we need to append -USD if not already present
+            if is_crypto and not symbol.endswith('-USD'):
+                encoded_symbol = urllib.parse.quote(f"{symbol}-USD")
+            else:
+                encoded_symbol = urllib.parse.quote(symbol)
+
             url = f"https://query1.finance.yahoo.com/v8/finance/chart/{encoded_symbol}"
             params = {
                 'interval': '5m',  # 5-minute intervals
@@ -209,14 +220,15 @@ class StockManager:
                 "price": current_price,
                 "change": change_pct,
                 "open": prev_close,
-                "price_history": price_history
+                "price_history": price_history,
+                "is_crypto": is_crypto
             }
             
             # Cache the new data
             if cached_data is None:
                 cached_data = {}
             cached_data[symbol] = stock_data
-            self.cache_manager.update_cache('stocks', cached_data)
+            self.cache_manager.update_cache(cache_key, cached_data)
             
             return stock_data
             
@@ -312,67 +324,60 @@ class StockManager:
             logger.info(f"Stock symbols changed. New symbols: {new_symbols}")
 
     def update_stock_data(self):
-        """Update stock data for all configured symbols."""
+        """Update stock and crypto data for all configured symbols."""
         current_time = time.time()
         update_interval = self.stocks_config.get('update_interval', 300)
         
         # Check if we need to update based on time
         if current_time - self.last_update > update_interval:
-            symbols = self.stocks_config.get('symbols', [])
-            if not symbols:
-                logger.warning("No stock symbols configured")
-                return
-
-            # Get cached data
-            cached_data = self.cache_manager.get_cached_data('stocks')
+            stock_symbols = self.stocks_config.get('symbols', [])
+            crypto_symbols = self.crypto_config.get('symbols', []) if self.crypto_config.get('enabled', False) else []
             
-            # Check if market is open
-            if cached_data and not self.cache_manager._is_market_open():
-                logger.info("Market is closed, using cached data")
-                self.stock_data = cached_data
-                self.last_update = current_time
+            if not stock_symbols and not crypto_symbols:
+                logger.warning("No stock or crypto symbols configured")
                 return
 
-            # Update each symbol
-            for symbol in symbols:
-                # Check if data has changed before fetching
-                if cached_data and symbol in cached_data:
-                    current_state = cached_data[symbol]
-                    if not self.cache_manager.has_data_changed('stocks', current_state):
-                        logger.info(f"Stock data hasn't changed for {symbol}, using existing data")
-                        self.stock_data[symbol] = current_state
-                        continue
+            # Update stocks
+            for symbol in stock_symbols:
+                data = self._fetch_stock_data(symbol, is_crypto=False)
+                if data:
+                    self.stock_data[symbol] = data
 
-                data = self._fetch_stock_data(symbol)
+            # Update crypto
+            for symbol in crypto_symbols:
+                data = self._fetch_stock_data(symbol, is_crypto=True)
                 if data:
                     self.stock_data[symbol] = data
 
             self.last_update = current_time
 
-    def _get_stock_logo(self, symbol: str) -> Image.Image:
-        """Get stock logo image from local ticker icons directory.
-        
-        Args:
-            symbol: Stock symbol (e.g., 'AAPL', 'MSFT')
-            
-        Returns:
-            PIL Image of the logo or text-based fallback
-        """
-        # Try to get the local ticker icon
+    def _get_stock_logo(self, symbol: str, is_crypto: bool = False) -> Image.Image:
+        """Get stock or crypto logo image from local directory."""
         try:
+            # Try crypto icons first if it's a crypto symbol
+            if is_crypto:
+                icon_path = os.path.join(self.crypto_icons_dir, f"{symbol}.png")
+                if os.path.exists(icon_path):
+                    with Image.open(icon_path) as img:
+                        if img.mode != 'RGBA':
+                            img = img.convert('RGBA')
+                        max_size = min(int(self.display_manager.matrix.width / 1.2), 
+                                    int(self.display_manager.matrix.height / 1.2))
+                        img = img.resize((max_size, max_size), Image.Resampling.LANCZOS)
+                        return img.copy()
+            
+            # Fall back to stock icons if not crypto or crypto icon not found
             icon_path = os.path.join(self.ticker_icons_dir, f"{symbol}.png")
             if os.path.exists(icon_path):
                 with Image.open(icon_path) as img:
-                    # Convert to RGBA if not already
                     if img.mode != 'RGBA':
                         img = img.convert('RGBA')
-                    # Resize to fit in the display - increased size by reducing divisor from 1.5 to 1.2
                     max_size = min(int(self.display_manager.matrix.width / 1.2), 
-                                  int(self.display_manager.matrix.height / 1.2))
+                                int(self.display_manager.matrix.height / 1.2))
                     img = img.resize((max_size, max_size), Image.Resampling.LANCZOS)
                     return img.copy()
         except Exception as e:
-            logger.warning(f"Error loading local ticker icon for {symbol}: {e}")
+            logger.warning(f"Error loading local icon for {symbol}: {e}")
 
         # If local icon not found or failed to load, create text-based fallback
         logger.warning(f"No local icon found for {symbol}. Using text fallback.")
@@ -393,16 +398,16 @@ class StockManager:
         draw.text((x, y), text, font=font, fill=(255, 255, 255, 255))
         return fallback
 
-    def _create_stock_display(self, symbol: str, price: float, change: float, change_percent: float) -> Image.Image:
-        """Create a display image for a stock with logo, symbol, price, and change."""
+    def _create_stock_display(self, symbol: str, price: float, change: float, change_percent: float, is_crypto: bool = False) -> Image.Image:
+        """Create a display image for a stock or crypto with logo, symbol, price, and change."""
         # Create a wider image for scrolling
         width = self.display_manager.matrix.width * 2  # Reduced from 3x to 2x since we'll handle spacing in display_stocks
         height = self.display_manager.matrix.height
         image = Image.new('RGB', (width, height), color=(0, 0, 0))
         draw = ImageDraw.Draw(image)
         
-        # Draw large stock logo on the left
-        logo = self._get_stock_logo(symbol)
+        # Draw large stock/crypto logo on the left
+        logo = self._get_stock_logo(symbol, is_crypto)
         if logo:
             # Position logo on the left side with minimal spacing
             logo_x = 0  # Already at 0, keeping it at the far left
@@ -430,34 +435,26 @@ class StockManager:
         price_bbox = draw.textbbox((0, 0), price_text, font=price_font)
         change_bbox = draw.textbbox((0, 0), change_text, font=small_font)
         
-        symbol_height = symbol_bbox[3] - symbol_bbox[1]
-        price_height = price_bbox[3] - price_bbox[1]
-        change_height = change_bbox[3] - change_bbox[1]
+        # Calculate total height needed
+        total_text_height = (symbol_bbox[3] - symbol_bbox[1]) + \
+                           (price_bbox[3] - price_bbox[1]) + \
+                           (change_bbox[3] - change_bbox[1])
         
-        # Calculate total height needed for all text
-        total_text_height = symbol_height + price_height + change_height + 2  # 2 pixels for spacing
-        
-        # Calculate starting y position to center the text block
+        # Calculate starting y position to center all text
         start_y = (height - total_text_height) // 2
         
-        # Position text elements centered between logo and chart
-        text_x = width // 3.5  # Changed from width//6 to width//4 to center between logo and chart
-        
         # Draw symbol
-        symbol_width = symbol_bbox[2] - symbol_bbox[0]
-        symbol_y = start_y
-        draw.text((text_x, symbol_y), symbol_text, font=symbol_font, fill=(255, 255, 255))
+        symbol_x = (width - (symbol_bbox[2] - symbol_bbox[0])) // 2
+        draw.text((symbol_x, start_y), symbol_text, font=symbol_font, fill=(255, 255, 255))
         
-        # Draw price - aligned with symbol
-        price_width = price_bbox[2] - price_bbox[0]
-        price_x = text_x + (symbol_width - price_width) // 2  # Center price under symbol
-        price_y = symbol_y + symbol_height + 1  # 1 pixel spacing
+        # Draw price
+        price_x = (width - (price_bbox[2] - price_bbox[0])) // 2
+        price_y = start_y + (symbol_bbox[3] - symbol_bbox[1])
         draw.text((price_x, price_y), price_text, font=price_font, fill=(255, 255, 255))
         
-        # Draw change with color based on value - aligned with price
-        change_width = change_bbox[2] - change_bbox[0]
-        change_x = price_x + (price_width - change_width) // 2  # Center change under price
-        change_y = price_y + price_height + 1  # 1 pixel spacing
+        # Draw change with color based on value
+        change_x = (width - (change_bbox[2] - change_bbox[0])) // 2
+        change_y = price_y + (price_bbox[3] - price_bbox[1])
         change_color = (0, 255, 0) if change >= 0 else (255, 0, 0)
         draw.text((change_x, change_y), change_text, font=small_font, fill=change_color)
         
@@ -565,8 +562,8 @@ class StockManager:
         self.frame_count += 1
 
     def display_stocks(self, force_clear: bool = False):
-        """Display stock information with continuous scrolling animation."""
-        if not self.stocks_config.get('enabled', False):
+        """Display stock and crypto information with continuous scrolling animation."""
+        if not self.stocks_config.get('enabled', False) and not self.crypto_config.get('enabled', False):
             return
             
         # Start update in background if needed
@@ -574,7 +571,7 @@ class StockManager:
             self.update_stock_data()
         
         if not self.stock_data:
-            logger.warning("No stock data available to display")
+            logger.warning("No stock or crypto data available to display")
             return
             
         # Get all symbols
@@ -599,14 +596,21 @@ class StockManager:
             draw = ImageDraw.Draw(full_image)
             
             # Add initial gap before the first stock
-            current_x = width  # Start with a full screen width gap
+            current_x = width
             
             # Draw each stock in sequence with consistent spacing
             for symbol in symbols:
                 data = self.stock_data[symbol]
+                is_crypto = data.get('is_crypto', False)
                 
                 # Create stock display for this symbol
-                stock_image = self._create_stock_display(symbol, data['price'], data['change'], data['change'] / data['open'] * 100)
+                stock_image = self._create_stock_display(
+                    symbol, 
+                    data['price'], 
+                    data['change'], 
+                    data['change'] / data['open'] * 100,
+                    is_crypto
+                )
                 
                 # Paste this stock image into the full image
                 full_image.paste(stock_image, (current_x, 0))

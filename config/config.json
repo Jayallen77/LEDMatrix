@@ -57,7 +57,15 @@
         "enabled": true,
         "update_interval": 300,
         "symbols": [
-            "ASTS", "SCHD", "INTC", "NVDA", "T", "VOO", "SPYG", "SMCI"
+            "ASTS", "SCHD", "INTC", "NVDA", "T", "VOO", "SPEST", "SMCI"
+        ],
+        "display_format": "{symbol}: ${price} ({change}%)"
+    },
+    "crypto": {
+        "enabled": true,
+        "update_interval": 300,
+        "symbols": [
+            "BTC-USD", "ETH-USD"
         ],
         "display_format": "{symbol}: ${price} ({change}%)"
     },
