@@ -33,13 +33,9 @@ class CalendarManager:
         self.events = []
         self.service = None
         
-        # Log font information during initialization
-        logger.debug(f"Display Manager fonts:")
-        logger.debug(f"  Small font: {self.display_manager.small_font}")
-        logger.debug(f"  Calendar font: {self.display_manager.calendar_font}")
-        logger.debug(f"  Font types - Small: {type(self.display_manager.small_font)}, Calendar: {type(self.display_manager.calendar_font)}")
-        
-        logger.info(f"Calendar configuration: enabled={self.enabled}, update_interval={self.update_interval}, max_events={self.max_events}, calendars={self.calendars}")
+        # Log font information during initialization only
+        if self.enabled:
+            logger.info(f"Calendar configuration: enabled={self.enabled}, update_interval={self.update_interval}, max_events={self.max_events}, calendars={self.calendars}")
         
         # Get timezone from config
         self.config_manager = ConfigManager()
@@ -122,7 +118,7 @@ class CalendarManager:
         try:
             # Get date, time, and summary
             date_text = self._format_event_date(event)
-            time_text = self._format_event_time(event).replace(" ", "")  # Remove space between time and AM/PM
+            time_text = self._format_event_time(event)
             datetime_text = f"{date_text} {time_text}"
             summary = event.get('summary', 'No Title')
             
@@ -242,15 +238,12 @@ class CalendarManager:
             if 'T' in start:
                 # The datetime string already includes timezone info (-05:00)
                 dt = datetime.fromisoformat(start)
-                logger.debug(f"Parsed datetime from event: {dt}")
             else:
                 dt = datetime.strptime(start, '%Y-%m-%d')
                 # Make date object timezone-aware (assume UTC if no tz info)
                 dt = pytz.utc.localize(dt)
-                logger.debug(f"Parsed date from event: {dt}")
             
             # No need to convert timezone since it's already in the correct one
-            logger.debug(f"Using event timezone: {dt}")
             return dt.strftime("%a %-m/%-d") # e.g., "Mon 4/21"
         except ValueError as e:
             logging.error(f"Could not parse date string: {start} - {e}")
@@ -265,10 +258,8 @@ class CalendarManager:
         try:
             # The datetime string already includes timezone info (-05:00)
             dt = datetime.fromisoformat(start)
-            logger.debug(f"Parsed time from event: {dt}")
             # No need to convert timezone since it's already in the correct one
-            logger.debug(f"Using event timezone: {dt}")
-            return dt.strftime("%I:%M %p")
+            return dt.strftime("%I:%M%p")
         except ValueError as e:
             logging.error(f"Could not parse time string: {start} - {e}")
             return "Invalid Time"
