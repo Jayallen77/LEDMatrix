@@ -214,8 +214,11 @@ class StockManager:
             
             logger.debug(f"Processed data for {symbol}: price={current_price}, change={change_pct}%")
             
+            # Remove -USD suffix from crypto symbols for display
+            display_symbol = symbol.replace('-USD', '') if is_crypto else symbol
+            
             stock_data = {
-                "symbol": symbol,
+                "symbol": display_symbol,  # Use the display symbol without -USD
                 "name": name,
                 "price": current_price,
                 "change": change_pct,
