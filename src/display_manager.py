@@ -220,8 +220,21 @@ class DisplayManager:
 
     def get_text_width(self, text, font):
         """Get the width of text when rendered with the given font."""
-        bbox = self.draw.textbbox((0, 0), text, font=font)
-        return bbox[2] - bbox[0]
+        try:
+            if isinstance(font, freetype.Face):
+                # For FreeType faces, calculate width using freetype
+                width = 0
+                for char in text:
+                    font.load_char(char)
+                    width += font.glyph.advance.x >> 6
+                return width
+            else:
+                # For PIL fonts, use textbbox
+                bbox = self.draw.textbbox((0, 0), text, font=font)
+                return bbox[2] - bbox[0]
+        except Exception as e:
+            logger.error(f"Error getting text width: {e}")
+            return 0  # Return 0 as fallback
 
     def draw_text(self, text: str, x: int = None, y: int = None, color: tuple = (255, 255, 255), 
                  small_font: bool = False, font: ImageFont = None):
