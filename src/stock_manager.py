@@ -359,7 +359,9 @@ class StockManager:
         try:
             # Try crypto icons first if it's a crypto symbol
             if is_crypto:
-                icon_path = os.path.join(self.crypto_icons_dir, f"{symbol}.png")
+                # Remove -USD suffix for crypto symbols
+                base_symbol = symbol.replace('-USD', '')
+                icon_path = os.path.join(self.crypto_icons_dir, f"{base_symbol}.png")
                 if os.path.exists(icon_path):
                     with Image.open(icon_path) as img:
                         if img.mode != 'RGBA':
@@ -475,9 +477,9 @@ class StockManager:
                 chart_data = [p['price'] for p in price_history]
                 
                 # Calculate chart dimensions
-                chart_width = int(width // 3)  # Reduced from width//2.5 to prevent overlap
-                chart_height = height // 2
-                chart_x = width - chart_width - 2  # 2px margin from right edge
+                chart_width = int(width // 2.5)  # Reduced from width//2.5 to prevent overlap
+                chart_height = height // 1.5
+                chart_x = width - chart_width - 12  # 2px margin from right edge
                 chart_y = (height - chart_height) // 2
                 
                 # Find min and max prices for scaling
