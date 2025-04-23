@@ -10,13 +10,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class FontTestManager:
-    """Manager for testing different font sizes of m3x6 font."""
+    """Manager for testing different font sizes of tom-thumb font."""
     
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         self.display_manager = display_manager
         self.config = config
-        self.font_path = "assets/fonts/m3x6.ttf"
-        self.font_sizes = [3, 4, 5, 6, 7, 8]
+        self.font_path = "assets/fonts/tom-thumb.bdf"
+        self.font_sizes = [4, 5, 6, 7, 8, 9]  # Adjusted sizes for BDF font
         self.logger = logging.getLogger('FontTest')
         
         # Verify font exists
@@ -24,7 +24,7 @@ class FontTestManager:
             self.logger.error(f"Font file not found: {self.font_path}")
             raise FileNotFoundError(f"Font file not found: {self.font_path}")
         
-        self.logger.info(f"Initialized FontTestManager with {len(self.font_sizes)} font sizes to test using m3x6 font")
+        self.logger.info(f"Initialized FontTestManager with {len(self.font_sizes)} font sizes to test using tom-thumb font")
     
     def update(self):
         """No update needed for static display."""
@@ -45,14 +45,14 @@ class FontTestManager:
             spacing = width // (total_sizes + 1)  # Add 1 to account for edges
             
             # Draw font name at the top
-            self.display_manager.draw_text("m3x6", y=2, color=(255, 255, 255))
+            self.display_manager.draw_text("tom-thumb", y=2, color=(255, 255, 255))
             
             # Draw each font size
             draw = ImageDraw.Draw(self.display_manager.image)
             
             for i, size in enumerate(self.font_sizes):
-                # Load the font at the current size
-                font = ImageFont.truetype(self.font_path, size)
+                # Load the BDF font
+                font = ImageFont.load(self.font_path)
                 
                 # Create text to display (the size number)
                 text = str(size)
