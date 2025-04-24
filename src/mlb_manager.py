@@ -555,15 +555,32 @@ class MLBUpcomingManager(BaseMLBManager):
                 now = datetime.now()
                 upcoming_cutoff = now + timedelta(hours=24)
                 
+                logger.info(f"Looking for games between {now} and {upcoming_cutoff}")
+                
                 for game in games.values():
                     game_time = datetime.fromisoformat(game['start_time'].replace('Z', '+00:00'))
-                    if game['status'] == 'preview' and game_time <= upcoming_cutoff:
+                    logger.info(f"Checking game: {game['away_team']} @ {game['home_team']} at {game_time}")
+                    logger.info(f"Game status: {game['status']}")
+                    
+                    # Check if game is within our time window and has preview status
+                    is_within_time = game_time <= upcoming_cutoff
+                    is_preview = game['status'] == 'preview'
+                    
+                    logger.info(f"Within time window: {is_within_time}")
+                    logger.info(f"Is preview status: {is_preview}")
+                    
+                    if is_preview and is_within_time:
                         new_upcoming_games.append(game)
+                        logger.info(f"Added game to upcoming list: {game['away_team']} @ {game['home_team']}")
                 
                 # Filter for favorite teams
                 new_team_games = [game for game in new_upcoming_games 
                              if game['home_team'] in self.favorite_teams or 
                                 game['away_team'] in self.favorite_teams]
+                
+                logger.info(f"Found {len(new_team_games)} games for favorite teams: {self.favorite_teams}")
+                for game in new_team_games:
+                    logger.info(f"Favorite team game: {game['away_team']} @ {game['home_team']}")
                 
                 if new_team_games:
                     logger.info(f"[MLB] Found {len(new_team_games)} upcoming games for favorite teams")
