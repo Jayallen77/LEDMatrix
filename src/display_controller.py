@@ -410,8 +410,6 @@ class DisplayController:
                 # Reset force clear flag
                 self.force_clear = False
                 
-                # Small delay to prevent excessive CPU usage
-                time.sleep(self.update_interval)
                 
         except KeyboardInterrupt:
             logger.info("Display loop interrupted by user")
