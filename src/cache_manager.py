@@ -195,6 +195,8 @@ class CacheManager:
             return self._has_news_changed(cached_data, new_data)
         elif data_type == 'nhl':
             return self._has_nhl_changed(cached_data, new_data)
+        elif data_type == 'mlb':
+            return self._has_mlb_changed(cached_data, new_data)
         
         return True
 
@@ -233,6 +235,37 @@ class CacheManager:
         """Check if NHL data has changed."""
         return (cached.get('game_status') != new.get('game_status') or
                 cached.get('score') != new.get('score'))
+
+    def _has_mlb_changed(self, cached: Dict[str, Any], new: Dict[str, Any]) -> bool:
+        """Check if MLB game data has changed."""
+        if not cached or not new:
+            return True
+            
+        # Check if any games have changed status or score
+        for game_id, new_game in new.items():
+            cached_game = cached.get(game_id)
+            if not cached_game:
+                return True
+                
+            # Check for score changes
+            if (new_game['away_score'] != cached_game['away_score'] or 
+                new_game['home_score'] != cached_game['home_score']):
+                return True
+                
+            # Check for status changes
+            if new_game['status'] != cached_game['status']:
+                return True
+                
+            # For live games, check inning and count
+            if new_game['status'] == 'in':
+                if (new_game['inning'] != cached_game['inning'] or 
+                    new_game['inning_half'] != cached_game['inning_half'] or
+                    new_game['balls'] != cached_game['balls'] or 
+                    new_game['strikes'] != cached_game['strikes'] or
+                    new_game['bases_occupied'] != cached_game['bases_occupied']):
+                    return True
+                    
+        return False
 
     def _is_market_open(self) -> bool:
         """Check if the US stock market is currently open."""
