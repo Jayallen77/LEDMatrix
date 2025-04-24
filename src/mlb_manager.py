@@ -22,16 +22,17 @@ class BaseMLBManager:
         self.mlb_config = config.get('mlb', {})
         self.favorite_teams = self.mlb_config.get('favorite_teams', [])
         self.cache_manager = CacheManager()
+        self.logger = logging.getLogger(__name__)
         
         # Logo handling
         self.logo_dir = self.mlb_config.get('logo_dir', os.path.join('assets', 'sports', 'mlb_logos'))
         if not os.path.exists(self.logo_dir):
-            logger.warning(f"MLB logos directory not found: {self.logo_dir}")
+            self.logger.warning(f"MLB logos directory not found: {self.logo_dir}")
             try:
                 os.makedirs(self.logo_dir, exist_ok=True)
-                logger.info(f"Created MLB logos directory: {self.logo_dir}")
+                self.logger.info(f"Created MLB logos directory: {self.logo_dir}")
             except Exception as e:
-                logger.error(f"Failed to create MLB logos directory: {e}")
+                self.logger.error(f"Failed to create MLB logos directory: {e}")
         
         # Set up session with retry logic
         self.session = requests.Session()
@@ -211,7 +212,7 @@ class BaseMLBManager:
             return games
             
         except Exception as e:
-            logger.error(f"Error fetching MLB data: {e}")
+            self.logger.error(f"Error fetching MLB data: {e}")
             return {}
 
 class MBLLiveManager(BaseMLBManager):
