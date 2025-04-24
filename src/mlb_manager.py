@@ -103,8 +103,8 @@ class BaseMLBManager:
         draw = ImageDraw.Draw(image)
         
         # Calculate dynamic sizes based on display dimensions
-        logo_size = (height - 8, height - 8)  # Make logos larger, leaving 4px padding top and bottom
-        score_font_size = height // 2  # Make scores larger
+        logo_size = (height - 4, height - 4)  # Make logos even larger, leaving only 2px padding top and bottom
+        score_font_size = height // 3  # Make scores slightly smaller since they're above logos
         status_font_size = height // 4  # Make status text smaller
         
         # Load team logos
@@ -117,18 +117,24 @@ class BaseMLBManager:
             
             # Position logos on left and right sides with padding
             logo_padding = 2
-            image.paste(away_logo, (logo_padding, (height - logo_size[1]) // 2), away_logo)
-            image.paste(home_logo, (width - logo_size[0] - logo_padding, (height - logo_size[1]) // 2), home_logo)
-        
-        # Draw scores with larger font
-        score_y = height // 2 - score_font_size // 2
-        away_score = str(game_data['away_score'])
-        home_score = str(game_data['home_score'])
-        
-        # Calculate score positions to be centered between logo and center
-        score_padding = logo_size[0] + 4
-        draw.text((score_padding, score_y), away_score, fill=(255, 255, 255), font=self.display_manager.font)
-        draw.text((width - score_padding - len(home_score) * 6, score_y), home_score, fill=(255, 255, 255), font=self.display_manager.font)
+            away_logo_y = (height - logo_size[1]) // 2
+            home_logo_y = (height - logo_size[1]) // 2
+            
+            # Draw scores above logos
+            away_score = str(game_data['away_score'])
+            home_score = str(game_data['home_score'])
+            
+            # Calculate score positions to be centered above logos
+            away_score_x = logo_padding + (logo_size[0] - len(away_score) * 6) // 2
+            home_score_x = width - logo_padding - logo_size[0] + (logo_size[0] - len(home_score) * 6) // 2
+            score_y = away_logo_y - 8  # Position scores 8 pixels above logos
+            
+            draw.text((away_score_x, score_y), away_score, fill=(255, 255, 255), font=self.display_manager.font)
+            draw.text((home_score_x, score_y), home_score, fill=(255, 255, 255), font=self.display_manager.font)
+            
+            # Paste logos
+            image.paste(away_logo, (logo_padding, away_logo_y), away_logo)
+            image.paste(home_logo, (width - logo_size[0] - logo_padding, home_logo_y), home_logo)
         
         # Draw game status
         if game_data['status'] == 'live':
