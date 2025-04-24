@@ -254,7 +254,7 @@ class BaseMLBManager:
             self.logger.error(f"Error fetching MLB data from ESPN API: {e}")
             return {}
 
-class MBLLiveManager(BaseMLBManager):
+class MLBLiveManager(BaseMLBManager):
     """Manager for displaying live MLB games."""
     def __init__(self, config: Dict[str, Any], display_manager):
         super().__init__(config, display_manager)
@@ -291,9 +291,9 @@ class MBLLiveManager(BaseMLBManager):
                 "status": "live"
             }
             self.live_games = [self.current_game]
-            self.logger.info("Initialized MBLLiveManager with test game: TB vs TEX")
+            self.logger.info("Initialized MLBLiveManager with test game: TB vs TEX")
         else:
-            self.logger.info("Initialized MBLLiveManager in live mode")
+            self.logger.info("Initialized MLBLiveManager in live mode")
 
     def update(self):
         """Update live game data."""
