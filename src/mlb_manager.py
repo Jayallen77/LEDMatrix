@@ -3,7 +3,7 @@ import logging
 import requests
 import json
 from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
@@ -552,7 +552,7 @@ class MLBUpcomingManager(BaseMLBManager):
             if games:
                 # Process games
                 new_upcoming_games = []
-                now = datetime.now()
+                now = datetime.now(timezone.utc)  # Make timezone-aware
                 upcoming_cutoff = now + timedelta(hours=24)
                 
                 logger.info(f"Looking for games between {now} and {upcoming_cutoff}")
