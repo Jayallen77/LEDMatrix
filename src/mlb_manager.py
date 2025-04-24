@@ -154,65 +154,71 @@ class BaseMLBManager:
             return "TBD"
 
     def _fetch_mlb_api_data(self) -> Dict[str, Any]:
-        """Fetch MLB game data from the API."""
+        """Fetch MLB game data from the ESPN API."""
         try:
-            # MLB Stats API endpoint for schedule
-            today = datetime.now().strftime('%Y-%m-%d')
-            url = f"https://statsapi.mlb.com/api/v1/schedule/games/{today}"
+            # ESPN API endpoint for MLB games
+            url = "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard"
             
+            self.logger.info("Fetching MLB games from ESPN API")
             response = self.session.get(url, headers=self.headers, timeout=10)
             response.raise_for_status()
             
             data = response.json()
             games = {}
             
-            for date in data.get('dates', []):
-                for game in date.get('games', []):
-                    game_id = game['gamePk']
+            for event in data.get('events', []):
+                game_id = event['id']
+                status = event['status']['type']['name'].lower()
+                
+                # Get team information
+                competitors = event['competitions'][0]['competitors']
+                home_team = next(c for c in competitors if c['homeAway'] == 'home')
+                away_team = next(c for c in competitors if c['homeAway'] == 'away')
+                
+                # Get game state information
+                if status == 'in':
+                    # For live games, get detailed state
+                    linescore = event['competitions'][0].get('linescores', [{}])[0]
+                    inning = linescore.get('value', 1)
+                    inning_half = linescore.get('displayValue', '').lower()
                     
-                    # Get detailed game data for live games
-                    if game['status']['abstractGameState'] == 'Live':
-                        game_url = f"https://statsapi.mlb.com/api/v1/game/{game_id}/linescore"
-                        game_response = self.session.get(game_url, headers=self.headers, timeout=10)
-                        game_response.raise_for_status()
-                        game_data = game_response.json()
-                        
-                        # Extract inning, count, and base runner info
-                        inning = game_data.get('currentInning', 1)
-                        inning_half = game_data.get('inningHalf', '').lower()
-                        balls = game_data.get('balls', 0)
-                        strikes = game_data.get('strikes', 0)
-                        bases_occupied = [
-                            game_data.get('offense', {}).get('first', False),
-                            game_data.get('offense', {}).get('second', False),
-                            game_data.get('offense', {}).get('third', False)
-                        ]
-                    else:
-                        # Default values for non-live games
-                        inning = 1
-                        inning_half = 'top'
-                        balls = 0
-                        strikes = 0
-                        bases_occupied = [False, False, False]
+                    # Get count and bases from situation
+                    situation = event['competitions'][0].get('situation', {})
+                    balls = situation.get('balls', 0)
+                    strikes = situation.get('strikes', 0)
                     
-                    games[game_id] = {
-                        'away_team': game['teams']['away']['team']['abbreviation'],
-                        'home_team': game['teams']['home']['team']['abbreviation'],
-                        'away_score': game['teams']['away']['score'],
-                        'home_score': game['teams']['home']['score'],
-                        'status': game['status']['abstractGameState'].lower(),
-                        'inning': inning,
-                        'inning_half': inning_half,
-                        'balls': balls,
-                        'strikes': strikes,
-                        'bases_occupied': bases_occupied,
-                        'start_time': game['gameDate']
-                    }
+                    # Get base runners
+                    bases_occupied = [
+                        situation.get('onFirst', False),
+                        situation.get('onSecond', False),
+                        situation.get('onThird', False)
+                    ]
+                else:
+                    # Default values for non-live games
+                    inning = 1
+                    inning_half = 'top'
+                    balls = 0
+                    strikes = 0
+                    bases_occupied = [False, False, False]
+                
+                games[game_id] = {
+                    'away_team': away_team['team']['abbreviation'],
+                    'home_team': home_team['team']['abbreviation'],
+                    'away_score': away_team['score'],
+                    'home_score': home_team['score'],
+                    'status': status,
+                    'inning': inning,
+                    'inning_half': inning_half,
+                    'balls': balls,
+                    'strikes': strikes,
+                    'bases_occupied': bases_occupied,
+                    'start_time': event['date']
+                }
             
             return games
             
         except Exception as e:
-            self.logger.error(f"Error fetching MLB data: {e}")
+            self.logger.error(f"Error fetching MLB data from ESPN API: {e}")
             return {}
 
 class MBLLiveManager(BaseMLBManager):
