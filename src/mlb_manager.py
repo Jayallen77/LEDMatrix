@@ -63,8 +63,8 @@ class BaseMLBManager:
 
     def _draw_base_indicators(self, draw: ImageDraw.Draw, bases_occupied: List[bool], center_x: int, y: int) -> None:
         """Draw base indicators on the display."""
-        base_size = 4
-        base_spacing = 6
+        base_size = 6  # Increased from 4 to 6
+        base_spacing = 8  # Increased from 6 to 8
         
         # Draw diamond outline
         diamond_points = [
@@ -89,28 +89,33 @@ class BaseMLBManager:
         image = Image.new('RGB', (width, height), color=(0, 0, 0))
         draw = ImageDraw.Draw(image)
         
+        # Calculate dynamic sizes based on display dimensions
+        logo_size = (height - 8, height - 8)  # Make logos larger, leaving 4px padding top and bottom
+        score_font_size = height // 2  # Make scores larger
+        status_font_size = height // 4  # Make status text smaller
+        
         # Load team logos
         away_logo = self._get_team_logo(game_data['away_team'])
         home_logo = self._get_team_logo(game_data['home_team'])
         
-        # Logo size and positioning
-        logo_size = (16, 16)
         if away_logo and home_logo:
             away_logo = away_logo.resize(logo_size, Image.Resampling.LANCZOS)
             home_logo = home_logo.resize(logo_size, Image.Resampling.LANCZOS)
             
-            # Position logos on left and right sides
-            image.paste(away_logo, (2, height//2 - logo_size[1]//2), away_logo)
-            image.paste(home_logo, (width - logo_size[0] - 2, height//2 - logo_size[1]//2), home_logo)
+            # Position logos on left and right sides with padding
+            logo_padding = 2
+            image.paste(away_logo, (logo_padding, (height - logo_size[1]) // 2), away_logo)
+            image.paste(home_logo, (width - logo_size[0] - logo_padding, (height - logo_size[1]) // 2), home_logo)
         
-        # Draw scores
-        score_y = height//2 - 4
+        # Draw scores with larger font
+        score_y = height // 2 - score_font_size // 2
         away_score = str(game_data['away_score'])
         home_score = str(game_data['home_score'])
         
-        # Use small font for scores
-        draw.text((20, score_y), away_score, fill=(255, 255, 255), font=self.display_manager.small_font)
-        draw.text((width - 20 - len(home_score)*4, score_y), home_score, fill=(255, 255, 255), font=self.display_manager.small_font)
+        # Calculate score positions to be centered between logo and center
+        score_padding = logo_size[0] + 4
+        draw.text((score_padding, score_y), away_score, fill=(255, 255, 255), font=self.display_manager.font)
+        draw.text((width - score_padding - len(home_score) * 6, score_y), home_score, fill=(255, 255, 255), font=self.display_manager.font)
         
         # Draw game status
         if game_data['status'] == 'live':
@@ -125,8 +130,8 @@ class BaseMLBManager:
             inning_x = (width - inning_width) // 2
             draw.text((inning_x, 2), inning_text, fill=(255, 255, 255), font=self.display_manager.small_font)
             
-            # Draw base indicators
-            self._draw_base_indicators(draw, game_data['bases_occupied'], width//2, 12)
+            # Draw base indicators (larger and more visible)
+            self._draw_base_indicators(draw, game_data['bases_occupied'], width//2, height//4)
             
             # Draw count (balls-strikes) at bottom
             count_text = f"{game_data['balls']}-{game_data['strikes']}"
