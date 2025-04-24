@@ -269,6 +269,31 @@ class MBLLiveManager(BaseMLBManager):
         self.last_display_update = 0  # Track when we last updated the display
         self.last_log_time = 0
         self.log_interval = 300  # Only log status every 5 minutes
+        self.test_mode = self.mlb_config.get('test_mode', False)
+
+        # Initialize with test game only if test mode is enabled
+        if self.test_mode:
+            self.current_game = {
+                "home_team": "TB",
+                "away_team": "TEX",
+                "home_score": "3",
+                "away_score": "2",
+                "inning": 5,
+                "inning_half": "top",
+                "balls": 2,
+                "strikes": 1,
+                "outs": 1,
+                "bases_occupied": [True, False, True],  # 1st and 3rd base occupied
+                "home_logo_path": os.path.join(self.logo_dir, "TB.png"),
+                "away_logo_path": os.path.join(self.logo_dir, "TEX.png"),
+                "game_time": "7:30 PM",
+                "game_date": "Apr 17",
+                "status": "live"
+            }
+            self.live_games = [self.current_game]
+            self.logger.info("Initialized MBLLiveManager with test game: TB vs TEX")
+        else:
+            self.logger.info("Initialized MBLLiveManager in live mode")
 
     def update(self):
         """Update live game data."""
@@ -279,64 +304,94 @@ class MBLLiveManager(BaseMLBManager):
         if current_time - self.last_update >= interval:
             self.last_update = current_time
             
-            # Fetch live game data from MLB API
-            games = self._fetch_mlb_api_data()
-            if games:
-                # Find all live games involving favorite teams
-                new_live_games = []
-                for game in games.values():
-                    if game['status'] == 'live':
-                        if not self.favorite_teams or (
-                            game['home_team'] in self.favorite_teams or 
-                            game['away_team'] in self.favorite_teams
-                        ):
-                            new_live_games.append(game)
-                
-                # Only log if there's a change in games or enough time has passed
-                should_log = (
-                    current_time - self.last_log_time >= self.log_interval or
-                    len(new_live_games) != len(self.live_games) or
-                    not self.live_games  # Log if we had no games before
-                )
-                
-                if should_log:
-                    if new_live_games:
-                        logger.info(f"[MLB] Found {len(new_live_games)} live games")
-                        for game in new_live_games:
-                            logger.info(f"[MLB] Live game: {game['away_team']} vs {game['home_team']} - {game['inning_half']}{game['inning']}, {game['balls']}-{game['strikes']}")
+            if self.test_mode:
+                # For testing, we'll just update the game state to show it's working
+                if self.current_game:
+                    # Update inning half
+                    if self.current_game["inning_half"] == "top":
+                        self.current_game["inning_half"] = "bottom"
                     else:
-                        logger.info("[MLB] No live games found")
-                    self.last_log_time = current_time
-                
-                if new_live_games:
-                    # Update the current game with the latest data
-                    for new_game in new_live_games:
-                        if self.current_game and (
-                            (new_game['home_team'] == self.current_game['home_team'] and 
-                             new_game['away_team'] == self.current_game['away_team']) or
-                            (new_game['home_team'] == self.current_game['away_team'] and 
-                             new_game['away_team'] == self.current_game['home_team'])
-                        ):
-                            self.current_game = new_game
-                            break
+                        self.current_game["inning_half"] = "top"
+                        self.current_game["inning"] += 1
                     
-                    # Only update the games list if we have new games
-                    if not self.live_games or set(game['away_team'] + game['home_team'] for game in new_live_games) != set(game['away_team'] + game['home_team'] for game in self.live_games):
-                        self.live_games = new_live_games
-                        # If we don't have a current game or it's not in the new list, start from the beginning
-                        if not self.current_game or self.current_game not in self.live_games:
-                            self.current_game_index = 0
-                            self.current_game = self.live_games[0]
-                            self.last_game_switch = current_time
+                    # Update count
+                    self.current_game["balls"] = (self.current_game["balls"] + 1) % 4
+                    self.current_game["strikes"] = (self.current_game["strikes"] + 1) % 3
                     
-                    # Always update display when we have new data, but limit to once per second
-                    if current_time - self.last_display_update >= 1.0:
-                        self.display(force_clear=True)
-                        self.last_display_update = current_time
-                else:
-                    # No live games found
-                    self.live_games = []
-                    self.current_game = None
+                    # Update outs
+                    self.current_game["outs"] = (self.current_game["outs"] + 1) % 3
+                    
+                    # Update bases
+                    self.current_game["bases_occupied"] = [
+                        not self.current_game["bases_occupied"][0],
+                        not self.current_game["bases_occupied"][1],
+                        not self.current_game["bases_occupied"][2]
+                    ]
+                    
+                    # Update score occasionally
+                    if self.current_game["inning"] % 2 == 0:
+                        self.current_game["home_score"] = str(int(self.current_game["home_score"]) + 1)
+                    else:
+                        self.current_game["away_score"] = str(int(self.current_game["away_score"]) + 1)
+            else:
+                # Fetch live game data from MLB API
+                games = self._fetch_mlb_api_data()
+                if games:
+                    # Find all live games involving favorite teams
+                    new_live_games = []
+                    for game in games.values():
+                        if game['status'] == 'live':
+                            if not self.favorite_teams or (
+                                game['home_team'] in self.favorite_teams or 
+                                game['away_team'] in self.favorite_teams
+                            ):
+                                new_live_games.append(game)
+                    
+                    # Only log if there's a change in games or enough time has passed
+                    should_log = (
+                        current_time - self.last_log_time >= self.log_interval or
+                        len(new_live_games) != len(self.live_games) or
+                        not self.live_games  # Log if we had no games before
+                    )
+                    
+                    if should_log:
+                        if new_live_games:
+                            logger.info(f"[MLB] Found {len(new_live_games)} live games")
+                            for game in new_live_games:
+                                logger.info(f"[MLB] Live game: {game['away_team']} vs {game['home_team']} - {game['inning_half']}{game['inning']}, {game['balls']}-{game['strikes']}")
+                        else:
+                            logger.info("[MLB] No live games found")
+                        self.last_log_time = current_time
+                    
+                    if new_live_games:
+                        # Update the current game with the latest data
+                        for new_game in new_live_games:
+                            if self.current_game and (
+                                (new_game['home_team'] == self.current_game['home_team'] and 
+                                 new_game['away_team'] == self.current_game['away_team']) or
+                                (new_game['home_team'] == self.current_game['away_team'] and 
+                                 new_game['away_team'] == self.current_game['home_team'])
+                            ):
+                                self.current_game = new_game
+                                break
+                        
+                        # Only update the games list if we have new games
+                        if not self.live_games or set(game['away_team'] + game['home_team'] for game in new_live_games) != set(game['away_team'] + game['home_team'] for game in self.live_games):
+                            self.live_games = new_live_games
+                            # If we don't have a current game or it's not in the new list, start from the beginning
+                            if not self.current_game or self.current_game not in self.live_games:
+                                self.current_game_index = 0
+                                self.current_game = self.live_games[0]
+                                self.last_game_switch = current_time
+                        
+                        # Always update display when we have new data, but limit to once per second
+                        if current_time - self.last_display_update >= 1.0:
+                            self.display(force_clear=True)
+                            self.last_display_update = current_time
+                    else:
+                        # No live games found
+                        self.live_games = []
+                        self.current_game = None
             
             # Check if it's time to switch games
             if len(self.live_games) > 1 and (current_time - self.last_game_switch) >= self.game_display_duration:
