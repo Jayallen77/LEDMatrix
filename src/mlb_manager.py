@@ -156,6 +156,25 @@ class BaseMLBManager:
     def _fetch_mlb_api_data(self) -> Dict[str, Any]:
         """Fetch MLB game data from the ESPN API."""
         try:
+            # Check if test mode is enabled
+            if self.mlb_config.get('test_mode', False):
+                self.logger.info("Using test mode data for MLB")
+                return {
+                    'test_game_1': {
+                        'away_team': 'TB',
+                        'home_team': 'TEX',
+                        'away_score': 3,
+                        'home_score': 2,
+                        'status': 'in',
+                        'inning': 7,
+                        'inning_half': 'bottom',
+                        'balls': 2,
+                        'strikes': 1,
+                        'bases_occupied': [True, False, True],  # Runner on 1st and 3rd
+                        'start_time': datetime.now().isoformat()
+                    }
+                }
+            
             # ESPN API endpoint for MLB games
             url = "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard"
             
