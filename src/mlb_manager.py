@@ -204,14 +204,6 @@ class BaseMLBManager:
             # ESPN API endpoint for MLB games
             url = "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard"
             
-            # Try to get cached data first
-            cache_key = f"mlb_games_{datetime.now().strftime('%Y%m%d')}"
-            cached_data = self.cache_manager.get_cached_data(cache_key)
-            
-            if cached_data:
-                self.logger.info("Using cached MLB game data")
-                return cached_data
-            
             self.logger.info("Fetching MLB games from ESPN API")
             response = self.session.get(url, headers=self.headers, timeout=10)
             response.raise_for_status()
@@ -281,12 +273,6 @@ class BaseMLBManager:
                             [game['away_team'] for game in games.values()])
             self.logger.info(f"Found teams in API response: {found_teams}")
             
-            # Cache the results with different expiration times based on game status
-            cache_duration = 300  # 5 minutes for live games
-            if not any(game['status'] == 'in' for game in games.values()):
-                cache_duration = 3600  # 1 hour for non-live games
-            
-            self.cache_manager.save_cache(cache_key, games)
             return games
             
         except Exception as e:
