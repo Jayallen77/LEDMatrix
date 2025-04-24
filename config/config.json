@@ -39,7 +39,10 @@
             "nba_recent": 20,
             "nba_upcoming": 20,
             "calendar": 30,
-            "youtube": 20
+            "youtube": 20,
+            "mlb_live": 30,
+            "mlb_recent": 20,
+            "mlb_upcoming": 20
         }
     },
     "clock": {
@@ -122,5 +125,22 @@
     "youtube": {
         "enabled": true,
         "update_interval": 3600
+    },
+    "mlb": {
+        "enabled": true,
+        "test_mode": true,
+        "update_interval_seconds": 300,
+        "live_update_interval": 20,
+        "recent_update_interval": 3600,
+        "upcoming_update_interval": 3600,
+        "recent_game_hours": 48,
+        "favorite_teams": ["TB", "TEX"],
+        "logo_dir": "assets/sports/mlb_logos",
+        "display_modes": {
+            "mlb_live": true,
+            "mlb_recent": true,
+            "mlb_upcoming": true
+        },
+        "live_game_duration": 30
     }
 } 
