@@ -215,15 +215,15 @@ class BaseMLBManager:
             return {}
 
 class MBLLiveManager(BaseMLBManager):
-    """Manager for live MLB games."""
+    """Manager for displaying live MLB games."""
     def __init__(self, config: Dict[str, Any], display_manager):
         super().__init__(config, display_manager)
-        self.update_interval = self.mlb_config.get('live_update_interval', 20)  # 20 seconds for live games
-        self.no_data_interval = 300  # 5 minutes when no live games
-        self.last_update = 0
         self.logger.info("Initialized MLB Live Manager")
-        self.live_games = []  # List to store all live games
-        self.current_game_index = 0  # Index to track which game to show
+        self.live_games = []
+        self.current_game_index = 0
+        self.last_update = 0
+        self.update_interval = self.mlb_config.get('live_update_interval', 20)
+        self.no_data_interval = 300  # 5 minutes when no live games
         self.last_game_switch = 0  # Track when we last switched games
         self.game_display_duration = self.mlb_config.get('live_game_duration', 30)  # Display each live game for 30 seconds
         self.last_display_update = 0  # Track when we last updated the display
@@ -321,13 +321,14 @@ class MBLLiveManager(BaseMLBManager):
             logger.error(f"[MLB] Error displaying live game: {e}", exc_info=True)
 
 class MLBRecentManager(BaseMLBManager):
-    """Manager for recently completed MLB games."""
+    """Manager for displaying recent MLB games."""
     def __init__(self, config: Dict[str, Any], display_manager):
         super().__init__(config, display_manager)
+        self.logger.info("Initialized MLB Recent Manager")
         self.recent_games = []
         self.current_game_index = 0
         self.last_update = 0
-        self.update_interval = self.mlb_config.get('recent_update_interval', 3600)  # 1 hour for recent games
+        self.update_interval = self.mlb_config.get('recent_update_interval', 3600)
         self.recent_hours = self.mlb_config.get('recent_game_hours', 48)
         self.last_game_switch = 0
         self.game_display_duration = 20  # Display each game for 20 seconds
@@ -404,13 +405,14 @@ class MLBRecentManager(BaseMLBManager):
             logger.error(f"[MLB] Error displaying recent game: {e}", exc_info=True)
 
 class MLBUpcomingManager(BaseMLBManager):
-    """Manager for upcoming MLB games."""
+    """Manager for displaying upcoming MLB games."""
     def __init__(self, config: Dict[str, Any], display_manager):
         super().__init__(config, display_manager)
+        self.logger.info("Initialized MLB Upcoming Manager")
         self.upcoming_games = []
         self.current_game_index = 0
         self.last_update = 0
-        self.update_interval = self.mlb_config.get('upcoming_update_interval', 3600)  # 1 hour for upcoming games
+        self.update_interval = self.mlb_config.get('upcoming_update_interval', 3600)
         self.last_warning_time = 0
         self.warning_cooldown = 300  # Only show warning every 5 minutes
         logger.info(f"Initialized MLBUpcomingManager with {len(self.favorite_teams)} favorite teams")
