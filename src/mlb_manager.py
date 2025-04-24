@@ -563,7 +563,7 @@ class MLBUpcomingManager(BaseMLBManager):
                     logger.info(f"Game status: {game['status']}")
                     
                     # Check if game is within our time window and has scheduled status
-                    is_within_time = game_time <= upcoming_cutoff
+                    is_within_time = now <= game_time <= upcoming_cutoff
                     is_scheduled = game['status'] == 'status_scheduled'
                     
                     logger.info(f"Within time window: {is_within_time}")
