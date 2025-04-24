@@ -410,8 +410,11 @@ class MLBLiveManager(BaseMLBManager):
         try:
             # Create and display the game image
             game_image = self._create_game_display(self.current_game)
-            image_array = np.array(game_image)
-            self.display_manager.update_display(image_array)
+            # Set the image in the display manager
+            self.display_manager.image = game_image
+            self.display_manager.draw = ImageDraw.Draw(self.display_manager.image)
+            # Update the display
+            self.display_manager.update_display()
         except Exception as e:
             logger.error(f"[MLB] Error displaying live game: {e}", exc_info=True)
 
