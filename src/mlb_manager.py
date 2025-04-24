@@ -103,9 +103,8 @@ class BaseMLBManager:
         draw = ImageDraw.Draw(image)
         
         # Calculate dynamic sizes based on display dimensions (32x128)
-        logo_size = (height - 4, height - 4)  # 28x28 pixels for logos
-        score_font_size = height // 3  # Score font size
-        status_font_size = height // 4  # Status text size
+        logo_size = (height - 8, height - 8)  # 24x24 pixels for logos (slightly smaller)
+        center_width = width // 2  # Use for centering calculations
         
         # Load team logos
         away_logo = self._get_team_logo(game_data['away_team'])
@@ -116,22 +115,24 @@ class BaseMLBManager:
             home_logo = home_logo.resize(logo_size, Image.Resampling.LANCZOS)
             
             # Position logos with proper spacing for 128 columns
-            logo_padding = 4  # Increased from 2 to 4 for better spacing
-            away_logo_x = logo_padding
-            home_logo_x = width - logo_size[0] - logo_padding
+            # Place logos about 1/4 and 3/4 of the display width
+            away_logo_x = width // 4 - logo_size[0] // 2
+            home_logo_x = (3 * width) // 4 - logo_size[0] // 2
             logo_y = (height - logo_size[1]) // 2
             
-            # Draw scores above logos
+            # Draw scores in center
             away_score = str(game_data['away_score'])
             home_score = str(game_data['home_score'])
+            score_text = f"{away_score}-{home_score}"  # Format as "1-1"
             
-            # Calculate score positions to be centered above logos
-            away_score_x = away_logo_x + (logo_size[0] - len(away_score) * 6) // 2
-            home_score_x = home_logo_x + (logo_size[0] - len(home_score) * 6) // 2
-            score_y = logo_y - 8  # Position scores 8 pixels above logos
+            # Calculate score position to be centered
+            score_bbox = draw.textbbox((0, 0), score_text, font=self.display_manager.font)
+            score_width = score_bbox[2] - score_bbox[0]
+            score_x = (width - score_width) // 2
+            score_y = (height - (score_bbox[3] - score_bbox[1])) // 2  # Center vertically
             
-            draw.text((away_score_x, score_y), away_score, fill=(255, 255, 255), font=self.display_manager.font)
-            draw.text((home_score_x, score_y), home_score, fill=(255, 255, 255), font=self.display_manager.font)
+            # Draw the centered score
+            draw.text((score_x, score_y), score_text, fill=(255, 255, 255), font=self.display_manager.font)
             
             # Paste logos
             image.paste(away_logo, (away_logo_x, logo_y), away_logo)
@@ -151,14 +152,14 @@ class BaseMLBManager:
             draw.text((inning_x, 2), inning_text, fill=(255, 255, 255), font=self.display_manager.small_font)
             
             # Draw base indicators (centered in the wider display)
-            self._draw_base_indicators(draw, game_data['bases_occupied'], width//2, height//3)
+            self._draw_base_indicators(draw, game_data['bases_occupied'], width//2, 8)  # Move bases up
             
             # Draw count (balls-strikes) at bottom
             count_text = f"{game_data['balls']}-{game_data['strikes']}"
             count_bbox = draw.textbbox((0, 0), count_text, font=self.display_manager.small_font)
             count_width = count_bbox[2] - count_bbox[0]
             count_x = (width - count_width) // 2
-            draw.text((count_x, height - 10), count_text, fill=(255, 255, 255), font=self.display_manager.small_font)
+            draw.text((count_x, height - 8), count_text, fill=(255, 255, 255), font=self.display_manager.small_font)
         else:
             # Show game time for upcoming games or "Final" for completed games
             status_text = "Final" if game_data['status'] == 'final' else self._format_game_time(game_data['start_time'])
