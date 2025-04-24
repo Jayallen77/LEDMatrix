@@ -161,7 +161,7 @@ class BaseMLBManager:
             
             # Try to get cached data first
             cache_key = f"mlb_games_{datetime.now().strftime('%Y%m%d')}"
-            cached_data = self.cache_manager.get_data('mlb', cache_key)
+            cached_data = self.cache_manager.get_cached_data(cache_key)
             
             if cached_data:
                 self.logger.info("Using cached MLB game data")
@@ -228,7 +228,7 @@ class BaseMLBManager:
             if not any(game['status'] == 'in' for game in games.values()):
                 cache_duration = 3600  # 1 hour for non-live games
             
-            self.cache_manager.set_data('mlb', cache_key, games, cache_duration)
+            self.cache_manager.save_cache(cache_key, games)
             return games
             
         except Exception as e:
