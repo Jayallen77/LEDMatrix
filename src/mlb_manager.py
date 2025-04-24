@@ -217,6 +217,8 @@ class BaseMLBManager:
             response.raise_for_status()
             
             data = response.json()
+            self.logger.debug(f"Raw API response: {data}")  # Log raw response
+            
             games = {}
             
             for event in data.get('events', []):
@@ -227,6 +229,11 @@ class BaseMLBManager:
                 competitors = event['competitions'][0]['competitors']
                 home_team = next(c for c in competitors if c['homeAway'] == 'home')
                 away_team = next(c for c in competitors if c['homeAway'] == 'away')
+                
+                # Log team abbreviations we're getting
+                home_abbr = home_team['team']['abbreviation']
+                away_abbr = away_team['team']['abbreviation']
+                self.logger.info(f"Found game: {away_abbr} @ {home_abbr} (Status: {status})")
                 
                 # Get game state information
                 if status == 'in':
@@ -255,8 +262,8 @@ class BaseMLBManager:
                     bases_occupied = [False, False, False]
                 
                 games[game_id] = {
-                    'away_team': away_team['team']['abbreviation'],
-                    'home_team': home_team['team']['abbreviation'],
+                    'away_team': away_abbr,
+                    'home_team': home_abbr,
                     'away_score': away_team['score'],
                     'home_score': home_team['score'],
                     'status': status,
@@ -267,6 +274,12 @@ class BaseMLBManager:
                     'bases_occupied': bases_occupied,
                     'start_time': event['date']
                 }
+            
+            # Log what teams we're looking for vs what we found
+            self.logger.info(f"Looking for favorite teams: {self.favorite_teams}")
+            found_teams = set([game['home_team'] for game in games.values()] + 
+                            [game['away_team'] for game in games.values()])
+            self.logger.info(f"Found teams in API response: {found_teams}")
             
             # Cache the results with different expiration times based on game status
             cache_duration = 300  # 5 minutes for live games
