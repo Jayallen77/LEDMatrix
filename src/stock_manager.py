@@ -479,7 +479,7 @@ class StockManager:
                 # Calculate chart dimensions
                 chart_width = int(width // 2.5)  # Reduced from width//2.5 to prevent overlap
                 chart_height = height // 1.5
-                chart_x = width - chart_width - 4  # 4px margin from right edge
+                chart_x = width - chart_width # - 4  # 4px margin from right edge
                 chart_y = (height - chart_height) // 2
                 
                 # Find min and max prices for scaling
