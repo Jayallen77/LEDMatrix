@@ -533,6 +533,7 @@ class MLBUpcomingManager(BaseMLBManager):
         super().__init__(config, display_manager)
         self.logger.info("Initialized MLB Upcoming Manager")
         self.upcoming_games = []
+        self.current_game = None  # Initialize current_game
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = self.mlb_config.get('upcoming_update_interval', 3600)
