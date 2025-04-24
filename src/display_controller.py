@@ -19,7 +19,7 @@ from src.stock_manager import StockManager
 from src.stock_news_manager import StockNewsManager
 from src.nhl_managers import NHLLiveManager, NHLRecentManager, NHLUpcomingManager
 from src.nba_managers import NBALiveManager, NBARecentManager, NBAUpcomingManager
-from src.mlb_manager import MBLLiveManager, MLBRecentManager, MLBUpcomingManager
+from src.mlb_manager import MLBManager
 from src.youtube_display import YouTubeDisplay
 from src.calendar_manager import CalendarManager
 
@@ -77,19 +77,13 @@ class DisplayController:
             self.nba_recent = None
             self.nba_upcoming = None
 
-        # Initialize MLB managers if enabled
-        mlb_time = time.time()
-        mlb_enabled = self.config.get('mlb', {}).get('enabled', False)
-        mlb_display_modes = self.config.get('mlb', {}).get('display_modes', {})
-        
-        if mlb_enabled:
-            self.mlb_live = MBLLiveManager(self.config, self.display_manager) if mlb_display_modes.get('mlb_live', True) else None
-            self.mlb_recent = MLBRecentManager(self.config, self.display_manager) if mlb_display_modes.get('mlb_recent', True) else None
-            self.mlb_upcoming = MLBUpcomingManager(self.config, self.display_manager) if mlb_display_modes.get('mlb_upcoming', True) else None
-        else:
-            self.mlb_live = None
-            self.mlb_recent = None
-            self.mlb_upcoming = None
+        # Initialize MLB manager if enabled
+        if self.config.get('mlb', {}).get('enabled', False):
+            self.mlb_manager = MLBManager(self.config, self.display_manager)
+            mlb_display_modes = self.config.get('mlb', {}).get('display_modes', {})
+            self.mlb_live = MLBManager(self.config, self.display_manager) if mlb_display_modes.get('mlb_live', True) else None
+            self.mlb_recent = MLBManager(self.config, self.display_manager) if mlb_display_modes.get('mlb_recent', True) else None
+            self.mlb_upcoming = MLBManager(self.config, self.display_manager) if mlb_display_modes.get('mlb_upcoming', True) else None
             
         # Track MLB rotation state
         self.mlb_current_team_index = 0
@@ -119,10 +113,9 @@ class DisplayController:
             # nba_live is handled separately when live games are available
             
         # Add MLB display modes if enabled
-        if mlb_enabled:
-            if mlb_display_modes.get('mlb_recent', True): self.available_modes.append('mlb_recent')
-            if mlb_display_modes.get('mlb_upcoming', True): self.available_modes.append('mlb_upcoming')
-            # mlb_live is handled separately when live games are available
+        if self.mlb_live: self.available_modes.append('mlb_live')
+        if self.mlb_recent: self.available_modes.append('mlb_recent')
+        if self.mlb_upcoming: self.available_modes.append('mlb_upcoming')
         
         # Set initial display to first available mode (clock)
         self.current_mode_index = 0
@@ -174,7 +167,6 @@ class DisplayController:
         logger.info(f"NBA Favorite teams: {self.nba_favorite_teams}")
         logger.info(f"MLB Favorite teams: {self.mlb_favorite_teams}")
         logger.info("NHL managers initialized in %.3f seconds", time.time() - nhl_time)
-        logger.info("MLB managers initialized in %.3f seconds", time.time() - mlb_time)
 
     def get_current_duration(self) -> int:
         """Get the duration for the current display mode."""
