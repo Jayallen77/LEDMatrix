@@ -19,7 +19,7 @@ from src.stock_manager import StockManager
 from src.stock_news_manager import StockNewsManager
 from src.nhl_managers import NHLLiveManager, NHLRecentManager, NHLUpcomingManager
 from src.nba_managers import NBALiveManager, NBARecentManager, NBAUpcomingManager
-from src.mlb_manager import MBLLiveManager, MLBRecentManager, MLBUpcomingManager
+from src.mlb_manager import MLBLiveManager, MLBRecentManager, MLBUpcomingManager
 from src.youtube_display import YouTubeDisplay
 from src.calendar_manager import CalendarManager
 
@@ -83,7 +83,7 @@ class DisplayController:
         mlb_display_modes = self.config.get('mlb', {}).get('display_modes', {})
         
         if mlb_enabled:
-            self.mlb_live = MBLLiveManager(self.config, self.display_manager) if mlb_display_modes.get('mlb_live', True) else None
+            self.mlb_live = MLBLiveManager(self.config, self.display_manager) if mlb_display_modes.get('mlb_live', True) else None
             self.mlb_recent = MLBRecentManager(self.config, self.display_manager) if mlb_display_modes.get('mlb_recent', True) else None
             self.mlb_upcoming = MLBUpcomingManager(self.config, self.display_manager) if mlb_display_modes.get('mlb_upcoming', True) else None
         else:
@@ -119,9 +119,10 @@ class DisplayController:
             # nba_live is handled separately when live games are available
             
         # Add MLB display modes if enabled
-        if self.mlb_live: self.available_modes.append('mlb_live')
-        if self.mlb_recent: self.available_modes.append('mlb_recent')
-        if self.mlb_upcoming: self.available_modes.append('mlb_upcoming')
+        if mlb_enabled:
+            if mlb_display_modes.get('mlb_recent', True): self.available_modes.append('mlb_recent')
+            if mlb_display_modes.get('mlb_upcoming', True): self.available_modes.append('mlb_upcoming')
+            # mlb_live is handled separately when live games are available
         
         # Set initial display to first available mode (clock)
         self.current_mode_index = 0
@@ -140,11 +141,6 @@ class DisplayController:
         self.nba_showing_recent = True
         self.nba_favorite_teams = self.config.get('nba_scoreboard', {}).get('favorite_teams', [])
         self.in_nba_rotation = False
-        
-        self.mlb_current_team_index = 0
-        self.mlb_showing_recent = True
-        self.mlb_favorite_teams = self.config.get('mlb', {}).get('favorite_teams', [])
-        self.in_mlb_rotation = False
         
         # Update display durations to include all modes
         self.display_durations = self.config['display'].get('display_durations', {
@@ -173,6 +169,7 @@ class DisplayController:
         logger.info(f"NBA Favorite teams: {self.nba_favorite_teams}")
         logger.info(f"MLB Favorite teams: {self.mlb_favorite_teams}")
         logger.info("NHL managers initialized in %.3f seconds", time.time() - nhl_time)
+        logger.info("MLB managers initialized in %.3f seconds", time.time() - mlb_time)
 
     def get_current_duration(self) -> int:
         """Get the duration for the current display mode."""
@@ -289,7 +286,7 @@ class DisplayController:
         elif sport == 'nba':
             return bool(self.nba_favorite_teams and (self.nba_recent or self.nba_upcoming))
         elif sport == 'mlb':
-            return bool(self.mlb_favorite_teams and self.mlb_live)
+            return bool(self.mlb_favorite_teams and (self.mlb_recent or self.mlb_upcoming))
         return False
 
     def _rotate_team_games(self, sport: str = 'nhl') -> None:
@@ -346,86 +343,122 @@ class DisplayController:
                 self.mlb_showing_recent = True  # Reset to recent games for next team
 
     def run(self):
-        """Main display loop."""
+        """Run the display controller, switching between displays."""
+        if not self.available_modes:
+            logger.warning("No display modes are enabled. Exiting.")
+            self.display_manager.cleanup()
+            return
+             
         try:
             while True:
                 current_time = time.time()
                 
-                # Check for live games first
-                has_live_games, sport_type = self._check_live_games()
-                
-                if has_live_games:
-                    # Handle live game display
-                    if sport_type == 'nhl' and self.nhl_live:
-                        self.nhl_live.display_games(self.force_clear)
-                        self.current_display_mode = 'nhl_live'
-                    elif sport_type == 'nba' and self.nba_live:
-                        self.nba_live.display_games(self.force_clear)
-                        self.current_display_mode = 'nba_live'
-                    elif sport_type == 'mlb' and self.mlb_live:
-                        self.mlb_live.display_games(self.force_clear)
-                        self.current_display_mode = 'mlb_live'
-                else:
-                    # Regular display rotation
-                    if current_time - self.last_switch >= self.get_current_duration():
-                        self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
-                        self.current_display_mode = self.available_modes[self.current_mode_index]
-                        self.last_switch = current_time
-                        self.force_clear = True
-                        
-                        # Reset rotation flags when switching modes
-                        if not self.current_display_mode.startswith('nhl_'):
-                            self.in_nhl_rotation = False
-                        if not self.current_display_mode.startswith('nba_'):
-                            self.in_nba_rotation = False
-                        if not self.current_display_mode.startswith('mlb_'):
-                            self.in_mlb_rotation = False
-                    
-                    # Handle current display mode
-                    if self.current_display_mode == 'clock' and self.clock:
-                        self.clock.display_time()
-                    elif self.current_display_mode.startswith('weather_') and self.weather:
-                        mode = self.current_display_mode.split('_')[1]
-                        self.weather.display_weather(mode)
-                    elif self.current_display_mode == 'stocks' and self.stocks:
-                        done = self.stocks.display_stocks(self.force_clear)
-                        if done: self.force_clear = True
-                    elif self.current_display_mode == 'stock_news' and self.news:
-                        done = self.news.display_news(self.force_clear)
-                        if done: self.force_clear = True
-                    elif self.current_display_mode == 'calendar' and self.calendar:
-                        self.calendar.display()
-                    elif self.current_display_mode == 'youtube' and self.youtube:
-                        self.youtube.display()
-                    elif self.current_display_mode.startswith('nhl_'):
-                        self._handle_nhl_display()
-                    elif self.current_display_mode.startswith('nba_'):
-                        self._handle_nba_display()
-                    elif self.current_display_mode.startswith('mlb_'):
-                        self._handle_mlb_display()
-                
-                # Update modules periodically
+                # Update data for all modules
                 self._update_modules()
                 
-                # Reset force clear flag
-                self.force_clear = False
+                # Check for live games
+                has_live_games, sport_type = self._check_live_games()
                 
+                # If we have live games, cycle through them
+                if has_live_games:
+                    # Check if it's time to switch live games
+                    if current_time - self.last_switch > self.get_current_duration():
+                        # Switch between NHL, NBA, and MLB live games if multiple are available
+                        if sport_type == 'nhl' and self.nba_live and self.nba_live.live_games:
+                            sport_type = 'nba'
+                            self.last_switch = current_time
+                            self.force_clear = True
+                        elif sport_type == 'nba' and self.mlb_live and self.mlb_live.live_games:
+                            sport_type = 'mlb'
+                            self.last_switch = current_time
+                            self.force_clear = True
+                        elif sport_type == 'mlb' and self.nhl_live and self.nhl_live.live_games:
+                            sport_type = 'nhl'
+                            self.last_switch = current_time
+                            self.force_clear = True
+                    
+                    # Display the current live game
+                    if sport_type == 'nhl' and self.nhl_live:
+                        self.nhl_live.update()  # Force update to get latest data
+                        self.nhl_live.display(force_clear=self.force_clear)
+                    elif sport_type == 'nba' and self.nba_live:
+                        self.nba_live.update()  # Force update to get latest data
+                        self.nba_live.display(force_clear=self.force_clear)
+                    elif sport_type == 'mlb' and self.mlb_live:
+                        self.mlb_live.update()  # Force update to get latest data
+                        self.mlb_live.display(force_clear=self.force_clear)
+                    
+                    self.force_clear = False
+                    continue  # Skip the rest of the loop to stay on live games
                 
-        except KeyboardInterrupt:
-            logger.info("Display loop interrupted by user")
-        except Exception as e:
-            logger.error(f"Error in display loop: {e}", exc_info=True)
-        finally:
-            self.display_manager.clear()
+                # Only proceed with mode switching if no live games
+                if current_time - self.last_switch > self.get_current_duration():
+                    # No live games, continue with regular rotation
+                    # If we're currently on calendar, advance to next event before switching modes
+                    if self.current_display_mode == 'calendar' and self.calendar:
+                        self.calendar.advance_event()
+                    
+                    self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
+                    self.current_display_mode = self.available_modes[self.current_mode_index]
+                    logger.info(f"Switching to: {self.current_display_mode}")
+                    self.force_clear = True
+                    self.last_switch = current_time
 
-    def _handle_mlb_display(self):
-        """Handle MLB display modes."""
-        if self.current_display_mode == 'mlb_live' and self.mlb_live:
-            self.mlb_live.display(self.force_clear)
-        elif self.current_display_mode == 'mlb_recent' and self.mlb_recent:
-            self.mlb_recent.display(self.force_clear)
-        elif self.current_display_mode == 'mlb_upcoming' and self.mlb_upcoming:
-            self.mlb_upcoming.display(self.force_clear)
+                # Display current mode frame (only for non-live modes)
+                try:
+                    if self.current_display_mode == 'clock' and self.clock:
+                        self.clock.display_time(force_clear=self.force_clear)
+                            
+                    elif self.current_display_mode == 'weather_current' and self.weather:
+                        self.weather.display_weather(force_clear=self.force_clear)
+                    elif self.current_display_mode == 'weather_hourly' and self.weather:
+                        self.weather.display_hourly_forecast(force_clear=self.force_clear)
+                    elif self.current_display_mode == 'weather_daily' and self.weather:
+                        self.weather.display_daily_forecast(force_clear=self.force_clear)
+                            
+                    elif self.current_display_mode == 'stocks' and self.stocks:
+                        self.stocks.display_stocks(force_clear=self.force_clear)
+                            
+                    elif self.current_display_mode == 'stock_news' and self.news:
+                        self.news.display_news()
+                            
+                    elif self.current_display_mode == 'calendar' and self.calendar:
+                        # Update calendar data if needed
+                        self.calendar.update(current_time)
+                        # Always display the calendar, with force_clear only on mode switch
+                        self.calendar.display(force_clear=self.force_clear)
+                            
+                    elif self.current_display_mode == 'nhl_recent' and self.nhl_recent:
+                        self.nhl_recent.display(force_clear=self.force_clear)
+                    elif self.current_display_mode == 'nhl_upcoming' and self.nhl_upcoming:
+                        self.nhl_upcoming.display(force_clear=self.force_clear)
+                            
+                    elif self.current_display_mode == 'nba_recent' and self.nba_recent:
+                        self.nba_recent.display(force_clear=self.force_clear)
+                    elif self.current_display_mode == 'nba_upcoming' and self.nba_upcoming:
+                        self.nba_upcoming.display(force_clear=self.force_clear)
+                            
+                    elif self.current_display_mode == 'mlb_recent' and self.mlb_recent:
+                        self.mlb_recent.display(force_clear=self.force_clear)
+                    elif self.current_display_mode == 'mlb_upcoming' and self.mlb_upcoming:
+                        self.mlb_upcoming.display(force_clear=self.force_clear)
+                            
+                    elif self.current_display_mode == 'youtube' and self.youtube:
+                        self.youtube.display(force_clear=self.force_clear)
+                            
+                except Exception as e:
+                    logger.error(f"Error updating display for mode {self.current_display_mode}: {e}", exc_info=True)
+                    continue
+
+                self.force_clear = False
+
+
+        except KeyboardInterrupt:
+            logger.info("Display controller stopped by user")
+        except Exception as e:
+            logger.error(f"Error in display controller: {e}", exc_info=True)
+        finally:
+            self.display_manager.cleanup()
 
 def main():
     controller = DisplayController()
