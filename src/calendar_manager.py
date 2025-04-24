@@ -29,7 +29,7 @@ class CalendarManager:
         self.max_events = self.calendar_config.get('max_events', 3)
         self.calendars = self.calendar_config.get('calendars', ['birthdays'])
         self.last_update = 0
-        self.last_debug_log = 0  # Add timestamp for debug message throttling
+        self.last_display_log = 0  # Add timestamp for display message throttling
         self.events = []
         self.service = None
         
@@ -241,9 +241,9 @@ class CalendarManager:
             self.current_event_index = 0 
         else:
             # Only log debug message every 5 seconds
-            if current_time - self.last_debug_log > 5:
+            if current_time - self.last_display_log > 5:
                 logger.debug("Skipping calendar update - not enough time has passed")
-                self.last_debug_log = current_time
+                self.last_display_log = current_time
 
     def _format_event_date(self, event):
         """Format event date for display"""
@@ -297,13 +297,16 @@ class CalendarManager:
                 
             event = self.events[self.current_event_index]
             
-            # Log the event being displayed
-            summary = event.get('summary', 'No Title')
-            date_text = self._format_event_date(event)
-            time_text = self._format_event_time(event)
-            logger.info(f"Displaying calendar event: {summary}")
-            logger.info(f"  Date: {date_text}")
-            logger.info(f"  Time: {time_text}")
+            # Log the event being displayed, but only every 5 seconds
+            current_time = time.time()
+            if current_time - self.last_display_log > 5:
+                summary = event.get('summary', 'No Title')
+                date_text = self._format_event_date(event)
+                time_text = self._format_event_time(event)
+                logger.info(f"Displaying calendar event: {summary}")
+                logger.info(f"  Date: {date_text}")
+                logger.info(f"  Time: {time_text}")
+                self.last_display_log = current_time
             
             # Draw the event
             self.draw_event(event)
