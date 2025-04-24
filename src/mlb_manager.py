@@ -63,24 +63,37 @@ class BaseMLBManager:
 
     def _draw_base_indicators(self, draw: ImageDraw.Draw, bases_occupied: List[bool], center_x: int, y: int) -> None:
         """Draw base indicators on the display."""
-        base_size = 6  # Increased from 4 to 6
-        base_spacing = 8  # Increased from 6 to 8
+        base_size = 8  # Increased from 6 to 8 for better visibility
+        base_spacing = 10  # Increased from 8 to 10 for better spacing
         
-        # Draw diamond outline
+        # Draw diamond outline with thicker lines
         diamond_points = [
             (center_x, y),  # Home
             (center_x - base_spacing, y - base_spacing),  # First
             (center_x, y - 2 * base_spacing),  # Second
             (center_x + base_spacing, y - base_spacing)  # Third
         ]
-        draw.polygon(diamond_points, outline=(255, 255, 255))
         
-        # Draw occupied bases
+        # Draw thicker diamond outline
+        for i in range(len(diamond_points)):
+            start = diamond_points[i]
+            end = diamond_points[(i + 1) % len(diamond_points)]
+            draw.line([start, end], fill=(255, 255, 255), width=2)  # Added width parameter for thicker lines
+        
+        # Draw occupied bases with larger circles and outline
         for i, occupied in enumerate(bases_occupied):
+            x = diamond_points[i+1][0] - base_size//2
+            y = diamond_points[i+1][1] - base_size//2
+            
+            # Draw base circle with outline
             if occupied:
-                x = diamond_points[i+1][0] - base_size//2
-                y = diamond_points[i+1][1] - base_size//2
-                draw.ellipse([x, y, x + base_size, y + base_size], fill=(255, 255, 255))
+                # Draw white outline
+                draw.ellipse([x-1, y-1, x + base_size+1, y + base_size+1], fill=(255, 255, 255))
+                # Draw filled circle
+                draw.ellipse([x+1, y+1, x + base_size-1, y + base_size-1], fill=(0, 0, 0))
+            else:
+                # Draw empty base with outline
+                draw.ellipse([x, y, x + base_size, y + base_size], outline=(255, 255, 255), width=1)
 
     def _create_game_display(self, game_data: Dict[str, Any]) -> Image.Image:
         """Create a display image for an MLB game with team logos, score, and game state."""
