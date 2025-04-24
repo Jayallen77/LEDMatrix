@@ -562,14 +562,14 @@ class MLBUpcomingManager(BaseMLBManager):
                     logger.info(f"Checking game: {game['away_team']} @ {game['home_team']} at {game_time}")
                     logger.info(f"Game status: {game['status']}")
                     
-                    # Check if game is within our time window and has preview status
+                    # Check if game is within our time window and has scheduled status
                     is_within_time = game_time <= upcoming_cutoff
-                    is_preview = game['status'] == 'preview'
+                    is_scheduled = game['status'] == 'status_scheduled'
                     
                     logger.info(f"Within time window: {is_within_time}")
-                    logger.info(f"Is preview status: {is_preview}")
+                    logger.info(f"Is scheduled status: {is_scheduled}")
                     
-                    if is_preview and is_within_time:
+                    if is_scheduled and is_within_time:
                         new_upcoming_games.append(game)
                         logger.info(f"Added game to upcoming list: {game['away_team']} @ {game['home_team']}")
                 
