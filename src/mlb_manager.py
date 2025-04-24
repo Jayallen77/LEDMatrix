@@ -610,8 +610,9 @@ class MLBUpcomingManager(BaseMLBManager):
         try:
             # Create and display the game image
             game_image = self._create_game_display(self.current_game)
-            image_array = np.array(game_image)
-            self.display_manager.update_display(image_array)
+            self.display_manager.image = game_image
+            self.display_manager.draw = ImageDraw.Draw(self.display_manager.image)
+            self.display_manager.update_display()
             
             # Move to next game
             self.current_game_index = (self.current_game_index + 1) % len(self.upcoming_games)
