@@ -243,6 +243,7 @@ class BaseMLBManager:
                         'inning_half': 'bottom',
                         'balls': 2,
                         'strikes': 1,
+                        'outs': 1,
                         'bases_occupied': [True, False, True],  # Runner on 1st and 3rd
                         'start_time': datetime.now().isoformat()
                     }
@@ -378,6 +379,7 @@ class MLBLiveManager(BaseMLBManager):
                 "inning_half": "top",
                 "balls": 2,
                 "strikes": 1,
+                "outs": 1,
                 "bases_occupied": [True, False, True],
                 "home_logo_path": os.path.join(self.logo_dir, "TB.png"),
                 "away_logo_path": os.path.join(self.logo_dir, "TEX.png"),
