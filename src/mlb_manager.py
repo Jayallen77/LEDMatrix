@@ -131,12 +131,11 @@ class BaseMLBManager:
         if game_data['status'] == 'status_scheduled':
             # Show "Next Game" at the top using 5x7 font
             status_text = "Next Game"
-            status_font = self.display_manager.load_font("5x7.bdf")
-            status_bbox = draw.textbbox((0, 0), status_text, font=status_font)
+            status_bbox = draw.textbbox((0, 0), status_text, font=self.display_manager.calendar_font)
             status_width = status_bbox[2] - status_bbox[0]
             status_x = (width - status_width) // 2
             status_y = 2
-            draw.text((status_x, status_y), status_text, fill=(255, 255, 255), font=status_font)
+            self.display_manager._draw_bdf_text(status_text, status_x, status_y)
             
             # Format game date and time
             game_time = datetime.fromisoformat(game_data['start_time'].replace('Z', '+00:00'))
@@ -161,12 +160,11 @@ class BaseMLBManager:
         elif game_data['status'] in ['status_final', 'final', 'completed']:
             # Show "Final" at the top using 5x7 font
             status_text = "Final"
-            status_font = self.display_manager.load_font("5x7.bdf")
-            status_bbox = draw.textbbox((0, 0), status_text, font=status_font)
+            status_bbox = draw.textbbox((0, 0), status_text, font=self.display_manager.calendar_font)
             status_width = status_bbox[2] - status_bbox[0]
             status_x = (width - status_width) // 2
             status_y = 2
-            draw.text((status_x, status_y), status_text, fill=(255, 255, 255), font=status_font)
+            self.display_manager._draw_bdf_text(status_text, status_x, status_y)
             
             # Draw scores at the bottom (matching NHL layout) using PressStart2P
             away_score = str(game_data['away_score'])
