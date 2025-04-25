@@ -613,29 +613,32 @@ class MLBUpcomingManager(BaseMLBManager):
                 logger.info(f"Looking for games between {now} and {upcoming_cutoff}")
                 
                 for game in games.values():
-                    game_time = datetime.fromisoformat(game['start_time'].replace('Z', '+00:00'))
-                    logger.info(f"Checking game: {game['away_team']} @ {game['home_team']} at {game_time}")
-                    logger.info(f"Game status: {game['status']}")
+                    # Check if this is a favorite team game first
+                    is_favorite_game = (game['home_team'] in self.favorite_teams or 
+                                      game['away_team'] in self.favorite_teams)
                     
-                    # Check if game is within our time window and has scheduled status
+                    if not is_favorite_game:
+                        continue  # Skip non-favorite team games
+                        
+                    game_time = datetime.fromisoformat(game['start_time'].replace('Z', '+00:00'))
+                    logger.info(f"Checking favorite team game: {game['away_team']} @ {game['home_team']} at {game_time}")
+                    logger.info(f"Game status: {game['status']}, State: {game['status_state']}")
+                    
+                    # Check if game is within our time window and is upcoming
                     is_within_time = now <= game_time <= upcoming_cutoff
-                    is_scheduled = game['status'] == 'status_scheduled'
+                    is_upcoming = game['status_state'] == 'pre'  # Use status_state like NHL manager
                     
                     logger.info(f"Within time window: {is_within_time}")
-                    logger.info(f"Is scheduled status: {is_scheduled}")
+                    logger.info(f"Is upcoming status: {is_upcoming}")
                     
-                    if is_scheduled and is_within_time:
+                    if is_upcoming and is_within_time:
                         new_upcoming_games.append(game)
-                        logger.info(f"Added game to upcoming list: {game['away_team']} @ {game['home_team']}")
+                        logger.info(f"Added favorite team game to upcoming list: {game['away_team']} @ {game['home_team']}")
                 
-                # Filter for favorite teams
+                # Filter for favorite teams (though we already filtered above, this is a safety check)
                 new_team_games = [game for game in new_upcoming_games 
                              if game['home_team'] in self.favorite_teams or 
                                 game['away_team'] in self.favorite_teams]
-                
-                logger.info(f"Found {len(new_team_games)} games for favorite teams: {self.favorite_teams}")
-                for game in new_team_games:
-                    logger.info(f"Favorite team game: {game['away_team']} @ {game['home_team']}")
                 
                 if new_team_games:
                     logger.info(f"[MLB] Found {len(new_team_games)} upcoming games for favorite teams")
