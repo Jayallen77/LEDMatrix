@@ -526,6 +526,9 @@ class MLBLiveManager(BaseMLBManager):
 
         # --- Live Game Specific Elements ---
         
+        # Define default text color
+        text_color = (255, 255, 255)
+        
         # Draw Inning (Top Center)
         inning_half_indicator = "▲" if game_data['inning_half'] == 'top' else "▼"
         inning_text = f"{inning_half_indicator}{game_data['inning']}"
