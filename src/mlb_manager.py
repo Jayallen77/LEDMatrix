@@ -538,7 +538,7 @@ class MLBLiveManager(BaseMLBManager):
         inning_bbox = draw.textbbox((0, 0), inning_text, font=self.display_manager.font)
         inning_width = inning_bbox[2] - inning_bbox[0]
         inning_x = (width - inning_width) // 2
-        inning_y = 2 # Position near top center
+        inning_y = 0 # Position near top center
         draw.text((inning_x, inning_y), inning_text, fill=(255, 255, 255), font=self.display_manager.font)
         
         # --- REVISED BASES AND OUTS DRAWING --- 
