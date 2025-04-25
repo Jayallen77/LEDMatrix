@@ -534,12 +534,14 @@ class MLBUpcomingManager(BaseMLBManager):
         super().__init__(config, display_manager)
         self.logger.info("Initialized MLB Upcoming Manager")
         self.upcoming_games = []
-        self.current_game = None  # Initialize current_game
+        self.current_game = None
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = self.mlb_config.get('upcoming_update_interval', 3600)
         self.last_warning_time = 0
         self.warning_cooldown = 300  # Only show warning every 5 minutes
+        self.last_game_switch = 0  # Track when we last switched games
+        self.game_display_duration = 10  # Display each game for 10 seconds
         logger.info(f"Initialized MLBUpcomingManager with {len(self.favorite_teams)} favorite teams")
 
     def update(self):
@@ -609,15 +611,21 @@ class MLBUpcomingManager(BaseMLBManager):
             return  # Skip display update entirely
             
         try:
+            current_time = time.time()
+            
+            # Check if it's time to switch games
+            if current_time - self.last_game_switch >= self.game_display_duration:
+                # Move to next game
+                self.current_game_index = (self.current_game_index + 1) % len(self.upcoming_games)
+                self.current_game = self.upcoming_games[self.current_game_index]
+                self.last_game_switch = current_time
+                force_clear = True  # Force clear when switching games
+            
             # Create and display the game image
             game_image = self._create_game_display(self.current_game)
             self.display_manager.image = game_image
             self.display_manager.draw = ImageDraw.Draw(self.display_manager.image)
             self.display_manager.update_display()
-            
-            # Move to next game
-            self.current_game_index = (self.current_game_index + 1) % len(self.upcoming_games)
-            self.current_game = self.upcoming_games[self.current_game_index]
             
         except Exception as e:
             logger.error(f"[MLB] Error displaying upcoming game: {e}", exc_info=True) 
