@@ -538,40 +538,82 @@ class MLBLiveManager(BaseMLBManager):
         inning_y = 2 # Position near top center
         draw.text((inning_x, inning_y), inning_text, fill=(255, 255, 255), font=self.display_manager.font)
         
-        # Draw NEW Base Indicators (Compact, below inning)
-        base_size = 3
-        base_spacing = 2
-        bases_occupied = game_data['bases_occupied'] # Should be [bool, bool, bool] for 1st, 2nd, 3rd
-        total_bases_width = 3 * base_size + 2 * base_spacing
-        base_start_x = inning_x + (inning_width // 2) - (total_bases_width // 2)
-        # Use inning_bbox to position below text: inning_bbox[3] is the bottom y-coordinate
-        base_y = inning_bbox[3] + 2 # Position 2 pixels below inning text
+        # --- NEW BASES AND COUNT DRAWING --- 
+        bases_occupied = game_data['bases_occupied'] # [1st, 2nd, 3rd]
+        balls = game_data['balls']
+        strikes = game_data['strikes']
+        
+        # Define geometry
+        diamond_size = 5 # Size of the base diamonds
+        circle_diameter = 3 # Diameter of the count circles
+        vertical_spacing = 1 # Space between bases row and count row
+        horizontal_spacing = 1 # Space between elements
+        
+        # Calculate total dimensions
+        base_cluster_height = diamond_size + vertical_spacing + circle_diameter
+        # Width is roughly max(width_of_2nd_base_diamond, width_of_1st+3rd+spacing, width_of_3_circles+spacing)
+        # For simplicity, approximate using 3 circles width as it's likely widest
+        count_cluster_width = 3 * circle_diameter + 2 * horizontal_spacing
+        base_row_width = 2 * diamond_size + horizontal_spacing # Width for 1st and 3rd base
+        cluster_width = max(count_cluster_width, base_row_width, diamond_size)
+
+        # Calculate center position for the cluster
+        cluster_start_x = (width - cluster_width) // 2
+        cluster_start_y = inning_bbox[3] + 3 # Start 3 pixels below inning text
+        
+        # --- Draw Bases (Diamonds) ---
+        base_color_occupied = (255, 255, 255)
+        base_color_empty = (255, 255, 255) # Outline color
+        
+        # Calculate diamond points relative to their center
+        h_d = diamond_size // 2 # half diamond size
+        
+        # 2nd Base (Top center of cluster)
+        c2x = cluster_start_x + cluster_width // 2
+        c2y = cluster_start_y + h_d
+        poly2 = [(c2x, cluster_start_y), (c2x + h_d, c2y), (c2x, c2y + h_d), (c2x - h_d, c2y)]
+        if bases_occupied[1]: # Index 1 is 2nd base
+            draw.polygon(poly2, fill=base_color_occupied)
+        else:
+            draw.polygon(poly2, outline=base_color_empty)
+        
+        base_bottom_y = c2y + h_d
+        
+        # 1st Base (Bottom left of cluster)
+        c1x = cluster_start_x + h_d
+        c1y = base_bottom_y + vertical_spacing + h_d
+        poly1 = [(c1x, base_bottom_y + vertical_spacing), (c1x + h_d, c1y), (c1x, c1y + h_d), (c1x - h_d, c1y)]
+        if bases_occupied[0]: # Index 0 is 1st base
+            draw.polygon(poly1, fill=base_color_occupied)
+        else:
+            draw.polygon(poly1, outline=base_color_empty)
+
+        # 3rd Base (Bottom right of cluster)
+        c3x = cluster_start_x + cluster_width - h_d
+        c3y = base_bottom_y + vertical_spacing + h_d
+        poly3 = [(c3x, base_bottom_y + vertical_spacing), (c3x + h_d, c3y), (c3x, c3y + h_d), (c3x - h_d, c3y)]
+        if bases_occupied[2]: # Index 2 is 3rd base
+            draw.polygon(poly3, fill=base_color_occupied)
+        else:
+            draw.polygon(poly3, outline=base_color_empty)
+        
+        bases_overall_bottom_y = c1y + h_d # Bottom of the 1st/3rd base diamonds
+
+        # --- Draw Count (Circles) --- 
+        count_start_y = bases_overall_bottom_y + vertical_spacing
+        count_start_x = cluster_start_x + (cluster_width - count_cluster_width) // 2
+        circle_color_ball = (255, 255, 255)
+        circle_color_strike = (255, 255, 255) # Outline color
 
         for i in range(3):
-            x1 = base_start_x + i * (base_size + base_spacing)
-            y1 = base_y
-            x2 = x1 + base_size
-            y2 = y1 + base_size
-            if bases_occupied[i]:
-                draw.rectangle([x1, y1, x2, y2], fill=(255, 255, 0)) # Yellow fill for occupied
-            else:
-                draw.rectangle([x1, y1, x2, y2], outline=(100, 100, 100)) # Gray outline for empty
-
-        # Draw Count (Balls-Strikes) using BDF font below bases
-        count_text = f"{game_data['balls']}-{game_data['strikes']}"
-        bdf_font = self.display_manager.calendar_font
-        bdf_font.set_char_size(height=7*64) # Set 7px height
-        count_width = self.display_manager.get_text_width(count_text, bdf_font)
-        # Center below bases: find center of bases area
-        bases_center_x = base_start_x + total_bases_width // 2
-        count_x = bases_center_x - count_width // 2
-        # Position below bases (base_y is top of bases, add base_size and spacing)
-        count_y = base_y + base_size + 2 
-        # Ensure display manager has the right draw object before calling _draw_bdf_text
-        self.display_manager.draw = draw 
-        self.display_manager._draw_bdf_text(count_text, count_x, count_y, text_color, font=bdf_font)
-        # Update display (might be redundant if called later, but safe)
-        # self.display_manager.update_display() 
+            cx = count_start_x + i * (circle_diameter + horizontal_spacing)
+            cy = count_start_y
+            coords = [cx, cy, cx + circle_diameter, cy + circle_diameter]
+            if i < balls:
+                draw.ellipse(coords, fill=circle_color_ball)
+            elif i < balls + strikes:
+                draw.ellipse(coords, outline=circle_color_strike)
+            # else: leave empty (no circle for unused spots)
 
         # Draw Team:Score at the bottom
         score_font = self.display_manager.font # Use PressStart2P
