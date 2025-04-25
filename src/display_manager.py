@@ -140,11 +140,11 @@ class DisplayManager:
         except Exception as e:
             logger.error(f"Error clearing display: {e}")
 
-    def _draw_bdf_text(self, text, x, y, color=(255, 255, 255)):
+    def _draw_bdf_text(self, text, x, y, color=(255, 255, 255), font=None):
         """Draw text using BDF font with proper bitmap handling."""
         try:
-            # Use the existing calendar_font instead of creating a new Face
-            face = self.calendar_font
+            # Use the passed font or fall back to calendar_font
+            face = font if font else self.calendar_font
             
             for char in text:
                 face.load_char(char)
@@ -250,17 +250,7 @@ class DisplayManager:
             
             # Calculate x position if not provided (center text)
             if x is None:
-                if isinstance(current_font, ImageFont.FreeTypeFont):
-                    # For TTF fonts, use textlength
-                    text_width = self.draw.textlength(text, font=current_font)
-                else:
-                    # For BDF fonts, use freetype to calculate width
-                    face = freetype.Face(self.calendar_font_path)
-                    width = 0
-                    for char in text:
-                        face.load_char(char)
-                        width += face.glyph.advance.x >> 6
-                    text_width = width
+                text_width = self.get_text_width(text, current_font)
                 x = (self.matrix.width - text_width) // 2
             
             # Set default y position if not provided
@@ -269,9 +259,14 @@ class DisplayManager:
             
             # Draw the text
             if isinstance(current_font, freetype.Face):
-                self._draw_bdf_text(text, x, y, color)
+                # For BDF fonts, use _draw_bdf_text
+                self._draw_bdf_text(text, x, y, color, current_font)
             else:
+                # For TTF fonts, use PIL's text drawing
                 self.draw.text((x, y), text, font=current_font, fill=color)
+            
+            # Update the display to show the text
+            self.update_display()
             
         except Exception as e:
             logger.error(f"Error drawing text: {e}", exc_info=True)
