@@ -116,11 +116,11 @@ class BaseMLBManager:
             
             # Position logos with proper spacing (matching NHL layout)
             # Away logo on left, slightly off screen
-            away_x = -8  # Adjusted for 32x32 logo
+            away_x = 0  # Adjusted for 32x32 logo
             away_y = 0  # Align to top of display
             
             # Home logo on right, slightly off screen
-            home_x = width - home_logo.width + 8  # Adjusted for 32x32 logo
+            home_x = width - home_logo.width   # Adjusted for 32x32 logo
             home_y = 0  # Align to top of display
             
             # Paste logos
@@ -232,6 +232,7 @@ class BaseMLBManager:
             for event in data.get('events', []):
                 game_id = event['id']
                 status = event['status']['type']['name'].lower()
+                status_state = event['status']['type']['state'].lower()
                 
                 # Get team information
                 competitors = event['competitions'][0]['competitors']
@@ -245,11 +246,10 @@ class BaseMLBManager:
                 # Only log detailed information for favorite teams
                 is_favorite_game = (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams)
                 if is_favorite_game:
-                    self.logger.info(f"Found favorite team game: {away_abbr} @ {home_abbr} (Status: {status})")
-                    self.logger.info(f"Game {game_id} status object: {event['status']}")
+                    self.logger.info(f"Found favorite team game: {away_abbr} @ {home_abbr} (Status: {status}, State: {status_state})")
                 
                 # Get game state information
-                if status == 'in':
+                if status_state == 'in':
                     # For live games, get detailed state
                     linescore = event['competitions'][0].get('linescores', [{}])[0]
                     inning = linescore.get('value', 1)
@@ -280,6 +280,7 @@ class BaseMLBManager:
                     'away_score': away_team['score'],
                     'home_score': home_team['score'],
                     'status': status,
+                    'status_state': status_state,  # Add status state
                     'inning': inning,
                     'inning_half': inning_half,
                     'balls': balls,
@@ -295,7 +296,7 @@ class BaseMLBManager:
             if favorite_games:
                 self.logger.info(f"Found {len(favorite_games)} games for favorite teams: {self.favorite_teams}")
                 for game in favorite_games:
-                    self.logger.info(f"Favorite team game: {game['away_team']} @ {game['home_team']}")
+                    self.logger.info(f"Favorite team game: {game['away_team']} @ {game['home_team']} (Status: {game['status']}, State: {game['status_state']})")
             
             return games
             
@@ -502,6 +503,8 @@ class MLBRecentManager(BaseMLBManager):
             now = datetime.now(timezone.utc)  # Make timezone-aware
             recent_cutoff = now - timedelta(hours=self.recent_hours)
             
+            logger.info(f"[MLB] Time window: {recent_cutoff} to {now}")
+            
             for game_id, game in games.items():
                 # Convert game time to UTC datetime
                 game_time_str = game['start_time'].replace('Z', '+00:00')
@@ -516,10 +519,10 @@ class MLBRecentManager(BaseMLBManager):
                 if is_favorite_game:
                     logger.info(f"[MLB] Checking favorite team game: {game['away_team']} @ {game['home_team']}")
                     logger.info(f"[MLB] Game time (UTC): {game_time}")
-                    logger.info(f"[MLB] Game status: {game['status']}")
+                    logger.info(f"[MLB] Game status: {game['status']}, State: {game['status_state']}")
                 
-                # Accept more status types for recent games, including status_final
-                is_final = game['status'] in ['final', 'completed', 'postponed', 'suspended', 'status_final']
+                # Use status_state to determine if game is final
+                is_final = game['status_state'] in ['post', 'final', 'completed']
                 is_within_time = recent_cutoff <= game_time <= now
                 
                 if is_favorite_game:
