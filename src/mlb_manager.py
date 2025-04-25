@@ -204,7 +204,7 @@ class BaseMLBManager:
             response.raise_for_status()
             
             data = response.json()
-            self.logger.debug(f"Raw API response: {data}")  # Log raw response
+            self.logger.info(f"Raw API response: {data}")  # Log raw response
             
             games = {}
             
@@ -271,6 +271,12 @@ class BaseMLBManager:
             found_teams = set([game['home_team'] for game in games.values()] + 
                             [game['away_team'] for game in games.values()])
             self.logger.info(f"Found teams in API response: {found_teams}")
+            
+            # Log all games with status_final
+            final_games = [game for game in games.values() if game['status'] == 'status_final']
+            self.logger.info(f"Games with status_final: {len(final_games)}")
+            for game in final_games:
+                self.logger.info(f"Final game: {game['away_team']} @ {game['home_team']}")
             
             return games
             
