@@ -161,7 +161,14 @@ class BaseMLBManager:
     def _format_game_time(self, game_time: str) -> str:
         """Format game time for display."""
         try:
+            # Get timezone from config
+            timezone_str = self.config.get('timezone', 'UTC')
+            tz = timezone(timedelta(hours=0))  # Default to UTC if timezone not found
+            
+            # Convert game time to local timezone
             dt = datetime.fromisoformat(game_time.replace('Z', '+00:00'))
+            dt = dt.astimezone(tz)
+            
             return dt.strftime("%I:%M %p")
         except Exception as e:
             logger.error(f"Error formatting game time: {e}")
@@ -204,6 +211,10 @@ class BaseMLBManager:
             for event in data.get('events', []):
                 game_id = event['id']
                 status = event['status']['type']['name'].lower()
+                
+                # Log the full status object for debugging
+                self.logger.info(f"Game {game_id} status object: {event['status']}")
+                self.logger.info(f"Game {game_id} status type: {status}")
                 
                 # Get team information
                 competitors = event['competitions'][0]['competitors']
