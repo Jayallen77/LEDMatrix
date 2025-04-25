@@ -157,7 +157,7 @@ class BaseMLBManager:
                 game_time = game_time.replace(tzinfo=pytz.UTC)
             local_time = game_time.astimezone(tz)
             game_date = local_time.strftime("%b %d")  # e.g., "Apr 24"
-            game_time_str = local_time.strftime("%I:%M %p")  # e.g., "07:30 PM"
+            game_time_str = self._format_game_time(game_data['start_time'])  # Use the existing method
             
             # Draw date in center using PressStart2P
             date_bbox = draw.textbbox((0, 0), game_date, font=self.display_manager.font)
