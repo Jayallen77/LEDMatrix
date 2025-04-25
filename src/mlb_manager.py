@@ -543,11 +543,25 @@ class MLBLiveManager(BaseMLBManager):
         inning_y = 2 # Position near top center
         draw.text((inning_x, inning_y), inning_text, fill=(255, 255, 255), font=self.display_manager.font)
         
-        # Draw Base Indicators (Centered above score)
-        base_center_x = width // 2
-        base_y = score_y - 10 # Position above the score
-        self._draw_base_indicators(draw, game_data['bases_occupied'], base_center_x, base_y)
-        
+        # Draw NEW Base Indicators (Compact, below inning)
+        base_size = 3
+        base_spacing = 2
+        bases_occupied = game_data['bases_occupied'] # Should be [bool, bool, bool] for 1st, 2nd, 3rd
+        total_bases_width = 3 * base_size + 2 * base_spacing
+        base_start_x = inning_x + (inning_width // 2) - (total_bases_width // 2)
+        # Use inning_bbox to position below text: inning_bbox[3] is the bottom y-coordinate
+        base_y = inning_bbox[3] + 2 # Position 2 pixels below inning text
+
+        for i in range(3):
+            x1 = base_start_x + i * (base_size + base_spacing)
+            y1 = base_y
+            x2 = x1 + base_size
+            y2 = y1 + base_size
+            if bases_occupied[i]:
+                draw.rectangle([x1, y1, x2, y2], fill=(255, 255, 0)) # Yellow fill for occupied
+            else:
+                draw.rectangle([x1, y1, x2, y2], outline=(100, 100, 100)) # Gray outline for empty
+
         # Draw Count (Balls-Strikes, potentially bottom left/right or near inning)
         # Example: Bottom left
         count_text = f"{game_data['balls']}-{game_data['strikes']}"
