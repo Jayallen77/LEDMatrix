@@ -176,6 +176,14 @@ class DisplayManager:
             self.small_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
             logger.info("Press Start 2P small font loaded successfully")
 
+            # Load another PressStart2P instance at size 6 for inning display
+            try:
+                self.inning_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 6)
+                logger.info("Press Start 2P inning font (size 6) loaded successfully")
+            except Exception as e:
+                logger.warning(f"Failed to load Press Start 2P size 6: {e}. Falling back to small_font.")
+                self.inning_font = self.small_font
+
             # Load 5x7 BDF font for calendar events
             try:
                 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -219,6 +227,8 @@ class DisplayManager:
             self.calendar_font = self.regular_font
             if not hasattr(self, 'extra_small_font'): 
                 self.extra_small_font = self.regular_font
+            if not hasattr(self, 'inning_font'): # Add fallback for inning_font too
+                self.inning_font = self.small_font
 
     def get_text_width(self, text, font):
         """Get the width of text when rendered with the given font."""
