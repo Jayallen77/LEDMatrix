@@ -238,6 +238,7 @@ class BaseMLBManager:
                         'away_score': 3,
                         'home_score': 2,
                         'status': 'in',
+                        'status_state': 'in',
                         'inning': 7,
                         'inning_half': 'bottom',
                         'balls': 2,
