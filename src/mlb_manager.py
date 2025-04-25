@@ -559,19 +559,24 @@ class MLBLiveManager(BaseMLBManager):
         base_cluster_width = base_diamond_size + base_horiz_spacing + base_diamond_size
         out_cluster_height = 3 * out_circle_diameter + 2 * out_vertical_spacing
         out_cluster_width = out_circle_diameter
-        total_width = base_cluster_width + spacing_between_bases_outs + out_cluster_width
+        # total_width = base_cluster_width + spacing_between_bases_outs + out_cluster_width # No longer needed for centering
         
         # Calculate overall start positions
-        overall_start_x = (width - total_width) // 2
-        overall_start_y = inning_bbox[3] + 3 # Start below inning text
+        # overall_start_x = (width - total_width) // 2 # Removed
+        overall_start_y = inning_bbox[3] + 0 # Start immediately below inning text (moved up 3 pixels)
         
-        # Determine relative positions based on inning half
+        # Center the BASE cluster horizontally
+        bases_origin_x = (width - base_cluster_width) // 2
+        
+        # Determine relative positions for outs based on inning half
         if inning_half == 'top': # Away batting, outs on left
-            outs_column_x = overall_start_x
-            bases_origin_x = overall_start_x + out_cluster_width + spacing_between_bases_outs
+            # outs_column_x = overall_start_x # Old way
+            outs_column_x = bases_origin_x - spacing_between_bases_outs - out_cluster_width
+            # bases_origin_x = overall_start_x + out_cluster_width + spacing_between_bases_outs # Old way
         else: # Home batting, outs on right
-            bases_origin_x = overall_start_x
-            outs_column_x = overall_start_x + base_cluster_width + spacing_between_bases_outs
+            # bases_origin_x = overall_start_x # Old way
+            # outs_column_x = overall_start_x + base_cluster_width + spacing_between_bases_outs # Old way
+            outs_column_x = bases_origin_x + base_cluster_width + spacing_between_bases_outs
         
         # Calculate vertical alignment offset for outs column (center align with bases cluster)
         outs_column_start_y = overall_start_y + (base_cluster_height // 2) - (out_cluster_height // 2)
@@ -629,8 +634,9 @@ class MLBLiveManager(BaseMLBManager):
         cluster_bottom_y = overall_start_y + base_cluster_height # Find the bottom of the taller part (bases)
         count_y = cluster_bottom_y + 2 # Start 2 pixels below cluster
         
-        # Center horizontally within the overall cluster width
-        count_x = overall_start_x + (total_width - count_text_width) // 2
+        # Center horizontally within the BASE cluster width
+        # count_x = overall_start_x + (total_width - count_text_width) // 2 # Old way
+        count_x = bases_origin_x + (base_cluster_width - count_text_width) // 2
         
         # Ensure draw object is set and draw text
         self.display_manager.draw = draw 
