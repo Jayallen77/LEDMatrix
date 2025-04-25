@@ -441,7 +441,7 @@ class MLBRecentManager(BaseMLBManager):
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = self.mlb_config.get('recent_update_interval', 3600)
-        self.recent_hours = self.mlb_config.get('recent_game_hours', 48)
+        self.recent_hours = self.mlb_config.get('recent_game_hours', 72)  # Increased from 48 to 72 hours
         self.last_game_switch = 0  # Track when we last switched games
         self.game_display_duration = 10  # Display each game for 10 seconds
         self.last_warning_time = 0
@@ -476,7 +476,8 @@ class MLBRecentManager(BaseMLBManager):
                 logger.info(f"[MLB] Checking game: {game['away_team']} @ {game['home_team']} at {game_time}")
                 logger.info(f"[MLB] Game status: {game['status']}")
                 
-                is_final = game['status'] == 'final'
+                # Accept more status types for recent games
+                is_final = game['status'] in ['final', 'completed', 'postponed', 'suspended']
                 is_within_time = recent_cutoff <= game_time <= now
                 
                 logger.info(f"[MLB] Is final: {is_final}")
