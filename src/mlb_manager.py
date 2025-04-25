@@ -372,17 +372,16 @@ class MLBLiveManager(BaseMLBManager):
                 "away_team": "TEX",
                 "home_score": "3",
                 "away_score": "2",
+                "status": "live",
+                "status_state": "live",
                 "inning": 5,
                 "inning_half": "top",
                 "balls": 2,
                 "strikes": 1,
-                "outs": 1,
-                "bases_occupied": [True, False, True],  # 1st and 3rd base occupied
+                "bases_occupied": [True, False, True],
                 "home_logo_path": os.path.join(self.logo_dir, "TB.png"),
                 "away_logo_path": os.path.join(self.logo_dir, "TEX.png"),
-                "game_time": "7:30 PM",
-                "game_date": "Apr 17",
-                "status": "live"
+                "start_time": datetime.now(timezone.utc).isoformat(),
             }
             self.live_games = [self.current_game]
             self.logger.info("Initialized MLBLiveManager with test game: TB vs TEX")
@@ -665,6 +664,9 @@ class MLBUpcomingManager(BaseMLBManager):
                         continue  # Skip non-favorite team games
                         
                     game_time = datetime.fromisoformat(game['start_time'].replace('Z', '+00:00'))
+                    # Ensure game_time is timezone-aware (UTC)
+                    if game_time.tzinfo is None:
+                        game_time = game_time.replace(tzinfo=timezone.utc)
                     logger.info(f"Checking favorite team game: {game['away_team']} @ {game['home_team']} at {game_time}")
                     logger.info(f"Game status: {game['status']}, State: {game['status_state']}")
                     
