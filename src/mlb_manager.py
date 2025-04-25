@@ -132,6 +132,8 @@ class BaseMLBManager:
         if game_data['status'] == 'status_scheduled':
             # Show "Next Game" at the top using 5x7 font
             status_text = "Next Game"
+            # Set font size for BDF font
+            self.display_manager.calendar_font.set_char_size(height=7*64)  # 7 pixels high, 64 units per pixel
             status_width = self.display_manager.get_text_width(status_text, self.display_manager.calendar_font)
             status_x = (width - status_width) // 2
             status_y = 2
@@ -160,6 +162,8 @@ class BaseMLBManager:
         elif game_data['status'] in ['status_final', 'final', 'completed']:
             # Show "Final" at the top using 5x7 font
             status_text = "Final"
+            # Set font size for BDF font
+            self.display_manager.calendar_font.set_char_size(height=7*64)  # 7 pixels high, 64 units per pixel
             status_width = self.display_manager.get_text_width(status_text, self.display_manager.calendar_font)
             status_x = (width - status_width) // 2
             status_y = 2
