@@ -265,6 +265,11 @@ class DisplayManager:
                 # For TTF fonts, use PIL's text drawing
                 self.draw.text((x, y), text, font=current_font, fill=color)
             
+            # Sync the image with the canvas and update display
+            self.offscreen_canvas.SetImage(self.image)
+            self.matrix.SwapOnVSync(self.offscreen_canvas, False)
+            self.offscreen_canvas, self.current_canvas = self.current_canvas, self.offscreen_canvas
+            
         except Exception as e:
             logger.error(f"Error drawing text: {e}", exc_info=True)
 
