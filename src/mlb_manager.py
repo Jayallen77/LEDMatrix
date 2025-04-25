@@ -218,79 +218,93 @@ class BaseMLBManager:
                     }
                 }
             
-            # ESPN API endpoint for MLB games
-            url = "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard"
+            # Get dates for API request
+            now = datetime.now(timezone.utc)
+            yesterday = now - timedelta(days=1)
+            tomorrow = now + timedelta(days=1)
             
-            self.logger.info("Fetching MLB games from ESPN API")
-            response = self.session.get(url, headers=self.headers, timeout=10)
-            response.raise_for_status()
+            # Format dates for API
+            dates = [
+                yesterday.strftime("%Y%m%d"),
+                now.strftime("%Y%m%d"),
+                tomorrow.strftime("%Y%m%d")
+            ]
             
-            data = response.json()
+            all_games = {}
             
-            games = {}
-            
-            for event in data.get('events', []):
-                game_id = event['id']
-                status = event['status']['type']['name'].lower()
-                status_state = event['status']['type']['state'].lower()
+            # Fetch games for each date
+            for date in dates:
+                # ESPN API endpoint for MLB games with date parameter
+                url = f"https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates={date}"
                 
-                # Get team information
-                competitors = event['competitions'][0]['competitors']
-                home_team = next(c for c in competitors if c['homeAway'] == 'home')
-                away_team = next(c for c in competitors if c['homeAway'] == 'away')
+                self.logger.info(f"Fetching MLB games from ESPN API for date: {date}")
+                response = self.session.get(url, headers=self.headers, timeout=10)
+                response.raise_for_status()
                 
-                # Get team abbreviations
-                home_abbr = home_team['team']['abbreviation']
-                away_abbr = away_team['team']['abbreviation']
+                data = response.json()
                 
-                # Only log detailed information for favorite teams
-                is_favorite_game = (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams)
-                if is_favorite_game:
-                    self.logger.info(f"Found favorite team game: {away_abbr} @ {home_abbr} (Status: {status}, State: {status_state})")
-                
-                # Get game state information
-                if status_state == 'in':
-                    # For live games, get detailed state
-                    linescore = event['competitions'][0].get('linescores', [{}])[0]
-                    inning = linescore.get('value', 1)
-                    inning_half = linescore.get('displayValue', '').lower()
+                for event in data.get('events', []):
+                    game_id = event['id']
+                    status = event['status']['type']['name'].lower()
+                    status_state = event['status']['type']['state'].lower()
                     
-                    # Get count and bases from situation
-                    situation = event['competitions'][0].get('situation', {})
-                    balls = situation.get('balls', 0)
-                    strikes = situation.get('strikes', 0)
+                    # Get team information
+                    competitors = event['competitions'][0]['competitors']
+                    home_team = next(c for c in competitors if c['homeAway'] == 'home')
+                    away_team = next(c for c in competitors if c['homeAway'] == 'away')
                     
-                    # Get base runners
-                    bases_occupied = [
-                        situation.get('onFirst', False),
-                        situation.get('onSecond', False),
-                        situation.get('onThird', False)
-                    ]
-                else:
-                    # Default values for non-live games
-                    inning = 1
-                    inning_half = 'top'
-                    balls = 0
-                    strikes = 0
-                    bases_occupied = [False, False, False]
-                
-                games[game_id] = {
-                    'away_team': away_abbr,
-                    'home_team': home_abbr,
-                    'away_score': away_team['score'],
-                    'home_score': home_team['score'],
-                    'status': status,
-                    'status_state': status_state,  # Add status state
-                    'inning': inning,
-                    'inning_half': inning_half,
-                    'balls': balls,
-                    'strikes': strikes,
-                    'bases_occupied': bases_occupied,
-                    'start_time': event['date']
-                }
+                    # Get team abbreviations
+                    home_abbr = home_team['team']['abbreviation']
+                    away_abbr = away_team['team']['abbreviation']
+                    
+                    # Only log detailed information for favorite teams
+                    is_favorite_game = (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams)
+                    if is_favorite_game:
+                        self.logger.info(f"Found favorite team game: {away_abbr} @ {home_abbr} (Status: {status}, State: {status_state})")
+                    
+                    # Get game state information
+                    if status_state == 'in':
+                        # For live games, get detailed state
+                        linescore = event['competitions'][0].get('linescores', [{}])[0]
+                        inning = linescore.get('value', 1)
+                        inning_half = linescore.get('displayValue', '').lower()
+                        
+                        # Get count and bases from situation
+                        situation = event['competitions'][0].get('situation', {})
+                        balls = situation.get('balls', 0)
+                        strikes = situation.get('strikes', 0)
+                        
+                        # Get base runners
+                        bases_occupied = [
+                            situation.get('onFirst', False),
+                            situation.get('onSecond', False),
+                            situation.get('onThird', False)
+                        ]
+                    else:
+                        # Default values for non-live games
+                        inning = 1
+                        inning_half = 'top'
+                        balls = 0
+                        strikes = 0
+                        bases_occupied = [False, False, False]
+                    
+                    all_games[game_id] = {
+                        'away_team': away_abbr,
+                        'home_team': home_abbr,
+                        'away_score': away_team['score'],
+                        'home_score': home_team['score'],
+                        'status': status,
+                        'status_state': status_state,
+                        'inning': inning,
+                        'inning_half': inning_half,
+                        'balls': balls,
+                        'strikes': strikes,
+                        'bases_occupied': bases_occupied,
+                        'start_time': event['date']
+                    }
             
             # Only log favorite team games
-            favorite_games = [game for game in games.values() 
+            favorite_games = [game for game in all_games.values() 
                            if game['home_team'] in self.favorite_teams or 
                               game['away_team'] in self.favorite_teams]
             if favorite_games:
@@ -298,7 +312,7 @@ class BaseMLBManager:
                 for game in favorite_games:
                     self.logger.info(f"Favorite team game: {game['away_team']} @ {game['home_team']} (Status: {game['status']}, State: {game['status_state']})")
             
-            return games
+            return all_games
             
         except Exception as e:
             self.logger.error(f"Error fetching MLB data from ESPN API: {e}")
@@ -624,14 +638,25 @@ class MLBUpcomingManager(BaseMLBManager):
                     logger.info(f"Checking favorite team game: {game['away_team']} @ {game['home_team']} at {game_time}")
                     logger.info(f"Game status: {game['status']}, State: {game['status_state']}")
                     
-                    # Check if game is within our time window and is upcoming
+                    # Check if game is within our time window
                     is_within_time = now <= game_time <= upcoming_cutoff
-                    is_upcoming = game['status_state'] == 'pre'  # Use status_state like NHL manager
+                    
+                    # For upcoming games, we'll consider any game that:
+                    # 1. Is within our time window
+                    # 2. Is not final (not 'post' or 'final' state)
+                    # 3. Has a future start time
+                    is_upcoming = (
+                        is_within_time and 
+                        game['status_state'] not in ['post', 'final', 'completed'] and
+                        game_time > now
+                    )
                     
                     logger.info(f"Within time window: {is_within_time}")
-                    logger.info(f"Is upcoming status: {is_upcoming}")
+                    logger.info(f"Is upcoming: {is_upcoming}")
+                    logger.info(f"Game time > now: {game_time > now}")
+                    logger.info(f"Status state not final: {game['status_state'] not in ['post', 'final', 'completed']}")
                     
-                    if is_upcoming and is_within_time:
+                    if is_upcoming:
                         new_upcoming_games.append(game)
                         logger.info(f"Added favorite team game to upcoming list: {game['away_team']} @ {game['home_team']}")
                 
