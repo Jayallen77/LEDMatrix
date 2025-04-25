@@ -102,8 +102,8 @@ class BaseMLBManager:
         image = Image.new('RGB', (width, height), color=(0, 0, 0))
         draw = ImageDraw.Draw(image)
         
-        # Calculate dynamic sizes based on display dimensions (32x128)
-        logo_size = (height - 8, height - 8)  # 24x24 pixels for logos
+        # Set logo size to 32x32 pixels
+        logo_size = (height, height)  # 32x32 pixels for logos
         center_y = height // 2  # Vertical center line
         
         # Load team logos
@@ -116,12 +116,12 @@ class BaseMLBManager:
             
             # Position logos with proper spacing (matching NHL layout)
             # Away logo on left, slightly off screen
-            away_x = -12
-            away_y = center_y - (away_logo.height // 2)
+            away_x = -16  # Adjusted for 32x32 logo
+            away_y = 0  # Align to top of display
             
             # Home logo on right, slightly off screen
-            home_x = width - home_logo.width + 12
-            home_y = center_y - (home_logo.height // 2)
+            home_x = width - home_logo.width + 16  # Adjusted for 32x32 logo
+            home_y = 0  # Align to top of display
             
             # Paste logos
             image.paste(away_logo, (away_x, away_y), away_logo)
@@ -497,55 +497,55 @@ class MLBRecentManager(BaseMLBManager):
                 logger.warning("[MLB] No games returned from API")
                 return
                 
-            logger.info(f"[MLB] Found {len(games)} total games in API response")
-            
             # Process games
             new_recent_games = []
             now = datetime.now(timezone.utc)  # Make timezone-aware
             recent_cutoff = now - timedelta(hours=self.recent_hours)
             
-            logger.info(f"[MLB] Current time (UTC): {now}")
-            logger.info(f"[MLB] Recent cutoff time (UTC): {recent_cutoff}")
-            logger.info(f"[MLB] Recent hours setting: {self.recent_hours}")
-            
             for game_id, game in games.items():
-                game_time = datetime.fromisoformat(game['start_time'].replace('Z', '+00:00'))
-                logger.info(f"[MLB] Checking game: {game['away_team']} @ {game['home_team']} at {game_time}")
-                logger.info(f"[MLB] Game status: {game['status']}")
-                logger.info(f"[MLB] Game ID: {game_id}")
-                logger.info(f"[MLB] Game data: {game}")
+                # Convert game time to UTC datetime
+                game_time_str = game['start_time'].replace('Z', '+00:00')
+                game_time = datetime.fromisoformat(game_time_str)
+                if game_time.tzinfo is None:
+                    game_time = game_time.replace(tzinfo=timezone.utc)
+                
+                # Only log detailed information for favorite teams
+                is_favorite_game = (game['home_team'] in self.favorite_teams or 
+                                  game['away_team'] in self.favorite_teams)
+                
+                if is_favorite_game:
+                    logger.info(f"[MLB] Checking favorite team game: {game['away_team']} @ {game['home_team']}")
+                    logger.info(f"[MLB] Game time (UTC): {game_time}")
+                    logger.info(f"[MLB] Game status: {game['status']}")
                 
                 # Accept more status types for recent games, including status_final
                 is_final = game['status'] in ['final', 'completed', 'postponed', 'suspended', 'status_final']
                 is_within_time = recent_cutoff <= game_time <= now
                 
-                logger.info(f"[MLB] Is final: {is_final}")
-                logger.info(f"[MLB] Is within time window: {is_within_time}")
-                logger.info(f"[MLB] Time comparison: {recent_cutoff} <= {game_time} <= {now}")
+                if is_favorite_game:
+                    logger.info(f"[MLB] Is final: {is_final}")
+                    logger.info(f"[MLB] Is within time window: {is_within_time}")
+                    logger.info(f"[MLB] Time comparison: {recent_cutoff} <= {game_time} <= {now}")
                 
                 if is_final and is_within_time:
                     new_recent_games.append(game)
-                    logger.info(f"[MLB] Added game to recent list: {game['away_team']} @ {game['home_team']}")
+                    if is_favorite_game:
+                        logger.info(f"[MLB] Added favorite team game to recent list: {game['away_team']} @ {game['home_team']}")
             
-            logger.info(f"[MLB] Found {len(new_recent_games)} games within time window")
+            # Only log summary for favorite team games
+            favorite_games = [game for game in new_recent_games 
+                           if game['home_team'] in self.favorite_teams or 
+                              game['away_team'] in self.favorite_teams]
+            if favorite_games:
+                logger.info(f"[MLB] Found {len(favorite_games)} recent games for favorite teams: {self.favorite_teams}")
+                for game in favorite_games:
+                    logger.info(f"[MLB] Recent favorite team game: {game['away_team']} @ {game['home_team']}")
             
-            # Filter for favorite teams
-            new_team_games = [game for game in new_recent_games 
-                         if game['home_team'] in self.favorite_teams or 
-                            game['away_team'] in self.favorite_teams]
-            
-            logger.info(f"[MLB] Favorite teams: {self.favorite_teams}")
-            logger.info(f"[MLB] Found {len(new_team_games)} games for favorite teams")
-            for game in new_team_games:
-                logger.info(f"[MLB] Favorite team game: {game['away_team']} @ {game['home_team']}")
-            
-            if new_team_games:
-                logger.info(f"[MLB] Found {len(new_team_games)} recent games for favorite teams")
-                self.recent_games = new_team_games
+            if new_recent_games:
+                self.recent_games = new_recent_games
                 if not self.current_game:
                     self.current_game = self.recent_games[0]
             else:
-                logger.info("[MLB] No recent games found for favorite teams")
                 self.recent_games = []
                 self.current_game = None
             
