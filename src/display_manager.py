@@ -143,7 +143,8 @@ class DisplayManager:
     def _draw_bdf_text(self, text, x, y, color=(255, 255, 255)):
         """Draw text using BDF font with proper bitmap handling."""
         try:
-            face = freetype.Face(self.calendar_font_path)
+            # Use the existing calendar_font instead of creating a new Face
+            face = self.calendar_font
             
             for char in text:
                 face.load_char(char)
