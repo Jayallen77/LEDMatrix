@@ -524,15 +524,38 @@ class MLBLiveManager(BaseMLBManager):
 
         # --- Live Game Specific Elements ---
         
-        # Draw scores (similar to final game layout for now)
-        away_score = str(game_data['away_score'])
-        home_score = str(game_data['home_score'])
-        score_text = f"{away_score}-{home_score}"
-        score_bbox = draw.textbbox((0, 0), score_text, font=self.display_manager.font)
-        score_width = score_bbox[2] - score_bbox[0]
-        score_x = (width - score_width) // 2
-        score_y = height - 15  # Position at bottom center
-        draw.text((score_x, score_y), score_text, fill=(255, 255, 255), font=self.display_manager.font)
+        # Draw scores overlaid on logos with outline
+        away_score_str = str(game_data['away_score'])
+        home_score_str = str(game_data['home_score'])
+        score_font = self.display_manager.font # Use PressStart2P
+        outline_color = (0, 0, 0)
+        text_color = (255, 255, 255)
+        
+        # Helper function for outlined text
+        def draw_outlined_text(x, y, text):
+            # Draw outline
+            draw.text((x-1, y), text, font=score_font, fill=outline_color)
+            draw.text((x+1, y), text, font=score_font, fill=outline_color)
+            draw.text((x, y-1), text, font=score_font, fill=outline_color)
+            draw.text((x, y+1), text, font=score_font, fill=outline_color)
+            # Draw main text
+            draw.text((x, y), text, font=score_font, fill=text_color)
+
+        # Away Score
+        away_score_bbox = draw.textbbox((0, 0), away_score_str, font=score_font)
+        away_score_width = away_score_bbox[2] - away_score_bbox[0]
+        away_score_height = away_score_bbox[3] - away_score_bbox[1]
+        away_score_x = away_x + (logo_size[0] - away_score_width) // 2
+        away_score_y = away_y + (logo_size[1] - away_score_height) // 2
+        draw_outlined_text(away_score_x, away_score_y, away_score_str)
+
+        # Home Score
+        home_score_bbox = draw.textbbox((0, 0), home_score_str, font=score_font)
+        home_score_width = home_score_bbox[2] - home_score_bbox[0]
+        home_score_height = home_score_bbox[3] - home_score_bbox[1]
+        home_score_x = home_x + (logo_size[0] - home_score_width) // 2
+        home_score_y = home_y + (logo_size[1] - home_score_height) // 2
+        draw_outlined_text(home_score_x, home_score_y, home_score_str)
 
         # Draw Inning (Top Center)
         inning_half_indicator = "▲" if game_data['inning_half'] == 'top' else "▼"
@@ -562,14 +585,21 @@ class MLBLiveManager(BaseMLBManager):
             else:
                 draw.rectangle([x1, y1, x2, y2], outline=(100, 100, 100)) # Gray outline for empty
 
-        # Draw Count (Balls-Strikes, potentially bottom left/right or near inning)
-        # Example: Bottom left
+        # Draw Count (Balls-Strikes) using BDF font below bases
         count_text = f"{game_data['balls']}-{game_data['strikes']}"
-        count_bbox = draw.textbbox((0, 0), count_text, font=self.display_manager.font)
-        # count_width = count_bbox[2] - count_bbox[0] # Not needed for fixed position
-        count_x = 2 # Bottom left corner
-        count_y = height - 15
-        draw.text((count_x, count_y), count_text, fill=(255, 255, 255), font=self.display_manager.font)
+        bdf_font = self.display_manager.calendar_font
+        bdf_font.set_char_size(height=7*64) # Set 7px height
+        count_width = self.display_manager.get_text_width(count_text, bdf_font)
+        # Center below bases: find center of bases area
+        bases_center_x = base_start_x + total_bases_width // 2
+        count_x = bases_center_x - count_width // 2
+        # Position below bases (base_y is top of bases, add base_size and spacing)
+        count_y = base_y + base_size + 2 
+        # Ensure display manager has the right draw object before calling _draw_bdf_text
+        self.display_manager.draw = draw 
+        self.display_manager._draw_bdf_text(count_text, count_x, count_y, text_color, font=bdf_font)
+        # Update display (might be redundant if called later, but safe)
+        # self.display_manager.update_display() 
 
         # TODO: Add Outs display if needed
 
