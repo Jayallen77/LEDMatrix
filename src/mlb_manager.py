@@ -116,11 +116,11 @@ class BaseMLBManager:
             
             # Position logos with proper spacing (matching NHL layout)
             # Away logo on left, slightly off screen
-            away_x = -16  # Adjusted for 32x32 logo
+            away_x = -8  # Adjusted for 32x32 logo
             away_y = 0  # Align to top of display
             
             # Home logo on right, slightly off screen
-            home_x = width - home_logo.width + 16  # Adjusted for 32x32 logo
+            home_x = width - home_logo.width + 8  # Adjusted for 32x32 logo
             home_y = 0  # Align to top of display
             
             # Paste logos
