@@ -246,7 +246,7 @@ class BaseMLBManager:
                         'strikes': 1,
                         'outs': 1,
                         'bases_occupied': [True, False, True],  # Runner on 1st and 3rd
-                        'start_time': datetime.now().isoformat()
+                        'start_time': datetime.now(timezone.utc).isoformat()
                     }
                 }
             
@@ -305,6 +305,7 @@ class BaseMLBManager:
                         situation = event['competitions'][0].get('situation', {})
                         balls = situation.get('balls', 0)
                         strikes = situation.get('strikes', 0)
+                        outs = situation.get('outs', 0)
                         
                         # Get base runners
                         bases_occupied = [
@@ -318,6 +319,7 @@ class BaseMLBManager:
                         inning_half = 'top'
                         balls = 0
                         strikes = 0
+                        outs = 0
                         bases_occupied = [False, False, False]
                     
                     all_games[game_id] = {
@@ -331,6 +333,7 @@ class BaseMLBManager:
                         'inning_half': inning_half,
                         'balls': balls,
                         'strikes': strikes,
+                        'outs': outs,
                         'bases_occupied': bases_occupied,
                         'start_time': event['date']
                     }
@@ -599,22 +602,23 @@ class MLBLiveManager(BaseMLBManager):
         
         bases_overall_bottom_y = c1y + h_d # Bottom of the 1st/3rd base diamonds
 
-        # --- Draw Count (Circles) --- 
-        count_vertical_offset = 3 # Increase space below bases
+        # --- Draw Outs (Circles) --- 
+        outs = game_data.get('outs', 0) # Get outs, default to 0 if missing
+        count_vertical_offset = 3 # Space below bases
         count_start_y = bases_overall_bottom_y + count_vertical_offset 
         count_start_x = cluster_start_x + (cluster_width - count_cluster_width) // 2
-        circle_color_ball = (255, 255, 255)
-        circle_color_strike = (255, 255, 255) # Outline color
+        circle_color_out = (255, 255, 255) # White filled circle for out
+        circle_color_empty_outline = (100, 100, 100) # Gray outline for unused spots
 
         for i in range(3):
             cx = count_start_x + i * (circle_diameter + horizontal_spacing)
             cy = count_start_y
             coords = [cx, cy, cx + circle_diameter, cy + circle_diameter]
-            if i < balls:
-                draw.ellipse(coords, fill=circle_color_ball)
-            elif i < balls + strikes:
-                draw.ellipse(coords, outline=circle_color_strike)
-            # else: leave empty (no circle for unused spots)
+            if i < outs:
+                draw.ellipse(coords, fill=circle_color_out)
+            else:
+                # Draw empty outline for remaining spots
+                draw.ellipse(coords, outline=circle_color_empty_outline)
 
         # Draw Team:Score at the bottom
         score_font = self.display_manager.font # Use PressStart2P
