@@ -104,7 +104,7 @@ class BaseMLBManager:
         
         # Calculate dynamic sizes based on display dimensions (32x128)
         logo_size = (height - 8, height - 8)  # 24x24 pixels for logos (slightly smaller)
-        center_width = width // 2  # Use for centering calculations
+        center_y = height // 2  # Vertical center line
         
         # Load team logos
         away_logo = self._get_team_logo(game_data['away_team'])
@@ -114,59 +114,47 @@ class BaseMLBManager:
             away_logo = away_logo.resize(logo_size, Image.Resampling.LANCZOS)
             home_logo = home_logo.resize(logo_size, Image.Resampling.LANCZOS)
             
-            # Position logos with proper spacing for 128 columns
-            # Place logos about 1/4 and 3/4 of the display width
-            away_logo_x = width // 4 - logo_size[0] // 2
-            home_logo_x = (3 * width) // 4 - logo_size[0] // 2
-            logo_y = (height - logo_size[1]) // 2
+            # Position logos with proper spacing
+            # Away logo on left, slightly off screen
+            away_x = -12
+            away_y = center_y - (away_logo.height // 2)
             
-            # Draw scores in center
-            away_score = str(game_data['away_score'])
-            home_score = str(game_data['home_score'])
-            score_text = f"{away_score}-{home_score}"  # Format as "1-1"
-            
-            # Calculate score position to be centered
-            score_bbox = draw.textbbox((0, 0), score_text, font=self.display_manager.font)
-            score_width = score_bbox[2] - score_bbox[0]
-            score_x = (width - score_width) // 2
-            score_y = (height - (score_bbox[3] - score_bbox[1])) // 2  # Center vertically
-            
-            # Draw the centered score
-            draw.text((score_x, score_y), score_text, fill=(255, 255, 255), font=self.display_manager.font)
+            # Home logo on right, slightly off screen
+            home_x = width - home_logo.width + 12
+            home_y = center_y - (home_logo.height // 2)
             
             # Paste logos
-            image.paste(away_logo, (away_logo_x, logo_y), away_logo)
-            image.paste(home_logo, (home_logo_x, logo_y), home_logo)
+            image.paste(away_logo, (away_x, away_y), away_logo)
+            image.paste(home_logo, (home_x, home_y), home_logo)
         
-        # Draw game status
-        if game_data['status'] == 'live':
-            # Draw inning indicator at top
-            inning = game_data['inning']
-            inning_half = '▲' if game_data['inning_half'] == 'top' else '▼'
-            inning_text = f"{inning_half}{inning}"
-            
-            # Center the inning text
-            inning_bbox = draw.textbbox((0, 0), inning_text, font=self.display_manager.small_font)
-            inning_width = inning_bbox[2] - inning_bbox[0]
-            inning_x = (width - inning_width) // 2
-            draw.text((inning_x, 2), inning_text, fill=(255, 255, 255), font=self.display_manager.small_font)
-            
-            # Draw base indicators (centered in the wider display)
-            self._draw_base_indicators(draw, game_data['bases_occupied'], width//2, 8)  # Move bases up
-            
-            # Draw count (balls-strikes) at bottom
-            count_text = f"{game_data['balls']}-{game_data['strikes']}"
-            count_bbox = draw.textbbox((0, 0), count_text, font=self.display_manager.small_font)
-            count_width = count_bbox[2] - count_bbox[0]
-            count_x = (width - count_width) // 2
-            draw.text((count_x, height - 8), count_text, fill=(255, 255, 255), font=self.display_manager.small_font)
-        else:
-            # Show game time for upcoming games or "Final" for completed games
-            status_text = "Final" if game_data['status'] == 'final' else self._format_game_time(game_data['start_time'])
-            status_bbox = draw.textbbox((0, 0), status_text, font=self.display_manager.small_font)
+        # For upcoming games, show date and time stacked in the center
+        if game_data['status'] == 'status_scheduled':
+            # Show "Next Game" at the top
+            status_text = "Next Game"
+            status_bbox = draw.textbbox((0, 0), status_text, font=self.display_manager.font)
             status_width = status_bbox[2] - status_bbox[0]
             status_x = (width - status_width) // 2
-            draw.text((status_x, 2), status_text, fill=(255, 255, 255), font=self.display_manager.small_font)
+            status_y = 2
+            draw.text((status_x, status_y), status_text, fill=(255, 255, 255), font=self.display_manager.font)
+            
+            # Format game date and time
+            game_time = datetime.fromisoformat(game_data['start_time'].replace('Z', '+00:00'))
+            game_date = game_time.strftime("%b %d")  # e.g., "Apr 24"
+            game_time_str = game_time.strftime("%I:%M %p")  # e.g., "07:30 PM"
+            
+            # Draw date in center
+            date_bbox = draw.textbbox((0, 0), game_date, font=self.display_manager.font)
+            date_width = date_bbox[2] - date_bbox[0]
+            date_x = (width - date_width) // 2
+            date_y = center_y - 5
+            draw.text((date_x, date_y), game_date, fill=(255, 255, 255), font=self.display_manager.font)
+            
+            # Draw time below date
+            time_bbox = draw.textbbox((0, 0), game_time_str, font=self.display_manager.font)
+            time_width = time_bbox[2] - time_bbox[0]
+            time_x = (width - time_width) // 2
+            time_y = date_y + 10
+            draw.text((time_x, time_y), game_time_str, fill=(255, 255, 255), font=self.display_manager.font)
         
         return image
 
