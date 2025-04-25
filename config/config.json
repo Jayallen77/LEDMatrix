@@ -128,7 +128,7 @@
     },
     "mlb": {
         "enabled": true,
-        "test_mode": false,
+        "test_mode": true,
         "update_interval_seconds": 300,
         "live_update_interval": 20,
         "recent_update_interval": 3600,
