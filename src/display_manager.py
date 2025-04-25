@@ -265,9 +265,6 @@ class DisplayManager:
                 # For TTF fonts, use PIL's text drawing
                 self.draw.text((x, y), text, font=current_font, fill=color)
             
-            # Update the display to show the text
-            self.update_display()
-            
         except Exception as e:
             logger.error(f"Error drawing text: {e}", exc_info=True)
 
