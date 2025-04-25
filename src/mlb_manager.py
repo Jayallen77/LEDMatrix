@@ -169,6 +169,7 @@ class BaseMLBManager:
             home_score = str(game_data['home_score'])
             score_text = f"{away_score}-{home_score}"
             
+            
             # Calculate position for the score text (centered at the bottom)
             score_bbox = draw.textbbox((0, 0), score_text, font=self.display_manager.font)
             score_width = score_bbox[2] - score_bbox[0]
