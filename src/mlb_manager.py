@@ -145,8 +145,19 @@ class BaseMLBManager:
             
             # Format game date and time
             game_time = datetime.fromisoformat(game_data['start_time'].replace('Z', '+00:00'))
-            game_date = game_time.strftime("%b %d")  # e.g., "Apr 24"
-            game_time_str = game_time.strftime("%I:%M %p")  # e.g., "07:30 PM"
+            # Get timezone from config
+            timezone_str = self.config.get('timezone', 'UTC')
+            try:
+                tz = pytz.timezone(timezone_str)
+            except pytz.exceptions.UnknownTimeZoneError:
+                logger.warning(f"Unknown timezone: {timezone_str}, falling back to UTC")
+                tz = pytz.UTC
+            # Convert to local timezone
+            if game_time.tzinfo is None:
+                game_time = game_time.replace(tzinfo=pytz.UTC)
+            local_time = game_time.astimezone(tz)
+            game_date = local_time.strftime("%b %d")  # e.g., "Apr 24"
+            game_time_str = local_time.strftime("%I:%M %p")  # e.g., "07:30 PM"
             
             # Draw date in center using PressStart2P
             date_bbox = draw.textbbox((0, 0), game_date, font=self.display_manager.font)
