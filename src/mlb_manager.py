@@ -520,9 +520,9 @@ class MLBLiveManager(BaseMLBManager):
         if away_logo and home_logo:
             away_logo = away_logo.resize(logo_size, Image.Resampling.LANCZOS)
             home_logo = home_logo.resize(logo_size, Image.Resampling.LANCZOS)
-            away_x = 0
+            away_x = 2
             away_y = logo_y_offset # Apply offset
-            home_x = width - home_logo.width # home_logo.width should be 24 now
+            home_x = width - home_logo.width - 2# home_logo.width should be 24 now
             home_y = logo_y_offset # Apply offset
             image.paste(away_logo, (away_x, away_y), away_logo)
             image.paste(home_logo, (home_x, home_y), home_logo)
