@@ -129,27 +129,28 @@ class BaseMLBManager:
         
         # For upcoming games, show date and time stacked in the center
         if game_data['status'] == 'status_scheduled':
-            # Show "Next Game" at the top
+            # Show "Next Game" at the top using 5x7 font
             status_text = "Next Game"
-            status_bbox = draw.textbbox((0, 0), status_text, font=self.display_manager.font)
+            status_font = self.display_manager.load_font("5x7.bdf")
+            status_bbox = draw.textbbox((0, 0), status_text, font=status_font)
             status_width = status_bbox[2] - status_bbox[0]
             status_x = (width - status_width) // 2
             status_y = 2
-            draw.text((status_x, status_y), status_text, fill=(255, 255, 255), font=self.display_manager.font)
+            draw.text((status_x, status_y), status_text, fill=(255, 255, 255), font=status_font)
             
             # Format game date and time
             game_time = datetime.fromisoformat(game_data['start_time'].replace('Z', '+00:00'))
             game_date = game_time.strftime("%b %d")  # e.g., "Apr 24"
             game_time_str = game_time.strftime("%I:%M %p")  # e.g., "07:30 PM"
             
-            # Draw date in center
+            # Draw date in center using PressStart2P
             date_bbox = draw.textbbox((0, 0), game_date, font=self.display_manager.font)
             date_width = date_bbox[2] - date_bbox[0]
             date_x = (width - date_width) // 2
             date_y = center_y - 5  # Position in center
             draw.text((date_x, date_y), game_date, fill=(255, 255, 255), font=self.display_manager.font)
             
-            # Draw time below date
+            # Draw time below date using PressStart2P
             time_bbox = draw.textbbox((0, 0), game_time_str, font=self.display_manager.font)
             time_width = time_bbox[2] - time_bbox[0]
             time_x = (width - time_width) // 2
@@ -158,15 +159,16 @@ class BaseMLBManager:
         
         # For recent/final games, show scores and status
         elif game_data['status'] in ['status_final', 'final', 'completed']:
-            # Show "Final" at the top
+            # Show "Final" at the top using 5x7 font
             status_text = "Final"
-            status_bbox = draw.textbbox((0, 0), status_text, font=self.display_manager.font)
+            status_font = self.display_manager.load_font("5x7.bdf")
+            status_bbox = draw.textbbox((0, 0), status_text, font=status_font)
             status_width = status_bbox[2] - status_bbox[0]
             status_x = (width - status_width) // 2
             status_y = 2
-            draw.text((status_x, status_y), status_text, fill=(255, 255, 255), font=self.display_manager.font)
+            draw.text((status_x, status_y), status_text, fill=(255, 255, 255), font=status_font)
             
-            # Draw scores at the bottom (matching NHL layout)
+            # Draw scores at the bottom (matching NHL layout) using PressStart2P
             away_score = str(game_data['away_score'])
             home_score = str(game_data['home_score'])
             score_text = f"{away_score}-{home_score}"
