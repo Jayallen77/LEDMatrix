@@ -10,6 +10,7 @@ import numpy as np
 from .cache_manager import CacheManager
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+import pytz
 
 # Get logger
 logger = logging.getLogger(__name__)
@@ -184,13 +185,19 @@ class BaseMLBManager:
         try:
             # Get timezone from config
             timezone_str = self.config.get('timezone', 'UTC')
-            tz = timezone(timedelta(hours=0))  # Default to UTC if timezone not found
+            try:
+                tz = pytz.timezone(timezone_str)
+            except pytz.exceptions.UnknownTimeZoneError:
+                logger.warning(f"Unknown timezone: {timezone_str}, falling back to UTC")
+                tz = pytz.UTC
             
             # Convert game time to local timezone
             dt = datetime.fromisoformat(game_time.replace('Z', '+00:00'))
-            dt = dt.astimezone(tz)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=pytz.UTC)
+            local_dt = dt.astimezone(tz)
             
-            return dt.strftime("%I:%M %p")
+            return local_dt.strftime("%I:%M %p")
         except Exception as e:
             logger.error(f"Error formatting game time: {e}")
             return "TBD"
