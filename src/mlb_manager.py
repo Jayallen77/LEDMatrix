@@ -497,14 +497,78 @@ class MLBLiveManager(BaseMLBManager):
                 self.display(force_clear=True)
                 self.last_display_update = current_time
 
+    def _create_live_game_display(self, game_data: Dict[str, Any]) -> Image.Image:
+        """Create a display image for a live MLB game."""
+        width = self.display_manager.matrix.width
+        height = self.display_manager.matrix.height
+        image = Image.new('RGB', (width, height), color=(0, 0, 0))
+        draw = ImageDraw.Draw(image)
+        
+        # Set logo size
+        logo_size = (height, height)
+        center_y = height // 2
+        
+        # Load and place team logos (same as base method)
+        away_logo = self._get_team_logo(game_data['away_team'])
+        home_logo = self._get_team_logo(game_data['home_team'])
+        
+        if away_logo and home_logo:
+            away_logo = away_logo.resize(logo_size, Image.Resampling.LANCZOS)
+            home_logo = home_logo.resize(logo_size, Image.Resampling.LANCZOS)
+            away_x = 0
+            away_y = 0
+            home_x = width - home_logo.width
+            home_y = 0
+            image.paste(away_logo, (away_x, away_y), away_logo)
+            image.paste(home_logo, (home_x, home_y), home_logo)
+
+        # --- Live Game Specific Elements ---
+        
+        # Draw scores (similar to final game layout for now)
+        away_score = str(game_data['away_score'])
+        home_score = str(game_data['home_score'])
+        score_text = f"{away_score}-{home_score}"
+        score_bbox = draw.textbbox((0, 0), score_text, font=self.display_manager.font)
+        score_width = score_bbox[2] - score_bbox[0]
+        score_x = (width - score_width) // 2
+        score_y = height - 15  # Position at bottom center
+        draw.text((score_x, score_y), score_text, fill=(255, 255, 255), font=self.display_manager.font)
+
+        # Draw Inning (Top Center)
+        inning_half_indicator = "▲" if game_data['inning_half'] == 'top' else "▼"
+        inning_text = f"{inning_half_indicator}{game_data['inning']}"
+        inning_bbox = draw.textbbox((0, 0), inning_text, font=self.display_manager.font)
+        inning_width = inning_bbox[2] - inning_bbox[0]
+        inning_x = (width - inning_width) // 2
+        inning_y = 2 # Position near top center
+        draw.text((inning_x, inning_y), inning_text, fill=(255, 255, 255), font=self.display_manager.font)
+        
+        # Draw Base Indicators (Centered above score)
+        base_center_x = width // 2
+        base_y = score_y - 10 # Position above the score
+        self._draw_base_indicators(draw, game_data['bases_occupied'], base_center_x, base_y)
+        
+        # Draw Count (Balls-Strikes, potentially bottom left/right or near inning)
+        # Example: Bottom left
+        count_text = f"{game_data['balls']}-{game_data['strikes']}"
+        count_bbox = draw.textbbox((0, 0), count_text, font=self.display_manager.font)
+        # count_width = count_bbox[2] - count_bbox[0] # Not needed for fixed position
+        count_x = 2 # Bottom left corner
+        count_y = height - 15
+        draw.text((count_x, count_y), count_text, fill=(255, 255, 255), font=self.display_manager.font)
+
+        # TODO: Add Outs display if needed
+
+        return image
+
     def display(self, force_clear: bool = False):
         """Display live game information."""
         if not self.current_game:
             return
             
         try:
-            # Create and display the game image
-            game_image = self._create_game_display(self.current_game)
+            # Create and display the game image using the new method
+            game_image = self._create_live_game_display(self.current_game)
             # Set the image in the display manager
             self.display_manager.image = game_image
             self.display_manager.draw = ImageDraw.Draw(self.display_manager.image)
