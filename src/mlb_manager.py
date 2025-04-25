@@ -476,8 +476,8 @@ class MLBRecentManager(BaseMLBManager):
                 logger.info(f"[MLB] Checking game: {game['away_team']} @ {game['home_team']} at {game_time}")
                 logger.info(f"[MLB] Game status: {game['status']}")
                 
-                # Accept more status types for recent games
-                is_final = game['status'] in ['final', 'completed', 'postponed', 'suspended']
+                # Accept more status types for recent games, including status_final
+                is_final = game['status'] in ['final', 'completed', 'postponed', 'suspended', 'status_final']
                 is_within_time = recent_cutoff <= game_time <= now
                 
                 logger.info(f"[MLB] Is final: {is_final}")
