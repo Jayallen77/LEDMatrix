@@ -549,7 +549,7 @@ class MLBLiveManager(BaseMLBManager):
         # Define geometry
         base_diamond_size = 7
         out_circle_diameter = 3
-        out_vertical_spacing = 1 # Space between out circles
+        out_vertical_spacing = 2 # Space between out circles
         spacing_between_bases_outs = 3 # Horizontal space between base cluster and out column
         base_vert_spacing = 1 # Internal vertical space in base cluster
         base_horiz_spacing = 1 # Internal horizontal space in base cluster
@@ -616,6 +616,25 @@ class MLBLiveManager(BaseMLBManager):
                 draw.ellipse(coords, fill=circle_color_out)
             else:
                 draw.ellipse(coords, outline=circle_color_empty_outline)
+
+        # --- Draw Balls-Strikes Count (BDF Font) --- 
+        balls = game_data.get('balls', 0)
+        strikes = game_data.get('strikes', 0)
+        count_text = f"{balls}-{strikes}"
+        bdf_font = self.display_manager.calendar_font
+        bdf_font.set_char_size(height=7*64) # Set 7px height
+        count_text_width = self.display_manager.get_text_width(count_text, bdf_font)
+        
+        # Position below the base/out cluster
+        cluster_bottom_y = overall_start_y + base_cluster_height # Find the bottom of the taller part (bases)
+        count_y = cluster_bottom_y + 2 # Start 2 pixels below cluster
+        
+        # Center horizontally within the overall cluster width
+        count_x = overall_start_x + (total_width - count_text_width) // 2
+        
+        # Ensure draw object is set and draw text
+        self.display_manager.draw = draw 
+        self.display_manager._draw_bdf_text(count_text, count_x, count_y, text_color, font=bdf_font)
 
         # Draw Team:Score at the bottom
         score_font = self.display_manager.font # Use PressStart2P
