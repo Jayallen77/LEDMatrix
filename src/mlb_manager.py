@@ -644,6 +644,19 @@ class MLBLiveManager(BaseMLBManager):
 
         # Draw Team:Score at the bottom
         score_font = self.display_manager.font # Use PressStart2P
+        outline_color = (0, 0, 0)
+        score_text_color = (255, 255, 255) # Use a specific name for score text color
+
+        # Helper function for outlined text
+        def draw_bottom_outlined_text(x, y, text):
+            # Draw outline
+            draw.text((x-1, y), text, font=score_font, fill=outline_color)
+            draw.text((x+1, y), text, font=score_font, fill=outline_color)
+            draw.text((x, y-1), text, font=score_font, fill=outline_color)
+            draw.text((x, y+1), text, font=score_font, fill=outline_color)
+            # Draw main text
+            draw.text((x, y), text, font=score_font, fill=score_text_color)
+
         away_abbr = game_data['away_team']
         home_abbr = game_data['home_team']
         away_score_str = str(game_data['away_score'])
@@ -662,13 +675,15 @@ class MLBLiveManager(BaseMLBManager):
         
         # Away Team:Score (Bottom Left)
         away_score_x = 2 # 2 pixels padding from left
-        draw.text((away_score_x, score_y), away_text, font=score_font, fill=text_color)
+        # draw.text((away_score_x, score_y), away_text, font=score_font, fill=text_color)
+        draw_bottom_outlined_text(away_score_x, score_y, away_text)
         
         # Home Team:Score (Bottom Right)
         home_text_bbox = draw.textbbox((0,0), home_text, font=score_font)
         home_text_width = home_text_bbox[2] - home_text_bbox[0]
         home_score_x = width - home_text_width - 2 # 2 pixels padding from right
-        draw.text((home_score_x, score_y), home_text, font=score_font, fill=text_color)
+        # draw.text((home_score_x, score_y), home_text, font=score_font, fill=text_color)
+        draw_bottom_outlined_text(home_score_x, score_y, home_text)
 
         # TODO: Add Outs display if needed
 
