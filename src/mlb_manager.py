@@ -535,12 +535,11 @@ class MLBLiveManager(BaseMLBManager):
         # Draw Inning (Top Center)
         inning_half_indicator = "▲" if game_data['inning_half'] == 'top' else "▼"
         inning_text = f"{inning_half_indicator}{game_data['inning']}"
-        inning_font_to_use = self.display_manager.inning_font # Use the new smaller font
-        inning_bbox = draw.textbbox((0, 0), inning_text, font=inning_font_to_use)
+        inning_bbox = draw.textbbox((0, 0), inning_text, font=self.display_manager.font)
         inning_width = inning_bbox[2] - inning_bbox[0]
         inning_x = (width - inning_width) // 2
         inning_y = 2 # Position near top center
-        draw.text((inning_x, inning_y), inning_text, fill=(255, 255, 255), font=inning_font_to_use)
+        draw.text((inning_x, inning_y), inning_text, fill=(255, 255, 255), font=self.display_manager.font)
         
         # --- NEW BASES AND COUNT DRAWING --- 
         bases_occupied = game_data['bases_occupied'] # [1st, 2nd, 3rd]
