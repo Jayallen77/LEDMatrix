@@ -51,13 +51,13 @@
         "update_interval": 1
     },
     "weather": {
-        "enabled": true,
+        "enabled": false,
         "update_interval": 600,
         "units": "imperial",
         "display_format": "{temp}°F\n{condition}"
     },
     "stocks": {
-        "enabled": true,
+        "enabled": false,
         "update_interval": 300,
         "symbols": [
             "ASTS", "SCHD", "INTC", "NVDA", "T", "VOO", "SPEST", "SMCI"
@@ -65,7 +65,7 @@
         "display_format": "{symbol}: ${price} ({change}%)"
     },
     "crypto": {
-        "enabled": true,
+        "enabled": false,
         "update_interval": 300,
         "symbols": [
             "BTC-USD", "ETH-USD"
@@ -73,7 +73,7 @@
         "display_format": "{symbol}: ${price} ({change}%)"
     },
     "stock_news": {
-        "enabled": true,
+        "enabled": false,
         "update_interval": 3600,
         "scroll_speed": 1,
         "scroll_delay": 0.001,
@@ -81,7 +81,7 @@
         "headlines_per_rotation": 2
     },
     "calendar": {
-        "enabled": true,
+        "enabled": false,
         "credentials_file": "credentials.json",
         "token_file": "token.pickle",
         "update_interval": 3600,
