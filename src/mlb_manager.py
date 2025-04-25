@@ -547,7 +547,7 @@ class MLBLiveManager(BaseMLBManager):
         diamond_size = 7 # Increase size of the base diamonds
         circle_diameter = 3 # Diameter of the count circles
         vertical_spacing = 1 # Space between bases row and count row
-        horizontal_spacing = 1 # Space between elements
+        horizontal_spacing = 2 # Increase space between elements
         
         # Calculate total dimensions
         base_cluster_height = diamond_size + vertical_spacing + circle_diameter
