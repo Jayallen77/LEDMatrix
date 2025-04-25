@@ -544,7 +544,7 @@ class MLBLiveManager(BaseMLBManager):
         strikes = game_data['strikes']
         
         # Define geometry
-        diamond_size = 5 # Size of the base diamonds
+        diamond_size = 7 # Increase size of the base diamonds
         circle_diameter = 3 # Diameter of the count circles
         vertical_spacing = 1 # Space between bases row and count row
         horizontal_spacing = 1 # Space between elements
