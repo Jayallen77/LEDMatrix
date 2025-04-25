@@ -507,7 +507,7 @@ class MLBLiveManager(BaseMLBManager):
         
         # Set logo size
         logo_size = (24, 24) # Shrink to 24x24
-        logo_y_offset = 4    # Move down from top edge
+        logo_y_offset = 0    # Move down from top edge
         # center_y = height // 2 # center_y not used for logo placement now
         
         # Load and place team logos (same as base method)
