@@ -541,83 +541,80 @@ class MLBLiveManager(BaseMLBManager):
         inning_y = 2 # Position near top center
         draw.text((inning_x, inning_y), inning_text, fill=(255, 255, 255), font=self.display_manager.font)
         
-        # --- NEW BASES AND COUNT DRAWING --- 
+        # --- REVISED BASES AND OUTS DRAWING --- 
         bases_occupied = game_data['bases_occupied'] # [1st, 2nd, 3rd]
-        balls = game_data['balls']
-        strikes = game_data['strikes']
+        outs = game_data.get('outs', 0)
+        inning_half = game_data['inning_half']
         
         # Define geometry
-        diamond_size = 7 # Increase size of the base diamonds
-        circle_diameter = 3 # Diameter of the count circles
-        vertical_spacing = 1 # Space between bases row and count row
-        horizontal_spacing = 2 # Increase space between elements
+        base_diamond_size = 7
+        out_circle_diameter = 3
+        out_vertical_spacing = 1 # Space between out circles
+        spacing_between_bases_outs = 3 # Horizontal space between base cluster and out column
+        base_vert_spacing = 1 # Internal vertical space in base cluster
+        base_horiz_spacing = 1 # Internal horizontal space in base cluster
         
-        # Calculate total dimensions
-        base_cluster_height = diamond_size + vertical_spacing + circle_diameter
-        # Width is roughly max(width_of_2nd_base_diamond, width_of_1st+3rd+spacing, width_of_3_circles+spacing)
-        # For simplicity, approximate using 3 circles width as it's likely widest
-        count_cluster_width = 3 * circle_diameter + 2 * horizontal_spacing
-        base_row_width = 2 * diamond_size + horizontal_spacing # Width for 1st and 3rd base
-        cluster_width = max(count_cluster_width, base_row_width, diamond_size)
+        # Calculate cluster dimensions
+        base_cluster_height = base_diamond_size + base_vert_spacing + base_diamond_size
+        base_cluster_width = base_diamond_size + base_horiz_spacing + base_diamond_size
+        out_cluster_height = 3 * out_circle_diameter + 2 * out_vertical_spacing
+        out_cluster_width = out_circle_diameter
+        total_width = base_cluster_width + spacing_between_bases_outs + out_cluster_width
+        
+        # Calculate overall start positions
+        overall_start_x = (width - total_width) // 2
+        overall_start_y = inning_bbox[3] + 3 # Start below inning text
+        
+        # Determine relative positions based on inning half
+        if inning_half == 'top': # Away batting, outs on left
+            outs_column_x = overall_start_x
+            bases_origin_x = overall_start_x + out_cluster_width + spacing_between_bases_outs
+        else: # Home batting, outs on right
+            bases_origin_x = overall_start_x
+            outs_column_x = overall_start_x + base_cluster_width + spacing_between_bases_outs
+        
+        # Calculate vertical alignment offset for outs column (center align with bases cluster)
+        outs_column_start_y = overall_start_y + (base_cluster_height // 2) - (out_cluster_height // 2)
 
-        # Calculate center position for the cluster
-        cluster_start_x = (width - cluster_width) // 2
-        cluster_start_y = inning_bbox[3] + 3 # Start 3 pixels below inning text
-        
         # --- Draw Bases (Diamonds) ---
         base_color_occupied = (255, 255, 255)
         base_color_empty = (255, 255, 255) # Outline color
+        h_d = base_diamond_size // 2 
         
-        # Calculate diamond points relative to their center
-        h_d = diamond_size // 2 # half diamond size
+        # 2nd Base (Top center relative to bases_origin_x)
+        c2x = bases_origin_x + base_cluster_width // 2 
+        c2y = overall_start_y + h_d
+        poly2 = [(c2x, overall_start_y), (c2x + h_d, c2y), (c2x, c2y + h_d), (c2x - h_d, c2y)]
+        if bases_occupied[1]: draw.polygon(poly2, fill=base_color_occupied)
+        else: draw.polygon(poly2, outline=base_color_empty)
         
-        # 2nd Base (Top center of cluster)
-        c2x = cluster_start_x + cluster_width // 2
-        c2y = cluster_start_y + h_d
-        poly2 = [(c2x, cluster_start_y), (c2x + h_d, c2y), (c2x, c2y + h_d), (c2x - h_d, c2y)]
-        if bases_occupied[1]: # Index 1 is 2nd base
-            draw.polygon(poly2, fill=base_color_occupied)
-        else:
-            draw.polygon(poly2, outline=base_color_empty)
+        base_bottom_y = c2y + h_d # Bottom Y of 2nd base diamond
         
-        base_bottom_y = c2y + h_d
-        
-        # 1st Base (Bottom left of cluster)
-        c1x = cluster_start_x + h_d
-        c1y = base_bottom_y + vertical_spacing + h_d
-        poly1 = [(c1x, base_bottom_y + vertical_spacing), (c1x + h_d, c1y), (c1x, c1y + h_d), (c1x - h_d, c1y)]
-        if bases_occupied[0]: # Index 0 is 1st base
-            draw.polygon(poly1, fill=base_color_occupied)
-        else:
-            draw.polygon(poly1, outline=base_color_empty)
+        # 1st Base (Bottom left relative to bases_origin_x)
+        c1x = bases_origin_x + h_d 
+        c1y = base_bottom_y + base_vert_spacing + h_d
+        poly1 = [(c1x, base_bottom_y + base_vert_spacing), (c1x + h_d, c1y), (c1x, c1y + h_d), (c1x - h_d, c1y)]
+        if bases_occupied[0]: draw.polygon(poly1, fill=base_color_occupied)
+        else: draw.polygon(poly1, outline=base_color_empty)
 
-        # 3rd Base (Bottom right of cluster)
-        c3x = cluster_start_x + cluster_width - h_d
-        c3y = base_bottom_y + vertical_spacing + h_d
-        poly3 = [(c3x, base_bottom_y + vertical_spacing), (c3x + h_d, c3y), (c3x, c3y + h_d), (c3x - h_d, c3y)]
-        if bases_occupied[2]: # Index 2 is 3rd base
-            draw.polygon(poly3, fill=base_color_occupied)
-        else:
-            draw.polygon(poly3, outline=base_color_empty)
+        # 3rd Base (Bottom right relative to bases_origin_x)
+        c3x = bases_origin_x + base_cluster_width - h_d
+        c3y = base_bottom_y + base_vert_spacing + h_d
+        poly3 = [(c3x, base_bottom_y + base_vert_spacing), (c3x + h_d, c3y), (c3x, c3y + h_d), (c3x - h_d, c3y)]
+        if bases_occupied[2]: draw.polygon(poly3, fill=base_color_occupied)
+        else: draw.polygon(poly3, outline=base_color_empty)
         
-        bases_overall_bottom_y = c1y + h_d # Bottom of the 1st/3rd base diamonds
-
-        # --- Draw Outs (Circles) --- 
-        outs = game_data.get('outs', 0) # Get outs, default to 0 if missing
-        count_vertical_offset = 3 # Space below bases
-        count_start_y = bases_overall_bottom_y + count_vertical_offset 
-        count_start_x = cluster_start_x + (cluster_width - count_cluster_width) // 2
-        circle_color_out = (255, 255, 255) # White filled circle for out
-        circle_color_empty_outline = (100, 100, 100) # Gray outline for unused spots
+        # --- Draw Outs (Vertical Circles) ---
+        circle_color_out = (255, 255, 255) 
+        circle_color_empty_outline = (100, 100, 100) 
 
         for i in range(3):
-            cx = count_start_x + i * (circle_diameter + horizontal_spacing)
-            cy = count_start_y
-            coords = [cx, cy, cx + circle_diameter, cy + circle_diameter]
+            cx = outs_column_x
+            cy = outs_column_start_y + i * (out_circle_diameter + out_vertical_spacing)
+            coords = [cx, cy, cx + out_circle_diameter, cy + out_circle_diameter]
             if i < outs:
                 draw.ellipse(coords, fill=circle_color_out)
             else:
-                # Draw empty outline for remaining spots
                 draw.ellipse(coords, outline=circle_color_empty_outline)
 
         # Draw Team:Score at the bottom
