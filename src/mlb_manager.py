@@ -103,9 +103,10 @@ class BaseMLBManager:
         image = Image.new('RGB', (width, height), color=(0, 0, 0))
         draw = ImageDraw.Draw(image)
         
-        # Set logo size to 32x32 pixels
-        logo_size = (height, height)  # 32x32 pixels for logos
-        center_y = height // 2  # Vertical center line
+        # Set logo size
+        logo_size = (24, 24) # Shrink to 24x24
+        logo_y_offset = 4    # Move down from top edge
+        # center_y = height // 2 # center_y not used for logo placement now
         
         # Load team logos
         away_logo = self._get_team_logo(game_data['away_team'])
@@ -117,12 +118,12 @@ class BaseMLBManager:
             
             # Position logos with proper spacing (matching NHL layout)
             # Away logo on left, slightly off screen
-            away_x = 0  # Adjusted for 32x32 logo
-            away_y = 0  # Align to top of display
+            away_x = 0
+            away_y = logo_y_offset # Apply offset
             
             # Home logo on right, slightly off screen
-            home_x = width - home_logo.width   # Adjusted for 32x32 logo
-            home_y = 0  # Align to top of display
+            home_x = width - home_logo.width # home_logo.width should be 24 now
+            home_y = logo_y_offset # Apply offset
             
             # Paste logos
             image.paste(away_logo, (away_x, away_y), away_logo)
@@ -163,7 +164,7 @@ class BaseMLBManager:
             date_bbox = draw.textbbox((0, 0), game_date, font=self.display_manager.font)
             date_width = date_bbox[2] - date_bbox[0]
             date_x = (width - date_width) // 2
-            date_y = center_y - 5  # Position in center
+            date_y = logo_y_offset - 5  # Position in center
             draw.text((date_x, date_y), game_date, fill=(255, 255, 255), font=self.display_manager.font)
             
             # Draw time below date using PressStart2P
@@ -505,8 +506,9 @@ class MLBLiveManager(BaseMLBManager):
         draw = ImageDraw.Draw(image)
         
         # Set logo size
-        logo_size = (height, height)
-        center_y = height // 2
+        logo_size = (24, 24) # Shrink to 24x24
+        logo_y_offset = 4    # Move down from top edge
+        # center_y = height // 2 # center_y not used for logo placement now
         
         # Load and place team logos (same as base method)
         away_logo = self._get_team_logo(game_data['away_team'])
@@ -516,47 +518,14 @@ class MLBLiveManager(BaseMLBManager):
             away_logo = away_logo.resize(logo_size, Image.Resampling.LANCZOS)
             home_logo = home_logo.resize(logo_size, Image.Resampling.LANCZOS)
             away_x = 0
-            away_y = 0
-            home_x = width - home_logo.width
-            home_y = 0
+            away_y = logo_y_offset # Apply offset
+            home_x = width - home_logo.width # home_logo.width should be 24 now
+            home_y = logo_y_offset # Apply offset
             image.paste(away_logo, (away_x, away_y), away_logo)
             image.paste(home_logo, (home_x, home_y), home_logo)
 
         # --- Live Game Specific Elements ---
         
-        # Draw scores overlaid on logos with outline
-        away_score_str = str(game_data['away_score'])
-        home_score_str = str(game_data['home_score'])
-        score_font = self.display_manager.font # Use PressStart2P
-        outline_color = (0, 0, 0)
-        text_color = (255, 255, 255)
-        
-        # Helper function for outlined text
-        def draw_outlined_text(x, y, text):
-            # Draw outline
-            draw.text((x-1, y), text, font=score_font, fill=outline_color)
-            draw.text((x+1, y), text, font=score_font, fill=outline_color)
-            draw.text((x, y-1), text, font=score_font, fill=outline_color)
-            draw.text((x, y+1), text, font=score_font, fill=outline_color)
-            # Draw main text
-            draw.text((x, y), text, font=score_font, fill=text_color)
-
-        # Away Score
-        away_score_bbox = draw.textbbox((0, 0), away_score_str, font=score_font)
-        away_score_width = away_score_bbox[2] - away_score_bbox[0]
-        away_score_height = away_score_bbox[3] - away_score_bbox[1]
-        away_score_x = away_x + (logo_size[0] - away_score_width) // 2
-        away_score_y = away_y + (logo_size[1] - away_score_height) // 2
-        draw_outlined_text(away_score_x, away_score_y, away_score_str)
-
-        # Home Score
-        home_score_bbox = draw.textbbox((0, 0), home_score_str, font=score_font)
-        home_score_width = home_score_bbox[2] - home_score_bbox[0]
-        home_score_height = home_score_bbox[3] - home_score_bbox[1]
-        home_score_x = home_x + (logo_size[0] - home_score_width) // 2
-        home_score_y = home_y + (logo_size[1] - home_score_height) // 2
-        draw_outlined_text(home_score_x, home_score_y, home_score_str)
-
         # Draw Inning (Top Center)
         inning_half_indicator = "▲" if game_data['inning_half'] == 'top' else "▼"
         inning_text = f"{inning_half_indicator}{game_data['inning']}"
@@ -600,6 +569,34 @@ class MLBLiveManager(BaseMLBManager):
         self.display_manager._draw_bdf_text(count_text, count_x, count_y, text_color, font=bdf_font)
         # Update display (might be redundant if called later, but safe)
         # self.display_manager.update_display() 
+
+        # Draw Team:Score at the bottom
+        score_font = self.display_manager.font # Use PressStart2P
+        away_abbr = game_data['away_team']
+        home_abbr = game_data['home_team']
+        away_score_str = str(game_data['away_score'])
+        home_score_str = str(game_data['home_score'])
+
+        away_text = f"{away_abbr}:{away_score_str}"
+        home_text = f"{home_abbr}:{home_score_str}"
+        
+        # Calculate Y position (bottom edge)
+        # Get font height (approximate or precise)
+        try:
+            font_height = score_font.getbbox("A")[3] - score_font.getbbox("A")[1]
+        except AttributeError:
+            font_height = 8 # Fallback for default font
+        score_y = height - font_height - 1 # 1 pixel padding from bottom
+        
+        # Away Team:Score (Bottom Left)
+        away_score_x = 2 # 2 pixels padding from left
+        draw.text((away_score_x, score_y), away_text, font=score_font, fill=text_color)
+        
+        # Home Team:Score (Bottom Right)
+        home_text_bbox = draw.textbbox((0,0), home_text, font=score_font)
+        home_text_width = home_text_bbox[2] - home_text_bbox[0]
+        home_score_x = width - home_text_width - 2 # 2 pixels padding from right
+        draw.text((home_score_x, score_y), home_text, font=score_font, fill=text_color)
 
         # TODO: Add Outs display if needed
 
