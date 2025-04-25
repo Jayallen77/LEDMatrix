@@ -103,7 +103,7 @@ class BaseMLBManager:
         draw = ImageDraw.Draw(image)
         
         # Calculate dynamic sizes based on display dimensions (32x128)
-        logo_size = (height - 8, height - 8)  # 24x24 pixels for logos (slightly smaller)
+        logo_size = (height - 12, height - 12)  # 20x20 pixels for logos
         center_y = height // 2  # Vertical center line
         
         # Load team logos
@@ -115,12 +115,12 @@ class BaseMLBManager:
             home_logo = home_logo.resize(logo_size, Image.Resampling.LANCZOS)
             
             # Position logos with proper spacing
-            # Away logo on left, slightly off screen
-            away_x = -12
+            # Away logo on left, slightly visible
+            away_x = 2
             away_y = center_y - (away_logo.height // 2)
             
-            # Home logo on right, slightly off screen
-            home_x = width - home_logo.width + 12
+            # Home logo on right, slightly visible
+            home_x = width - home_logo.width - 2
             home_y = center_y - (home_logo.height // 2)
             
             # Paste logos
@@ -134,7 +134,7 @@ class BaseMLBManager:
             status_bbox = draw.textbbox((0, 0), status_text, font=self.display_manager.font)
             status_width = status_bbox[2] - status_bbox[0]
             status_x = (width - status_width) // 2
-            status_y = 2
+            status_y = 1  # Move up slightly
             draw.text((status_x, status_y), status_text, fill=(255, 255, 255), font=self.display_manager.font)
             
             # Format game date and time
@@ -146,14 +146,14 @@ class BaseMLBManager:
             date_bbox = draw.textbbox((0, 0), game_date, font=self.display_manager.font)
             date_width = date_bbox[2] - date_bbox[0]
             date_x = (width - date_width) // 2
-            date_y = center_y - 5
+            date_y = center_y - 6  # Move up slightly
             draw.text((date_x, date_y), game_date, fill=(255, 255, 255), font=self.display_manager.font)
             
             # Draw time below date
             time_bbox = draw.textbbox((0, 0), game_time_str, font=self.display_manager.font)
             time_width = time_bbox[2] - time_bbox[0]
             time_x = (width - time_width) // 2
-            time_y = date_y + 10
+            time_y = date_y + 8  # Reduce spacing
             draw.text((time_x, time_y), game_time_str, fill=(255, 255, 255), font=self.display_manager.font)
         
         return image
