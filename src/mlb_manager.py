@@ -134,7 +134,7 @@ class BaseMLBManager:
             status_width = self.display_manager.get_text_width(status_text, self.display_manager.calendar_font)
             status_x = (width - status_width) // 2
             status_y = 2
-            self.display_manager.draw_text(status_text, status_x, status_y, color=(255, 255, 255), font=self.display_manager.calendar_font)
+            self.display_manager._draw_bdf_text(status_text, status_x, status_y, color=(255, 255, 255), font=self.display_manager.calendar_font)
             
             # Format game date and time
             game_time = datetime.fromisoformat(game_data['start_time'].replace('Z', '+00:00'))
@@ -162,7 +162,7 @@ class BaseMLBManager:
             status_width = self.display_manager.get_text_width(status_text, self.display_manager.calendar_font)
             status_x = (width - status_width) // 2
             status_y = 2
-            self.display_manager.draw_text(status_text, status_x, status_y, color=(255, 255, 255), font=self.display_manager.calendar_font)
+            self.display_manager._draw_bdf_text(status_text, status_x, status_y, color=(255, 255, 255), font=self.display_manager.calendar_font)
             
             # Draw scores at the bottom (matching NHL layout) using PressStart2P
             away_score = str(game_data['away_score'])
