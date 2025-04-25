@@ -600,7 +600,8 @@ class MLBLiveManager(BaseMLBManager):
         bases_overall_bottom_y = c1y + h_d # Bottom of the 1st/3rd base diamonds
 
         # --- Draw Count (Circles) --- 
-        count_start_y = bases_overall_bottom_y + vertical_spacing
+        count_vertical_offset = 3 # Increase space below bases
+        count_start_y = bases_overall_bottom_y + count_vertical_offset 
         count_start_x = cluster_start_x + (cluster_width - count_cluster_width) // 2
         circle_color_ball = (255, 255, 255)
         circle_color_strike = (255, 255, 255) # Outline color
