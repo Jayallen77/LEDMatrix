@@ -103,7 +103,7 @@ class BaseMLBManager:
         draw = ImageDraw.Draw(image)
         
         # Calculate dynamic sizes based on display dimensions (32x128)
-        logo_size = (height - 12, height - 12)  # 20x20 pixels for logos
+        logo_size = (height - 8, height - 8)  # 24x24 pixels for logos
         center_y = height // 2  # Vertical center line
         
         # Load team logos
@@ -114,13 +114,13 @@ class BaseMLBManager:
             away_logo = away_logo.resize(logo_size, Image.Resampling.LANCZOS)
             home_logo = home_logo.resize(logo_size, Image.Resampling.LANCZOS)
             
-            # Position logos with proper spacing
-            # Away logo on left, slightly visible
-            away_x = 2
+            # Position logos with proper spacing (matching NHL layout)
+            # Away logo on left, slightly off screen
+            away_x = -12
             away_y = center_y - (away_logo.height // 2)
             
-            # Home logo on right, slightly visible
-            home_x = width - home_logo.width - 2
+            # Home logo on right, slightly off screen
+            home_x = width - home_logo.width + 12
             home_y = center_y - (home_logo.height // 2)
             
             # Paste logos
@@ -134,7 +134,7 @@ class BaseMLBManager:
             status_bbox = draw.textbbox((0, 0), status_text, font=self.display_manager.font)
             status_width = status_bbox[2] - status_bbox[0]
             status_x = (width - status_width) // 2
-            status_y = 1  # Move up slightly
+            status_y = 2
             draw.text((status_x, status_y), status_text, fill=(255, 255, 255), font=self.display_manager.font)
             
             # Format game date and time
@@ -146,15 +146,37 @@ class BaseMLBManager:
             date_bbox = draw.textbbox((0, 0), game_date, font=self.display_manager.font)
             date_width = date_bbox[2] - date_bbox[0]
             date_x = (width - date_width) // 2
-            date_y = center_y - 6  # Move up slightly
+            date_y = center_y - 5  # Position in center
             draw.text((date_x, date_y), game_date, fill=(255, 255, 255), font=self.display_manager.font)
             
             # Draw time below date
             time_bbox = draw.textbbox((0, 0), game_time_str, font=self.display_manager.font)
             time_width = time_bbox[2] - time_bbox[0]
             time_x = (width - time_width) // 2
-            time_y = date_y + 8  # Reduce spacing
+            time_y = date_y + 10  # Position below date
             draw.text((time_x, time_y), game_time_str, fill=(255, 255, 255), font=self.display_manager.font)
+        
+        # For recent/final games, show scores and status
+        elif game_data['status'] in ['status_final', 'final', 'completed']:
+            # Show "Final" at the top
+            status_text = "Final"
+            status_bbox = draw.textbbox((0, 0), status_text, font=self.display_manager.font)
+            status_width = status_bbox[2] - status_bbox[0]
+            status_x = (width - status_width) // 2
+            status_y = 2
+            draw.text((status_x, status_y), status_text, fill=(255, 255, 255), font=self.display_manager.font)
+            
+            # Draw scores at the bottom (matching NHL layout)
+            away_score = str(game_data['away_score'])
+            home_score = str(game_data['home_score'])
+            score_text = f"{away_score}-{home_score}"
+            
+            # Calculate position for the score text (centered at the bottom)
+            score_bbox = draw.textbbox((0, 0), score_text, font=self.display_manager.font)
+            score_width = score_bbox[2] - score_bbox[0]
+            score_x = (width - score_width) // 2
+            score_y = height - 15  # Position at bottom
+            draw.text((score_x, score_y), score_text, fill=(255, 255, 255), font=self.display_manager.font)
         
         return image
 
@@ -204,7 +226,6 @@ class BaseMLBManager:
             response.raise_for_status()
             
             data = response.json()
-            self.logger.info(f"Raw API response: {data}")  # Log raw response
             
             games = {}
             
@@ -212,19 +233,20 @@ class BaseMLBManager:
                 game_id = event['id']
                 status = event['status']['type']['name'].lower()
                 
-                # Log the full status object for debugging
-                self.logger.info(f"Game {game_id} status object: {event['status']}")
-                self.logger.info(f"Game {game_id} status type: {status}")
-                
                 # Get team information
                 competitors = event['competitions'][0]['competitors']
                 home_team = next(c for c in competitors if c['homeAway'] == 'home')
                 away_team = next(c for c in competitors if c['homeAway'] == 'away')
                 
-                # Log team abbreviations we're getting
+                # Get team abbreviations
                 home_abbr = home_team['team']['abbreviation']
                 away_abbr = away_team['team']['abbreviation']
-                self.logger.info(f"Found game: {away_abbr} @ {home_abbr} (Status: {status})")
+                
+                # Only log detailed information for favorite teams
+                is_favorite_game = (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams)
+                if is_favorite_game:
+                    self.logger.info(f"Found favorite team game: {away_abbr} @ {home_abbr} (Status: {status})")
+                    self.logger.info(f"Game {game_id} status object: {event['status']}")
                 
                 # Get game state information
                 if status == 'in':
@@ -266,17 +288,14 @@ class BaseMLBManager:
                     'start_time': event['date']
                 }
             
-            # Log what teams we're looking for vs what we found
-            self.logger.info(f"Looking for favorite teams: {self.favorite_teams}")
-            found_teams = set([game['home_team'] for game in games.values()] + 
-                            [game['away_team'] for game in games.values()])
-            self.logger.info(f"Found teams in API response: {found_teams}")
-            
-            # Log all games with status_final
-            final_games = [game for game in games.values() if game['status'] == 'status_final']
-            self.logger.info(f"Games with status_final: {len(final_games)}")
-            for game in final_games:
-                self.logger.info(f"Final game: {game['away_team']} @ {game['home_team']}")
+            # Only log favorite team games
+            favorite_games = [game for game in games.values() 
+                           if game['home_team'] in self.favorite_teams or 
+                              game['away_team'] in self.favorite_teams]
+            if favorite_games:
+                self.logger.info(f"Found {len(favorite_games)} games for favorite teams: {self.favorite_teams}")
+                for game in favorite_games:
+                    self.logger.info(f"Favorite team game: {game['away_team']} @ {game['home_team']}")
             
             return games
             
@@ -485,7 +504,8 @@ class MLBRecentManager(BaseMLBManager):
             now = datetime.now(timezone.utc)  # Make timezone-aware
             recent_cutoff = now - timedelta(hours=self.recent_hours)
             
-            logger.info(f"[MLB] Looking for games between {recent_cutoff} and {now}")
+            logger.info(f"[MLB] Current time (UTC): {now}")
+            logger.info(f"[MLB] Recent cutoff time (UTC): {recent_cutoff}")
             logger.info(f"[MLB] Recent hours setting: {self.recent_hours}")
             
             for game_id, game in games.items():
@@ -501,6 +521,7 @@ class MLBRecentManager(BaseMLBManager):
                 
                 logger.info(f"[MLB] Is final: {is_final}")
                 logger.info(f"[MLB] Is within time window: {is_within_time}")
+                logger.info(f"[MLB] Time comparison: {recent_cutoff} <= {game_time} <= {now}")
                 
                 if is_final and is_within_time:
                     new_recent_games.append(game)
