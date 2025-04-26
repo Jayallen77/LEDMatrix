@@ -730,7 +730,8 @@ class NBARecentManager(BaseNBAManager):
             new_recent_games = []
             for event in events:
                 game = self._extract_game_details(event)
-                if game:
+                # Filter for recent games: must be final and within the time window
+                if game and game['is_final'] and game['is_within_window']:
                     new_recent_games.append(game)
             
             # Filter for favorite teams
