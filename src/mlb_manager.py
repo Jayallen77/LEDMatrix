@@ -510,7 +510,7 @@ class MLBLiveManager(BaseMLBManager):
         draw = ImageDraw.Draw(image)
         
         # Set logo size
-        new_logo_height = 28
+        new_logo_height = 32
         logo_size = (new_logo_height, new_logo_height) # Increase size
         logo_y_offset = 0# Center vertically
         # center_y = height // 2 # center_y not used for logo placement now
