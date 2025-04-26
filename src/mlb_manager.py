@@ -165,7 +165,7 @@ class BaseMLBManager:
             date_bbox = draw.textbbox((0, 0), game_date, font=self.display_manager.font)
             date_width = date_bbox[2] - date_bbox[0]
             date_x = (width - date_width) // 2
-            date_y = (height) // 2  # Position in center
+            date_y = (height - date_bbox[3]) // 2 - 3 # Position in center
             draw.text((date_x, date_y), game_date, fill=(255, 255, 255), font=self.display_manager.font)
             
             # Draw time below date using PressStart2P
