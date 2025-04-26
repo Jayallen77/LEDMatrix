@@ -89,7 +89,7 @@
         "calendars": ["birthdays"]
     },
     "nhl_scoreboard": {
-        "enabled": false,
+        "enabled": true,
         "test_mode": false,
         "update_interval_seconds": 300,
         "live_update_interval": 15,
@@ -128,7 +128,7 @@
     },
     "mlb": {
         "enabled": true,
-        "test_mode": true,
+        "test_mode": false,
         "update_interval_seconds": 300,
         "live_update_interval": 20,
         "recent_update_interval": 3600,
