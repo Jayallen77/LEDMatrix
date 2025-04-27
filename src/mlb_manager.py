@@ -356,6 +356,7 @@ class MLBLiveManager(BaseMLBManager):
         super().__init__(config, display_manager)
         self.logger.info("Initialized MLB Live Manager")
         self.live_games = []
+        self.current_game = None  # Initialize current_game to None
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = self.mlb_config.get('live_update_interval', 20)
