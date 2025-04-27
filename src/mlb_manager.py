@@ -301,8 +301,7 @@ class BaseMLBManager:
                     # Get game state information
                     if status_state == 'in':
                         # For live games, get detailed state
-                        linescore = event['competitions'][0].get('linescores', [{}])[0]
-                        inning = linescore.get('value', 1)
+                        inning = event['status'].get('period', 1)  # Get inning from status period
                         
                         # Get inning information from status
                         status_detail = event['status'].get('detail', '').lower()
