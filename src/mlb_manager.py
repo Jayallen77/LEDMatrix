@@ -298,20 +298,29 @@ class BaseMLBManager:
                         inning = linescore.get('value', 1)
                         inning_display = linescore.get('displayValue', '').lower()
                         
-                        # Add debug logging for inning data
+                        # Add detailed debug logging for inning data
                         if is_favorite_game:
                             self.logger.debug(f"[MLB] Raw inning data - value: {inning}, displayValue: {inning_display}")
+                            self.logger.debug(f"[MLB] Full linescore data: {linescore}")
+                            self.logger.debug(f"[MLB] Raw displayValue: {linescore.get('displayValue')}")
                         
                         # Determine inning half from display value
-                        if 'top' in inning_display:
-                            inning_half = 'top'
-                        elif 'bottom' in inning_display:
-                            inning_half = 'bottom'
-                        else:
-                            # Default to top of inning if we can't determine
-                            inning_half = 'top'
-                            if is_favorite_game:
-                                self.logger.warning(f"[MLB] Could not determine inning half from display value: {inning_display}, defaulting to top")
+                        inning_half = 'top'  # Default to top
+                        
+                        # Check various possible formats for inning half
+                        if inning_display:
+                            if any(x in inning_display for x in ['top', 't', '1st']):
+                                inning_half = 'top'
+                            elif any(x in inning_display for x in ['bottom', 'b', '2nd']):
+                                inning_half = 'bottom'
+                            
+                            # Additional check for inning number in display
+                            if inning_display.isdigit():
+                                inning = int(inning_display)
+                                inning_half = 'top'  # If just a number, assume top
+                        
+                        if is_favorite_game:
+                            self.logger.debug(f"[MLB] Determined inning half: {inning_half} (from display: {inning_display})")
                         
                         # Get count and bases from situation
                         situation = event['competitions'][0].get('situation', {})
