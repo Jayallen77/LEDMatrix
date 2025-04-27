@@ -349,12 +349,23 @@ class BaseMLBManager:
                         
                         # Try alternative locations for count data
                         if balls == 0 and strikes == 0:
-                            # Check if count is directly in situation
-                            balls = situation.get('balls', 0)
-                            strikes = situation.get('strikes', 0)
-                            if is_favorite_game:
-                                self.logger.debug(f"[MLB] Using direct situation count: balls={balls}, strikes={strikes}")
-                                self.logger.debug(f"[MLB] Full situation keys: {list(situation.keys())}")
+                            # First try the summary field
+                            if 'summary' in situation:
+                                try:
+                                    count_summary = situation['summary']
+                                    balls, strikes = map(int, count_summary.split('-'))
+                                    if is_favorite_game:
+                                        self.logger.debug(f"[MLB] Using summary count: {count_summary}")
+                                except (ValueError, AttributeError):
+                                    if is_favorite_game:
+                                        self.logger.debug("[MLB] Could not parse summary count")
+                            else:
+                                # Check if count is directly in situation
+                                balls = situation.get('balls', 0)
+                                strikes = situation.get('strikes', 0)
+                                if is_favorite_game:
+                                    self.logger.debug(f"[MLB] Using direct situation count: balls={balls}, strikes={strikes}")
+                                    self.logger.debug(f"[MLB] Full situation keys: {list(situation.keys())}")
                         
                         if is_favorite_game:
                             self.logger.debug(f"[MLB] Final count: balls={balls}, strikes={strikes}")
