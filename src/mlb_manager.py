@@ -296,7 +296,22 @@ class BaseMLBManager:
                         # For live games, get detailed state
                         linescore = event['competitions'][0].get('linescores', [{}])[0]
                         inning = linescore.get('value', 1)
-                        inning_half = linescore.get('displayValue', '').lower()
+                        inning_display = linescore.get('displayValue', '').lower()
+                        
+                        # Add debug logging for inning data
+                        if is_favorite_game:
+                            self.logger.debug(f"[MLB] Raw inning data - value: {inning}, displayValue: {inning_display}")
+                        
+                        # Determine inning half from display value
+                        if 'top' in inning_display:
+                            inning_half = 'top'
+                        elif 'bottom' in inning_display:
+                            inning_half = 'bottom'
+                        else:
+                            # Default to top of inning if we can't determine
+                            inning_half = 'top'
+                            if is_favorite_game:
+                                self.logger.warning(f"[MLB] Could not determine inning half from display value: {inning_display}, defaulting to top")
                         
                         # Get count and bases from situation
                         situation = event['competitions'][0].get('situation', {})
