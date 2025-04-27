@@ -440,7 +440,7 @@ class MLBLiveManager(BaseMLBManager):
                     # Find all live games involving favorite teams
                     new_live_games = []
                     for game in games.values():
-                        if game['status'] == 'live':
+                        if game['status'] in ['live', 'status_in_progress']:
                             if not self.favorite_teams or (
                                 game['home_team'] in self.favorite_teams or 
                                 game['away_team'] in self.favorite_teams
