@@ -24,6 +24,7 @@ class BaseMLBManager:
         self.favorite_teams = self.mlb_config.get('favorite_teams', [])
         self.cache_manager = CacheManager()
         self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.DEBUG)  # Set logger level to DEBUG
         
         # Logo handling
         self.logo_dir = self.mlb_config.get('logo_dir', os.path.join('assets', 'sports', 'mlb_logos'))
@@ -277,6 +278,13 @@ class BaseMLBManager:
                     status = event['status']['type']['name'].lower()
                     status_state = event['status']['type']['state'].lower()
                     
+                    # Add detailed logging for status information
+                    if is_favorite_game:
+                        self.logger.debug(f"[MLB] Full status data: {event['status']}")
+                        self.logger.debug(f"[MLB] Status type: {status}, State: {status_state}")
+                        self.logger.debug(f"[MLB] Status detail: {event['status'].get('detail', '')}")
+                        self.logger.debug(f"[MLB] Status shortDetail: {event['status'].get('shortDetail', '')}")
+                    
                     # Get team information
                     competitors = event['competitions'][0]['competitors']
                     home_team = next(c for c in competitors if c['homeAway'] == 'home')
@@ -296,31 +304,22 @@ class BaseMLBManager:
                         # For live games, get detailed state
                         linescore = event['competitions'][0].get('linescores', [{}])[0]
                         inning = linescore.get('value', 1)
-                        inning_display = linescore.get('displayValue', '').lower()
                         
-                        # Add detailed debug logging for inning data
-                        if is_favorite_game:
-                            self.logger.debug(f"[MLB] Raw inning data - value: {inning}, displayValue: {inning_display}")
-                            self.logger.debug(f"[MLB] Full linescore data: {linescore}")
-                            self.logger.debug(f"[MLB] Raw displayValue: {linescore.get('displayValue')}")
+                        # Get inning information from status
+                        status_detail = event['status'].get('detail', '').lower()
+                        status_short = event['status'].get('shortDetail', '').lower()
                         
-                        # Determine inning half from display value
+                        # Determine inning half from status information
                         inning_half = 'top'  # Default to top
-                        
-                        # Check various possible formats for inning half
-                        if inning_display:
-                            if any(x in inning_display for x in ['top', 't', '1st']):
-                                inning_half = 'top'
-                            elif any(x in inning_display for x in ['bottom', 'b', '2nd']):
-                                inning_half = 'bottom'
-                            
-                            # Additional check for inning number in display
-                            if inning_display.isdigit():
-                                inning = int(inning_display)
-                                inning_half = 'top'  # If just a number, assume top
+                        if 'bottom' in status_detail or 'bottom' in status_short:
+                            inning_half = 'bottom'
+                        elif 'top' in status_detail or 'top' in status_short:
+                            inning_half = 'top'
                         
                         if is_favorite_game:
-                            self.logger.debug(f"[MLB] Determined inning half: {inning_half} (from display: {inning_display})")
+                            self.logger.debug(f"[MLB] Status detail: {status_detail}")
+                            self.logger.debug(f"[MLB] Status short: {status_short}")
+                            self.logger.debug(f"[MLB] Determined inning: {inning_half} {inning}")
                         
                         # Get count and bases from situation
                         situation = event['competitions'][0].get('situation', {})
