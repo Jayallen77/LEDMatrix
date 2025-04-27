@@ -117,11 +117,11 @@ class BaseMLBManager:
             away_logo = away_logo.resize(logo_size, Image.Resampling.LANCZOS)
             home_logo = home_logo.resize(logo_size, Image.Resampling.LANCZOS)
             
-            # Position logos with NHL-style spacing (12px offset)
-            away_x = -12
+            # Position logos with NHL-style spacing (0px offset)
+            away_x = 0
             away_y = logo_y_offset
             
-            home_x = width - home_logo.width + 12
+            home_x = width - home_logo.width 
             home_y = logo_y_offset
             
             image.paste(away_logo, (away_x, away_y), away_logo)
