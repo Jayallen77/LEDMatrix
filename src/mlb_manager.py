@@ -278,13 +278,6 @@ class BaseMLBManager:
                     status = event['status']['type']['name'].lower()
                     status_state = event['status']['type']['state'].lower()
                     
-                    # Add detailed logging for status information
-                    if is_favorite_game:
-                        self.logger.debug(f"[MLB] Full status data: {event['status']}")
-                        self.logger.debug(f"[MLB] Status type: {status}, State: {status_state}")
-                        self.logger.debug(f"[MLB] Status detail: {event['status'].get('detail', '')}")
-                        self.logger.debug(f"[MLB] Status shortDetail: {event['status'].get('shortDetail', '')}")
-                    
                     # Get team information
                     competitors = event['competitions'][0]['competitors']
                     home_team = next(c for c in competitors if c['homeAway'] == 'home')
@@ -294,10 +287,16 @@ class BaseMLBManager:
                     home_abbr = home_team['team']['abbreviation']
                     away_abbr = away_team['team']['abbreviation']
                     
-                    # Only log detailed information for favorite teams
+                    # Check if this is a favorite team game
                     is_favorite_game = (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams)
+                    
+                    # Only log detailed information for favorite teams
                     if is_favorite_game:
                         self.logger.info(f"Found favorite team game: {away_abbr} @ {home_abbr} (Status: {status}, State: {status_state})")
+                        self.logger.debug(f"[MLB] Full status data: {event['status']}")
+                        self.logger.debug(f"[MLB] Status type: {status}, State: {status_state}")
+                        self.logger.debug(f"[MLB] Status detail: {event['status'].get('detail', '')}")
+                        self.logger.debug(f"[MLB] Status shortDetail: {event['status'].get('shortDetail', '')}")
                     
                     # Get game state information
                     if status_state == 'in':
