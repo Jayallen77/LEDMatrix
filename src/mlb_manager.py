@@ -325,12 +325,19 @@ class BaseMLBManager:
                         strikes = situation.get('strikes', 0)
                         outs = situation.get('outs', 0)
                         
+                        if is_favorite_game:
+                            self.logger.debug(f"[MLB] Raw situation data: {situation}")
+                            self.logger.debug(f"[MLB] Count: {balls}-{strikes}, Outs: {outs}")
+                        
                         # Get base runners
                         bases_occupied = [
                             situation.get('onFirst', False),
                             situation.get('onSecond', False),
                             situation.get('onThird', False)
                         ]
+                        
+                        if is_favorite_game:
+                            self.logger.debug(f"[MLB] Bases occupied: {bases_occupied}")
                     else:
                         # Default values for non-live games
                         inning = 1
@@ -538,7 +545,6 @@ class MLBLiveManager(BaseMLBManager):
         new_logo_height = 32
         logo_size = (new_logo_height, new_logo_height) # Increase size
         logo_y_offset = 0# Center vertically
-        # center_y = height // 2 # center_y not used for logo placement now
         
         # Load and place team logos (same as base method)
         away_logo = self._get_team_logo(game_data['away_team'])
@@ -652,6 +658,12 @@ class MLBLiveManager(BaseMLBManager):
         # --- Draw Balls-Strikes Count (BDF Font) --- 
         balls = game_data.get('balls', 0)
         strikes = game_data.get('strikes', 0)
+        
+        # Add debug logging for count
+        if game_data['home_team'] in self.favorite_teams or game_data['away_team'] in self.favorite_teams:
+            self.logger.debug(f"[MLB] Displaying count: {balls}-{strikes}")
+            self.logger.debug(f"[MLB] Raw count data: balls={game_data.get('balls')}, strikes={game_data.get('strikes')}")
+        
         count_text = f"{balls}-{strikes}"
         bdf_font = self.display_manager.calendar_font
         bdf_font.set_char_size(height=7*64) # Set 7px height
@@ -662,7 +674,6 @@ class MLBLiveManager(BaseMLBManager):
         count_y = cluster_bottom_y + 2 # Start 2 pixels below cluster
         
         # Center horizontally within the BASE cluster width
-        # count_x = overall_start_x + (total_width - count_text_width) // 2 # Old way
         count_x = bases_origin_x + (base_cluster_width - count_text_width) // 2
         
         # Ensure draw object is set and draw text
