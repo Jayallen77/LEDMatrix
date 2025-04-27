@@ -340,6 +340,13 @@ class BaseMLBManager:
                         strikes = count.get('strikes', 0)
                         outs = situation.get('outs', 0)
                         
+                        # Add detailed logging for favorite team games
+                        if is_favorite_game:
+                            self.logger.debug(f"[MLB] Full situation data: {situation}")
+                            self.logger.debug(f"[MLB] Count object: {count}")
+                            self.logger.debug(f"[MLB] Raw count values - balls: {balls}, strikes: {strikes}")
+                            self.logger.debug(f"[MLB] Raw outs value: {outs}")
+                        
                         # Try alternative locations for count data
                         if balls == 0 and strikes == 0:
                             # Check if count is directly in situation
@@ -347,6 +354,7 @@ class BaseMLBManager:
                             strikes = situation.get('strikes', 0)
                             if is_favorite_game:
                                 self.logger.debug(f"[MLB] Using direct situation count: balls={balls}, strikes={strikes}")
+                                self.logger.debug(f"[MLB] Full situation keys: {list(situation.keys())}")
                         
                         if is_favorite_game:
                             self.logger.debug(f"[MLB] Final count: balls={balls}, strikes={strikes}")
