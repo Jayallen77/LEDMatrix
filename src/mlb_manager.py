@@ -458,12 +458,19 @@ class MLBLiveManager(BaseMLBManager):
                     # Find all live games involving favorite teams
                     new_live_games = []
                     for game in games.values():
-                        if game['status'] in ['live', 'status_in_progress']:
+                        # Only process games that are actually in progress
+                        if game['status_state'] == 'in' and game['status'] == 'status_in_progress':
                             if not self.favorite_teams or (
                                 game['home_team'] in self.favorite_teams or 
                                 game['away_team'] in self.favorite_teams
                             ):
-                                new_live_games.append(game)
+                                # Ensure scores are valid numbers
+                                try:
+                                    game['home_score'] = int(game['home_score'])
+                                    game['away_score'] = int(game['away_score'])
+                                    new_live_games.append(game)
+                                except (ValueError, TypeError):
+                                    self.logger.warning(f"Invalid score format for game {game['away_team']} @ {game['home_team']}")
                     
                     # Only log if there's a change in games or enough time has passed
                     should_log = (
