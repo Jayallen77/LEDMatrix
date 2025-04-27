@@ -104,8 +104,8 @@ class BaseMLBManager:
         draw = ImageDraw.Draw(image)
         
         # Set logo size to match NHL (150% of display width)
-        max_width = int(width * 1.5)
-        max_height = int(height * 1.5)
+        max_width = 35
+        max_height = 35
         logo_size = (max_width, max_height)
         logo_y_offset = (height - max_height) // 2
         
