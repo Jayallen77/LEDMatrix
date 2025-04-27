@@ -103,11 +103,11 @@ class BaseMLBManager:
         image = Image.new('RGB', (width, height), color=(0, 0, 0))
         draw = ImageDraw.Draw(image)
         
-        # Set logo size
-        new_logo_height = 28
-        logo_size = (new_logo_height, new_logo_height) # Increase size
-        logo_y_offset = (height - new_logo_height) // 2 # Center vertically
-        # center_y = height // 2 # center_y not used for logo placement now
+        # Set logo size to match NHL (150% of display width)
+        max_width = int(width * 1.5)
+        max_height = int(height * 1.5)
+        logo_size = (max_width, max_height)
+        logo_y_offset = (height - max_height) // 2
         
         # Load team logos
         away_logo = self._get_team_logo(game_data['away_team'])
@@ -117,22 +117,19 @@ class BaseMLBManager:
             away_logo = away_logo.resize(logo_size, Image.Resampling.LANCZOS)
             home_logo = home_logo.resize(logo_size, Image.Resampling.LANCZOS)
             
-            # Position logos with proper spacing (matching NHL layout)
-            # Away logo on left, slightly off screen
-            away_x = 0
-            away_y = logo_y_offset # Apply offset
+            # Position logos with NHL-style spacing (12px offset)
+            away_x = -12
+            away_y = logo_y_offset
             
-            # Home logo on right, slightly off screen
-            home_x = width - home_logo.width # home_logo.width should be 24 now
-            home_y = logo_y_offset # Apply offset
+            home_x = width - home_logo.width + 12
+            home_y = logo_y_offset
             
-            # Paste logos
             image.paste(away_logo, (away_x, away_y), away_logo)
             image.paste(home_logo, (home_x, home_y), home_logo)
         
         # For upcoming games, show date and time stacked in the center
         if game_data['status'] == 'status_scheduled':
-            # Show "Next Game" at the top using 5x7 font
+            # Show "Next Game" at the top using NHL-style font
             status_text = "Next Game"
             # Set font size for BDF font
             self.display_manager.calendar_font.set_char_size(height=7*64)  # 7 pixels high, 64 units per pixel
@@ -147,37 +144,37 @@ class BaseMLBManager:
             
             # Format game date and time
             game_time = datetime.fromisoformat(game_data['start_time'].replace('Z', '+00:00'))
-            # Get timezone from config
             timezone_str = self.config.get('timezone', 'UTC')
             try:
                 tz = pytz.timezone(timezone_str)
             except pytz.exceptions.UnknownTimeZoneError:
                 logger.warning(f"Unknown timezone: {timezone_str}, falling back to UTC")
                 tz = pytz.UTC
-            # Convert to local timezone
             if game_time.tzinfo is None:
                 game_time = game_time.replace(tzinfo=pytz.UTC)
             local_time = game_time.astimezone(tz)
-            game_date = local_time.strftime("%b %d")  # e.g., "Apr 24"
-            game_time_str = self._format_game_time(game_data['start_time'])  # Use the existing method
+            game_date = local_time.strftime("%b %d")
+            game_time_str = self._format_game_time(game_data['start_time'])
             
-            # Draw date in center using PressStart2P
-            date_bbox = draw.textbbox((0, 0), game_date, font=self.display_manager.font)
-            date_width = date_bbox[2] - date_bbox[0]
+            # Draw date and time using NHL-style fonts
+            date_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
+            time_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
+            
+            # Draw date in center
+            date_width = draw.textlength(game_date, font=date_font)
             date_x = (width - date_width) // 2
-            date_y = (height - date_bbox[3]) // 2 - 3 # Position in center
-            draw.text((date_x, date_y), game_date, fill=(255, 255, 255), font=self.display_manager.font)
+            date_y = (height - date_font.size) // 2 - 3
+            draw.text((date_x, date_y), game_date, font=date_font, fill=(255, 255, 255))
             
-            # Draw time below date using PressStart2P
-            time_bbox = draw.textbbox((0, 0), game_time_str, font=self.display_manager.font)
-            time_width = time_bbox[2] - time_bbox[0]
+            # Draw time below date
+            time_width = draw.textlength(game_time_str, font=time_font)
             time_x = (width - time_width) // 2
-            time_y = date_y + 10  # Position below date
-            draw.text((time_x, time_y), game_time_str, fill=(255, 255, 255), font=self.display_manager.font)
+            time_y = date_y + 10
+            draw.text((time_x, time_y), game_time_str, font=time_font, fill=(255, 255, 255))
         
         # For recent/final games, show scores and status
         elif game_data['status'] in ['status_final', 'final', 'completed']:
-            # Show "Final" at the top using 5x7 font
+            # Show "Final" at the top using NHL-style font
             status_text = "Final"
             # Set font size for BDF font
             self.display_manager.calendar_font.set_char_size(height=7*64)  # 7 pixels high, 64 units per pixel
@@ -190,18 +187,17 @@ class BaseMLBManager:
             # Update the display
             self.display_manager.update_display()
             
-            # Draw scores at the bottom (matching NHL layout) using PressStart2P
+            # Draw scores at the bottom using NHL-style font
             away_score = str(game_data['away_score'])
             home_score = str(game_data['home_score'])
             score_text = f"{away_score}-{home_score}"
+            score_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 12)
             
-            
-            # Calculate position for the score text (centered at the bottom)
-            score_bbox = draw.textbbox((0, 0), score_text, font=self.display_manager.font)
-            score_width = score_bbox[2] - score_bbox[0]
+            # Calculate position for the score text
+            score_width = draw.textlength(score_text, font=score_font)
             score_x = (width - score_width) // 2
-            score_y = height - 15  # Position at bottom
-            draw.text((score_x, score_y), score_text, fill=(255, 255, 255), font=self.display_manager.font)
+            score_y = height - score_font.size - 2
+            draw.text((score_x, score_y), score_text, font=score_font, fill=(255, 255, 255))
         
         return image
 
