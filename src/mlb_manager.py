@@ -307,12 +307,20 @@ class BaseMLBManager:
                         status_detail = event['status'].get('detail', '').lower()
                         status_short = event['status'].get('shortDetail', '').lower()
                         
+                        if is_favorite_game:
+                            self.logger.debug(f"[MLB] Raw status detail: {event['status'].get('detail')}")
+                            self.logger.debug(f"[MLB] Raw status short: {event['status'].get('shortDetail')}")
+                        
                         # Determine inning half from status information
                         inning_half = 'top'  # Default to top
-                        if any(x in status_detail.lower() for x in ['bottom', 'bot']):
+                        if 'bottom' in status_detail or 'bot' in status_detail or 'bottom' in status_short or 'bot' in status_short:
                             inning_half = 'bottom'
-                        elif any(x in status_detail.lower() for x in ['top', 'mid']):
+                            if is_favorite_game:
+                                self.logger.debug("[MLB] Detected bottom of inning")
+                        elif 'top' in status_detail or 'mid' in status_detail or 'top' in status_short or 'mid' in status_short:
                             inning_half = 'top'
+                            if is_favorite_game:
+                                self.logger.debug("[MLB] Detected top of inning")
                         
                         if is_favorite_game:
                             self.logger.debug(f"[MLB] Status detail: {status_detail}")
