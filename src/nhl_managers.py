@@ -768,7 +768,7 @@ class NHLUpcomingManager(BaseNHLManager):
             new_upcoming_games = []
             for event in events:
                 game = self._extract_game_details(event)
-                if game and not game['is_final'] and game['is_upcoming']:
+                if game and not game['is_final'] and game['is_within_window']:
                     new_upcoming_games.append(game)
             
             # Filter for favorite teams
