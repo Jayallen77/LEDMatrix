@@ -309,9 +309,9 @@ class BaseMLBManager:
                         
                         # Determine inning half from status information
                         inning_half = 'top'  # Default to top
-                        if 'bottom' in status_detail or 'bottom' in status_short:
+                        if any(x in status_detail.lower() for x in ['bottom', 'bot']):
                             inning_half = 'bottom'
-                        elif 'top' in status_detail or 'top' in status_short:
+                        elif any(x in status_detail.lower() for x in ['top', 'mid']):
                             inning_half = 'top'
                         
                         if is_favorite_game:
