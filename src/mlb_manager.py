@@ -628,19 +628,19 @@ class MLBLiveManager(BaseMLBManager):
         
         base_bottom_y = c2y + h_d # Bottom Y of 2nd base diamond
         
-        # 1st Base (Bottom left relative to bases_origin_x)
-        c1x = bases_origin_x + h_d 
-        c1y = base_bottom_y + base_vert_spacing + h_d
-        poly1 = [(c1x, base_bottom_y + base_vert_spacing), (c1x + h_d, c1y), (c1x, c1y + h_d), (c1x - h_d, c1y)]
-        if bases_occupied[0]: draw.polygon(poly1, fill=base_color_occupied)
-        else: draw.polygon(poly1, outline=base_color_empty)
-
-        # 3rd Base (Bottom right relative to bases_origin_x)
-        c3x = bases_origin_x + base_cluster_width - h_d
+        # 3rd Base (Bottom left relative to bases_origin_x)
+        c3x = bases_origin_x + h_d 
         c3y = base_bottom_y + base_vert_spacing + h_d
         poly3 = [(c3x, base_bottom_y + base_vert_spacing), (c3x + h_d, c3y), (c3x, c3y + h_d), (c3x - h_d, c3y)]
         if bases_occupied[2]: draw.polygon(poly3, fill=base_color_occupied)
         else: draw.polygon(poly3, outline=base_color_empty)
+
+        # 1st Base (Bottom right relative to bases_origin_x)
+        c1x = bases_origin_x + base_cluster_width - h_d
+        c1y = base_bottom_y + base_vert_spacing + h_d
+        poly1 = [(c1x, base_bottom_y + base_vert_spacing), (c1x + h_d, c1y), (c1x, c1y + h_d), (c1x - h_d, c1y)]
+        if bases_occupied[0]: draw.polygon(poly1, fill=base_color_occupied)
+        else: draw.polygon(poly1, outline=base_color_empty)
         
         # --- Draw Outs (Vertical Circles) ---
         circle_color_out = (255, 255, 255) 
