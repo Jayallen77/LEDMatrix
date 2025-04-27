@@ -95,8 +95,8 @@ class BaseNHLManager:
         self.favorite_teams = self.nhl_config.get("favorite_teams", [])
         self.recent_hours = self.nhl_config.get("recent_game_hours", 48)  # Default 48 hours
         
-        # Set logging level to INFO to reduce noise
-        self.logger.setLevel(logging.INFO)
+        # Set logging level to DEBUG to see all messages
+        self.logger.setLevel(logging.DEBUG)
         
         # Get display dimensions from config
         display_config = config.get("display", {})
@@ -769,13 +769,20 @@ class NHLUpcomingManager(BaseNHLManager):
                 return
                 
             events = data['events']
+            self.logger.info(f"[NHL] Successfully fetched {len(events)} events from ESPN API")
             
             # Process games
             new_upcoming_games = []
             for event in events:
                 game = self._extract_game_details(event)
-                if game and not game['is_final'] and game['is_within_window']:
-                    new_upcoming_games.append(game)
+                if game:
+                    self.logger.debug(f"[NHL] Processing game: {game['away_abbr']} vs {game['home_abbr']}")
+                    self.logger.debug(f"[NHL] Game status: is_final={game['is_final']}, is_upcoming={game['is_upcoming']}, is_within_window={game['is_within_window']}")
+                    self.logger.debug(f"[NHL] Game time: {game['start_time_utc']}")
+                    
+                    if not game['is_final'] and game['is_within_window']:
+                        new_upcoming_games.append(game)
+                        self.logger.debug(f"[NHL] Added to upcoming games: {game['away_abbr']} vs {game['home_abbr']}")
             
             # Filter for favorite teams
             new_team_games = [game for game in new_upcoming_games 
@@ -792,8 +799,12 @@ class NHLUpcomingManager(BaseNHLManager):
             if should_log:
                 if new_team_games:
                     self.logger.info(f"[NHL] Found {len(new_team_games)} upcoming games for favorite teams")
+                    for game in new_team_games:
+                        self.logger.info(f"[NHL] Upcoming game: {game['away_abbr']} vs {game['home_abbr']} - {game['game_date']} {game['game_time']}")
                 else:
                     self.logger.info("[NHL] No upcoming games found for favorite teams")
+                    self.logger.debug(f"[NHL] Favorite teams: {self.favorite_teams}")
+                    self.logger.debug(f"[NHL] Total upcoming games before filtering: {len(new_upcoming_games)}")
                 self.last_log_time = current_time
             
             self.upcoming_games = new_team_games
