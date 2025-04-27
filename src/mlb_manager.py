@@ -330,16 +330,26 @@ class BaseMLBManager:
                         # Get count and bases from situation
                         situation = event['competitions'][0].get('situation', {})
                         
+                        if is_favorite_game:
+                            self.logger.debug(f"[MLB] Full competition data: {event['competitions'][0]}")
+                            self.logger.debug(f"[MLB] Full situation data: {situation}")
+                        
                         # Get count from the correct location in the API response
                         count = situation.get('count', {})
                         balls = count.get('balls', 0)
                         strikes = count.get('strikes', 0)
                         outs = situation.get('outs', 0)
                         
+                        # Try alternative locations for count data
+                        if balls == 0 and strikes == 0:
+                            # Check if count is directly in situation
+                            balls = situation.get('balls', 0)
+                            strikes = situation.get('strikes', 0)
+                            if is_favorite_game:
+                                self.logger.debug(f"[MLB] Using direct situation count: balls={balls}, strikes={strikes}")
+                        
                         if is_favorite_game:
-                            self.logger.debug(f"[MLB] Full situation data: {situation}")
-                            self.logger.debug(f"[MLB] Count object: {count}")
-                            self.logger.debug(f"[MLB] Raw count: balls={balls}, strikes={strikes}")
+                            self.logger.debug(f"[MLB] Final count: balls={balls}, strikes={strikes}")
                         
                         # Get base runners
                         bases_occupied = [
