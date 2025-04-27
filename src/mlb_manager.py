@@ -328,6 +328,7 @@ class BaseMLBManager:
                         if is_favorite_game:
                             self.logger.debug(f"[MLB] Raw situation data: {situation}")
                             self.logger.debug(f"[MLB] Count: {balls}-{strikes}, Outs: {outs}")
+                            self.logger.debug(f"[MLB] Full competition data: {event['competitions'][0]}")
                         
                         # Get base runners
                         bases_occupied = [
@@ -394,6 +395,8 @@ class MLBLiveManager(BaseMLBManager):
         self.last_display_update = 0  # Track when we last updated the display
         self.last_log_time = 0
         self.log_interval = 300  # Only log status every 5 minutes
+        self.last_count_log_time = 0  # Track when we last logged count data
+        self.count_log_interval = 5  # Only log count data every 5 seconds
         self.test_mode = self.mlb_config.get('test_mode', False)
 
         # Initialize with test game only if test mode is enabled
@@ -592,10 +595,8 @@ class MLBLiveManager(BaseMLBManager):
         base_cluster_width = base_diamond_size + base_horiz_spacing + base_diamond_size
         out_cluster_height = 3 * out_circle_diameter + 2 * out_vertical_spacing
         out_cluster_width = out_circle_diameter
-        # total_width = base_cluster_width + spacing_between_bases_outs + out_cluster_width # No longer needed for centering
         
         # Calculate overall start positions
-        # overall_start_x = (width - total_width) // 2 # Removed
         overall_start_y = inning_bbox[3] + 0 # Start immediately below inning text (moved up 3 pixels)
         
         # Center the BASE cluster horizontally
@@ -603,12 +604,8 @@ class MLBLiveManager(BaseMLBManager):
         
         # Determine relative positions for outs based on inning half
         if inning_half == 'top': # Away batting, outs on left
-            # outs_column_x = overall_start_x # Old way
             outs_column_x = bases_origin_x - spacing_between_bases_outs - out_cluster_width
-            # bases_origin_x = overall_start_x + out_cluster_width + spacing_between_bases_outs # Old way
         else: # Home batting, outs on right
-            # bases_origin_x = overall_start_x # Old way
-            # outs_column_x = overall_start_x + base_cluster_width + spacing_between_bases_outs # Old way
             outs_column_x = bases_origin_x + base_cluster_width + spacing_between_bases_outs
         
         # Calculate vertical alignment offset for outs column (center align with bases cluster)
@@ -659,10 +656,13 @@ class MLBLiveManager(BaseMLBManager):
         balls = game_data.get('balls', 0)
         strikes = game_data.get('strikes', 0)
         
-        # Add debug logging for count
-        if game_data['home_team'] in self.favorite_teams or game_data['away_team'] in self.favorite_teams:
+        # Add debug logging for count with cooldown
+        current_time = time.time()
+        if (game_data['home_team'] in self.favorite_teams or game_data['away_team'] in self.favorite_teams) and \
+           current_time - self.last_count_log_time >= self.count_log_interval:
             self.logger.debug(f"[MLB] Displaying count: {balls}-{strikes}")
             self.logger.debug(f"[MLB] Raw count data: balls={game_data.get('balls')}, strikes={game_data.get('strikes')}")
+            self.last_count_log_time = current_time
         
         count_text = f"{balls}-{strikes}"
         bdf_font = self.display_manager.calendar_font
