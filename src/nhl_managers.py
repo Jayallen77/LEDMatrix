@@ -755,6 +755,8 @@ class NHLUpcomingManager(BaseNHLManager):
         self.log_interval = 300  # Only log status every 5 minutes
         self.last_warning_time = 0
         self.warning_cooldown = 300  # Only show warning every 5 minutes
+        self.last_game_switch = 0  # Track when we last switched games
+        self.game_display_duration = 15  # Display each game for 15 seconds
         self.logger.info(f"Initialized NHLUpcomingManager with {len(self.favorite_teams)} favorite teams")
         
     def update(self):
@@ -827,15 +829,21 @@ class NHLUpcomingManager(BaseNHLManager):
             return  # Skip display update entirely
             
         try:
+            current_time = time.time()
+            
+            # Check if it's time to switch games
+            if current_time - self.last_game_switch >= self.game_display_duration:
+                # Move to next game
+                self.current_game_index = (self.current_game_index + 1) % len(self.upcoming_games)
+                self.current_game = self.upcoming_games[self.current_game_index]
+                self.last_game_switch = current_time
+                force_clear = True  # Force clear when switching games
+            
             # Draw the scorebug layout
             self._draw_scorebug_layout(self.current_game, force_clear)
             
             # Update display
             self.display_manager.update_display()
-            
-            # Move to next game
-            self.current_game_index = (self.current_game_index + 1) % len(self.upcoming_games)
-            self.current_game = self.upcoming_games[self.current_game_index]
             
         except Exception as e:
             self.logger.error(f"[NHL] Error displaying upcoming game: {e}", exc_info=True) 
