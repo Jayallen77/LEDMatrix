@@ -355,6 +355,8 @@ class BaseNHLManager:
                 if status["type"]["state"] == "pre":
                     cutoff_time = datetime.now(timezone.utc) + timedelta(hours=self.recent_hours)
                     is_within_window = start_time_utc <= cutoff_time
+                    self.logger.info(f"[NHL] Game time: {start_time_utc}, Cutoff time: {cutoff_time}, Within window: {is_within_window}")
+                    self.logger.info(f"[NHL] Game status: {status['type']['state']}, Home: {home_team['team']['abbreviation']}, Away: {away_team['team']['abbreviation']}")
                 else:
                     # For recent games, check if the game is within the last 48 hours
                     cutoff_time = datetime.now(timezone.utc) - timedelta(hours=self.recent_hours)
