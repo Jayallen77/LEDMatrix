@@ -8,119 +8,49 @@ class WeatherIcons:
     DEFAULT_ICON = "not-available.png"
     DEFAULT_SIZE = 64 # Default size, should match icons but can be overridden
 
+    # Mapping from OpenWeatherMap icon codes to our filenames
+    # See: https://openweathermap.org/weather-conditions#Icon-list
+    ICON_MAP = {
+        # Day icons
+        "01d": "clear-day.png",
+        "02d": "partly-cloudy-day.png",  # Few clouds
+        "03d": "cloudy.png",             # Scattered clouds
+        "04d": "overcast-day.png",       # Broken clouds / Overcast
+        "09d": "drizzle.png",            # Shower rain (using drizzle)
+        "10d": "partly-cloudy-day-rain.png", # Rain
+        "11d": "thunderstorms-day.png",  # Thunderstorm
+        "13d": "partly-cloudy-day-snow.png", # Snow
+        "50d": "mist.png",               # Mist (can use fog, haze etc. too)
+
+        # Night icons
+        "01n": "clear-night.png",
+        "02n": "partly-cloudy-night.png",# Few clouds
+        "03n": "cloudy.png",             # Scattered clouds (same as day)
+        "04n": "overcast-night.png",     # Broken clouds / Overcast
+        "09n": "drizzle.png",            # Shower rain (using drizzle, same as day)
+        "10n": "partly-cloudy-night-rain.png", # Rain
+        "11n": "thunderstorms-night.png", # Thunderstorm
+        "13n": "partly-cloudy-night-snow.png", # Snow
+        "50n": "mist.png",               # Mist (same as day)
+
+        # Add mappings for specific conditions if needed, although OWM codes are preferred
+        "tornado": "tornado.png",
+        "hurricane": "hurricane.png",
+        "wind": "wind.png", # Generic wind if code is not specific enough
+    }
+
     @staticmethod
-    def _get_icon_filename(condition: str) -> str:
-        """Maps a weather condition string to an icon filename."""
-        # Normalize the input condition string
-        condition = condition.lower().strip()
-        print(f"[WeatherIcons] Determining icon for condition: '{condition}'")
-        
-        filename = WeatherIcons.DEFAULT_ICON # Start with default
-        
-        # --- Severe / Extreme --- (Checked first)
-        if "tornado" in condition: filename = "tornado.png"
-        elif "hurricane" in condition: filename = "hurricane.png"
-        elif "squall" in condition: filename = "wind.png" # Or potentially extreme.png? Using wind for now.
-        elif "extreme" in condition: # Look for combined extreme conditions
-            if "thunderstorm" in condition or "thunder" in condition or "storm" in condition:
-                if "rain" in condition: filename = "thunderstorms-day-extreme-rain.png" # Default day
-                elif "snow" in condition: filename = "thunderstorms-day-extreme-snow.png" # Default day
-                else: filename = "thunderstorms-day-extreme.png" # Default day
-            elif "rain" in condition: filename = "extreme-rain.png"
-            elif "snow" in condition: filename = "extreme-snow.png"
-            elif "sleet" in condition: filename = "extreme-sleet.png"
-            elif "drizzle" in condition: filename = "extreme-drizzle.png"
-            elif "hail" in condition: filename = "extreme-hail.png"
-            elif "fog" in condition: filename = "extreme-day-fog.png" # Default day
-            elif "haze" in condition: filename = "extreme-day-haze.png" # Default day
-            elif "smoke" in condition: filename = "extreme-day-smoke.png" # Default day
-            else: filename = "extreme-day.png" # Default day
+    def _get_icon_filename(icon_code: str) -> str:
+        """Maps an OpenWeatherMap icon code (e.g., '01d', '10n') to an icon filename."""
+        filename = WeatherIcons.ICON_MAP.get(icon_code, WeatherIcons.DEFAULT_ICON)
+        print(f"[WeatherIcons] Mapping icon code '{icon_code}' to filename: '{filename}'")
 
-        # --- Thunderstorms --- 
-        elif "thunderstorm" in condition or "thunder" in condition or "storm" in condition:
-            if "overcast" in condition:
-                if "rain" in condition: filename = "thunderstorms-overcast-rain.png"
-                elif "snow" in condition: filename = "thunderstorms-overcast-snow.png"
-                else: filename = "thunderstorms-overcast.png"
-            # Simple thunderstorm conditions
-            elif "rain" in condition: filename = "thunderstorms-day-rain.png" # Default day
-            elif "snow" in condition: filename = "thunderstorms-day-snow.png" # Default day
-            else: filename = "thunderstorms-day.png" # Default day
-
-        # --- Precipitation --- (Excluding thunderstorms covered above)
-        elif "sleet" in condition:
-            if "overcast" in condition: filename = "overcast-day-sleet.png" # Default day
-            elif "partly cloudy" in condition or "scattered" in condition or "few" in condition or "broken" in condition: # Approximating partly cloudy
-                 filename = "partly-cloudy-day-sleet.png" # Default day
-            else: filename = "sleet.png"
-        elif "snow" in condition:
-            if "overcast" in condition: filename = "overcast-day-snow.png" # Default day
-            elif "partly cloudy" in condition or "scattered" in condition or "few" in condition or "broken" in condition:
-                 filename = "partly-cloudy-day-snow.png" # Default day
-            elif "wind" in condition: filename = "wind-snow.png"
-            else: filename = "snow.png"
-        elif "rain" in condition:
-            if "overcast" in condition: filename = "overcast-day-rain.png" # Default day
-            elif "partly cloudy" in condition or "scattered" in condition or "few" in condition or "broken" in condition:
-                 filename = "partly-cloudy-day-rain.png" # Default day
-            else: filename = "rain.png"
-        elif "drizzle" in condition:
-            if "overcast" in condition: filename = "overcast-day-drizzle.png" # Default day
-            elif "partly cloudy" in condition or "scattered" in condition or "few" in condition or "broken" in condition:
-                 filename = "partly-cloudy-day-drizzle.png" # Default day
-            else: filename = "drizzle.png"
-        elif "hail" in condition:
-            if "overcast" in condition: filename = "overcast-day-hail.png" # Default day
-            elif "partly cloudy" in condition or "scattered" in condition or "few" in condition or "broken" in condition:
-                 filename = "partly-cloudy-day-hail.png" # Default day
-            else: filename = "hail.png"
-
-        # --- Obscurations (Fog, Mist, Haze, Smoke, Dust, Sand, Ash) ---
-        elif "fog" in condition:
-            if "overcast" in condition: filename = "overcast-day-fog.png" # Default day
-            elif "partly cloudy" in condition or "scattered" in condition or "few" in condition or "broken" in condition:
-                 filename = "partly-cloudy-day-fog.png" # Default day
-            else: filename = "fog-day.png" # Default day
-        elif "mist" in condition: filename = "mist.png"
-        elif "haze" in condition:
-            if "overcast" in condition: filename = "overcast-day-haze.png" # Default day
-            elif "partly cloudy" in condition or "scattered" in condition or "few" in condition or "broken" in condition:
-                 filename = "partly-cloudy-day-haze.png" # Default day
-            else: filename = "haze-day.png" # Default day
-        elif "smoke" in condition:
-            if "overcast" in condition: filename = "overcast-day-smoke.png" # Default day
-            elif "partly cloudy" in condition or "scattered" in condition or "few" in condition or "broken" in condition:
-                 filename = "partly-cloudy-day-smoke.png" # Default day
-            else: filename = "smoke.png"
-        elif "dust" in condition:
-             filename = "dust-day.png" # Default day
-        elif "sand" in condition: filename = "dust-day.png" # Map sand to dust (day)
-        elif "ash" in condition: filename = "smoke.png" # Map ash to smoke
-
-        # --- Clouds --- (No precipitation, no obscuration)
-        elif "overcast" in condition: # Solid cloud cover
-             filename = "overcast-day.png" # Default day
-        elif "broken clouds" in condition or "scattered clouds" in condition or "partly cloudy" in condition: # Partial cover
-             filename = "partly-cloudy-day.png" # Default day
-        elif "few clouds" in condition: # Minimal clouds
-             filename = "partly-cloudy-day.png" # Use partly cloudy day for few clouds
-        elif "clouds" in condition: # Generic cloudy
-             filename = "cloudy.png"
-
-        # --- Clear --- 
-        elif "clear" in condition or "sunny" in condition:
-             filename = "clear-day.png" # Default day
-
-        # --- Wind (if no other condition matched significantly) ---
-        elif "wind" in condition: filename = "wind.png"
-        
-        # --- Final Check --- 
-        # Check if the determined filename exists, otherwise use default
+        # Check if the mapped filename exists, otherwise use default
         potential_path = os.path.join(WeatherIcons.ICON_DIR, filename)
         if not os.path.exists(potential_path):
             # If a specific icon was determined but not found, log warning and use default
             if filename != WeatherIcons.DEFAULT_ICON:
-                print(f"Warning: Determined icon '{filename}' not found at '{potential_path}'. Falling back to default.")
+                print(f"Warning: Mapped icon file '{filename}' not found at '{potential_path}'. Falling back to default.")
                 filename = WeatherIcons.DEFAULT_ICON
             
             # Check if default exists
@@ -132,9 +62,9 @@ class WeatherIcons:
         return filename
 
     @staticmethod
-    def load_weather_icon(condition: str, size: int = DEFAULT_SIZE) -> Image.Image | None:
-        """Loads, converts, and resizes the appropriate weather icon. Returns None on failure."""
-        filename = WeatherIcons._get_icon_filename(condition)
+    def load_weather_icon(icon_code: str, size: int = DEFAULT_SIZE) -> Image.Image | None:
+        """Loads, converts, and resizes the appropriate weather icon based on the OWM code. Returns None on failure."""
+        filename = WeatherIcons._get_icon_filename(icon_code)
         icon_path = os.path.join(WeatherIcons.ICON_DIR, filename)
 
         try:
@@ -155,9 +85,9 @@ class WeatherIcons:
             return None
 
     @staticmethod
-    def draw_weather_icon(image: Image.Image, condition: str, x: int, y: int, size: int = DEFAULT_SIZE):
-         """Loads the appropriate weather icon and pastes it onto the target PIL Image object."""
-         icon_to_draw = WeatherIcons.load_weather_icon(condition, size)
+    def draw_weather_icon(image: Image.Image, icon_code: str, x: int, y: int, size: int = DEFAULT_SIZE):
+         """Loads the appropriate weather icon based on OWM code and pastes it onto the target PIL Image object."""
+         icon_to_draw = WeatherIcons.load_weather_icon(icon_code, size)
          if icon_to_draw:
              # Create a thresholded mask from the icon's alpha channel
              # to remove faint anti-aliasing pixels when pasting on black bg.
@@ -173,7 +103,7 @@ class WeatherIcons:
                  # Paste the icon directly with its original alpha channel
                  image.paste(icon_to_draw, (x, y), icon_to_draw)
              except Exception as e:
-                 print(f"Error processing or pasting icon for condition '{condition}' at ({x},{y}): {e}")
+                 print(f"Error processing or pasting icon for code '{icon_code}' at ({x},{y}): {e}")
                  # Fallback or alternative handling if needed
                  # try:
                  #    # Fallback: Try pasting with original alpha if thresholding fails
@@ -183,7 +113,7 @@ class WeatherIcons:
                  pass
          else:
              # Optional: Draw a placeholder if icon loading fails completely
-             print(f"Could not load icon for condition '{condition}' to draw at ({x},{y})")
+             print(f"Could not load icon for code '{icon_code}' to draw at ({x},{y})")
 
     @staticmethod
     def draw_sun(draw: ImageDraw, x: int, y: int, size: int = 16, color: tuple = (255, 200, 0)):

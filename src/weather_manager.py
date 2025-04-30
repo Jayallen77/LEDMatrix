@@ -164,10 +164,12 @@ class WeatherManager:
             dt = datetime.fromtimestamp(hour_data['dt'])
             temp = round(hour_data['temp'])
             condition = hour_data['weather'][0]['main']
+            icon_code = hour_data['weather'][0]['icon']
             self.hourly_forecast.append({
                 'hour': dt.strftime('%I:00 %p').lstrip('0'),  # Format as "2:00 PM"
                 'temp': temp,
-                'condition': condition
+                'condition': condition,
+                'icon': icon_code
             })
 
         # Process daily forecast
@@ -179,13 +181,15 @@ class WeatherManager:
             temp_high = round(day_data['temp']['max'])
             temp_low = round(day_data['temp']['min'])
             condition = day_data['weather'][0]['main']
+            icon_code = day_data['weather'][0]['icon']
             
             self.daily_forecast.append({
                 'date': dt.strftime('%a'),  # Day name (Mon, Tue, etc.)
                 'date_str': dt.strftime('%m/%d'),  # Date (4/8, 4/9, etc.)
                 'temp_high': temp_high,
                 'temp_low': temp_low,
-                'condition': condition
+                'condition': condition,
+                'icon': icon_code
             })
 
     def get_weather(self) -> Dict[str, Any]:
@@ -262,12 +266,13 @@ class WeatherManager:
             
             # --- Top Left: Icon ---
             condition = weather_data['weather'][0]['main']
+            icon_code = weather_data['weather'][0]['icon']
             icon_size = self.ICON_SIZE['extra_large'] # Use extra_large size
             icon_x = 1 # Small padding from left edge
             # Center the icon vertically in the top two-thirds of the display
             available_height = (self.display_manager.matrix.height * 2) // 3  # Use top 2/3 of screen
             icon_y = (available_height - icon_size) // 2
-            WeatherIcons.draw_weather_icon(image, condition, icon_x, icon_y, size=icon_size)
+            WeatherIcons.draw_weather_icon(image, icon_code, icon_x, icon_y, size=icon_size)
             
             # --- Top Right: Condition Text ---
             condition_text = condition
@@ -405,7 +410,7 @@ class WeatherManager:
                 calculated_y = top_text_height + (available_height_for_icon - icon_size) // 2
                 icon_y = (self.display_manager.matrix.height // 2) - 16
                 icon_x = center_x - icon_size // 2
-                WeatherIcons.draw_weather_icon(image, forecast['condition'], icon_x, icon_y, icon_size)
+                WeatherIcons.draw_weather_icon(image, forecast['icon'], icon_x, icon_y, icon_size)
                 
                 # Draw temperature at bottom
                 temp_text = f"{forecast['temp']}°"
@@ -475,7 +480,7 @@ class WeatherManager:
                     calculated_y = top_text_height + (available_height_for_icon - icon_size) // 2
                     icon_y = (self.display_manager.matrix.height // 2) - 16
                     icon_x = center_x - icon_size // 2
-                    WeatherIcons.draw_weather_icon(image, forecast['condition'], icon_x, icon_y, icon_size)
+                    WeatherIcons.draw_weather_icon(image, forecast['icon'], icon_x, icon_y, icon_size)
                     
                     # Draw high/low temperatures at bottom (without degree symbol)
                     temp_text = f"{forecast['temp_low']} / {forecast['temp_high']}" # Removed degree symbols
