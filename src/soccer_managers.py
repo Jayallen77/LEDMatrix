@@ -12,7 +12,8 @@ from src.display_manager import DisplayManager
 from src.cache_manager import CacheManager
 
 # Constants
-ESPN_SOCCER_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/scoreboards"
+# ESPN_SOCCER_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/scoreboards" # Old URL
+ESPN_SOCCER_LEAGUE_SCOREBOARD_URL_FORMAT = "http://site.api.espn.com/apis/site/v2/sports/soccer/{}/scoreboard" # New format string
 # Common league slugs (add more as needed)
 LEAGUE_SLUGS = {
     "eng.1": "Premier League",
@@ -126,95 +127,110 @@ class BaseSoccerManager:
 
     @classmethod
     def _fetch_shared_data(cls, date_str: str = None) -> Optional[Dict]:
-        """Fetch and cache data for all managers to share."""
+        """Fetch and cache data for all managers to share, iterating through target leagues."""
         current_time = time.time()
-        all_data = {"events": []} # Combine data from multiple dates/leagues
+        all_data = {"events": []}
+        target_leagues = cls.soccer_config.get("leagues", list(LEAGUE_SLUGS.keys())) if hasattr(cls, 'soccer_config') else list(LEAGUE_SLUGS.keys())
 
-        # Determine dates to fetch
         today = datetime.now(timezone.utc).date()
         dates_to_fetch = [
-            (today - timedelta(days=1)).strftime('%Y%m%d'), # Yesterday
-            today.strftime('%Y%m%d'),                     # Today
-            (today + timedelta(days=1)).strftime('%Y%m%d')      # Tomorrow (for upcoming)
+            (today - timedelta(days=1)).strftime('%Y%m%d'),
+            today.strftime('%Y%m%d'),
+            (today + timedelta(days=1)).strftime('%Y%m%d')
         ]
         if date_str and date_str not in dates_to_fetch:
-             dates_to_fetch.append(date_str) # Ensure specific requested date is included
+            dates_to_fetch.append(date_str)
 
-
-        for fetch_date in dates_to_fetch:
-            cache_key = f"soccer_{fetch_date}"
-            
-            # Check cache first
-            cached_data = cls.cache_manager.get(cache_key, max_age=300) # 5 minutes cache
-            if cached_data:
-                cls.logger.info(f"[Soccer] Using cached data for {fetch_date}")
-                if "events" in cached_data:
-                    all_data["events"].extend(cached_data["events"])
-                continue # Skip fetching if cached
-
-            # If not in cache or stale, fetch from API
-            try:
-                url = ESPN_SOCCER_SCOREBOARD_URL
-                params = {'dates': fetch_date, 'limit': 500} # Fetch more events if needed
-
-                response = requests.get(url, params=params)
-                response.raise_for_status()
-                data = response.json()
-                cls.logger.info(f"[Soccer] Successfully fetched data from ESPN API for date {fetch_date}")
-
-                # Cache the response
-                cls.cache_manager.set(cache_key, data)
+        for league_slug in target_leagues:
+            for fetch_date in dates_to_fetch:
+                cache_key = f"soccer_{league_slug}_{fetch_date}"
                 
-                if "events" in data:
-                    all_data["events"].extend(data["events"])
+                # Check cache first
+                cached_data = cls.cache_manager.get(cache_key, max_age=300)
+                if cached_data:
+                    cls.logger.debug(f"[Soccer] Using cached data for {league_slug} on {fetch_date}")
+                    if "events" in cached_data:
+                        all_data["events"].extend(cached_data["events"])
+                    continue
 
-            except requests.exceptions.RequestException as e:
-                cls.logger.error(f"[Soccer] Error fetching data from ESPN for date {fetch_date}: {e}")
-                # Continue to try other dates even if one fails
+                try:
+                    url = ESPN_SOCCER_LEAGUE_SCOREBOARD_URL_FORMAT.format(league_slug)
+                    params = {'dates': fetch_date, 'limit': 100} # Limit per league/date call
 
-        # Update shared data and timestamp (using a generic key for simplicity)
-        cls._shared_data = all_data
-        cls._last_shared_update = current_time
+                    response = requests.get(url, params=params)
+                    response.raise_for_status()
+                    data = response.json()
+                    cls.logger.info(f"[Soccer] Fetched data from ESPN API for {league_slug} on {fetch_date}")
+
+                    cls.cache_manager.set(cache_key, data)
+                    if "events" in data:
+                        all_data["events"].extend(data["events"])
+
+                except requests.exceptions.RequestException as e:
+                    # Log specific error but continue trying other leagues/dates
+                    if response is not None and response.status_code == 404:
+                         cls.logger.debug(f"[Soccer] No data found (404) for {league_slug} on {fetch_date}. URL: {url}")
+                    else:
+                         cls.logger.error(f"[Soccer] Error fetching data from ESPN for {league_slug} on {fetch_date}: {e}")
+                    # Cache an empty result for 404s to avoid retrying immediately
+                    if response is not None and response.status_code == 404:
+                         cls.cache_manager.set(cache_key, {"events": []})
+
+
+        # Filter combined data by target leagues (might be redundant now but safe)
+        # This step might not be strictly necessary anymore if fetching is already league-specific
+        # but keeping it doesn't hurt.
+        # filtered_events = [
+        #     event for event in all_data["events"]
+        #     if event.get("league", {}).get("slug") in target_leagues
+        # ]
+        # cls._shared_data = {"events": filtered_events} # Use the already combined data
+
+        cls._shared_data = all_data # Store combined data
+        cls._last_shared_update = current_time # Update timestamp
 
         return cls._shared_data
 
-
     def _fetch_data(self, date_str: str = None) -> Optional[Dict]:
-        """Fetch data using shared data mechanism, ensuring fresh data for live games."""
+        """Fetch data using shared data mechanism or live fetching per league."""
         if isinstance(self, SoccerLiveManager) and not self.test_mode:
-            # Live manager bypasses shared cache for most recent data
-            try:
-                url = ESPN_SOCCER_SCOREBOARD_URL
-                # Fetch only today's data for live games
-                today_date_str = datetime.now(timezone.utc).strftime('%Y%m%d')
-                params = {'dates': today_date_str, 'limit': 500}
+            # Live manager bypasses shared cache; fetches today's data per league
+            live_data = {"events": []}
+            today_date_str = datetime.now(timezone.utc).strftime('%Y%m%d')
+            
+            for league_slug in self.target_leagues:
+                try:
+                    # Check cache first for live data (shorter expiry?)
+                    # cache_key = f"soccer_live_{league_slug}_{today_date_str}"
+                    # cached_league_data = self.cache_manager.get(cache_key, max_age=15) # Short cache for live
+                    # if cached_league_data:
+                    #      self.logger.debug(f"[Soccer] Using cached live data for {league_slug}")
+                    #      if "events" in cached_league_data: live_data["events"].extend(cached_league_data["events"])
+                    #      continue 
 
-                response = requests.get(url, params=params)
-                response.raise_for_status()
-                data = response.json()
-                self.logger.info(f"[Soccer] Successfully fetched live game data from ESPN API for {today_date_str}")
-                # Filter by target leagues immediately
-                if "events" in data:
-                     data["events"] = [
-                        event for event in data["events"]
-                        if event.get("league", {}).get("slug") in self.target_leagues
-                    ]
-                return data
-            except requests.exceptions.RequestException as e:
-                self.logger.error(f"[Soccer] Error fetching live game data from ESPN: {e}")
-                return None
+                    url = ESPN_SOCCER_LEAGUE_SCOREBOARD_URL_FORMAT.format(league_slug)
+                    params = {'dates': today_date_str, 'limit': 100}
+
+                    response = requests.get(url, params=params)
+                    response.raise_for_status()
+                    league_data = response.json()
+                    self.logger.info(f"[Soccer] Fetched live game data from ESPN API for {league_slug} on {today_date_str}")
+                    
+                    if "events" in league_data:
+                        live_data["events"].extend(league_data["events"])
+                    # self.cache_manager.set(cache_key, league_data) # Cache the result
+
+                except requests.exceptions.RequestException as e:
+                     if response is not None and response.status_code == 404:
+                         self.logger.debug(f"[Soccer] No live data found (404) for {league_slug} today. URL: {url}")
+                     else:
+                         self.logger.error(f"[Soccer] Error fetching live game data for {league_slug}: {e}")
+                     # Cache empty result on 404? Maybe not for live?
+            return live_data
         else:
-            # For non-live games or test mode, use the shared data fetch
-            data = self._fetch_shared_data(date_str)
-            # Filter shared data by target leagues
-            if data and "events" in data:
-                filtered_events = [
-                    event for event in data["events"]
-                    if event.get("league", {}).get("slug") in self.target_leagues
-                ]
-                # Return a copy to avoid modifying the shared cache
-                return {"events": filtered_events}
-            return data
+            # Non-live or test mode: use the shared data fetch (which now iterates leagues)
+            # The filtering by target_leagues is inherently done within _fetch_shared_data now.
+            return self._fetch_shared_data(date_str)
 
     def _load_fonts(self):
         """Load fonts used by the scoreboard."""
@@ -328,12 +344,13 @@ class BaseSoccerManager:
             competitors = competition["competitors"]
             game_date_str = game_event["date"]
             league_info = game_event.get("league", {})
-            league_slug = league_info.get("slug")
-            league_name = league_info.get("name", league_slug) # Use name if available
+            league_slug = league_info.get("slug", "unknown") # Default if missing
+            league_name = league_info.get("name", league_slug)
 
-            # Filter out games not in target leagues (redundant check, but safe)
+            # Re-introduce filtering at extraction time as a safeguard, 
+            # especially if _fetch_data bypasses _fetch_shared_data
             if league_slug not in self.target_leagues:
-                self.logger.debug(f"[Soccer] Skipping game from league: {league_name} ({league_slug})")
+                self.logger.debug(f"[Soccer] Skipping game from league (in extract): {league_name} ({league_slug})")
                 return None
 
             try:
@@ -410,16 +427,27 @@ class BaseSoccerManager:
 
             home_logo = game.get("home_logo")
             away_logo = game.get("away_logo")
+            logo_size = 36 # Defined logo size
 
             # --- Layout Configuration ---
-            logo_y = (self.display_height - (home_logo.height if home_logo else 20)) // 2
-            away_logo_x = 2
-            home_logo_x = self.display_width - (home_logo.width if home_logo else 20) - 2
+            # Vertically center logos if possible, otherwise place near top
+            logo_y = (self.display_height - logo_size) // 2
+            if logo_y < 0: logo_y = 0 # Ensure non-negative
+            
+            # Place logos near edges
+            away_logo_x = 1
+            home_logo_x = self.display_width - logo_size - 1
 
             center_x = self.display_width // 2
-            score_y = logo_y # Align score vertically with logos
-            abbr_y = score_y + (self.fonts['score'].size if 'score' in self.fonts else 10) + 1 # Below score
+            abbr_font = self.fonts['team']
+            abbr_height = abbr_font.size if hasattr(abbr_font, 'size') else 6
+            abbr_y = self.display_height - abbr_height - 1 # Position at the very bottom
+            
+            status_font = self.fonts['status']
             status_y = 1 # Status/Time at the top center
+            score_font = self.fonts['score']
+            score_height = score_font.size if hasattr(score_font, 'size') else 10
+            score_y = (self.display_height - score_height) // 2 # Center score vertically
 
             # --- Draw Logos ---
             if away_logo:
@@ -427,47 +455,43 @@ class BaseSoccerManager:
             if home_logo:
                 main_img.paste(home_logo, (home_logo_x, logo_y), home_logo)
 
-            # --- Draw Team Abbreviations ---
+            # --- Draw Team Abbreviations (Bottom) ---
             away_abbr = game.get("away_abbr", "AWAY")
             home_abbr = game.get("home_abbr", "HOME")
-            abbr_font = self.fonts['team']
-
+            
             away_abbr_width = draw.textlength(away_abbr, font=abbr_font)
             home_abbr_width = draw.textlength(home_abbr, font=abbr_font)
 
-            # Position abbreviations near logos
-            away_abbr_x = away_logo_x + (away_logo.width if away_logo else 20) + 2
-            home_abbr_x = home_logo_x - home_abbr_width - 2
+            # Position abbreviations: One left-aligned, one right-aligned
+            # Add a small margin from the edges
+            away_abbr_x = 2 
+            home_abbr_x = self.display_width - home_abbr_width - 2
 
             self._draw_text_with_outline(draw, away_abbr, (away_abbr_x, abbr_y), abbr_font)
             self._draw_text_with_outline(draw, home_abbr, (home_abbr_x, abbr_y), abbr_font)
 
-
-            # --- Draw Score / Game Time ---
-            score_font = self.fonts['score']
-            status_font = self.fonts['time'] # Use 'time' font for status line
+            # --- Draw Score / Game Time / Status ---
+            status_font = self.fonts['time'] # Re-using 'time' font for top status
 
             if game.get("is_upcoming"):
-                # Display Date and Time for upcoming games
+                # Upcoming: Show Date & Time centered vertically, "Upcoming" top center
                 game_date = game.get("game_date", "")
                 game_time = game.get("game_time", "")
                 date_time_text = f"{game_date} {game_time}"
 
                 date_time_width = draw.textlength(date_time_text, font=status_font)
                 date_time_x = center_x - date_time_width // 2
-                # Position below logos/abbrs
-                date_time_y = abbr_y + (self.fonts['team'].size if 'team' in self.fonts else 8) + 2
-
+                date_time_y = score_y # Use the calculated vertical center for score
+                
                 self._draw_text_with_outline(draw, date_time_text, (date_time_x, date_time_y), status_font)
 
-                # Show "Upcoming" status at the top
                 status_text = "Upcoming"
                 status_width = draw.textlength(status_text, font=status_font)
                 status_x = center_x - status_width // 2
                 self._draw_text_with_outline(draw, status_text, (status_x, status_y), status_font)
 
             else:
-                # Display Score for live/final games
+                # Live/Final: Show Score centered vertically, Status top center
                 home_score = str(game.get("home_score", "0"))
                 away_score = str(game.get("away_score", "0"))
                 score_text = f"{away_score} - {home_score}"
@@ -477,12 +501,10 @@ class BaseSoccerManager:
 
                 self._draw_text_with_outline(draw, score_text, (score_x, score_y), score_font)
 
-                # --- Draw Game Status/Time ---
                 status_text = game.get("game_clock_display", "")
                 status_width = draw.textlength(status_text, font=status_font)
                 status_x = center_x - status_width // 2
                 self._draw_text_with_outline(draw, status_text, (status_x, status_y), status_font)
-
 
             # --- Display Image ---
             self.display_manager.image.paste(main_img, (0, 0))
