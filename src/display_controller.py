@@ -113,7 +113,7 @@ class DisplayController:
             self.soccer_recent = None
             self.soccer_upcoming = None
         logger.info("Soccer managers initialized in %.3f seconds", time.time() - soccer_time)
-
+            
         # Track MLB rotation state
         self.mlb_current_team_index = 0
         self.mlb_showing_recent = True
@@ -511,7 +511,7 @@ class DisplayController:
                         elif self.current_display_mode == 'mlb_upcoming' and self.mlb_upcoming:
                             self.mlb_upcoming.display(force_clear=self.force_clear)
                             display_updated = True
-                                
+                                    
                         elif self.current_display_mode == 'soccer_recent' and self.soccer_recent:
                             self.soccer_recent.display(force_clear=self.force_clear)
                             display_updated = True
@@ -526,7 +526,7 @@ class DisplayController:
                         elif self.current_display_mode == 'text_display' and self.text_display:
                             self.text_display.display() # Assumes text handles its own drawing
                             display_updated = True
-                        
+                            
                         # Reset force_clear only if a display method was actually called
                         if display_updated:
                              self.force_clear = False
