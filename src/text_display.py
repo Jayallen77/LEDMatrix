@@ -98,10 +98,7 @@ class TextDisplay:
             
     def display(self):
         """Draw the text onto the display manager's canvas."""
-        self.display_manager.draw.rectangle(
-            (0, 0, self.display_manager.matrix.width, self.display_manager.matrix.height),
-            fill=self.bg_color
-        )
+        self.display_manager.clear()
 
         matrix_width = self.display_manager.matrix.width
         matrix_height = self.display_manager.matrix.height
