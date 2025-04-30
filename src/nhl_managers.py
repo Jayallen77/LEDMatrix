@@ -264,10 +264,10 @@ class BaseNHLManager:
 
     def _load_and_resize_logo(self, team_abbrev: str) -> Optional[Image.Image]:
         """Load and resize a team logo, with caching."""
-        self.logger.debug(f"Loading logo for {team_abbrev}")
+        # self.logger.debug(f"Loading logo for {team_abbrev}") # Commented out
         
         if team_abbrev in self._logo_cache:
-            self.logger.debug(f"Using cached logo for {team_abbrev}")
+            # self.logger.debug(f"Using cached logo for {team_abbrev}") # Commented out
             return self._logo_cache[team_abbrev]
             
         logo_path = os.path.join(self.logo_dir, f"{team_abbrev}.png")
