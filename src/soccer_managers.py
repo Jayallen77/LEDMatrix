@@ -5,6 +5,7 @@ import requests
 import json
 from typing import Dict, Any, Optional, List
 from PIL import Image, ImageDraw, ImageFont
+import random # Import random for placeholder logo generation
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from src.display_manager import DisplayManager
@@ -133,7 +134,7 @@ class BaseSoccerManager:
         today = datetime.now(timezone.utc).date()
         dates_to_fetch = [
             (today - timedelta(days=1)).strftime('%Y%m%d'), # Yesterday
-            today.strftime('%Y%m%d'),                     # Today
+            today.strftime('%Ym%d'),                     # Today
             (today + timedelta(days=1)).strftime('%Y%m%d')      # Tomorrow (for upcoming)
         ]
         if date_str and date_str not in dates_to_fetch:
@@ -219,10 +220,10 @@ class BaseSoccerManager:
         """Load fonts used by the scoreboard."""
         fonts = {}
         try:
-            fonts['score'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8) # Smaller score
+            fonts['score'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 10) # Slightly larger score
             fonts['time'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
-            fonts['team'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6) # Even smaller team abbr
-            fonts['status'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6) # Small status
+            fonts['team'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6) # Keep team abbr small
+            fonts['status'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6) # Keep status small
             logging.info("[Soccer] Successfully loaded custom fonts")
         except IOError:
             logging.warning("[Soccer] Custom fonts not found, using default PIL font.")
@@ -253,11 +254,17 @@ class BaseSoccerManager:
             if not os.path.exists(logo_path):
                 self.logger.info(f"Creating placeholder logo for {team_abbrev}")
                 os.makedirs(os.path.dirname(logo_path), exist_ok=True)
-                logo = Image.new('RGBA', (24, 24), (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255), 255)) # Smaller default logo
+                logo = Image.new('RGBA', (36, 36), (random.randint(50, 200), random.randint(50, 200), random.randint(50, 200), 255))
                 draw = ImageDraw.Draw(logo)
-                # Simple placeholder: colored square
-                # Optionally add text, but keep it simple
-                # draw.text((2, 2), team_abbrev[:3], fill=(0,0,0,255)) # Draw abbreviation if needed
+                # Optionally add text to placeholder
+                try:
+                    placeholder_font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 12)
+                    text_width = draw.textlength(team_abbrev, font=placeholder_font)
+                    text_x = (36 - text_width) // 2
+                    text_y = 10
+                    draw.text((text_x, text_y), team_abbrev, fill=(0,0,0,255), font=placeholder_font)
+                except IOError:
+                    pass # Font not found, skip text
                 logo.save(logo_path)
                 self.logger.info(f"Created placeholder logo at {logo_path}")
 
@@ -265,9 +272,10 @@ class BaseSoccerManager:
             if logo.mode != 'RGBA':
                 logo = logo.convert('RGBA')
 
-            # Resize logo to fit better in soccer layout (e.g., 16x16 or 20x20)
-            target_size = 20 # Smaller logos for soccer
-            logo.thumbnail((target_size, target_size), Image.Resampling.LANCZOS)
+            # Resize logo to target size
+            target_size = 36 # Change target size to 36x36
+            # Use resize instead of thumbnail to force size if image is smaller
+            logo = logo.resize((target_size, target_size), Image.Resampling.LANCZOS)
             self.logger.debug(f"Resized {team_abbrev} logo to {logo.size}")
 
             self._logo_cache[team_abbrev] = logo
@@ -302,7 +310,10 @@ class BaseSoccerManager:
                  clock_parts = clock.split(':')
                  return f"{clock_parts[0]}'" # Display as minutes'
              else:
-                 return clock # Fallback
+                 # Handle potential stoppage time format like "90:00+2"
+                 if '+' in clock:
+                     clock = clock.replace(':00', '') # Remove :00 for cleaner look
+                 return clock
                  
         return clock # Default fallback
 
