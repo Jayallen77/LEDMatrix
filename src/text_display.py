@@ -1,6 +1,6 @@
 import logging
 import time
-from PIL import ImageFont
+from PIL import ImageFont, Image, ImageDraw
 import freetype
 import os
 
@@ -98,8 +98,16 @@ class TextDisplay:
             
     def display(self):
         """Draw the text onto the display manager's canvas."""
-        self.display_manager.clear()
-
+        # Explicitly create a new image and draw context for the display manager
+        self.display_manager.image = Image.new('RGB', (self.display_manager.matrix.width, self.display_manager.matrix.height))
+        self.display_manager.draw = ImageDraw.Draw(self.display_manager.image)
+        
+        # Draw the background rectangle first
+        self.display_manager.draw.rectangle(
+            (0, 0, self.display_manager.matrix.width, self.display_manager.matrix.height),
+            fill=self.bg_color
+        )
+        
         matrix_width = self.display_manager.matrix.width
         matrix_height = self.display_manager.matrix.height
 
