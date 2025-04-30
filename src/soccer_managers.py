@@ -134,7 +134,7 @@ class BaseSoccerManager:
         today = datetime.now(timezone.utc).date()
         dates_to_fetch = [
             (today - timedelta(days=1)).strftime('%Y%m%d'), # Yesterday
-            today.strftime('%Ym%d'),                     # Today
+            today.strftime('%Y%m%d'),                     # Today
             (today + timedelta(days=1)).strftime('%Y%m%d')      # Tomorrow (for upcoming)
         ]
         if date_str and date_str not in dates_to_fetch:
