@@ -146,12 +146,12 @@
     },
     "text_display": {
         "enabled": true,
-        "text": "Your custom text here!",
+        "text": "Subscribe to ChuckBuilds",
         "font_path": "assets/fonts/5x7.bdf", 
         "font_size": 7,
         "scroll": false,
         "scroll_speed": 25, 
         "text_color": [255, 255, 0], 
-        "background_color": [0, 0, 50]
+        "background_color": [0, 0, 0]
     }
 } 
