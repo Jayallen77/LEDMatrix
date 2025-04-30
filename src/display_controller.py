@@ -449,7 +449,7 @@ class DisplayController:
                         self.youtube.display(force_clear=self.force_clear)
                             
                     elif self.current_display_mode == 'text_display' and self.text_display:
-                        self.text_display.display(force_clear=self.force_clear)
+                        self.text_display.display()
                             
                 except Exception as e:
                     logger.error(f"Error updating display for mode {self.current_display_mode}: {e}", exc_info=True)
