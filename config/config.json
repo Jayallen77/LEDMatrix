@@ -43,7 +43,10 @@
             "mlb_live": 30,
             "mlb_recent": 20,
             "mlb_upcoming": 20,
-            "text_display": 10
+            "text_display": 10,
+            "soccer_live": 30,
+            "soccer_recent": 20,
+            "soccer_upcoming": 20
         }
     },
     "clock": {
@@ -153,5 +156,23 @@
         "scroll_speed": 25, 
         "text_color": [255, 255, 0], 
         "background_color": [0, 0, 0]
+    },
+    "soccer_scoreboard": {
+        "enabled": false,
+        "test_mode": false,
+        "update_interval_seconds": 300,
+        "live_update_interval": 20,
+        "recent_update_interval": 3600,
+        "upcoming_update_interval": 3600,
+        "recent_game_hours": 48,
+        "favorite_teams": [],
+        "leagues": ["eng.1", "esp.1", "ger.1", "ita.1", "fra.1", "uefa.champions", "usa.1"],
+        "logo_dir": "assets/sports/soccer_logos",
+        "display_modes": {
+            "soccer_live": true,
+            "soccer_recent": true,
+            "soccer_upcoming": true
+        },
+        "live_game_duration": 30
     }
 } 
