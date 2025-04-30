@@ -152,9 +152,6 @@ class TextDisplay:
             )
             # No need to call update_display here, controller should handle it after calling display
         
-        # Add the call to update the display here
-        self.display_manager.update_display()
-        
         # Reset scroll position for next time if not scrolling
         # self.last_update_time = time.time() # Reset time tracking if static
 
