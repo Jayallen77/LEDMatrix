@@ -158,14 +158,14 @@
         "background_color": [0, 0, 0]
     },
     "soccer_scoreboard": {
-        "enabled": false,
-        "test_mode": false,
+        "enabled": true,
+        "test_mode": true,
         "update_interval_seconds": 300,
         "live_update_interval": 20,
         "recent_update_interval": 3600,
         "upcoming_update_interval": 3600,
         "recent_game_hours": 48,
-        "favorite_teams": [],
+        "favorite_teams": ["BAR"],
         "leagues": ["eng.1", "esp.1", "ger.1", "ita.1", "fra.1", "uefa.champions", "usa.1"],
         "logo_dir": "assets/sports/soccer_logos",
         "display_modes": {
