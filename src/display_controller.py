@@ -22,6 +22,7 @@ from src.nba_managers import NBALiveManager, NBARecentManager, NBAUpcomingManage
 from src.mlb_manager import MLBLiveManager, MLBRecentManager, MLBUpcomingManager
 from src.youtube_display import YouTubeDisplay
 from src.calendar_manager import CalendarManager
+from src.text_display import TextDisplay
 
 # Get logger without configuring
 logger = logging.getLogger(__name__)
@@ -47,7 +48,9 @@ class DisplayController:
         self.news = StockNewsManager(self.config, self.display_manager) if self.config.get('stock_news', {}).get('enabled', False) else None
         self.calendar = CalendarManager(self.display_manager, self.config) if self.config.get('calendar', {}).get('enabled', False) else None
         self.youtube = YouTubeDisplay(self.display_manager, self.config) if self.config.get('youtube', {}).get('enabled', False) else None
+        self.text_display = TextDisplay(self.display_manager, self.config) if self.config.get('text_display', {}).get('enabled', False) else None
         logger.info(f"Calendar Manager initialized: {'Object' if self.calendar else 'None'}")
+        logger.info(f"Text Display initialized: {'Object' if self.text_display else 'None'}")
         logger.info("Display modes initialized in %.3f seconds", time.time() - init_time)
         
         # Initialize NHL managers if enabled
@@ -105,6 +108,7 @@ class DisplayController:
         if self.news: self.available_modes.append('stock_news')
         if self.calendar: self.available_modes.append('calendar')
         if self.youtube: self.available_modes.append('youtube')
+        if self.text_display: self.available_modes.append('text_display')
         
         # Add NHL display modes if enabled
         if nhl_enabled:
@@ -191,6 +195,7 @@ class DisplayController:
         if self.news: self.news.update_news_data()
         if self.calendar: self.calendar.update(time.time())
         if self.youtube: self.youtube.update()
+        if self.text_display: self.text_display.update()
         
         # Update NHL managers
         if self.nhl_live: self.nhl_live.update()
@@ -407,26 +412,23 @@ class DisplayController:
                 # Display current mode frame (only for non-live modes)
                 try:
                     if self.current_display_mode == 'clock' and self.clock:
-                        self.clock.display_time(force_clear=self.force_clear)
+                        self.clock.display()
                             
                     elif self.current_display_mode == 'weather_current' and self.weather:
-                        self.weather.display_weather(force_clear=self.force_clear)
+                        self.weather.display_current()
                     elif self.current_display_mode == 'weather_hourly' and self.weather:
-                        self.weather.display_hourly_forecast(force_clear=self.force_clear)
+                        self.weather.display_hourly()
                     elif self.current_display_mode == 'weather_daily' and self.weather:
-                        self.weather.display_daily_forecast(force_clear=self.force_clear)
+                        self.weather.display_daily()
                             
                     elif self.current_display_mode == 'stocks' and self.stocks:
-                        self.stocks.display_stocks(force_clear=self.force_clear)
+                        self.stocks.display()
                             
                     elif self.current_display_mode == 'stock_news' and self.news:
-                        self.news.display_news()
+                        self.news.display()
                             
                     elif self.current_display_mode == 'calendar' and self.calendar:
-                        # Update calendar data if needed
-                        self.calendar.update(current_time)
-                        # Always display the calendar, with force_clear only on mode switch
-                        self.calendar.display(force_clear=self.force_clear)
+                        self.calendar.display()
                             
                     elif self.current_display_mode == 'nhl_recent' and self.nhl_recent:
                         self.nhl_recent.display(force_clear=self.force_clear)
@@ -444,7 +446,10 @@ class DisplayController:
                         self.mlb_upcoming.display(force_clear=self.force_clear)
                             
                     elif self.current_display_mode == 'youtube' and self.youtube:
-                        self.youtube.display(force_clear=self.force_clear)
+                        self.youtube.display()
+                            
+                    elif self.current_display_mode == 'text_display' and self.text_display:
+                        self.text_display.display()
                             
                 except Exception as e:
                     logger.error(f"Error updating display for mode {self.current_display_mode}: {e}", exc_info=True)

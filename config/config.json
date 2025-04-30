@@ -42,7 +42,8 @@
             "youtube": 20,
             "mlb_live": 30,
             "mlb_recent": 20,
-            "mlb_upcoming": 20
+            "mlb_upcoming": 20,
+            "text_display": 10
         }
     },
     "clock": {
@@ -142,5 +143,15 @@
             "mlb_upcoming": true
         },
         "live_game_duration": 30
+    },
+    "text_display": {
+        "enabled": true,
+        "text": "Your custom text here!",
+        "font_path": "assets/fonts/5x7.bdf", 
+        "font_size": 7,
+        "scroll": false,
+        "scroll_speed": 25, 
+        "text_color": [255, 255, 0], 
+        "background_color": [0, 0, 50]
     }
 } 
