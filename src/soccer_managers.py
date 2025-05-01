@@ -95,21 +95,27 @@ class BaseSoccerManager:
     cache_manager = CacheManager()
     logger = logging.getLogger('Soccer') # Use 'Soccer' logger
     
+    # Class attribute to store soccer_config for shared access
+    _soccer_config_shared = {} 
+
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         self.display_manager = display_manager
         self.config = config
         self.soccer_config = config.get("soccer_scoreboard", {}) # Use 'soccer_scoreboard' config
+        BaseSoccerManager._soccer_config_shared = self.soccer_config # Store for class methods
+        
         self.is_enabled = self.soccer_config.get("enabled", False)
         self.test_mode = self.soccer_config.get("test_mode", False)
         self.logo_dir = self.soccer_config.get("logo_dir", "assets/sports/soccer_logos") # Soccer logos
-        self.update_interval = self.soccer_config.get("update_interval_seconds", 60)
+        self.update_interval = self.soccer_config.get("update_interval_seconds", 60) # General fallback
         self.last_update = 0
         self.current_game = None
         self.fonts = self._load_fonts()
         self.favorite_teams = self.soccer_config.get("favorite_teams", [])
         self.target_leagues = self.soccer_config.get("leagues", list(LEAGUE_SLUGS.keys())) # Get target leagues from config
-        self.recent_hours = self.soccer_config.get("recent_game_hours", 48)
-        
+        self.recent_hours = self.soccer_config.get("recent_game_hours", 168) # Used for recent past AND upcoming future display window
+        self.upcoming_fetch_days = self.soccer_config.get("upcoming_fetch_days", 7) # Days ahead to fetch (default: tomorrow)
+
         self.logger.setLevel(logging.DEBUG)
         
         display_config = config.get("display", {})
@@ -124,22 +130,29 @@ class BaseSoccerManager:
         self.logger.info(f"Initialized Soccer manager with display dimensions: {self.display_width}x{self.display_height}")
         self.logger.info(f"Logo directory: {self.logo_dir}")
         self.logger.info(f"Target leagues: {self.target_leagues}")
+        self.logger.info(f"Upcoming fetch days: {self.upcoming_fetch_days}") # Log new setting
 
     @classmethod
     def _fetch_shared_data(cls, date_str: str = None) -> Optional[Dict]:
         """Fetch and cache data for all managers to share, iterating through target leagues."""
         current_time = time.time()
         all_data = {"events": []}
-        target_leagues = cls.soccer_config.get("leagues", list(LEAGUE_SLUGS.keys())) if hasattr(cls, 'soccer_config') else list(LEAGUE_SLUGS.keys())
+        # Access shared config through the class attribute
+        target_leagues = cls._soccer_config_shared.get("leagues", list(LEAGUE_SLUGS.keys()))
+        upcoming_fetch_days = cls._soccer_config_shared.get("upcoming_fetch_days", 1) # Fetch days
 
         today = datetime.now(timezone.utc).date()
+        # Generate dates from yesterday up to 'upcoming_fetch_days' in the future
         dates_to_fetch = [
-            (today - timedelta(days=1)).strftime('%Y%m%d'),
-            today.strftime('%Y%m%d'),
-            (today + timedelta(days=1)).strftime('%Y%m%d')
+            (today + timedelta(days=i)).strftime('%Y%m%d') 
+            for i in range(-1, upcoming_fetch_days + 1) # -1 (yesterday) to upcoming_fetch_days
         ]
+        
+        # Add specific date if provided and not already included (e.g., for testing/debugging)
         if date_str and date_str not in dates_to_fetch:
             dates_to_fetch.append(date_str)
+            
+        cls.logger.debug(f"[Soccer] Fetching shared data for dates: {dates_to_fetch}")
 
         for league_slug in target_leagues:
             for fetch_date in dates_to_fetch:
@@ -689,10 +702,11 @@ class SoccerRecentManager(BaseSoccerManager):
         self.games_list = []   # Holds games filtered by favorite teams (if applicable)
         self.current_game_index = 0
         self.last_update = 0
-        self.update_interval = 300 # 5 minutes for recent games
+        # Use configurable update interval, default to 300s (5 min)
+        self.update_interval = self.soccer_config.get("recent_update_interval", 300) 
         self.last_game_switch = 0
         self.game_display_duration = 15 # Short display time for recent/upcoming
-        self.logger.info(f"Initialized SoccerRecentManager")
+        self.logger.info(f"Initialized SoccerRecentManager (Update Interval: {self.update_interval}s)")
 
     def update(self):
         """Update recent games data."""
@@ -785,14 +799,15 @@ class SoccerUpcomingManager(BaseSoccerManager):
         self.upcoming_games = [] # Filtered list for display
         self.current_game_index = 0
         self.last_update = 0
-        self.update_interval = 300 # 5 minutes
+        # Use configurable update interval, default to 300s (5 min)
+        self.update_interval = self.soccer_config.get("upcoming_update_interval", 300) 
         self.last_log_time = 0
         self.log_interval = 300
         self.last_warning_time = 0
         self.warning_cooldown = 300
         self.last_game_switch = 0
         self.game_display_duration = 15 # Short display time
-        self.logger.info(f"Initialized SoccerUpcomingManager")
+        self.logger.info(f"Initialized SoccerUpcomingManager (Update Interval: {self.update_interval}s)")
 
     def update(self):
         """Update upcoming games data."""
