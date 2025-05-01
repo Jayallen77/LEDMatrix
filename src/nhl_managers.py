@@ -793,6 +793,14 @@ class NHLUpcomingManager(BaseNHLManager):
                          if game['home_abbr'] in self.favorite_teams or 
                             game['away_abbr'] in self.favorite_teams]
             
+            # Log all upcoming games found *before* filtering by favorite teams
+            if new_upcoming_games:
+                self.logger.info(f"[NHL] Found {len(new_upcoming_games)} total upcoming games within window before team filtering:")
+                for game in new_upcoming_games:
+                    self.logger.info(f"  - {game['away_abbr']} vs {game['home_abbr']} at {game['game_date']} {game['game_time']}")
+            else:
+                self.logger.info("[NHL] No upcoming games found within window (before team filtering).")
+
             # Only log if there's a change in games or enough time has passed
             should_log = (
                 current_time - self.last_log_time >= self.log_interval or
