@@ -475,6 +475,7 @@ class DisplayController:
                     if manager_to_display:
                         manager_to_display.display(force_clear=self.force_clear)
                         self.force_clear = False # Reset clear flag after display
+                        continue # Skip regular mode display logic if live game was shown
                     # else handled by falling back to non-live rotation below
                     
                 # --- Regular Mode Rotation (only if NO live games OR fallback from live) ---
@@ -575,7 +576,7 @@ class DisplayController:
                         # Continue to next iteration after error
 
                 # Small sleep to prevent high CPU usage
-                time.sleep(self.update_interval)
+                #time.sleep(self.update_interval)
 
         except KeyboardInterrupt:
             logger.info("Display controller stopped by user")
