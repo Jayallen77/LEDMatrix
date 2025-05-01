@@ -201,12 +201,12 @@ class BaseSoccerManager:
             for league_slug in self.target_leagues:
                 try:
                     # Check cache first for live data (shorter expiry?)
-                    # cache_key = f"soccer_live_{league_slug}_{today_date_str}"
-                    # cached_league_data = self.cache_manager.get(cache_key, max_age=15) # Short cache for live
-                    # if cached_league_data:
-                    #      self.logger.debug(f"[Soccer] Using cached live data for {league_slug}")
-                    #      if "events" in cached_league_data: live_data["events"].extend(cached_league_data["events"])
-                    #      continue 
+                    cache_key = f"soccer_live_{league_slug}_{today_date_str}"
+                    cached_league_data = self.cache_manager.get(cache_key, max_age=15) # Short cache for live
+                    if cached_league_data:
+                         self.logger.debug(f"[Soccer] Using cached live data for {league_slug}")
+                         if "events" in cached_league_data: live_data["events"].extend(cached_league_data["events"])
+                         continue 
 
                     url = ESPN_SOCCER_LEAGUE_SCOREBOARD_URL_FORMAT.format(league_slug)
                     params = {'dates': today_date_str, 'limit': 100}
@@ -218,7 +218,7 @@ class BaseSoccerManager:
                     
                     if "events" in league_data:
                         live_data["events"].extend(league_data["events"])
-                    # self.cache_manager.set(cache_key, league_data) # Cache the result
+                    self.cache_manager.set(cache_key, league_data) # Cache the result
 
                 except requests.exceptions.RequestException as e:
                      if response is not None and response.status_code == 404:
@@ -346,12 +346,6 @@ class BaseSoccerManager:
             league_info = game_event.get("league", {})
             league_slug = league_info.get("slug", "unknown") # Default if missing
             league_name = league_info.get("name", league_slug)
-
-            # Re-introduce filtering at extraction time as a safeguard, 
-            # especially if _fetch_data bypasses _fetch_shared_data
-            if league_slug not in self.target_leagues:
-                self.logger.debug(f"[Soccer] Skipping game from league (in extract): {league_name} ({league_slug})")
-                return None
 
             try:
                 start_time_utc = datetime.fromisoformat(game_date_str.replace("Z", "+00:00"))
