@@ -407,32 +407,61 @@ class DisplayController:
                 
                 # --- Live Game Handling ---
                 if has_live_games:
-                    # Determine which live manager to use
+                    # Determine the *highest priority* live sport initially
+                    initial_live_sport_type = live_sport_type 
+
+                    # Check if it's time to switch *between* live sports
+                    if current_time - self.last_switch > self.get_current_duration():
+                        active_live_sports = []
+                        if self.soccer_live and self.soccer_live.live_games: active_live_sports.append('soccer')
+                        if self.nhl_live and self.nhl_live.live_games: active_live_sports.append('nhl')
+                        if self.nba_live and self.nba_live.live_games: active_live_sports.append('nba')
+                        if self.mlb_live and self.mlb_live.live_games: active_live_sports.append('mlb')
+                        
+                        if len(active_live_sports) > 1:
+                            try:
+                                current_index = active_live_sports.index(self.current_display_mode.replace('_live', ''))
+                                next_index = (current_index + 1) % len(active_live_sports)
+                                live_sport_type = active_live_sports[next_index] # Update to the next live sport
+                                logger.info(f"Rotating live sports: {self.current_display_mode} -> {live_sport_type}_live")
+                                self.last_switch = current_time # Reset timer only when rotating
+                                self.force_clear = True
+                            except ValueError: 
+                                # Current mode wasn't a live mode or wasn't in the active list, default to highest priority
+                                live_sport_type = active_live_sports[0]
+                        else:
+                             # Only one live sport, or timer expired but no rotation needed
+                             # Reset timer anyway to adhere to duration for the single live sport view
+                             self.last_switch = current_time 
+                             # Don't force clear if we are staying on the same sport
+                             # self.force_clear = True 
+                    
+                    # Determine which manager to use based on the potentially updated live_sport_type
                     live_manager = None
+                    current_mode_for_display = f"{live_sport_type}_live"
+
                     if live_sport_type == 'soccer' and self.soccer_live:
                         live_manager = self.soccer_live
-                        current_mode_for_duration = 'soccer_live'
                     elif live_sport_type == 'nhl' and self.nhl_live:
                         live_manager = self.nhl_live
-                        current_mode_for_duration = 'nhl_live'
                     elif live_sport_type == 'nba' and self.nba_live:
                         live_manager = self.nba_live
-                        current_mode_for_duration = 'nba_live'
                     elif live_sport_type == 'mlb' and self.mlb_live:
                         live_manager = self.mlb_live
-                        current_mode_for_duration = 'mlb_live'
                     
                     if live_manager:
-                         # Check if switching *into* live mode or switching *between* live sports
-                        if self.current_display_mode != current_mode_for_duration:
-                            logger.info(f"Switching to LIVE mode: {current_mode_for_duration}")
-                            self.current_display_mode = current_mode_for_duration
-                            self.force_clear = True
-                            self.last_switch = current_time # Reset timer for live duration
+                         # Check if switching *into* a live mode OR switching *between* live sports
+                        if self.current_display_mode != current_mode_for_display:
+                            logger.info(f"Switching display mode to: {current_mode_for_display}")
+                            self.current_display_mode = current_mode_for_display
+                            self.force_clear = True # Force clear when changing modes
+                            if not (current_time - self.last_switch > self.get_current_duration()):
+                                # If we didn't just rotate via timer, reset the switch time now
+                                self.last_switch = current_time 
 
                         # Display the current live game using the selected manager
                         live_manager.display(force_clear=self.force_clear)
-                        self.force_clear = False # Clear only once when switching
+                        self.force_clear = False # Clear only once when switching or rotating
                     else:
                          # Should not happen if _check_live_games is correct, but handle defensively
                          has_live_games = False # Fall back to regular rotation
