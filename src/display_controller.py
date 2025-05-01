@@ -407,20 +407,20 @@ class DisplayController:
                 
                 # --- Live Game Handling ---
                 if has_live_games:
-                    target_mode = "" # The mode we intend to display this iteration
-                    needs_state_update = False
+                    mode_to_show = "" # What we intend to display this iteration
+                    perform_state_update = False # Flag to trigger mode change
 
                     is_currently_live = self.current_display_mode.endswith('_live')
 
                     if not is_currently_live:
-                        # Switching INTO live mode from a non-live mode
-                        target_mode = f"{live_sport_type}_live" # Use highest priority sport
-                        needs_state_update = True
-                        logger.info(f"Switching into LIVE mode: {target_mode}")
+                        # Switching INTO live mode
+                        mode_to_show = f"{live_sport_type}_live" # Use highest priority
+                        perform_state_update = True
+                        logger.info(f"Switching into LIVE mode: {mode_to_show}")
                     else:
                         # Already in a live mode, check timer for rotation
                         if current_time - self.last_switch > self.get_current_duration():
-                            # Timer expired, check for rotation possibility
+                            # Timer expired
                             active_live_sports = []
                             priority_order = ['soccer', 'nhl', 'nba', 'mlb'] 
                             for sport in priority_order:
@@ -429,55 +429,62 @@ class DisplayController:
                                     active_live_sports.append(sport)
                             
                             if len(active_live_sports) > 1:
+                                # More than one sport live, rotate
                                 try:
                                     current_sport = self.current_display_mode.replace('_live', '')
                                     current_index = active_live_sports.index(current_sport)
                                     next_index = (current_index + 1) % len(active_live_sports)
                                     next_sport = active_live_sports[next_index]
-                                    target_mode = f"{next_sport}_live"
-                                    if target_mode != self.current_display_mode:
-                                         needs_state_update = True
-                                         logger.info(f"Rotating live sports: {self.current_display_mode} -> {target_mode}")
-                                    else: 
-                                         # Target is same as current, reset timer but no mode change needed
-                                         self.last_switch = current_time 
-                                         self.force_clear = False
+                                    mode_to_show = f"{next_sport}_live"
+                                    if mode_to_show != self.current_display_mode:
+                                        perform_state_update = True
+                                        logger.info(f"Rotating live sports: {self.current_display_mode} -> {mode_to_show}")
+                                    else:
+                                        # Should not happen if index calculation is correct, but handle defensively
+                                        self.last_switch = current_time # Reset timer anyway
+                                        self.force_clear = False
                                 except ValueError: 
                                     logger.warning(f"Could not find current live mode {self.current_display_mode} in active list {active_live_sports}. Defaulting.")
-                                    target_mode = f"{active_live_sports[0]}_live" 
-                                    needs_state_update = True # Force update to default
+                                    mode_to_show = f"{active_live_sports[0]}_live" 
+                                    perform_state_update = True # Force update to default
                             else:
-                                 # Timer expired, but only one/zero active sports. Stay on current or switch if needed.
+                                 # Timer expired, but <= 1 active sport. Stay or exit.
                                  if active_live_sports:
-                                     target_mode = f"{active_live_sports[0]}_live"
-                                 else: # No live sports anymore? Fallback handled later.
-                                     target_mode = self.current_display_mode # Tentatively stay
-                                     
-                                 if target_mode != self.current_display_mode:
-                                      needs_state_update = True # Switch to the single active one if needed
+                                     # Stay on the single active sport
+                                     mode_to_show = f"{active_live_sports[0]}_live"
+                                     if mode_to_show != self.current_display_mode:
+                                         # We were showing a different live sport that just ended
+                                         perform_state_update = True 
+                                         logger.info(f"Switching to only active live sport: {mode_to_show}")
+                                     else:
+                                         # Staying on the same single live sport, just reset timer
+                                         self.last_switch = current_time
+                                         self.force_clear = False 
                                  else:
-                                      # Still on the same single live sport, just reset its timer
-                                      self.last_switch = current_time
-                                      self.force_clear = False # No visual change
+                                     # No live sports left, trigger fallback to regular rotation
+                                     mode_to_show = "" # Indicate exit from live mode
+                                     perform_state_update = True # Need to update state to non-live
                         else:
                             # Timer has not expired, continue with current live mode
-                            target_mode = self.current_display_mode
-                            needs_state_update = False # No state change needed
+                            mode_to_show = self.current_display_mode
+                            perform_state_update = False
+                            self.force_clear = False # Ensure clear isn't forced if staying
 
                     # --- Update State if Required ---
-                    if needs_state_update and target_mode:
-                        self.current_display_mode = target_mode
-                        self.last_switch = current_time # Reset timer whenever mode changes
-                        self.force_clear = True
-                    elif not target_mode and is_currently_live:
-                         # We were live, but target couldn't be determined (e.g., all games ended)
-                         # Let execution fall through to regular mode rotation logic
-                         has_live_games = False 
-                         logger.info("Exiting live mode as no target live mode determined.")
+                    if perform_state_update:
+                        if mode_to_show: # Entering or rotating live mode
+                            self.current_display_mode = mode_to_show
+                            self.last_switch = current_time # Reset timer whenever mode actually changes
+                            self.force_clear = True
+                        else: 
+                            # Exiting live mode (mode_to_show is empty)
+                            has_live_games = False # Let regular rotation logic take over below
+                            logger.info("Exiting live mode as no active live games remain or determined.")
+                            # Don't continue; allow fall-through
                     
                     # --- Select Manager and Display --- 
                     manager_to_display = None
-                    if has_live_games: # Check again in case we bailed above
+                    if has_live_games and self.current_display_mode.endswith('_live'): # Check we are still intending live display
                         current_sport_type = self.current_display_mode.replace('_live', '')
                         manager_attr = f"{current_sport_type}_live"
                         if hasattr(self, manager_attr):
@@ -487,10 +494,11 @@ class DisplayController:
                              has_live_games = False # Fallback
                     
                     if manager_to_display:
+                        # Use the force_clear value determined during state update logic
                         manager_to_display.display(force_clear=self.force_clear)
-                        self.force_clear = False # Reset clear flag after display
+                        self.force_clear = False # Reset clear flag *after* potential use
                         continue # Skip regular mode display logic if live game was shown
-                    # else: Fall through to regular rotation
+                    # else: Fall through to regular rotation if manager couldn't be found or we exited live mode
                     
                 # --- Regular Mode Rotation (only if NO live games OR fallback from live) ---
                 if not has_live_games:
