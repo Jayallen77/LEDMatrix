@@ -38,6 +38,9 @@
             "nba_live": 30,
             "nba_recent": 20,
             "nba_upcoming": 20,
+            "nfl_live": 30,
+            "nfl_recent": 15,
+            "nfl_upcoming": 15,
             "calendar": 30,
             "youtube": 20,
             "mlb_live": 30,
@@ -112,7 +115,7 @@
     "nba_scoreboard": {
         "enabled": false,
         "test_mode": false,
-        "update_interval_seconds": 300,
+        "update_interval_seconds": 3600,
         "live_update_interval": 20,
         "recent_update_interval": 3600,
         "upcoming_update_interval": 3600,
@@ -125,6 +128,24 @@
             "nba_upcoming": true
         },
         "live_game_duration": 30
+    },
+    "nfl_scoreboard": {
+        "enabled": true,
+        "test_mode": false,
+        "update_interval_seconds": 3600,
+        "live_update_interval": 15,
+        "past_fetch_days": 7,
+        "future_fetch_days": 7,
+        "favorite_teams": ["TB", "DAL"],
+        "logo_dir": "assets/sports/nfl_logos",
+        "display_modes": {
+            "nfl_live": true,
+            "nfl_recent": true,
+            "nfl_upcoming": true
+        },
+        "live_game_duration": 30,
+        "recent_game_duration": 30,
+        "upcoming_game_duration": 30
     },
     "youtube": {
         "enabled": true,
