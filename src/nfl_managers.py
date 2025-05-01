@@ -113,7 +113,7 @@ class BaseNFLManager: # Renamed class
         self.logger.info(f"Logo directory: {self.logo_dir}")
 
     @classmethod
-    def _fetch_shared_data(cls, date_str: str = None) -> Optional[Dict]:
+    def _fetch_shared_data(cls, past_days: int, future_days: int, date_str: str = None) -> Optional[Dict]:
         """Fetch and cache data for all managers to share."""
         current_time = time.time()
 
@@ -146,8 +146,8 @@ class BaseNFLManager: # Renamed class
             if not date_str:
                 today = datetime.now(timezone.utc).date()
                 dates_to_fetch = []
-                # Generate dates from past_fetch_days ago to future_fetch_days ahead
-                for i in range(-cls.past_fetch_days, cls.future_fetch_days + 1):
+                # Generate dates from past_days ago to future_days ahead
+                for i in range(-past_days, future_days + 1):
                      fetch_dt = today + timedelta(days=i)
                      dates_to_fetch.append(fetch_dt.strftime('%Y%m%d'))
 
@@ -208,7 +208,7 @@ class BaseNFLManager: # Renamed class
                 return None
         else:
             # For non-live games, use the shared cache
-            return self._fetch_shared_data(date_str)
+            return self._fetch_shared_data(self.past_fetch_days, self.future_fetch_days, date_str)
 
     def _load_fonts(self):
         """Load fonts used by the scoreboard."""
