@@ -478,43 +478,36 @@ class BaseSoccerManager:
             self._draw_text_with_outline(draw, home_abbr, (home_abbr_x, abbr_y), abbr_font)
 
             # --- Draw Score / Game Time / Status ---
-            status_font = self.fonts['time'] # Re-using 'time' font for top status
+            # Determine fonts to use based on game state
+            score_font = self.fonts['score']
+            # Use 'time' font for status in Live/Final, 'status' font for "Next Game" in Upcoming
+            status_font_top = self.fonts['status'] if game.get("is_upcoming") else self.fonts['time'] 
+            time_font_center = self.fonts['time']
+            center_y = self.display_height // 2 # Re-calculate or ensure it's available here
 
             if game.get("is_upcoming"):
-                # Upcoming: Show Date & Time STACKED vertically, "Upcoming" top center
+                # Upcoming: "Next Game" top center, Date/Time vertically centered like NHL
                 game_date = game.get("game_date", "")
                 game_time = game.get("game_time", "")
                 
-                # Calculate dimensions and positions for stacked text
-                try:
-                    # Get height of a line using textbbox for better accuracy
-                    bbox = draw.textbbox((0,0), "Tg", font=status_font)
-                    line_height = bbox[3] - bbox[1] # Bottom - Top
-                except AttributeError: # Fallback for older PIL
-                    line_height = status_font.getsize("Tg")[1]
-                
-                spacing = 1 # Pixels between date and time
-                total_text_height = (line_height * 2) + spacing
-                
-                # Calculate top Y position to center the block vertically
-                date_y = (self.display_height - total_text_height) // 2
-                time_y = date_y + line_height + spacing
-                
-                # Calculate X position to center each line horizontally
-                date_width = draw.textlength(game_date, font=status_font)
-                time_width = draw.textlength(game_time, font=status_font)
-                date_x = center_x - date_width // 2
-                time_x = center_x - time_width // 2
-                
-                # Draw Date and Time stacked
-                self._draw_text_with_outline(draw, game_date, (date_x, date_y), status_font)
-                self._draw_text_with_outline(draw, game_time, (time_x, time_y), status_font)
+                # Draw "Next Game" at the top center
+                status_text = "Next Game"
+                status_width = draw.textlength(status_text, font=status_font_top)
+                status_x = (self.display_width - status_width) // 2
+                status_y_top = 2 # Specific Y position from NHL spec
+                self._draw_text_with_outline(draw, status_text, (status_x, status_y_top), status_font_top)
 
-                # Draw "Upcoming" status at the top center
-                status_text = "Upcoming"
-                status_width = draw.textlength(status_text, font=status_font)
-                status_x = center_x - status_width // 2
-                self._draw_text_with_outline(draw, status_text, (status_x, status_y), status_font)
+                # Calculate position for the date text (centered horizontally, above vertical center)
+                date_width = draw.textlength(game_date, font=time_font_center)
+                date_x = (self.display_width - date_width) // 2
+                date_y = center_y - 5 # Specific Y position from NHL spec
+                self._draw_text_with_outline(draw, game_date, (date_x, date_y), time_font_center)
+
+                # Calculate position for the time text (centered horizontally, below date)
+                time_width = draw.textlength(game_time, font=time_font_center)
+                time_x = (self.display_width - time_width) // 2
+                time_y = date_y + 10 # Specific Y position from NHL spec (relative to date_y)
+                self._draw_text_with_outline(draw, game_time, (time_x, time_y), time_font_center)
 
             else:
                 # Live/Final: Show Score centered vertically, Status top center
@@ -524,13 +517,16 @@ class BaseSoccerManager:
 
                 score_width = draw.textlength(score_text, font=score_font)
                 score_x = center_x - score_width // 2
+                score_y = (self.display_height - score_height) // 2 # Keep score centered vertically
 
                 self._draw_text_with_outline(draw, score_text, (score_x, score_y), score_font)
 
+                # Use status_font_top (which is self.fonts['time'] in this else block) for consistency
                 status_text = game.get("game_clock_display", "")
-                status_width = draw.textlength(status_text, font=status_font)
+                status_width = draw.textlength(status_text, font=status_font_top) 
                 status_x = center_x - status_width // 2
-                self._draw_text_with_outline(draw, status_text, (status_x, status_y), status_font)
+                status_y_top = 1 # Original Y position for live/final status
+                self._draw_text_with_outline(draw, status_text, (status_x, status_y_top), status_font_top)
 
             # --- Display Image ---
             self.display_manager.image.paste(main_img, (0, 0))
