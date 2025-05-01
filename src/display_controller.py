@@ -21,6 +21,7 @@ from src.nhl_managers import NHLLiveManager, NHLRecentManager, NHLUpcomingManage
 from src.nba_managers import NBALiveManager, NBARecentManager, NBAUpcomingManager
 from src.mlb_manager import MLBLiveManager, MLBRecentManager, MLBUpcomingManager
 from src.soccer_managers import SoccerLiveManager, SoccerRecentManager, SoccerUpcomingManager
+from src.nfl_managers import NFLLiveManager, NFLRecentManager, NFLUpcomingManager
 from src.youtube_display import YouTubeDisplay
 from src.calendar_manager import CalendarManager
 from src.text_display import TextDisplay
@@ -114,6 +115,21 @@ class DisplayController:
             self.soccer_upcoming = None
         logger.info("Soccer managers initialized in %.3f seconds", time.time() - soccer_time)
             
+        # Initialize NFL managers if enabled
+        nfl_time = time.time()
+        nfl_enabled = self.config.get('nfl_scoreboard', {}).get('enabled', False)
+        nfl_display_modes = self.config.get('nfl_scoreboard', {}).get('display_modes', {})
+        
+        if nfl_enabled:
+            self.nfl_live = NFLLiveManager(self.config, self.display_manager) if nfl_display_modes.get('nfl_live', True) else None
+            self.nfl_recent = NFLRecentManager(self.config, self.display_manager) if nfl_display_modes.get('nfl_recent', True) else None
+            self.nfl_upcoming = NFLUpcomingManager(self.config, self.display_manager) if nfl_display_modes.get('nfl_upcoming', True) else None
+        else:
+            self.nfl_live = None
+            self.nfl_recent = None
+            self.nfl_upcoming = None
+        logger.info("NFL managers initialized in %.3f seconds", time.time() - nfl_time)
+        
         # Track MLB rotation state
         self.mlb_current_team_index = 0
         self.mlb_showing_recent = True
@@ -154,6 +170,12 @@ class DisplayController:
             if self.soccer_upcoming: self.available_modes.append('soccer_upcoming')
             # soccer_live is handled separately when live games are available
         
+        # Add NFL display modes if enabled
+        if nfl_enabled:
+            if self.nfl_recent: self.available_modes.append('nfl_recent')
+            if self.nfl_upcoming: self.available_modes.append('nfl_upcoming')
+            # nfl_live is handled separately
+        
         # Set initial display to first available mode (clock)
         self.current_mode_index = 0
         self.current_display_mode = self.available_modes[0] if self.available_modes else 'none'
@@ -176,6 +198,12 @@ class DisplayController:
         self.soccer_showing_recent = True
         self.soccer_favorite_teams = self.config.get('soccer_scoreboard', {}).get('favorite_teams', [])
         self.in_soccer_rotation = False
+        
+        # Add NFL rotation state
+        self.nfl_current_team_index = 0 
+        self.nfl_showing_recent = True
+        self.nfl_favorite_teams = self.config.get('nfl_scoreboard', {}).get('favorite_teams', [])
+        self.in_nfl_rotation = False
         
         # Update display durations to include all modes
         self.display_durations = self.config['display'].get('display_durations', {})
@@ -200,7 +228,10 @@ class DisplayController:
             'mlb_upcoming': 20,
             'soccer_live': 30, # Soccer durations
             'soccer_recent': 20,
-            'soccer_upcoming': 20
+            'soccer_upcoming': 20,
+            'nfl_live': 30, # Added NFL durations
+            'nfl_recent': 30,
+            'nfl_upcoming': 30
         }
         # Merge loaded durations with defaults
         for key, value in default_durations.items():
@@ -213,6 +244,7 @@ class DisplayController:
         logger.info(f"NBA Favorite teams: {self.nba_favorite_teams}")
         logger.info(f"MLB Favorite teams: {self.mlb_favorite_teams}")
         logger.info(f"Soccer Favorite teams: {self.soccer_favorite_teams}") # Log Soccer teams
+        logger.info(f"NFL Favorite teams: {self.nfl_favorite_teams}") # Log NFL teams
         # Removed redundant NHL/MLB init time logs
 
     def get_current_duration(self) -> int:
@@ -259,6 +291,11 @@ class DisplayController:
         if self.soccer_recent: self.soccer_recent.update()
         if self.soccer_upcoming: self.soccer_upcoming.update()
 
+        # Update NFL managers
+        if self.nfl_live: self.nfl_live.update()
+        if self.nfl_recent: self.nfl_recent.update()
+        if self.nfl_upcoming: self.nfl_upcoming.update()
+
     def _check_live_games(self) -> tuple[bool, str]:
         """
         Check if there are any live games available.
@@ -269,6 +306,9 @@ class DisplayController:
         # Prioritize sports (e.g., Soccer > NHL > NBA > MLB)
         if self.soccer_live and self.soccer_live.live_games:
             return True, 'soccer'
+        
+        if self.nfl_live and self.nfl_live.live_games:
+            return True, 'nfl'
             
         if self.nhl_live and self.nhl_live.live_games:
             return True, 'nhl'
@@ -422,7 +462,7 @@ class DisplayController:
                         if current_time - self.last_switch > self.get_current_duration():
                             # Timer expired
                             active_live_sports = []
-                            priority_order = ['soccer', 'nhl', 'nba', 'mlb'] 
+                            priority_order = ['soccer', 'nfl', 'nhl', 'nba', 'mlb']
                             for sport in priority_order:
                                 live_attr = f"{sport}_live"
                                 if hasattr(self, live_attr) and getattr(self, live_attr) and getattr(self, live_attr).live_games:
@@ -579,6 +619,13 @@ class DisplayController:
                             display_updated = True
                         elif self.current_display_mode == 'soccer_upcoming' and self.soccer_upcoming:
                             self.soccer_upcoming.display(force_clear=self.force_clear)
+                            display_updated = True
+                                
+                        elif self.current_display_mode == 'nfl_recent' and self.nfl_recent:
+                            self.nfl_recent.display(force_clear=self.force_clear)
+                            display_updated = True
+                        elif self.current_display_mode == 'nfl_upcoming' and self.nfl_upcoming:
+                            self.nfl_upcoming.display(force_clear=self.force_clear)
                             display_updated = True
                                 
                         elif self.current_display_mode == 'youtube' and self.youtube:
