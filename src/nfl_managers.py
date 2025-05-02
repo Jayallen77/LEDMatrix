@@ -639,7 +639,7 @@ class NFLLiveManager(BaseNFLManager): # Renamed class
             if down_distance and game.get("is_live"): # Only show if live and available
                 dd_width = draw_overlay.textlength(down_distance, font=self.fonts['detail'])
                 dd_x = (self.display_width - dd_width) // 2
-                dd_y = self.display_height #score_y + 12 # Below the status/clock line
+                dd_y = (self.display_height)- 7 #score_y + 12 # Below the status/clock line
                 self._draw_text_with_outline(draw_overlay, down_distance, (dd_x, dd_y), self.fonts['detail'], fill=(200, 200, 0)) # Yellowish text
 
             # Timeouts (Bottom corners) - 3 small bars per team
