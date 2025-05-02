@@ -157,7 +157,7 @@
         "live_update_interval": 15,
         "past_fetch_days": 7,
         "future_fetch_days": 7,
-        "favorite_teams": [],
+        "favorite_teams": ["UGA", "AUB"],
         "logo_dir": "assets/sports/ncaa_fbs_logos",
         "display_modes": {
             "ncaa_fb_live": true,
