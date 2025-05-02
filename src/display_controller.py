@@ -346,7 +346,7 @@ class DisplayController:
         
         if self.nfl_live and self.nfl_live.live_games:
             logger.debug("NFL live games available")
-            return True, 'nfl_live'
+            return True, 'nfl'
             
         if self.nhl_live and self.nhl_live.live_games:
             return True, 'nhl'
@@ -360,11 +360,11 @@ class DisplayController:
         if 'ncaa_fb_scoreboard' in self.config and self.config['ncaa_fb_scoreboard'].get('enabled', False):
             if self.ncaa_fb_live and self.ncaa_fb_live.live_games:
                 logger.debug("NCAA FB live games available")
-                return True, 'ncaa_fb_live'
+                return True, 'ncaa_fb'
         # Add more sports checks here (e.g., MLB, Soccer)
         if 'mlb' in self.config and self.config['mlb'].get('enabled', False):
             if self.mlb_live and self.mlb_live.live_games:
-                return True, 'mlb_live'
+                return True, 'mlb'
             
         return False, None
 
