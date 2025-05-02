@@ -22,6 +22,7 @@ from src.nba_managers import NBALiveManager, NBARecentManager, NBAUpcomingManage
 from src.mlb_manager import MLBLiveManager, MLBRecentManager, MLBUpcomingManager
 from src.soccer_managers import SoccerLiveManager, SoccerRecentManager, SoccerUpcomingManager
 from src.nfl_managers import NFLLiveManager, NFLRecentManager, NFLUpcomingManager
+from src.ncaa_fb_managers import NCAAFBLiveManager, NCAAFBRecentManager, NCAAFBUpcomingManager
 from src.youtube_display import YouTubeDisplay
 from src.calendar_manager import CalendarManager
 from src.text_display import TextDisplay
@@ -130,6 +131,21 @@ class DisplayController:
             self.nfl_upcoming = None
         logger.info("NFL managers initialized in %.3f seconds", time.time() - nfl_time)
         
+        # Initialize NCAA FB managers if enabled
+        ncaa_fb_time = time.time()
+        ncaa_fb_enabled = self.config.get('ncaa_fb_scoreboard', {}).get('enabled', False)
+        ncaa_fb_display_modes = self.config.get('ncaa_fb_scoreboard', {}).get('display_modes', {})
+        
+        if ncaa_fb_enabled:
+            self.ncaa_fb_live = NCAAFBLiveManager(self.config, self.display_manager) if ncaa_fb_display_modes.get('ncaa_fb_live', True) else None
+            self.ncaa_fb_recent = NCAAFBRecentManager(self.config, self.display_manager) if ncaa_fb_display_modes.get('ncaa_fb_recent', True) else None
+            self.ncaa_fb_upcoming = NCAAFBUpcomingManager(self.config, self.display_manager) if ncaa_fb_display_modes.get('ncaa_fb_upcoming', True) else None
+        else:
+            self.ncaa_fb_live = None
+            self.ncaa_fb_recent = None
+            self.ncaa_fb_upcoming = None
+        logger.info("NCAA FB managers initialized in %.3f seconds", time.time() - ncaa_fb_time)
+        
         # Track MLB rotation state
         self.mlb_current_team_index = 0
         self.mlb_showing_recent = True
@@ -176,6 +192,12 @@ class DisplayController:
             if self.nfl_upcoming: self.available_modes.append('nfl_upcoming')
             # nfl_live is handled separately
         
+        # Add NCAA FB display modes if enabled
+        if ncaa_fb_enabled:
+            if self.ncaa_fb_recent: self.available_modes.append('ncaa_fb_recent')
+            if self.ncaa_fb_upcoming: self.available_modes.append('ncaa_fb_upcoming')
+            # ncaa_fb_live is handled separately
+        
         # Set initial display to first available mode (clock)
         self.current_mode_index = 0
         self.current_display_mode = self.available_modes[0] if self.available_modes else 'none'
@@ -205,6 +227,12 @@ class DisplayController:
         self.nfl_favorite_teams = self.config.get('nfl_scoreboard', {}).get('favorite_teams', [])
         self.in_nfl_rotation = False
         
+        # Add NCAA FB rotation state
+        self.ncaa_fb_current_team_index = 0 
+        self.ncaa_fb_showing_recent = True
+        self.ncaa_fb_favorite_teams = self.config.get('ncaa_fb_scoreboard', {}).get('favorite_teams', [])
+        self.in_ncaa_fb_rotation = False
+        
         # Update display durations to include all modes
         self.display_durations = self.config['display'].get('display_durations', {})
         # Add defaults for soccer if missing
@@ -231,7 +259,10 @@ class DisplayController:
             'soccer_upcoming': 20,
             'nfl_live': 30, # Added NFL durations
             'nfl_recent': 30,
-            'nfl_upcoming': 30
+            'nfl_upcoming': 30,
+            'ncaa_fb_live': 30, # Added NCAA FB durations
+            'ncaa_fb_recent': 15,
+            'ncaa_fb_upcoming': 15
         }
         # Merge loaded durations with defaults
         for key, value in default_durations.items():
@@ -245,6 +276,7 @@ class DisplayController:
         logger.info(f"MLB Favorite teams: {self.mlb_favorite_teams}")
         logger.info(f"Soccer Favorite teams: {self.soccer_favorite_teams}") # Log Soccer teams
         logger.info(f"NFL Favorite teams: {self.nfl_favorite_teams}") # Log NFL teams
+        logger.info(f"NCAA FB Favorite teams: {self.ncaa_fb_favorite_teams}") # Log NCAA FB teams
         # Removed redundant NHL/MLB init time logs
 
     def get_current_duration(self) -> int:
@@ -296,6 +328,11 @@ class DisplayController:
         if self.nfl_recent: self.nfl_recent.update()
         if self.nfl_upcoming: self.nfl_upcoming.update()
 
+        # Update NCAA FB managers
+        if self.ncaa_fb_live: self.ncaa_fb_live.update()
+        if self.ncaa_fb_recent: self.ncaa_fb_recent.update()
+        if self.ncaa_fb_upcoming: self.ncaa_fb_upcoming.update()
+
     def _check_live_games(self) -> tuple[bool, str]:
         """
         Check if there are any live games available.
@@ -308,7 +345,8 @@ class DisplayController:
             return True, 'soccer'
         
         if self.nfl_live and self.nfl_live.live_games:
-            return True, 'nfl'
+            logger.debug("NFL live games available")
+            return True, 'nfl_live'
             
         if self.nhl_live and self.nhl_live.live_games:
             return True, 'nhl'
@@ -318,6 +356,15 @@ class DisplayController:
             
         if self.mlb_live and self.mlb_live.live_games:
             return True, 'mlb'
+            
+        if 'ncaa_fb_scoreboard' in self.config and self.config['ncaa_fb_scoreboard'].get('enabled', False):
+            if self.ncaa_fb_live and self.ncaa_fb_live.live_games:
+                logger.debug("NCAA FB live games available")
+                return True, 'ncaa_fb_live'
+        # Add more sports checks here (e.g., MLB, Soccer)
+        if 'mlb' in self.config and self.config['mlb'].get('enabled', False):
+            if self.mlb_live and self.mlb_live.live_games:
+                return True, 'mlb_live'
             
         return False, None
 
@@ -353,6 +400,15 @@ class DisplayController:
             manager_recent = self.soccer_recent
             manager_upcoming = self.soccer_upcoming
             games_list_attr = 'games_list' if is_recent else 'upcoming_games' # Soccer uses games_list/upcoming_games
+        elif sport == 'nfl':
+            manager_recent = self.nfl_recent
+            manager_upcoming = self.nfl_upcoming
+        elif sport == 'ncaa_fb': # Add NCAA FB case
+            manager_recent = self.ncaa_fb_recent
+            manager_upcoming = self.ncaa_fb_upcoming
+        else:
+            logger.warning(f"Unsupported sport '{sport}' for team game check")
+            return False
 
         manager = manager_recent if is_recent else manager_upcoming
 
@@ -390,6 +446,14 @@ class DisplayController:
             favorite_teams = self.soccer_favorite_teams
             manager_recent = self.soccer_recent
             manager_upcoming = self.soccer_upcoming
+        elif sport == 'nfl':
+            favorite_teams = self.nfl_favorite_teams
+            manager_recent = self.nfl_recent
+            manager_upcoming = self.nfl_upcoming
+        elif sport == 'ncaa_fb': # Add NCAA FB case
+            favorite_teams = self.ncaa_fb_favorite_teams
+            manager_recent = self.ncaa_fb_recent
+            manager_upcoming = self.ncaa_fb_upcoming
             
         return bool(favorite_teams and (manager_recent or manager_upcoming))
 
@@ -427,6 +491,34 @@ class DisplayController:
                 self.soccer_current_team_index = (self.soccer_current_team_index + 1) % len(self.soccer_favorite_teams)
                 self.soccer_showing_recent = True # Reset to recent for the new team
                 # Maybe try finding game for the *new* team immediately? Optional.
+        elif sport == 'nfl':
+            if not self.nfl_favorite_teams: return
+            current_team = self.nfl_favorite_teams[self.nfl_current_team_index]
+            # Try to find games for current team (recent first)
+            found_games = self._get_team_games(current_team, 'nfl', self.nfl_showing_recent)
+            if not found_games:
+                # Try opposite type (upcoming/recent)
+                self.nfl_showing_recent = not self.nfl_showing_recent
+                found_games = self._get_team_games(current_team, 'nfl', self.nfl_showing_recent)
+            
+            if not found_games:
+                # Move to next team if no games found for current one
+                self.nfl_current_team_index = (self.nfl_current_team_index + 1) % len(self.nfl_favorite_teams)
+                self.nfl_showing_recent = True # Reset to recent for the new team
+        elif sport == 'ncaa_fb': # Add NCAA FB case
+            if not self.ncaa_fb_favorite_teams: return
+            current_team = self.ncaa_fb_favorite_teams[self.ncaa_fb_current_team_index]
+            # Try to find games for current team (recent first)
+            found_games = self._get_team_games(current_team, 'ncaa_fb', self.ncaa_fb_showing_recent)
+            if not found_games:
+                # Try opposite type (upcoming/recent)
+                self.ncaa_fb_showing_recent = not self.ncaa_fb_showing_recent
+                found_games = self._get_team_games(current_team, 'ncaa_fb', self.ncaa_fb_showing_recent)
+            
+            if not found_games:
+                # Move to next team if no games found for current one
+                self.ncaa_fb_current_team_index = (self.ncaa_fb_current_team_index + 1) % len(self.ncaa_fb_favorite_teams)
+                self.ncaa_fb_showing_recent = True # Reset to recent for the new team
 
     def run(self):
         """Run the display controller, switching between displays."""
@@ -634,6 +726,13 @@ class DisplayController:
                                 
                         elif self.current_display_mode == 'text_display' and self.text_display:
                             self.text_display.display() # Assumes text handles its own drawing
+                            display_updated = True
+                            
+                        elif self.current_display_mode == 'ncaa_fb_recent' and self.ncaa_fb_recent:
+                            self.ncaa_fb_recent.display(force_clear=self.force_clear)
+                            display_updated = True
+                        elif self.current_display_mode == 'ncaa_fb_upcoming' and self.ncaa_fb_upcoming:
+                            self.ncaa_fb_upcoming.display(force_clear=self.force_clear)
                             display_updated = True
                             
                         # Reset force_clear only if a display method was actually called

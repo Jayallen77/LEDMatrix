@@ -41,6 +41,9 @@
             "nfl_live": 30,
             "nfl_recent": 15,
             "nfl_upcoming": 15,
+            "ncaa_fb_live": 30,
+            "ncaa_fb_recent": 15,
+            "ncaa_fb_upcoming": 15,
             "calendar": 30,
             "youtube": 20,
             "mlb_live": 30,
@@ -146,6 +149,24 @@
         "live_game_duration": 30,
         "recent_game_duration": 30,
         "upcoming_game_duration": 30
+    },
+    "ncaa_fb_scoreboard": {
+        "enabled": false,
+        "test_mode": false,
+        "update_interval_seconds": 3600,
+        "live_update_interval": 15,
+        "past_fetch_days": 7,
+        "future_fetch_days": 7,
+        "favorite_teams": [],
+        "logo_dir": "assets/sports/ncaa_fbs_logos",
+        "display_modes": {
+            "ncaa_fb_live": true,
+            "ncaa_fb_recent": true,
+            "ncaa_fb_upcoming": true
+        },
+        "live_game_duration": 30,
+        "recent_game_duration": 15,
+        "upcoming_game_duration": 15
     },
     "youtube": {
         "enabled": true,
