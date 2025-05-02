@@ -130,8 +130,8 @@
         "live_game_duration": 30
     },
     "nfl_scoreboard": {
-        "enabled": true,
-        "test_mode": true,
+        "enabled": false,
+        "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 15,
         "past_fetch_days": 7,
@@ -179,7 +179,7 @@
         "background_color": [0, 0, 0]
     },
     "soccer_scoreboard": {
-        "enabled": true,
+        "enabled": false,
         "test_mode": false,
         "update_interval_seconds": 300,
         "live_update_interval": 20,
