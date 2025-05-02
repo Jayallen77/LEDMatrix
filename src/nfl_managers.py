@@ -437,13 +437,13 @@ class NFLLiveManager(BaseNFLManager): # Renamed class
             # More detailed test game for NFL
             self.current_game = {
                 "id": "test001",
-                "home_abbr": "KC", "away_abbr": "BUF",
+                "home_abbr": "TB", "away_abbr": "DAL",
                 "home_score": "21", "away_score": "17",
                 "period": 4, "period_text": "Q4", "clock": "02:35",
-                "down_distance_text": "1st & 10", "possession": "KC_ID", # Placeholder ID
+                "down_distance_text": "1st & 10", "possession": "TB_ID", # Placeholder ID
                 "home_timeouts": 2, "away_timeouts": 3,
-                "home_logo_path": os.path.join(self.logo_dir, "KC.png"),
-                "away_logo_path": os.path.join(self.logo_dir, "BUF.png"),
+                "home_logo_path": os.path.join(self.logo_dir, "TB.png"),
+                "away_logo_path": os.path.join(self.logo_dir, "DAL.png"),
                 "is_live": True, "is_final": False, "is_upcoming": False, "is_halftime": False,
                 "status_text": "Q4 02:35"
             }
@@ -607,11 +607,11 @@ class NFLLiveManager(BaseNFLManager): # Renamed class
             center_y = self.display_height // 2
 
             # Draw logos (shifted slightly more inward than NHL perhaps)
-            home_x = self.display_width - home_logo.width + 18 # Adjust position as needed
+            home_x = self.display_width - home_logo.width + 10 #adjusted from 18 # Adjust position as needed
             home_y = center_y - (home_logo.height // 2)
             main_img.paste(home_logo, (home_x, home_y), home_logo)
 
-            away_x = -18 # Adjust position as needed
+            away_x = -10 #adjusted from 18 # Adjust position as needed
             away_y = center_y - (away_logo.height // 2)
             main_img.paste(away_logo, (away_x, away_y), away_logo)
 
@@ -619,10 +619,10 @@ class NFLLiveManager(BaseNFLManager): # Renamed class
             # Scores (centered, slightly above bottom)
             home_score = str(game.get("home_score", "0"))
             away_score = str(game.get("away_score", "0"))
-            score_text = f"{away_score} - {home_score}"
+            score_text = f"{away_score}-{home_score}"
             score_width = draw_overlay.textlength(score_text, font=self.fonts['score'])
             score_x = (self.display_width - score_width) // 2
-            score_y = self.display_height - 14 # Position score higher
+            score_y = self.display_height - 10 #from 14 # Position score higher
             self._draw_text_with_outline(draw_overlay, score_text, (score_x, score_y), self.fonts['score'])
 
             # Period/Quarter and Clock (Top center)
@@ -639,7 +639,7 @@ class NFLLiveManager(BaseNFLManager): # Renamed class
             if down_distance and game.get("is_live"): # Only show if live and available
                 dd_width = draw_overlay.textlength(down_distance, font=self.fonts['detail'])
                 dd_x = (self.display_width - dd_width) // 2
-                dd_y = status_y + 9 # Below the status/clock line
+                dd_y = 0 #status_y + 9 # Below the status/clock line
                 self._draw_text_with_outline(draw_overlay, down_distance, (dd_x, dd_y), self.fonts['detail'], fill=(200, 200, 0)) # Yellowish text
 
             # Timeouts (Bottom corners) - 3 small bars per team
