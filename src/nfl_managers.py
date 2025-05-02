@@ -622,7 +622,7 @@ class NFLLiveManager(BaseNFLManager): # Renamed class
             score_text = f"{away_score}-{home_score}"
             score_width = draw_overlay.textlength(score_text, font=self.fonts['score'])
             score_x = (self.display_width - score_width) // 2
-            score_y = self.display_height // 2  #centered #from 14 # Position score higher
+            score_y = (self.display_height // 2) - 5 #centered #from 14 # Position score higher
             self._draw_text_with_outline(draw_overlay, score_text, (score_x, score_y), self.fonts['score'])
 
             # Period/Quarter and Clock (Top center)
