@@ -151,8 +151,8 @@
         "upcoming_game_duration": 30
     },
     "ncaa_fb_scoreboard": {
-        "enabled": false,
-        "test_mode": false,
+        "enabled": true,
+        "test_mode": true,
         "update_interval_seconds": 3600,
         "live_update_interval": 15,
         "past_fetch_days": 7,
