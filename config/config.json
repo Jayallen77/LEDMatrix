@@ -55,7 +55,10 @@
             "text_display": 10,
             "soccer_live": 30,
             "soccer_recent": 20,
-            "soccer_upcoming": 20
+            "soccer_upcoming": 20,
+            "ncaam_live": 20,
+            "ncaam_recent": 15,
+            "ncaam_upcoming": 15
         }
     },
     "clock": {
@@ -161,6 +164,20 @@
             "ncaa_fb_live": true,
             "ncaa_fb_recent": true,
             "ncaa_fb_upcoming": true
+        }
+    },
+    "ncaam_scoreboard": {
+        "enabled": true,
+        "test_mode": false,
+        "update_interval_seconds": 3600,
+        "live_update_interval": 15,
+        "recent_game_hours": 72,
+        "favorite_teams": ["UGA", "AUB"],
+        "logo_dir": "assets/sports/ncaam_logos",
+        "display_modes": {
+            "ncaam_live": true,
+            "ncaam_recent": true,
+            "ncaam_upcoming": true
         }
     },
     "ncaa_bb_scoreboard": {
