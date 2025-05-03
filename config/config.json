@@ -152,8 +152,8 @@
         }
     },
     "ncaa_fb_scoreboard": {
-        "enabled": true,
-        "test_mode": true,
+        "enabled": false,
+        "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 15,
         "past_fetch_days": 7,
@@ -167,7 +167,7 @@
         }
     },
     "ncaam_scoreboard": {
-        "enabled": true,
+        "enabled": false,
         "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 15,
