@@ -58,7 +58,8 @@
             "soccer_upcoming": 20,
             "ncaam_live": 20,
             "ncaam_recent": 15,
-            "ncaam_upcoming": 15
+            "ncaam_upcoming": 15,
+            "music": 20
         }
     },
     "clock": {
@@ -243,5 +244,11 @@
             "soccer_recent": true,
             "soccer_upcoming": true
         }
+    },
+    "music": {
+        "enabled": true,
+        "preferred_source": "ytm", 
+        "YTM_COMPANION_URL": "http://192.168.86.12:9863",
+        "POLLING_INTERVAL_SECONDS": 2
     }
 } 

@@ -352,3 +352,80 @@ The LEDMatrix system includes a robust caching mechanism to optimize API calls a
 
 ## Fonts
 You can add any font to the assets/fonts/ folder but they need to be .ttf and updated in display_manager.py
+
+### Music Display Configuration
+
+The Music Display module shows information about the currently playing track from either Spotify or YouTube Music (via the [YouTube Music Desktop App](https://ytmdesktop.app/) companion server).
+
+**Setup Requirements:**
+
+1.  **Spotify:**
+    *   Requires a Spotify Premium account (for API access).
+    *   You need to register an application on the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard/) to get API credentials.
+        *   Go to the dashboard, log in, and click "Create App".
+        *   Give it a name (e.g., "LEDMatrix Display") and description.
+        *   For the "Redirect URI", enter `http://localhost:8888/callback` (or another unused port if 8888 is taken). You **must** add this exact URI in your app settings on the Spotify dashboard.
+        *   Note down the `Client ID` and `Client Secret`.
+
+2.  **YouTube Music (YTM):**
+    *   Requires the [YouTube Music Desktop App](https://ytmdesktop.app/) (YTMD) to be installed and running on a computer on the *same network* as the Raspberry Pi.
+    *   In YTMD settings, enable the "Companion Server" under Integration options. Note the URL it provides (usually `http://localhost:9863` if running on the same machine, or `http://<YTMD-Computer-IP>:9863` if running on a different computer).
+
+**Configuration:**
+
+1.  In `config/config_secrets.json`, add your Spotify API credentials under the `music` key:
+    ```json
+    {
+        "music": {
+            "SPOTIFY_CLIENT_ID": "YOUR_SPOTIFY_CLIENT_ID_HERE",
+            "SPOTIFY_CLIENT_SECRET": "YOUR_SPOTIFY_CLIENT_SECRET_HERE",
+            "SPOTIFY_REDIRECT_URI": "http://localhost:8888/callback" 
+        }
+        // ... other secrets ...
+    }
+    ```
+    *(Ensure the `SPOTIFY_REDIRECT_URI` here matches exactly what you entered in the Spotify Developer Dashboard).*
+
+2.  In `config/config.json`, add/modify the `music` section:
+    ```json
+    {
+        "music": {
+            "enabled": true, // Set to false to disable this display
+            "preferred_source": "auto", // Options: "auto", "spotify", "ytm"
+            "YTM_COMPANION_URL": "http://<YTMD-Computer-IP>:9863", // Replace with actual URL if YTMD is not on the Pi
+            "POLLING_INTERVAL_SECONDS": 2 // How often to check for track updates
+        }
+        // ... other configurations ...
+    }
+    ```
+    Also, ensure the display duration is set in the `display_durations` section:
+    ```json
+    {
+        "display": {
+            "display_durations": {
+                "music": 20, // Duration in seconds
+                // ... other durations ...
+            }
+        }
+        // ... other configurations ...
+    }
+    ```
+
+**`preferred_source` Options:**
+
+*   `"auto"`: (Default) Checks Spotify first. If Spotify is playing, shows its track. If not, checks YTM.
+*   `"spotify"`: Only uses Spotify. Ignores YTM.
+*   `"ytm"`: Only uses the YTM Companion Server. Ignores Spotify.
+
+**First Spotify Run (Headless Setup):**
+
+Since the display runs on a headless Raspberry Pi, the Spotify authorization process requires a few manual steps:
+
+1.  **Start the Application:** Run the display controller script (`sudo python3 display_controller.py`).
+2.  **Copy Auth URL:** When Spotify needs authorization for the first time (or after a token expires), the application will **print a URL** to the console. Copy this full URL.
+3.  **Authorize in Browser (on another device):** Paste the copied URL into a web browser on your computer or phone. Log in to Spotify if prompted and click "Agree" to authorize the application.
+4.  **Get Redirected URL:** Your browser will be redirected to a URL starting with your `SPOTIFY_REDIRECT_URI` (e.g., `http://localhost:8888/callback`) followed by `?code=...`. The page will likely show an error like "Site can't be reached" - **this is expected and perfectly fine.**
+5.  **Copy Full Redirected URL:** **Immediately copy the complete URL** from your browser's address bar. Make sure you copy the *entire* thing, including the `?code=...` part.
+6.  **Paste URL Back to Pi:** Go back to the Raspberry Pi console where the display script is running. It should now be prompting you to "Enter the URL you were redirected to:". **Paste the full URL you just copied** from your browser into the console and press Enter.
+
+The application will then use the provided code to get the necessary tokens and cache them (usually in a `.cache` file). Subsequent runs should not require this process unless the token expires.
