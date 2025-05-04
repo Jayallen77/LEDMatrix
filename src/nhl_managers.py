@@ -639,10 +639,11 @@ class NHLLiveManager(BaseNHLManager):
                                 self.current_game = self.live_games[0]
                                 self.last_game_switch = current_time
                         
-                        # Always update display when we have new data, but limit to once per second
-                        if current_time - self.last_display_update >= 1.0:
-                            self.display(force_clear=True)
+                        # Update display if data changed, limit rate
+                        if data_changed and current_time - self.last_display_update >= 1.0:
+                            # self.display(force_clear=True) # REMOVED: DisplayController handles this
                             self.last_display_update = current_time
+                        
                     else:
                         # No live games found
                         self.live_games = []
@@ -653,9 +654,13 @@ class NHLLiveManager(BaseNHLManager):
                     self.current_game_index = (self.current_game_index + 1) % len(self.live_games)
                     self.current_game = self.live_games[self.current_game_index]
                     self.last_game_switch = current_time
-                    # Force display update when switching games
-                    self.display(force_clear=True)
-                    self.last_display_update = current_time
+                    # self.display(force_clear=True) # REMOVED: DisplayController handles this
+                    self.last_display_update = current_time # Track time for potential display update
+
+            # If data changed for the *current* game, consider updating display (rate limited)
+            elif data_changed and current_time - self.last_display_update >= 1.0:
+                # self.display(force_clear=True) # REMOVED: DisplayController handles this
+            self.last_display_update = current_time
 
     def display(self, force_clear: bool = False):
         """Display live game information."""

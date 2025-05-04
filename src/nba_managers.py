@@ -678,9 +678,9 @@ class NBALiveManager(BaseNBAManager):
                                 self.current_game = self.live_games[0]
                                 self.last_game_switch = current_time
                         
-                        # Always update display when we have new data, but limit to once per second
+                        # Only update display if we have new data and enough time has passed
                         if current_time - self.last_display_update >= 1.0:
-                            self.display(force_clear=True)
+                            # self.display(force_clear=True) # REMOVED: DisplayController handles this
                             self.last_display_update = current_time
                     else:
                         # No live games found

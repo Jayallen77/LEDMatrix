@@ -446,8 +446,9 @@ class NCAABBLiveManager(BaseNCAABBMManager):
                                  self.current_game = self.live_games[0] if self.live_games else None
                                  self.last_game_switch = current_time
                         
+                        # Only update display if we have new data and enough time has passed
                         if current_time - self.last_display_update >= 1.0:
-                            self.display(force_clear=True)
+                            # self.display(force_clear=True) # REMOVED: DisplayController handles this
                             self.last_display_update = current_time
                     else:
                         self.live_games = []
@@ -457,8 +458,9 @@ class NCAABBLiveManager(BaseNCAABBMManager):
                 self.current_game_index = (self.current_game_index + 1) % len(self.live_games)
                 self.current_game = self.live_games[self.current_game_index]
                 self.last_game_switch = current_time
-                self.display(force_clear=True)
-                self.last_display_update = current_time
+                # Force display update when switching games
+                # self.display(force_clear=True) # REMOVED: DisplayController handles this
+                self.last_display_update = current_time # Track last successful update that *would* have displayed
 
     def _create_live_game_display(self, game_data: Dict[str, Any]) -> Image.Image:
         """Create a display image for a live NCAA BB game."""

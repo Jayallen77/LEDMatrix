@@ -703,9 +703,9 @@ class NCAAMBLiveManager(BaseNCAAMBManager):
                              self.last_game_switch = current_time
 
 
-                        # Always update display when we have new data, but limit rate
-                        if self.current_game and current_time - self.last_display_update >= 1.0:
-                            self.display(force_clear=True)
+                        # Only update display if we have new data and enough time has passed
+                        if current_time - self.last_display_update >= 1.0:
+                            # self.display(force_clear=True) # REMOVED: DisplayController handles this
                             self.last_display_update = current_time
                     else:
                         # No live games found
