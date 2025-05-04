@@ -24,7 +24,7 @@ class BaseMLBManager:
         self.favorite_teams = self.mlb_config.get('favorite_teams', [])
         self.cache_manager = CacheManager()
         self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.DEBUG)  # Set logger level to DEBUG
+        self.logger.setLevel(logging.INFO)  # Set logger level to INFO
         
         # Logo handling
         self.logo_dir = self.mlb_config.get('logo_dir', os.path.join('assets', 'sports', 'mlb_logos'))
