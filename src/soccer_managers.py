@@ -97,6 +97,8 @@ class BaseSoccerManager:
     
     # Class attribute to store soccer_config for shared access
     _soccer_config_shared = {} 
+    _team_league_map = {} # In-memory cache for the map
+    _map_last_updated = 0
 
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         self.display_manager = display_manager
@@ -112,9 +114,11 @@ class BaseSoccerManager:
         self.current_game = None
         self.fonts = self._load_fonts()
         self.favorite_teams = self.soccer_config.get("favorite_teams", [])
-        self.target_leagues = self.soccer_config.get("leagues", list(LEAGUE_SLUGS.keys())) # Get target leagues from config
+        self.target_leagues_config = self.soccer_config.get("leagues", list(LEAGUE_SLUGS.keys())) # Get target leagues from config
         self.recent_hours = self.soccer_config.get("recent_game_hours", 168) # Used for recent past AND upcoming future display window
         self.upcoming_fetch_days = self.soccer_config.get("upcoming_fetch_days", 7) # Days ahead to fetch (default: tomorrow)
+        self.team_map_file = self.soccer_config.get("team_map_file", "assets/data/team_league_map.json")
+        self.team_map_update_days = self.soccer_config.get("team_map_update_days", 7) # How often to update the map
 
         self.logger.setLevel(logging.DEBUG)
         
@@ -126,11 +130,110 @@ class BaseSoccerManager:
         self.display_height = hardware_config.get("rows", 32)
         
         self._logo_cache = {}
+
+        # Ensure data directory exists
+        os.makedirs(os.path.dirname(self.team_map_file), exist_ok=True)
+        # Load or build the team map
+        self._update_team_league_map_if_needed()
         
         self.logger.info(f"Initialized Soccer manager with display dimensions: {self.display_width}x{self.display_height}")
         self.logger.info(f"Logo directory: {self.logo_dir}")
-        self.logger.info(f"Target leagues: {self.target_leagues}")
+        self.logger.info(f"Configured target leagues: {self.target_leagues_config}")
         self.logger.info(f"Upcoming fetch days: {self.upcoming_fetch_days}") # Log new setting
+        self.logger.info(f"Team map file: {self.team_map_file}")
+        self.logger.info(f"Team map update interval: {self.team_map_update_days} days")
+
+    # --- Team League Map Management ---
+    @classmethod
+    def _load_team_league_map(cls) -> None:
+        """Load the team-league map from the JSON file."""
+        map_file = cls._soccer_config_shared.get("team_map_file", "assets/data/team_league_map.json")
+        try:
+            if os.path.exists(map_file):
+                with open(map_file, 'r') as f:
+                    data = json.load(f)
+                    cls._team_league_map = data.get("map", {})
+                    cls._map_last_updated = data.get("last_updated", 0)
+                    cls.logger.info(f"[Soccer] Loaded team-league map ({len(cls._team_league_map)} teams) from {map_file}")
+            else:
+                cls.logger.info(f"[Soccer] Team-league map file not found: {map_file}. Will attempt to build.")
+                cls._team_league_map = {}
+                cls._map_last_updated = 0
+        except (IOError, json.JSONDecodeError) as e:
+            cls.logger.error(f"[Soccer] Error loading team-league map from {map_file}: {e}")
+            cls._team_league_map = {}
+            cls._map_last_updated = 0
+
+    @classmethod
+    def _save_team_league_map(cls) -> None:
+        """Save the current team-league map to the JSON file."""
+        map_file = cls._soccer_config_shared.get("team_map_file", "assets/data/team_league_map.json")
+        try:
+            timestamp = time.time()
+            with open(map_file, 'w') as f:
+                json.dump({"last_updated": timestamp, "map": cls._team_league_map}, f, indent=4)
+            cls._map_last_updated = timestamp
+            cls.logger.info(f"[Soccer] Saved team-league map ({len(cls._team_league_map)} teams) to {map_file}")
+        except IOError as e:
+            cls.logger.error(f"[Soccer] Error saving team-league map to {map_file}: {e}")
+
+    @classmethod
+    def _build_team_league_map(cls) -> None:
+        """Fetch data for all known leagues to build the team-to-league map."""
+        cls.logger.info("[Soccer] Building team-league map...")
+        new_map = {}
+        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime('%Y%m%d')
+
+        # Fetch data for all leagues defined in LEAGUE_SLUGS to get comprehensive team info
+        for league_slug in LEAGUE_SLUGS.keys():
+            try:
+                url = ESPN_SOCCER_LEAGUE_SCOREBOARD_URL_FORMAT.format(league_slug)
+                params = {'dates': yesterday, 'limit': 100}
+                response = requests.get(url, params=params, timeout=10) # Add timeout
+                response.raise_for_status()
+                data = response.json()
+                cls.logger.debug(f"[Soccer Map Build] Fetched data for {league_slug}")
+
+                for event in data.get("events", []):
+                    event_league_slug = event.get("league", {}).get("slug")
+                    if not event_league_slug: continue # Skip if league slug missing
+
+                    competitors = event.get("competitions", [{}])[0].get("competitors", [])
+                    for competitor in competitors:
+                        team_abbr = competitor.get("team", {}).get("abbreviation")
+                        if team_abbr and team_abbr not in new_map:
+                            new_map[team_abbr] = event_league_slug
+                            cls.logger.debug(f"[Soccer Map Build] Mapped {team_abbr} to {event_league_slug}")
+
+            except requests.exceptions.RequestException as e:
+                # Log errors but continue building map from other leagues
+                cls.logger.warning(f"[Soccer Map Build] Error fetching data for {league_slug}: {e}")
+            except Exception as e:
+                cls.logger.error(f"[Soccer Map Build] Unexpected error processing {league_slug}: {e}", exc_info=True)
+
+        if new_map:
+            cls._team_league_map = new_map
+            cls._save_team_league_map()
+        else:
+            cls.logger.warning("[Soccer Map Build] Failed to build team-league map. No team data found.")
+
+    @classmethod
+    def _update_team_league_map_if_needed(cls) -> None:
+        """Check if the map needs updating and rebuild if necessary."""
+        update_interval_seconds = cls._soccer_config_shared.get("team_map_update_days", 7) * 86400 # Convert days to seconds
+        
+        # Load map initially if not already loaded
+        if not cls._team_league_map:
+             cls._load_team_league_map()
+             
+        current_time = time.time()
+        if not cls._team_league_map or (current_time - cls._map_last_updated > update_interval_seconds):
+            cls.logger.info("[Soccer] Team-league map is missing or stale. Rebuilding...")
+            cls._build_team_league_map()
+        else:
+            cls.logger.info(f"[Soccer] Team-league map is up-to-date (last updated: {datetime.fromtimestamp(cls._map_last_updated).strftime('%Y-%m-%d %H:%M:%S')}).")
+
+    # --- End Team League Map Management ---
 
     @classmethod
     def _fetch_shared_data(cls, date_str: str = None) -> Optional[Dict]:
@@ -138,8 +241,29 @@ class BaseSoccerManager:
         current_time = time.time()
         all_data = {"events": []}
         # Access shared config through the class attribute
-        target_leagues = cls._soccer_config_shared.get("leagues", list(LEAGUE_SLUGS.keys()))
+        favorite_teams = cls._soccer_config_shared.get("favorite_teams", [])
+        target_leagues_config = cls._soccer_config_shared.get("leagues", list(LEAGUE_SLUGS.keys()))
         upcoming_fetch_days = cls._soccer_config_shared.get("upcoming_fetch_days", 1) # Fetch days
+
+        # Determine which leagues to actually fetch
+        leagues_to_fetch = set()
+        if favorite_teams and cls._team_league_map:
+            for team in favorite_teams:
+                league = cls._team_league_map.get(team)
+                if league:
+                    leagues_to_fetch.add(league)
+                else:
+                    cls.logger.warning(f"[Soccer] Favorite team '{team}' not found in team-league map. Cannot filter by its league.")
+            # If no leagues were found for favorites, should we fetch configured leagues or nothing?
+            # Current approach: fetch configured leagues as fallback if map lookups fail for all favs.
+            if not leagues_to_fetch:
+                 cls.logger.warning("[Soccer] No leagues found for any favorite teams in map. Falling back to configured leagues.")
+                 leagues_to_fetch = set(target_leagues_config)
+        else:
+            # No favorite teams specified, or map not loaded, use configured leagues
+            leagues_to_fetch = set(target_leagues_config)
+
+        cls.logger.debug(f"[Soccer] Determined leagues to fetch for shared data: {leagues_to_fetch}")
 
         today = datetime.now(timezone.utc).date()
         # Generate dates from yesterday up to 'upcoming_fetch_days' in the future
@@ -154,7 +278,8 @@ class BaseSoccerManager:
             
         cls.logger.debug(f"[Soccer] Fetching shared data for dates: {dates_to_fetch}")
 
-        for league_slug in target_leagues:
+        # Fetch data only for the determined leagues
+        for league_slug in leagues_to_fetch:
             for fetch_date in dates_to_fetch:
                 cache_key = f"soccer_{league_slug}_{fetch_date}"
                 
@@ -189,20 +314,52 @@ class BaseSoccerManager:
                     if response is not None and response.status_code == 404:
                          cls.cache_manager.set(cache_key, {"events": []})
 
+        # Filter events based on favorite teams, if specified
+        if favorite_teams:
+            leagues_with_favorites = set()
+            for event in all_data.get("events", []):
+                league_slug = event.get("league", {}).get("slug")
+                competitors = event.get("competitions", [{}])[0].get("competitors", [])
+                for competitor in competitors:
+                    team_abbr = competitor.get("team", {}).get("abbreviation")
+                    if team_abbr in favorite_teams and league_slug:
+                        leagues_with_favorites.add(league_slug)
+                        break # No need to check other competitor in this event
 
-        # Filter combined data by target leagues (might be redundant now but safe)
-        # This step might not be strictly necessary anymore if fetching is already league-specific
-        # but keeping it doesn't hurt.
-        # filtered_events = [
-        #     event for event in all_data["events"]
-        #     if event.get("league", {}).get("slug") in target_leagues
-        # ]
-        # cls._shared_data = {"events": filtered_events} # Use the already combined data
+            if leagues_with_favorites:
+                cls.logger.debug(f"[Soccer] Filtering shared data for leagues with favorite teams: {leagues_with_favorites}")
+                filtered_events = [
+                    event for event in all_data.get("events", [])
+                    if event.get("league", {}).get("slug") in leagues_with_favorites
+                ]
+                all_data["events"] = filtered_events
+            else:
+                 cls.logger.debug("[Soccer] No favorite teams found in any fetched events. Shared data will be empty.")
+                 all_data["events"] = [] # No relevant leagues found
 
-        cls._shared_data = all_data # Store combined data
+        cls._shared_data = all_data # Store combined (and potentially filtered) data
         cls._last_shared_update = current_time # Update timestamp
 
         return cls._shared_data
+
+    def _get_live_leagues_to_fetch(self) -> set:
+        """Determine which leagues to fetch for live data based on favorites and map."""
+        if self.favorite_teams and self._team_league_map:
+            leagues_to_fetch = set()
+            for team in self.favorite_teams:
+                league = self._team_league_map.get(team)
+                if league:
+                    leagues_to_fetch.add(league)
+                else:
+                    self.logger.warning(f"[Soccer Live] Favorite team '{team}' not found in team-league map.")
+            # Fallback if map lookups fail
+            if not leagues_to_fetch:
+                 self.logger.warning("[Soccer Live] No leagues found for favorite teams in map. Falling back to configured leagues.")
+                 return set(self.target_leagues_config)
+            return leagues_to_fetch
+        else:
+            # No favorites or no map, use configured leagues
+            return set(self.target_leagues_config)
 
     def _fetch_data(self, date_str: str = None) -> Optional[Dict]:
         """Fetch data using shared data mechanism or live fetching per league."""
@@ -211,7 +368,11 @@ class BaseSoccerManager:
             live_data = {"events": []}
             today_date_str = datetime.now(timezone.utc).strftime('%Y%m%d')
             
-            for league_slug in self.target_leagues:
+            # Determine leagues to fetch based on favorites and map
+            leagues_to_fetch = self._get_live_leagues_to_fetch()
+            self.logger.debug(f"[Soccer Live] Determined leagues to fetch: {leagues_to_fetch}")
+
+            for league_slug in leagues_to_fetch:
                 try:
                     # Check cache first for live data (shorter expiry?)
                     cache_key = f"soccer_live_{league_slug}_{today_date_str}"
