@@ -561,7 +561,7 @@ class MLBLiveManager(BaseMLBManager):
                         
                         # Always update display when we have new data, but limit to once per second
                         if current_time - self.last_display_update >= 1.0:
-                            self.display(force_clear=True)
+                            # self.display(force_clear=True) # REMOVED: DisplayController handles this
                             self.last_display_update = current_time
                     else:
                         # No live games found
@@ -574,7 +574,7 @@ class MLBLiveManager(BaseMLBManager):
                 self.current_game = self.live_games[self.current_game_index]
                 self.last_game_switch = current_time
                 # Force display update when switching games
-                self.display(force_clear=True)
+                # self.display(force_clear=True) # REMOVED: DisplayController handles this
                 self.last_display_update = current_time
 
     def _create_live_game_display(self, game_data: Dict[str, Any]) -> Image.Image:
