@@ -531,220 +531,244 @@ class DisplayController:
             while True:
                 current_time = time.time()
                 
-                # Update data for all modules
+                # Update data for all modules first
                 self._update_modules()
                 
-                # Check for live games (priority: Soccer > NHL > NBA > MLB)
+                # Check for live games
                 has_live_games, live_sport_type = self._check_live_games()
-                
-                # --- Live Game Handling ---
-                if has_live_games:
-                    mode_to_show = "" # What we intend to display this iteration
-                    perform_state_update = False # Flag to trigger mode change
+                is_currently_live = self.current_display_mode.endswith('_live')
 
-                    is_currently_live = self.current_display_mode.endswith('_live')
+                manager_to_display = None # Manager instance for the current frame
 
-                    if not is_currently_live:
-                        # Switching INTO live mode
-                        mode_to_show = f"{live_sport_type}_live" # Use highest priority
-                        perform_state_update = True
-                        logger.info(f"Switching into LIVE mode: {mode_to_show}")
-                    else:
-                        # Already in a live mode, check timer for rotation
-                        if current_time - self.last_switch > self.get_current_duration():
-                            # Timer expired
+                # --- State Machine for Display Logic ---
+
+                if is_currently_live:
+                    # --- Currently in a Live Game Mode ---
+                    if has_live_games:
+                        # Still live games available, check timer for rotation or continuation
+                        if current_time - self.last_switch >= self.get_current_duration():
+                            # Timer expired for the current live game, decide next step
+                            logger.debug(f"Timer expired for live mode {self.current_display_mode}. Checking for rotation.")
+                            
                             active_live_sports = []
-                            priority_order = ['soccer', 'nfl', 'nhl', 'nba', 'mlb']
+                            # Use the same priority order as _check_live_games
+                            priority_order = ['soccer', 'nfl', 'nhl', 'nba', 'mlb', 'ncaa_fb'] 
                             for sport in priority_order:
                                 live_attr = f"{sport}_live"
                                 if hasattr(self, live_attr) and getattr(self, live_attr) and getattr(self, live_attr).live_games:
                                     active_live_sports.append(sport)
                             
-                            if len(active_live_sports) > 1:
-                                # More than one sport live, rotate
+                            logger.debug(f"Active live sports found: {active_live_sports}")
+
+                            if not active_live_sports:
+                                # Should not happen if has_live_games is True, but handle defensively
+                                logger.warning("In live mode, timer expired, but no active sports found. Falling back.")
+                                # Fallback: Exit live mode logic will handle this below implicitly
+                                is_currently_live = False # Force exit from live block
+                                has_live_games = False  # Ensure we enter regular rotation block
+
+                            elif len(active_live_sports) == 1:
+                                # Only one sport is live, stay on it (or switch if mode mismatch)
+                                new_mode = f"{active_live_sports[0]}_live"
+                                if self.current_display_mode != new_mode:
+                                    logger.info(f"Switching to only active live sport: {new_mode} from {self.current_display_mode}")
+                                    self.current_display_mode = new_mode
+                                    self.force_clear = True
+                                else:
+                                    logger.debug(f"Staying on single active live sport: {self.current_display_mode}")
+                                    self.force_clear = False # Just resetting timer, no need to clear
+                                self.last_switch = current_time
+                                manager_to_display = getattr(self, f"{active_live_sports[0]}_live", None)
+                            
+                            else:
+                                # Multiple sports live, rotate
                                 try:
                                     current_sport = self.current_display_mode.replace('_live', '')
                                     current_index = active_live_sports.index(current_sport)
                                     next_index = (current_index + 1) % len(active_live_sports)
                                     next_sport = active_live_sports[next_index]
-                                    mode_to_show = f"{next_sport}_live"
-                                    if mode_to_show != self.current_display_mode:
-                                        perform_state_update = True
-                                        logger.info(f"Rotating live sports: {self.current_display_mode} -> {mode_to_show}")
-                                    else:
-                                        # Should not happen if index calculation is correct, but handle defensively
-                                        self.last_switch = current_time # Reset timer anyway
-                                        self.force_clear = False
-                                except ValueError: 
-                                    logger.warning(f"Could not find current live mode {self.current_display_mode} in active list {active_live_sports}. Defaulting.")
-                                    mode_to_show = f"{active_live_sports[0]}_live" 
-                                    perform_state_update = True # Force update to default
-                            else:
-                                 # Timer expired, but <= 1 active sport. Stay or exit.
-                                 if active_live_sports:
-                                     # Stay on the single active sport
-                                     mode_to_show = f"{active_live_sports[0]}_live"
-                                     if mode_to_show != self.current_display_mode:
-                                         # We were showing a different live sport that just ended
-                                         perform_state_update = True 
-                                         logger.info(f"Switching to only active live sport: {mode_to_show}")
-                                     else:
-                                         # Staying on the same single live sport, just reset timer
-                                         self.last_switch = current_time
-                                         self.force_clear = False 
-                                 else:
-                                     # No live sports left, trigger fallback to regular rotation
-                                     mode_to_show = "" # Indicate exit from live mode
-                                     perform_state_update = True # Need to update state to non-live
+                                    next_mode = f"{next_sport}_live"
+                                    logger.info(f"Rotating live sports: {self.current_display_mode} -> {next_mode}")
+                                    self.current_display_mode = next_mode
+                                    self.force_clear = True
+                                    self.last_switch = current_time
+                                    manager_to_display = getattr(self, f"{next_sport}_live", None)
+                                except ValueError:
+                                    # Current sport is no longer active, switch to highest priority active one
+                                    logger.warning(f"Current live sport {current_sport} not found in active list {active_live_sports}. Switching to highest priority.")
+                                    next_sport = active_live_sports[0]
+                                    next_mode = f"{next_sport}_live"
+                                    self.current_display_mode = next_mode
+                                    self.force_clear = True
+                                    self.last_switch = current_time
+                                    manager_to_display = getattr(self, f"{next_sport}_live", None)
                         else:
-                            # Timer has not expired, continue with current live mode
-                            mode_to_show = self.current_display_mode
-                            perform_state_update = False
-                            self.force_clear = False # Ensure clear isn't forced if staying
-
-                    # --- Update State if Required ---
-                    if perform_state_update:
-                        if mode_to_show: # Entering or rotating live mode
-                            self.current_display_mode = mode_to_show
-                            self.last_switch = current_time # Reset timer whenever mode actually changes
-                            self.force_clear = True
-                        else: 
-                            # Exiting live mode (mode_to_show is empty)
-                            has_live_games = False # Let regular rotation logic take over below
-                            logger.info("Exiting live mode as no active live games remain or determined.")
-                            # Don't continue; allow fall-through
+                            # Timer not expired, continue showing current live game
+                            logger.debug(f"Continuing live mode {self.current_display_mode}. Timer not expired.")
+                            self.force_clear = False 
+                            current_sport_type = self.current_display_mode.replace('_live', '')
+                            manager_to_display = getattr(self, f"{current_sport_type}_live", None)
                     
-                    # --- Select Manager and Display --- 
-                    manager_to_display = None
-                    if has_live_games and self.current_display_mode.endswith('_live'): # Check we are still intending live display
-                        current_sport_type = self.current_display_mode.replace('_live', '')
-                        manager_attr = f"{current_sport_type}_live"
-                        if hasattr(self, manager_attr):
-                            manager_to_display = getattr(self, manager_attr)
+                    else:
+                        # Was in live mode, but no live games detected *now*. Switch OUT.
+                        logger.info(f"Exiting live mode {self.current_display_mode} as no live games detected.")
+                        # Fall through to the 'not is_currently_live' block below
+                        is_currently_live = False # Update state for the next block
+                        # Let the regular mode selection logic handle the transition
+
+
+                if not is_currently_live:
+                    # --- Currently in a Regular Mode (or just exited Live) ---
+                    if has_live_games:
+                        # Not currently live, but live games ARE available. Switch IN.
+                        # (This check ensures we only switch *in* if we weren't already live)
+                        new_mode = f"{live_sport_type}_live" # live_sport_type has the highest priority
+                        if self.current_display_mode != new_mode: # Avoid unnecessary resets if somehow already correct
+                             logger.info(f"Switching into LIVE mode: {new_mode} from {self.current_display_mode}")
+                             self.current_display_mode = new_mode
+                             self.force_clear = True
+                             self.last_switch = current_time
+                             manager_to_display = getattr(self, f"{live_sport_type}_live", None)
                         else:
-                             logger.error(f"Could not find manager attribute {manager_attr} for current mode {self.current_display_mode}")
-                             has_live_games = False # Fallback
-                    
-                    if manager_to_display:
-                        # Use the force_clear value determined during state update logic
-                        manager_to_display.display(force_clear=self.force_clear)
-                        self.force_clear = False # Reset clear flag *after* potential use
-                        continue # Skip regular mode display logic if live game was shown
-                    # else: Fall through to regular rotation if manager couldn't be found or we exited live mode
-                    
-                # --- Regular Mode Rotation (only if NO live games OR fallback from live) ---
-                if not has_live_games:
-                    # Check if we were just in live mode and need to switch back
-                    if self.current_display_mode.endswith('_live'):
-                         logger.info(f"Switching back to regular rotation from {self.current_display_mode}")
-                         # Find the next available mode in the regular list
-                         self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
-                         self.current_display_mode = self.available_modes[self.current_mode_index]
-                         self.force_clear = True
-                         self.last_switch = current_time
-                         logger.info(f"Switching to: {self.current_display_mode}")
-                         
-                    # Check if it's time to switch modes based on duration
-                    elif current_time - self.last_switch > self.get_current_duration():
-                        # Advance calendar event before switching away
-                        if self.current_display_mode == 'calendar' and self.calendar:
-                            self.calendar.advance_event()
-                        
-                        self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
-                        self.current_display_mode = self.available_modes[self.current_mode_index]
-                        logger.info(f"Switching to: {self.current_display_mode}")
-                        self.force_clear = True
-                        self.last_switch = current_time
-
-                    # Display current mode frame
-                    try:
-                        display_updated = False # Flag to track if display was handled
-                        if self.current_display_mode == 'clock' and self.clock:
-                            self.clock.display_time(force_clear=self.force_clear)
-                            display_updated = True
-                                
-                        elif self.current_display_mode == 'weather_current' and self.weather:
-                            self.weather.display_weather(force_clear=self.force_clear)
-                            display_updated = True
-                        elif self.current_display_mode == 'weather_hourly' and self.weather:
-                            self.weather.display_hourly_forecast(force_clear=self.force_clear)
-                            display_updated = True
-                        elif self.current_display_mode == 'weather_daily' and self.weather:
-                            self.weather.display_daily_forecast(force_clear=self.force_clear)
-                            display_updated = True
-                                
-                        elif self.current_display_mode == 'stocks' and self.stocks:
-                            self.stocks.display_stocks(force_clear=self.force_clear)
-                            display_updated = True
-                                
-                        elif self.current_display_mode == 'stock_news' and self.news:
-                            self.news.display_news() # Assumes news handles its own clearing/drawing
-                            display_updated = True
-                                
-                        elif self.current_display_mode == 'calendar' and self.calendar:
-                            self.calendar.display(force_clear=self.force_clear)
-                            display_updated = True
-                                
-                        elif self.current_display_mode == 'nhl_recent' and self.nhl_recent:
-                            self.nhl_recent.display(force_clear=self.force_clear)
-                            display_updated = True
-                        elif self.current_display_mode == 'nhl_upcoming' and self.nhl_upcoming:
-                            self.nhl_upcoming.display(force_clear=self.force_clear)
-                            display_updated = True
-                                
-                        elif self.current_display_mode == 'nba_recent' and self.nba_recent:
-                            self.nba_recent.display(force_clear=self.force_clear)
-                            display_updated = True
-                        elif self.current_display_mode == 'nba_upcoming' and self.nba_upcoming:
-                            self.nba_upcoming.display(force_clear=self.force_clear)
-                            display_updated = True
-                                
-                        elif self.current_display_mode == 'mlb_recent' and self.mlb_recent:
-                            self.mlb_recent.display(force_clear=self.force_clear)
-                            display_updated = True
-                        elif self.current_display_mode == 'mlb_upcoming' and self.mlb_upcoming:
-                            self.mlb_upcoming.display(force_clear=self.force_clear)
-                            display_updated = True
-                                    
-                        elif self.current_display_mode == 'soccer_recent' and self.soccer_recent:
-                            self.soccer_recent.display(force_clear=self.force_clear)
-                            display_updated = True
-                        elif self.current_display_mode == 'soccer_upcoming' and self.soccer_upcoming:
-                            self.soccer_upcoming.display(force_clear=self.force_clear)
-                            display_updated = True
-                                
-                        elif self.current_display_mode == 'nfl_recent' and self.nfl_recent:
-                            self.nfl_recent.display(force_clear=self.force_clear)
-                            display_updated = True
-                        elif self.current_display_mode == 'nfl_upcoming' and self.nfl_upcoming:
-                            self.nfl_upcoming.display(force_clear=self.force_clear)
-                            display_updated = True
-                                
-                        elif self.current_display_mode == 'youtube' and self.youtube:
-                            self.youtube.display(force_clear=self.force_clear)
-                            display_updated = True
-                                
-                        elif self.current_display_mode == 'text_display' and self.text_display:
-                            self.text_display.display() # Assumes text handles its own drawing
-                            display_updated = True
-                            
-                        elif self.current_display_mode == 'ncaa_fb_recent' and self.ncaa_fb_recent:
-                            self.ncaa_fb_recent.display(force_clear=self.force_clear)
-                            display_updated = True
-                        elif self.current_display_mode == 'ncaa_fb_upcoming' and self.ncaa_fb_upcoming:
-                            self.ncaa_fb_upcoming.display(force_clear=self.force_clear)
-                            display_updated = True
-                            
-                        # Reset force_clear only if a display method was actually called
-                        if display_updated:
+                             # Should technically not happen based on is_currently_live flag, but safety first
                              self.force_clear = False
-                                
-                    except Exception as e:
-                        logger.error(f"Error updating display for mode {self.current_display_mode}: {e}", exc_info=True)
-                        # Continue to next iteration after error
+                             self.last_switch = current_time # Reset timer anyway
+                             manager_to_display = getattr(self, f"{live_sport_type}_live", None)
 
-                # Small sleep to prevent high CPU usage
-                #time.sleep(self.update_interval) 
+                    else:
+                        # No live games detected, and not in live mode. Regular rotation.
+                        needs_switch = False
+                        if self.current_display_mode.endswith('_live'):
+                             # This case handles the explicit transition OUT of live mode 
+                             # initiated in the block above.
+                             logger.info(f"Transitioning from live mode to regular rotation.")
+                             needs_switch = True 
+                             # Find the next *regular* mode index cleanly
+                             try:
+                                 # Find where we *would* be if we weren't live
+                                 # This assumes self.current_mode_index tracks the regular rotation position
+                                 self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
+                             except Exception: # Catch potential issues if available_modes changed etc.
+                                 logger.warning("Error advancing regular mode index after live mode exit. Resetting.")
+                                 self.current_mode_index = 0 
+                             
+                             if not self.available_modes: # Safety check
+                                 logger.error("No available regular modes to switch to!")
+                                 self.current_display_mode = 'none' # Or handle error appropriately
+                                 # Consider exiting or sleeping
+                             else:
+                                 self.current_display_mode = self.available_modes[self.current_mode_index]
+
+                        elif current_time - self.last_switch >= self.get_current_duration():
+                             # Regular timer expired, advance to next mode
+                             logger.debug(f"Timer expired for regular mode {self.current_display_mode}. Switching.")
+                             # Advance calendar event *before* potentially switching away
+                             if self.current_display_mode == 'calendar' and self.calendar:
+                                 self.calendar.advance_event()
+                             needs_switch = True
+                             self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
+                             self.current_display_mode = self.available_modes[self.current_mode_index]
+                        
+                        if needs_switch:
+                             logger.info(f"Switching to regular mode: {self.current_display_mode}")
+                             self.force_clear = True
+                             self.last_switch = current_time
+                        else:
+                             # Timer not expired for current regular mode
+                             self.force_clear = False
+
+                        # Select the manager for the current regular mode
+                        # (This code block is largely the same as before)
+                        if self.current_display_mode == 'clock' and self.clock:
+                             manager_to_display = self.clock
+                        elif self.current_display_mode == 'weather_current' and self.weather:
+                             manager_to_display = self.weather
+                        elif self.current_display_mode == 'weather_hourly' and self.weather:
+                             manager_to_display = self.weather
+                        elif self.current_display_mode == 'weather_daily' and self.weather:
+                             manager_to_display = self.weather
+                        elif self.current_display_mode == 'stocks' and self.stocks:
+                             manager_to_display = self.stocks
+                        elif self.current_display_mode == 'stock_news' and self.news:
+                              manager_to_display = self.news
+                        elif self.current_display_mode == 'calendar' and self.calendar:
+                              manager_to_display = self.calendar
+                        elif self.current_display_mode == 'youtube' and self.youtube:
+                              manager_to_display = self.youtube
+                        elif self.current_display_mode == 'text_display' and self.text_display:
+                              manager_to_display = self.text_display
+                        # Add other regular managers (NHL recent/upcoming, NBA, MLB, Soccer, NFL, NCAA FB)
+                        elif self.current_display_mode == 'nhl_recent' and self.nhl_recent:
+                            manager_to_display = self.nhl_recent
+                        elif self.current_display_mode == 'nhl_upcoming' and self.nhl_upcoming:
+                            manager_to_display = self.nhl_upcoming
+                        elif self.current_display_mode == 'nba_recent' and self.nba_recent:
+                            manager_to_display = self.nba_recent
+                        elif self.current_display_mode == 'nba_upcoming' and self.nba_upcoming:
+                            manager_to_display = self.nba_upcoming
+                        elif self.current_display_mode == 'mlb_recent' and self.mlb_recent:
+                            manager_to_display = self.mlb_recent
+                        elif self.current_display_mode == 'mlb_upcoming' and self.mlb_upcoming:
+                            manager_to_display = self.mlb_upcoming
+                        elif self.current_display_mode == 'soccer_recent' and self.soccer_recent:
+                            manager_to_display = self.soccer_recent
+                        elif self.current_display_mode == 'soccer_upcoming' and self.soccer_upcoming:
+                            manager_to_display = self.soccer_upcoming
+                        elif self.current_display_mode == 'nfl_recent' and self.nfl_recent:
+                            manager_to_display = self.nfl_recent
+                        elif self.current_display_mode == 'nfl_upcoming' and self.nfl_upcoming:
+                            manager_to_display = self.nfl_upcoming
+                        elif self.current_display_mode == 'ncaa_fb_recent' and self.ncaa_fb_recent:
+                            manager_to_display = self.ncaa_fb_recent
+                        elif self.current_display_mode == 'ncaa_fb_upcoming' and self.ncaa_fb_upcoming:
+                            manager_to_display = self.ncaa_fb_upcoming
+
+
+                # --- Perform Display Update ---
+                try:
+                    if manager_to_display:
+                        logger.debug(f"Attempting to display mode: {self.current_display_mode} using manager {type(manager_to_display).__name__} with force_clear={self.force_clear}")
+                        # Call the appropriate display method based on mode/manager type
+                        # Note: Some managers have different display methods or handle clearing internally
+                        if self.current_display_mode == 'clock':
+                            manager_to_display.display_time(force_clear=self.force_clear)
+                        elif self.current_display_mode == 'weather_current':
+                            manager_to_display.display_weather(force_clear=self.force_clear)
+                        elif self.current_display_mode == 'weather_hourly':
+                            manager_to_display.display_hourly_forecast(force_clear=self.force_clear)
+                        elif self.current_display_mode == 'weather_daily':
+                            manager_to_display.display_daily_forecast(force_clear=self.force_clear)
+                        elif self.current_display_mode == 'stocks':
+                            manager_to_display.display_stocks(force_clear=self.force_clear)
+                        elif self.current_display_mode == 'stock_news':
+                             manager_to_display.display_news() # Assumes internal clearing
+                        elif self.current_display_mode == 'calendar':
+                             manager_to_display.display(force_clear=self.force_clear)
+                        elif self.current_display_mode == 'youtube':
+                             manager_to_display.display(force_clear=self.force_clear)
+                        elif self.current_display_mode == 'text_display':
+                             manager_to_display.display() # Assumes internal clearing
+                        elif hasattr(manager_to_display, 'display'): # General case for most managers
+                            manager_to_display.display(force_clear=self.force_clear)
+                        else:
+                            logger.warning(f"Manager {type(manager_to_display).__name__} for mode {self.current_display_mode} does not have a standard 'display' method.")
+                        
+                        # Reset force_clear *after* a successful display call that used it
+                        # Important: Only reset if the display method *might* have used it.
+                        # Internal clearing methods (news, text) don't necessitate resetting it here.
+                        if self.force_clear and self.current_display_mode not in ['stock_news', 'text_display']:
+                            self.force_clear = False 
+                    elif self.current_display_mode != 'none':
+                         logger.warning(f"No manager found or selected for display mode: {self.current_display_mode}")
+
+                except Exception as e:
+                    logger.error(f"Error during display update for mode {self.current_display_mode}: {e}", exc_info=True)
+                    # Force clear on the next iteration after an error to be safe
+                    self.force_clear = True 
+
+
+                # Small sleep removed - updates/drawing should manage timing
+                # time.sleep(self.update_interval) 
 
         except KeyboardInterrupt:
             logger.info("Display controller stopped by user")
