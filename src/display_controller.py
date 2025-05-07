@@ -563,70 +563,82 @@ class DisplayController:
         """Displays the current music information."""
         if not self.music_manager:
             logger.warning("Music manager not available for display_music_screen.")
-            # Optionally display a "Music Unavailable" message
-            canvas = self.display_manager.matrix.CreateFrameCanvas()
             if force_clear:
-                self.display_manager.clear_screen()
-            # Use font_default if it exists, otherwise, this will raise an AttributeError for font_default
-            font_to_use = getattr(self.display_manager, 'font_default', None)
+                self.display_manager.clear() # Clear the display_manager's internal image
+            
+            # Use DisplayManager's drawing capabilities and its font
+            font_to_use = getattr(self.display_manager, 'font', None) # Default to 'font' (PressStart2P)
+            if not font_to_use: # Fallback if 'font' isn't there for some reason
+                font_to_use = getattr(self.display_manager, 'small_font', None)
+
             if font_to_use:
-                self.display_manager.draw_text(canvas, "Music N/A", 5, 15, font_to_use, (255,0,0))
+                 # Draw directly on DisplayManager's image
+                self.display_manager.draw.text((5, 10), "Music N/A", font=font_to_use, fill=(255,0,0))
             else:
-                # Fallback if font_default is not found - this is a temporary measure.
-                # Ideally, DisplayManager should provide a reliable way to get a font.
-                logger.error("font_default not found on DisplayManager. Cannot display 'Music N/A' text properly.")
-            self.display_manager.update_display(canvas)
+                logger.error("Suitable font not found on DisplayManager for 'Music N/A' message.")
+            self.display_manager.update_display() # Update with no arguments
             return
 
         track_info = self.music_manager.get_current_display_info()
         
-        canvas = self.display_manager.matrix.CreateFrameCanvas()
-        # Use font_default if it exists, otherwise, this will raise an AttributeError for font_default
-        font_small = getattr(self.display_manager, 'font_default', None)
+        if force_clear:
+            self.display_manager.clear() # Clear the display_manager's internal image
+
+        # Use DisplayManager's drawing capabilities and its font
+        # Let's try to use 'small_font' if available, otherwise 'font'
+        font_small = getattr(self.display_manager, 'small_font', None)
         if not font_small:
-            # This is a critical issue if font_default doesn't exist, as text rendering will fail.
-            logger.error("font_default not found on DisplayManager. Music screen cannot be rendered.")
-            # Optionally, clear the canvas and update to show a blank screen or error message without font.
-            if force_clear:
-                self.display_manager.clear_screen()
-            # self.display_manager.draw_text(canvas, "FONT ERR", 5, 15, ???, (255,0,0)) # No font to use here
-            self.display_manager.update_display(canvas)
+            font_small = getattr(self.display_manager, 'font', None) # Fallback to the default 'font'
+
+        if not font_small:
+            logger.error("Suitable font (small_font or font) not found on DisplayManager. Music screen cannot be rendered.")
+            self.display_manager.update_display() # Update to show cleared screen or previous state
             return
             
         white = (255, 255, 255)
         dim_white = (180, 180, 180)
 
-        if force_clear:
-            self.display_manager.clear_screen()
+        # We are drawing directly on self.display_manager.image via self.display_manager.draw
+        draw_surface = self.display_manager.draw 
+        display_width = self.display_manager.matrix.width # Get width for potential centering or wrapping
+
+        line_height = font_small.getbbox("A")[3] - font_small.getbbox("A")[1] + 3 #Approximate line height with padding
+        
+        y_pos = 1 # Starting Y position
 
         if track_info and track_info.get('is_playing'):
             title = track_info.get('title', 'No Title')
             artist = track_info.get('artist', 'No Artist')
             source = track_info.get('source', 'Music')
 
-            # Basic layout: Title, Artist, Source
-            # Consider text length and potential scrolling for longer strings in future enhancements
+            # Line 1: Title 
+            # For now, simple draw. Add text wrapping/scrolling later if needed.
+            draw_surface.text((1, y_pos), title, font=font_small, fill=white)
+            y_pos += line_height
             
-            # Line 1: Title (Y=8, using 5x7 font which is 7px high)
-            self.display_manager.draw_text_line(canvas, title, 1, font_small, white, max_width=self.display_manager.width - 2)
+            # Line 2: Artist
+            draw_surface.text((1, y_pos), artist, font=font_small, fill=dim_white)
+            y_pos += line_height
             
-            # Line 2: Artist (Y=8+7+2 = 17)
-            self.display_manager.draw_text_line(canvas, artist, 10, font_small, dim_white, max_width=self.display_manager.width - 2)
-            
-            # Line 3: Source (Y=17+7+2 = 26)
+            # Line 3: Source
             source_text = f"via {source}"
-            self.display_manager.draw_text_line(canvas, source_text, 19, font_small, dim_white, max_width=self.display_manager.width - 2)
+            draw_surface.text((1, y_pos), source_text, font=font_small, fill=dim_white)
 
         elif track_info and track_info.get('source') != 'None': # Music loaded but paused
             title = track_info.get('title', 'No Title')
-            self.display_manager.draw_text_line(canvas, "Paused:", 1, font_small, white)
-            self.display_manager.draw_text_line(canvas, title, 10, font_small, dim_white, max_width=self.display_manager.width -2)
+            draw_surface.text((1, y_pos), "Paused:", font=font_small, fill=white)
+            y_pos += line_height
+            draw_surface.text((1, y_pos), title, font=font_small, fill=dim_white)
+            y_pos += line_height
             source_text = f"({track_info.get('source')})"
-            self.display_manager.draw_text_line(canvas, source_text, 19, font_small, dim_white)
+            draw_surface.text((1, y_pos), source_text, font=font_small, fill=dim_white)
         else: # Nothing playing or source is None
-            self.display_manager.draw_text_line(canvas, "Nothing Playing", 10, font_small, white)
+            # Center "Nothing Playing"
+            text_width = draw_surface.textlength("Nothing Playing", font=font_small)
+            x_pos = (display_width - text_width) // 2
+            draw_surface.text((x_pos, y_pos + line_height // 2), "Nothing Playing", font=font_small, fill=white)
             
-        self.display_manager.update_display(canvas)
+        self.display_manager.update_display() # Update with no arguments
 
     def run(self):
         """Run the display controller, switching between displays."""
