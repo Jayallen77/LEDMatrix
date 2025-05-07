@@ -26,6 +26,7 @@ from src.ncaa_fb_managers import NCAAFBLiveManager, NCAAFBRecentManager, NCAAFBU
 from src.youtube_display import YouTubeDisplay
 from src.calendar_manager import CalendarManager
 from src.text_display import TextDisplay
+from src.music_manager import MusicManager
 
 # Get logger without configuring
 logger = logging.getLogger(__name__)
@@ -55,6 +56,31 @@ class DisplayController:
         logger.info(f"Calendar Manager initialized: {'Object' if self.calendar else 'None'}")
         logger.info(f"Text Display initialized: {'Object' if self.text_display else 'None'}")
         logger.info("Display modes initialized in %.3f seconds", time.time() - init_time)
+        
+        # Initialize Music Manager
+        music_init_time = time.time()
+        self.music_manager = None
+        # Ensure config is loaded before accessing it for music_manager
+        if hasattr(self, 'config'):
+            music_config_main = self.config.get('music', {})
+            if music_config_main.get('enabled', False):
+                try:
+                    # Pass the update_callback here
+                    self.music_manager = MusicManager(update_callback=self._handle_music_update)
+                    if self.music_manager.enabled: # Check MusicManager's internal enabled status
+                        logger.info("MusicManager initialized successfully.")
+                        self.music_manager.start_polling()
+                    else:
+                        logger.info("MusicManager initialized but is internally disabled or failed to load its own config.")
+                        self.music_manager = None # Ensure it's None if not truly usable
+                except Exception as e:
+                    logger.error(f"Failed to initialize MusicManager: {e}", exc_info=True)
+                    self.music_manager = None
+            else:
+                logger.info("Music module is disabled in main configuration (config.json).")
+        else:
+            logger.error("Config not loaded before MusicManager initialization attempt.")
+        logger.info("MusicManager initialized in %.3f seconds", time.time() - music_init_time)
         
         # Initialize NHL managers if enabled
         nhl_time = time.time()
@@ -162,6 +188,10 @@ class DisplayController:
         if self.youtube: self.available_modes.append('youtube')
         if self.text_display: self.available_modes.append('text_display')
         
+        # Add Music display mode if enabled
+        if self.music_manager: # Will be non-None only if successfully initialized and enabled
+            self.available_modes.append('music')
+        
         # Add NHL display modes if enabled
         if nhl_enabled:
             if self.nhl_recent: self.available_modes.append('nhl_recent')
@@ -262,7 +292,8 @@ class DisplayController:
             'nfl_upcoming': 30,
             'ncaa_fb_live': 30, # Added NCAA FB durations
             'ncaa_fb_recent': 15,
-            'ncaa_fb_upcoming': 15
+            'ncaa_fb_upcoming': 15,
+            'music': 20 # Default duration for music, will be overridden by config if present
         }
         # Merge loaded durations with defaults
         for key, value in default_durations.items():
@@ -278,6 +309,14 @@ class DisplayController:
         logger.info(f"NFL Favorite teams: {self.nfl_favorite_teams}") # Log NFL teams
         logger.info(f"NCAA FB Favorite teams: {self.ncaa_fb_favorite_teams}") # Log NCAA FB teams
         # Removed redundant NHL/MLB init time logs
+
+    def _handle_music_update(self, track_info: Dict[str, Any]):
+        """Callback for when music track changes."""
+        logger.debug(f"Music update received in DisplayController: {track_info.get('title')}")
+        if self.current_display_mode == 'music':
+            # If music is currently being displayed, force a clear and redraw in the next cycle
+            self.force_clear = True
+            logger.info("Music screen is active and track changed, queueing redraw.")
 
     def get_current_duration(self) -> int:
         """Get the duration for the current display mode."""
@@ -520,6 +559,57 @@ class DisplayController:
                 self.ncaa_fb_current_team_index = (self.ncaa_fb_current_team_index + 1) % len(self.ncaa_fb_favorite_teams)
                 self.ncaa_fb_showing_recent = True # Reset to recent for the new team
 
+    def display_music_screen(self, force_clear: bool = False):
+        """Displays the current music information."""
+        if not self.music_manager:
+            logger.warning("Music manager not available for display_music_screen.")
+            # Optionally display a "Music Unavailable" message
+            canvas = self.display_manager.get_canvas()
+            if force_clear:
+                self.display_manager.clear_screen()
+            self.display_manager.draw_text(canvas, "Music N/A", 5, 15, self.display_manager.fonts['5x7'], (255,0,0))
+            self.display_manager.update_display(canvas)
+            return
+
+        track_info = self.music_manager.get_current_display_info()
+        
+        canvas = self.display_manager.get_canvas()
+        font_small = self.display_manager.fonts.get('5x7', self.display_manager.font_default) # Use 5x7 or default
+        white = (255, 255, 255)
+        dim_white = (180, 180, 180)
+
+        if force_clear:
+            self.display_manager.clear_screen()
+
+        if track_info and track_info.get('is_playing'):
+            title = track_info.get('title', 'No Title')
+            artist = track_info.get('artist', 'No Artist')
+            source = track_info.get('source', 'Music')
+
+            # Basic layout: Title, Artist, Source
+            # Consider text length and potential scrolling for longer strings in future enhancements
+            
+            # Line 1: Title (Y=8, using 5x7 font which is 7px high)
+            self.display_manager.draw_text_line(canvas, title, 1, font_small, white, max_width=self.display_manager.width - 2)
+            
+            # Line 2: Artist (Y=8+7+2 = 17)
+            self.display_manager.draw_text_line(canvas, artist, 10, font_small, dim_white, max_width=self.display_manager.width - 2)
+            
+            # Line 3: Source (Y=17+7+2 = 26)
+            source_text = f"via {source}"
+            self.display_manager.draw_text_line(canvas, source_text, 19, font_small, dim_white, max_width=self.display_manager.width - 2)
+
+        elif track_info and track_info.get('source') != 'None': # Music loaded but paused
+            title = track_info.get('title', 'No Title')
+            self.display_manager.draw_text_line(canvas, "Paused:", 1, font_small, white)
+            self.display_manager.draw_text_line(canvas, title, 10, font_small, dim_white, max_width=self.display_manager.width -2)
+            source_text = f"({track_info.get('source')})"
+            self.display_manager.draw_text_line(canvas, source_text, 19, font_small, dim_white)
+        else: # Nothing playing or source is None
+            self.display_manager.draw_text_line(canvas, "Nothing Playing", 10, font_small, white)
+            
+        self.display_manager.update_display(canvas)
+
     def run(self):
         """Run the display controller, switching between displays."""
         if not self.available_modes:
@@ -726,7 +816,12 @@ class DisplayController:
 
                 # --- Perform Display Update ---
                 try:
-                    if manager_to_display:
+                    if self.current_display_mode == 'music' and self.music_manager:
+                        self.display_music_screen(force_clear=self.force_clear)
+                        # Reset force_clear if it was true for this mode
+                        if self.force_clear:
+                            self.force_clear = False
+                    elif manager_to_display:
                         logger.debug(f"Attempting to display mode: {self.current_display_mode} using manager {type(manager_to_display).__name__} with force_clear={self.force_clear}")
                         # Call the appropriate display method based on mode/manager type
                         # Note: Some managers have different display methods or handle clearing internally
@@ -777,6 +872,9 @@ class DisplayController:
         finally:
             logger.info("Cleaning up display manager...")
             self.display_manager.cleanup()
+            if self.music_manager: # Check if music_manager object exists
+                logger.info("Stopping music polling...")
+                self.music_manager.stop_polling()
             logger.info("Cleanup complete.")
 
 def main():
