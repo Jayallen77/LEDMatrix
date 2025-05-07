@@ -63,15 +63,20 @@ class StockManager:
                 self.logo_dir = None
         
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'LEDMatrix/1.0 (https://github.com/yourusername/LEDMatrix; contact@example.com)',
+            'Accept': 'application/json',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive'
         }
         
         # Set up session with retry logic
         self.session = requests.Session()
         retry_strategy = Retry(
-            total=3,  # number of retries
-            backoff_factor=0.5,  # wait 0.5, 1, 2 seconds between retries
-            status_forcelist=[500, 502, 503, 504],  # HTTP status codes to retry on
+            total=5,  # increased number of retries
+            backoff_factor=1,  # increased backoff factor
+            status_forcelist=[429, 500, 502, 503, 504],  # added 429 to retry list
+            allowed_methods=["GET", "HEAD", "OPTIONS"]
         )
         adapter = HTTPAdapter(max_retries=retry_strategy)
         self.session.mount("https://", adapter)
@@ -233,6 +238,8 @@ class StockManager:
             cached_data[symbol] = stock_data
             self.cache_manager.update_cache(cache_key, cached_data)
             
+            # Add a longer delay between requests to avoid rate limiting
+            time.sleep(random.uniform(1.0, 2.0))  # increased delay between requests
             return stock_data
             
         except requests.exceptions.SSLError as e:
