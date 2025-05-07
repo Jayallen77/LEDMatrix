@@ -564,7 +564,7 @@ class DisplayController:
         if not self.music_manager:
             logger.warning("Music manager not available for display_music_screen.")
             # Optionally display a "Music Unavailable" message
-            canvas = self.display_manager.get_canvas()
+            canvas = self.display_manager.matrix.CreateFrameCanvas()
             if force_clear:
                 self.display_manager.clear_screen()
             self.display_manager.draw_text(canvas, "Music N/A", 5, 15, self.display_manager.fonts['5x7'], (255,0,0))
@@ -573,7 +573,7 @@ class DisplayController:
 
         track_info = self.music_manager.get_current_display_info()
         
-        canvas = self.display_manager.get_canvas()
+        canvas = self.display_manager.matrix.CreateFrameCanvas()
         font_small = self.display_manager.fonts.get('5x7', self.display_manager.font_default) # Use 5x7 or default
         white = (255, 255, 255)
         dim_white = (180, 180, 180)
