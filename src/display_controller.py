@@ -567,14 +567,32 @@ class DisplayController:
             canvas = self.display_manager.matrix.CreateFrameCanvas()
             if force_clear:
                 self.display_manager.clear_screen()
-            self.display_manager.draw_text(canvas, "Music N/A", 5, 15, self.display_manager.fonts['5x7'], (255,0,0))
+            # Use font_default if it exists, otherwise, this will raise an AttributeError for font_default
+            font_to_use = getattr(self.display_manager, 'font_default', None)
+            if font_to_use:
+                self.display_manager.draw_text(canvas, "Music N/A", 5, 15, font_to_use, (255,0,0))
+            else:
+                # Fallback if font_default is not found - this is a temporary measure.
+                # Ideally, DisplayManager should provide a reliable way to get a font.
+                logger.error("font_default not found on DisplayManager. Cannot display 'Music N/A' text properly.")
             self.display_manager.update_display(canvas)
             return
 
         track_info = self.music_manager.get_current_display_info()
         
         canvas = self.display_manager.matrix.CreateFrameCanvas()
-        font_small = self.display_manager.fonts.get('5x7', self.display_manager.font_default) # Use 5x7 or default
+        # Use font_default if it exists, otherwise, this will raise an AttributeError for font_default
+        font_small = getattr(self.display_manager, 'font_default', None)
+        if not font_small:
+            # This is a critical issue if font_default doesn't exist, as text rendering will fail.
+            logger.error("font_default not found on DisplayManager. Music screen cannot be rendered.")
+            # Optionally, clear the canvas and update to show a blank screen or error message without font.
+            if force_clear:
+                self.display_manager.clear_screen()
+            # self.display_manager.draw_text(canvas, "FONT ERR", 5, 15, ???, (255,0,0)) # No font to use here
+            self.display_manager.update_display(canvas)
+            return
+            
         white = (255, 255, 255)
         dim_white = (180, 180, 180)
 
