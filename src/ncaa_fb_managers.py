@@ -452,12 +452,6 @@ class NCAAFBLiveManager(BaseNCAAFBManager): # Renamed class
         else:
             logging.info("[NCAAFB] Initialized NCAAFBLiveManager in live mode") # Updated log message
 
-    def update(self):
-        """Update live game data."""
-        if not self.is_enabled: return
-        current_time = time.time()
-        interval = self.no_data_interval if not self.live_games and not self.test_mode else self.update_interval
-
         if current_time - self.last_update >= interval:
             self.last_update = current_time
 

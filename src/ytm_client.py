@@ -21,26 +21,26 @@ class YTMClient:
         self._data_lock = threading.Lock()
         self._connection_event = threading.Event()
 
-        @self.sio.event
+        @self.sio.event(namespace='/api/v1/realtime')
         def connect():
-            logging.info(f"Successfully connected to YTM Companion Socket.IO server at {self.base_url}")
+            logging.info(f"Successfully connected to YTM Companion Socket.IO server at {self.base_url} on namespace /api/v1/realtime")
             self.is_connected = True
             self._connection_event.set()
 
-        @self.sio.event
+        @self.sio.event(namespace='/api/v1/realtime')
         def connect_error(data):
-            logging.error(f"YTM Companion Socket.IO connection failed: {data}")
+            logging.error(f"YTM Companion Socket.IO connection failed for namespace /api/v1/realtime: {data}")
             self.is_connected = False
             self._connection_event.set()
 
-        @self.sio.event
+        @self.sio.event(namespace='/api/v1/realtime')
         def disconnect():
-            logging.info(f"Disconnected from YTM Companion Socket.IO server at {self.base_url}")
+            logging.info(f"Disconnected from YTM Companion Socket.IO server at {self.base_url} on namespace /api/v1/realtime")
             self.is_connected = False
 
-        @self.sio.on('ytm_track_update')
+        @self.sio.on('ytm_track_update', namespace='/api/v1/realtime')
         def on_track_update(data):
-            logging.debug(f"Received track update from YTM Companion: {data}")
+            logging.debug(f"Received track update from YTM Companion on /api/v1/realtime: {data}")
             with self._data_lock:
                 self.last_known_track_data = data
 
@@ -74,9 +74,9 @@ class YTMClient:
 
     def _ensure_connected(self, timeout=5):
         if not self.is_connected:
-            logging.info(f"Attempting to connect to YTM Socket.IO server: {self.base_url}")
+            logging.info(f"Attempting to connect to YTM Socket.IO server: {self.base_url} on namespace /api/v1/realtime")
             try:
-                self.sio.connect(self.base_url, transports=['websocket'], wait_timeout=timeout)
+                self.sio.connect(self.base_url, transports=['websocket'], wait_timeout=timeout, namespaces=['/api/v1/realtime'])
                 self._connection_event.clear()
                 if not self._connection_event.wait(timeout=timeout):
                     logging.warning(f"YTM Socket.IO connection attempt timed out after {timeout}s.")
