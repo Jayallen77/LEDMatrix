@@ -429,3 +429,45 @@ Since the display runs on a headless Raspberry Pi, the Spotify authorization pro
 6.  **Paste URL Back to Pi:** Go back to the Raspberry Pi console where the display script is running. It should now be prompting you to "Enter the URL you were redirected to:". **Paste the full URL you just copied** from your browser into the console and press Enter.
 
 The application will then use the provided code to get the necessary tokens and cache them (usually in a `.cache` file). Subsequent runs should not require this process unless the token expires.
+
+### Music Display (YouTube Music)
+
+The system can display currently playing music information from YouTube Music Desktop (YTMD) via its Companion server API.
+
+**Setup:**
+
+1.  **Enable Companion Server in YTMD:**
+    *   In the YouTube Music Desktop application, go to `Settings` -> `Integrations`.
+    *   Enable the "Companion Server" (it might also be labeled as "JSON RPC" or similar).
+    *   Note the IP address and Port it's listening on (default is usually `http://localhost:9863`).
+
+2.  **Configure `config/config.json`:**
+    *   Update the `music` section in your `config/config.json`:
+        ```json
+        "music": {
+            "enabled": true,
+            "preferred_source": "ytm",
+            "YTM_COMPANION_URL": "http://YOUR_YTMD_IP_ADDRESS:PORT", // e.g., "http://localhost:9863" or "http://192.168.1.100:9863"
+            "POLLING_INTERVAL_SECONDS": 2
+        }
+        ```
+
+3.  **Initial Authentication & Token Storage:**
+    *   The first time you run `display_controller.py` after enabling YTM, it will attempt to register itself with the YTMD Companion Server.
+    *   You will see log messages in the terminal prompting you to **approve the "LEDMatrixController" application within the YouTube Music Desktop app.** You typically have 30 seconds to do this.
+    *   Once approved, an authentication token is saved to your `config/config.json`.
+
+4.  **File Permissions for Token Saving (Important if running as a specific user e.g., `ledpi`):**
+    *   If the script (e.g., `display_controller.py` or the systemd service) runs as a user like `ledpi`, that user needs permission to write the authentication token to `config/config.json`.
+    *   Execute the following commands, replacing `ledpi` if you use a different user:
+        ```bash
+        sudo chown ledpi:ledpi /home/ledpi/LEDMatrix/config /home/ledpi/LEDMatrix/config/config.json
+        sudo chmod 664 /home/ledpi/LEDMatrix/config/config.json
+        sudo chmod 775 /home/ledpi/LEDMatrix/config
+        ```
+    *   This ensures the `ledpi` user owns the config directory and file, and has the necessary write permissions.
+
+**Troubleshooting:**
+*   "No authorized companions" in YTMD: Ensure you've approved the `LEDMatrixController` in YTMD settings after the first run.
+*   Connection errors: Double-check the `YTM_COMPANION_URL` in `config.json` matches what YTMD's companion server is set to.
+*   Permission denied saving token: Ensure you've run the `chown` and `chmod` commands above.

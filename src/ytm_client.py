@@ -6,7 +6,14 @@ import time
 import threading
 import requests # Added for HTTP requests during auth
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Ensure application-level logging is configured (as it is)
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Reduce verbosity of socketio and engineio libraries
+logging.getLogger('socketio.client').setLevel(logging.WARNING)
+logging.getLogger('socketio.server').setLevel(logging.WARNING)
+logging.getLogger('engineio.client').setLevel(logging.WARNING)
+logging.getLogger('engineio.server').setLevel(logging.WARNING)
 
 # Define paths relative to this file's location
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), '..', 'config')
@@ -22,7 +29,8 @@ class YTMClient:
         self.base_url = None
         self.ytm_token = None # To store the auth token
         self.load_config()
-        self.sio = socketio.Client(engineio_logger=True)
+        # Explicitly disable internal loggers, rely on global config above
+        self.sio = socketio.Client(logger=False, engineio_logger=False)
         self.last_known_track_data = None
         self.is_connected = False
         self._data_lock = threading.Lock()
@@ -240,7 +248,8 @@ class YTMClient:
 
     def is_available(self):
         if not self.is_connected:
-            return self._ensure_connected(timeout=2)
+            # Increase timeout for initial availability check to allow connection to establish
+            return self._ensure_connected(timeout=10) 
         return True
 
     def get_current_track(self):
