@@ -183,7 +183,7 @@ class MusicManager:
                 self.current_track_info = polled_track_info
                 self.current_source = polled_source
                 display_title = simplified_info.get('title', 'None') if simplified_info else 'None'
-                logging.info(f"Track change detected. Source: {self.current_source.name}. Track: {display_title}")
+                logging.debug(f"Track change detected. Source: {self.current_source.name}. Track: {display_title}")
             else:
                 logging.debug("No change in simplified track info.")
 
