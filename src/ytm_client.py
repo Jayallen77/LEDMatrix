@@ -125,8 +125,11 @@ class YTMClient:
                     auth=auth_payload
                 )
                 self._connection_event.clear()
-                if not self._connection_event.wait(timeout=timeout):
-                    logging.warning(f"YTM Socket.IO connection attempt timed out after {timeout}s.")
+                # Use a slightly longer timeout for the event wait than the connect call itself
+                # to ensure the connect event has time to be processed.
+                event_wait_timeout = timeout + 5 # e.g., if connect timeout is 10s, wait 15s for the event
+                if not self._connection_event.wait(timeout=event_wait_timeout):
+                    logging.warning(f"YTM Socket.IO connection event not received within {event_wait_timeout}s (connect timeout was {timeout}s).")
                     self.is_connected = False # Ensure is_connected is false on timeout
                     return False
                 return self.is_connected # This should be true if connect event fired and no timeout
