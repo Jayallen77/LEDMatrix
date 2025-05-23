@@ -189,7 +189,7 @@ class MusicManager:
                 self.last_album_art_url = new_album_art_url
             
             display_title = self.current_track_info.get('title', 'None') if self.current_track_info else 'None'
-            logger.info(f"YTM Direct Update: Track change detected. Source: {self.current_source.name}. Track: {display_title}")
+            logger.debug(f"YTM Direct Update: Track change detected. Source: {self.current_source.name}. Track: {display_title}")
         else:
             logger.debug("YTM Direct Update: No change in simplified track info.")
 
