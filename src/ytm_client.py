@@ -117,6 +117,7 @@ class YTMClient:
             auth_payload = {"token": self.ytm_token}
 
             try:
+                self._connection_event.clear() # Clear event before attempting connection
                 self.sio.connect(
                     self.base_url, 
                     transports=['websocket'], 
@@ -124,7 +125,7 @@ class YTMClient:
                     namespaces=['/api/v1/realtime'],
                     auth=auth_payload
                 )
-                self._connection_event.clear()
+                # self._connection_event.clear() # No longer clear here
                 # Use a slightly longer timeout for the event wait than the connect call itself
                 # to ensure the connect event has time to be processed.
                 event_wait_timeout = timeout + 5 # e.g., if connect timeout is 10s, wait 15s for the event
