@@ -4,6 +4,7 @@ import json
 import os
 import time
 import threading
+import requests # Added for HTTP requests during auth
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -11,9 +12,15 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), '..', 'config')
 CONFIG_PATH = os.path.join(CONFIG_DIR, 'config.json')
 
+# YTM Companion App Constants
+YTM_APP_ID = "ledmatrixcontroller"
+YTM_APP_NAME = "LEDMatrixController"
+YTM_APP_VERSION = "1.0.0"
+
 class YTMClient:
     def __init__(self):
         self.base_url = None
+        self.ytm_token = None # To store the auth token
         self.load_config()
         self.sio = socketio.Client(logger=True, engineio_logger=False)
         self.last_known_track_data = None
@@ -46,37 +53,176 @@ class YTMClient:
 
     def load_config(self):
         default_url = "http://localhost:9863"
+        loaded_config = {} # To store the whole config for saving later
         if not os.path.exists(CONFIG_PATH):
             logging.error(f"Config file not found at {CONFIG_PATH}")
             self.base_url = default_url
+            self.ytm_token = None
             logging.warning(f"Using default YTM URL: {self.base_url}")
+            # No config to save, so just return
             return
 
         try:
             with open(CONFIG_PATH, 'r') as f:
-                config_data = json.load(f)
-                music_config = config_data.get("music", {})
+                loaded_config = json.load(f) # Load the entire config
+                music_config = loaded_config.get("music", {})
                 self.base_url = music_config.get("YTM_COMPANION_URL", default_url)
+                self.ytm_token = music_config.get("YTM_COMPANION_TOKEN") # Load the token
+
                 if not self.base_url:
                      logging.warning("YTM_COMPANION_URL missing or empty in config.json music section, using default.")
                      self.base_url = default_url
         except json.JSONDecodeError:
             logging.error(f"Error decoding JSON from {CONFIG_PATH}")
             self.base_url = default_url
+            self.ytm_token = None
         except Exception as e:
             logging.error(f"Error loading YTM config: {e}")
             self.base_url = default_url
+            self.ytm_token = None
+        
         logging.info(f"YTM Companion URL set to: {self.base_url}")
+        if self.ytm_token:
+            logging.info("YTM Companion token loaded from config.")
+        else:
+            logging.info("No YTM Companion token found in config. Will attempt to register.")
+
         if self.base_url and self.base_url.startswith("ws://"):
             self.base_url = "http://" + self.base_url[5:]
         elif self.base_url and self.base_url.startswith("wss://"):
             self.base_url = "https://" + self.base_url[6:]
+        
+        # Store the loaded config for potential saving later
+        self._loaded_config_data = loaded_config
+
+    def _save_config(self):
+        """Saves the current configuration, including the YTM token, back to config.json."""
+        if not hasattr(self, '_loaded_config_data') or not self._loaded_config_data:
+            logging.warning("No configuration data loaded, cannot save token.")
+            # If config.json didn't exist or was empty, we might need to create it.
+            # For now, let's assume it exists if we're trying to save a token.
+            # A more robust approach would be to create/update the structure.
+            if not os.path.exists(CONFIG_DIR):
+                try:
+                    os.makedirs(CONFIG_DIR)
+                except OSError as e:
+                    logging.error(f"Could not create config directory {CONFIG_DIR}: {e}")
+                    return
+            self._loaded_config_data = {"music": {}} # Initialize if totally empty
+
+        self._loaded_config_data.setdefault("music", {}) # Ensure music section exists
+        self._loaded_config_data["music"]["YTM_COMPANION_URL"] = self.base_url # Save current base_url too
+        self._loaded_config_data["music"]["YTM_COMPANION_TOKEN"] = self.ytm_token
+
+        try:
+            with open(CONFIG_PATH, 'w') as f:
+                json.dump(self._loaded_config_data, f, indent=4)
+            logging.info(f"YTM Companion token saved to {CONFIG_PATH}")
+        except Exception as e:
+            logging.error(f"Error saving YTM config with token: {e}")
+
+    def _request_auth_code(self):
+        """Requests an authentication code from the YTM Companion server."""
+        url = f"{self.base_url}/api/v1/auth/requestcode"
+        payload = {
+            "appId": YTM_APP_ID,
+            "appName": YTM_APP_NAME,
+            "appVersion": YTM_APP_VERSION
+        }
+        try:
+            logging.info(f"Requesting auth code from {url} with appId: {YTM_APP_ID}")
+            response = requests.post(url, json=payload, timeout=10)
+            response.raise_for_status() # Raise an exception for HTTP errors (4XX, 5XX)
+            data = response.json()
+            logging.info(f"Received auth code: {data.get('code')}")
+            return data.get('code')
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error requesting YTM auth code: {e}")
+            return None
+        except json.JSONDecodeError:
+            logging.error("Error decoding JSON response when requesting auth code.")
+            return None
+
+    def _request_auth_token(self, code):
+        """Requests an authentication token using the provided code."""
+        if not code:
+            return None
+        url = f"{self.base_url}/api/v1/auth/request"
+        payload = {
+            "appId": YTM_APP_ID,
+            "code": code
+        }
+        try:
+            logging.info("Requesting auth token. PLEASE CHECK YOUR YTM DESKTOP APP TO APPROVE THIS REQUEST.")
+            logging.info("You have 30 seconds to approve in the YTM Desktop App.")
+            # The API docs say this can take up to 30 seconds due to user interaction
+            response = requests.post(url, json=payload, timeout=35) 
+            response.raise_for_status()
+            data = response.json()
+            token = data.get('token')
+            if token:
+                logging.info("Successfully received YTM auth token.")
+            else:
+                logging.warning("Auth token not found in response.")
+            return token
+        except requests.exceptions.Timeout:
+            logging.error("Timeout waiting for YTM auth token. Did you approve the request in YTM Desktop App?")
+            return None
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error requesting YTM auth token: {e}")
+            return None
+        except json.JSONDecodeError:
+            logging.error("Error decoding JSON response when requesting auth token.")
+            return None
+
+    def _perform_initial_authentication(self):
+        """Performs the full authentication flow if no token is present."""
+        if self.ytm_token:
+            logging.info("Token already loaded. Skipping initial authentication.")
+            return True
+
+        logging.info("Attempting to perform initial YTM authentication...")
+        code = self._request_auth_code()
+        if not code:
+            logging.error("Failed to get YTM auth code. Cannot proceed with authentication.")
+            return False
+        
+        token = self._request_auth_token(code)
+        if token:
+            self.ytm_token = token
+            self._save_config() # Save the new token
+            return True
+        else:
+            logging.error("Failed to get YTM auth token.")
+            return False
 
     def _ensure_connected(self, timeout=5):
+        if not self.ytm_token: # Check for token first
+            if not self._perform_initial_authentication():
+                logging.warning("YTM authentication failed. Cannot connect to Socket.IO.")
+                self.is_connected = False
+                return False
+            # After successful auth, ytm_token should be set
+
         if not self.is_connected:
             logging.info(f"Attempting to connect to YTM Socket.IO server: {self.base_url} on namespace /api/v1/realtime")
+            auth_payload = None
+            if self.ytm_token:
+                auth_payload = {"token": self.ytm_token}
+            else:
+                # This case should ideally not be reached if _perform_initial_authentication was called and failed
+                logging.error("No YTM token available for Socket.IO connection after auth attempt. This should not happen.")
+                self.is_connected = False
+                return False
+
             try:
-                self.sio.connect(self.base_url, transports=['websocket'], wait_timeout=timeout, namespaces=['/api/v1/realtime'])
+                self.sio.connect(
+                    self.base_url, 
+                    transports=['websocket'], 
+                    wait_timeout=timeout, 
+                    namespaces=['/api/v1/realtime'],
+                    auth=auth_payload
+                )
                 self._connection_event.clear()
                 if not self._connection_event.wait(timeout=timeout):
                     logging.warning(f"YTM Socket.IO connection attempt timed out after {timeout}s.")
