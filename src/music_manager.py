@@ -212,29 +212,42 @@ class MusicManager:
                 'is_playing': track_data.get('is_playing', False),
             }
         elif source == MusicSource.YTM and track_data:
-            track = track_data.get('track', {})
-            player = track_data.get('player', {})
-            duration_sec = track.get('durationSeconds') # YTM specific field
-            duration_ms = int(duration_sec * 1000) if duration_sec is not None else player.get('duration') # Fallback if needed
-            progress_ms = player.get('trackState') # Simplified access if structure is consistent
+            video_info = track_data.get('video', {}) # Corrected: song details are in 'video'
+            player_info = track_data.get('player', {})
 
-            # Refined YTM data extraction
-            duration_sec_alt = player.get('trackState', {}).get('duration') # Alternative location
-            if duration_ms is None and duration_sec_alt is not None:
-                 duration_ms = int(duration_sec_alt * 1000)
+            title = video_info.get('title', 'Unknown Title')
+            artist = video_info.get('author', 'Unknown Artist')
+            album = video_info.get('album') # Can be null, handled by .get in return
+            
+            duration_seconds = video_info.get('durationSeconds')
+            duration_ms = int(duration_seconds * 1000) if duration_seconds is not None else 0
 
-            progress_sec = player.get('trackState', {}).get('currentTime')
-            progress_ms = int(progress_sec * 1000) if progress_sec is not None else None
+            # Progress is in player_info.videoProgress (in seconds)
+            progress_seconds = player_info.get('videoProgress')
+            progress_ms = int(progress_seconds * 1000) if progress_seconds is not None else 0
+
+            # Album art
+            thumbnails = video_info.get('thumbnails', [])
+            album_art_url = thumbnails[0].get('url') if thumbnails else None
+
+            # Play state: player_info.trackState: -1 Unknown, 0 Paused, 1 Playing, 2 Buffering
+            track_state = player_info.get('trackState')
+            is_playing = (track_state == 1) # 1 means Playing
+
+            # Check for ad playing, treat as 'paused' for track display purposes
+            if player_info.get('adPlaying', False):
+                is_playing = False # Or handle as a special state if needed
+                logging.debug("YTM: Ad is playing, reporting track as not actively playing.")
 
             return {
                 'source': 'YouTube Music',
-                'title': track.get('title'),
-                'artist': track.get('author'),
-                'album': track.get('album'),
-                'album_art_url': track.get('cover'),
+                'title': title,
+                'artist': artist,
+                'album': album if album else '', # Ensure album is not None for display
+                'album_art_url': album_art_url,
                 'duration_ms': duration_ms,
                 'progress_ms': progress_ms,
-                'is_playing': not player.get('isPaused', True),
+                'is_playing': is_playing,
             }
         else:
              # Return a default structure for 'nothing playing'
