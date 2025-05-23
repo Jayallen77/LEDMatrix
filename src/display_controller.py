@@ -1,7 +1,10 @@
 import time
 import logging
 import sys
-from typing import Dict, Any
+from typing import Dict, Any, List
+import requests
+from io import BytesIO
+from PIL import Image
 
 # Configure logging
 logging.basicConfig(
@@ -60,6 +63,11 @@ class DisplayController:
         # Initialize Music Manager
         music_init_time = time.time()
         self.music_manager = None
+        self.current_music_info = None
+        self.album_art_image = None
+        self.last_album_art_url = None
+        self.scroll_position_title = 0
+        self.scroll_position_artist = 0
         # Ensure config is loaded before accessing it for music_manager
         if hasattr(self, 'config'):
             music_config_main = self.config.get('music', {})
@@ -310,13 +318,59 @@ class DisplayController:
         logger.info(f"NCAA FB Favorite teams: {self.ncaa_fb_favorite_teams}") # Log NCAA FB teams
         # Removed redundant NHL/MLB init time logs
 
+    def _fetch_and_resize_image(self, url: str, target_size: tuple[int, int]) -> Image.Image | None:
+        """Fetches an image from a URL, resizes it, and returns a PIL Image object."""
+        if not url:
+            return None
+        try:
+            response = requests.get(url, timeout=5) # 5-second timeout for image download
+            response.raise_for_status() # Raise an exception for bad status codes
+            img_data = BytesIO(response.content)
+            img = Image.open(img_data)
+            
+            # Ensure image is RGB for compatibility with the matrix
+            img = img.convert("RGB") 
+            
+            # Resize while maintaining aspect ratio (letterbox/pillarbox if necessary)
+            # This creates a new image of target_size with the original image pasted into it.
+            # Original image is scaled to fit within target_size.
+            img.thumbnail(target_size, Image.Resampling.LANCZOS)
+            
+            # Create a new image with a black background (or any color)
+            # and paste the thumbnail onto it to ensure it's exactly target_size
+            # This is good if the matrix hardware expects exact dimensions.
+            final_img = Image.new("RGB", target_size, (0,0,0)) # Black background
+            paste_x = (target_size[0] - img.width) // 2
+            paste_y = (target_size[1] - img.height) // 2
+            final_img.paste(img, (paste_x, paste_y))
+            
+            return final_img
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching image from {url}: {e}")
+            return None
+        except IOError as e:
+            logger.error(f"Error processing image from {url}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error fetching/processing image {url}: {e}")
+            return None
+
     def _handle_music_update(self, track_info: Dict[str, Any]):
-        """Callback for when music track changes."""
-        logger.debug(f"Music update received in DisplayController: {track_info.get('title')}")
-        if self.current_display_mode == 'music':
-            # If music is currently being displayed, force a clear and redraw in the next cycle
-            self.force_clear = True
+        """Callback for when music track info changes."""
+        self.current_music_info = track_info # Store the latest info
+        # Reset album art if URL changes or no URL
+        new_album_art_url = track_info.get('album_art_url') if track_info else None
+        if new_album_art_url != self.last_album_art_url:
+            self.album_art_image = None # Clear old image, will be refetched
+            self.last_album_art_url = new_album_art_url
+
+        if self.current_display_mode == 'music' and track_info:
             logger.info("Music screen is active and track changed, queueing redraw.")
+            # The run loop will call display_music_screen, which will use self.current_music_info
+            # No need to force clear here unless specifically desired for music updates
+            # self.force_clear = True 
+        elif self.current_display_mode == 'music' and not track_info:
+            logger.info("Music screen is active and track stopped/is None, queueing redraw for 'Nothing Playing'.")
 
     def get_current_duration(self) -> int:
         """Get the duration for the current display mode."""
@@ -560,85 +614,130 @@ class DisplayController:
                 self.ncaa_fb_showing_recent = True # Reset to recent for the new team
 
     def display_music_screen(self, force_clear: bool = False):
-        """Displays the current music information."""
-        if not self.music_manager:
-            logger.warning("Music manager not available for display_music_screen.")
-            if force_clear:
-                self.display_manager.clear() # Clear the display_manager's internal image
-            
-            # Use DisplayManager's drawing capabilities and its font
-            font_to_use = getattr(self.display_manager, 'font', None) # Default to 'font' (PressStart2P)
-            if not font_to_use: # Fallback if 'font' isn't there for some reason
-                font_to_use = getattr(self.display_manager, 'small_font', None)
+        if force_clear or self.force_clear:
+            self.display_manager.clear()
+            self.force_clear = False
 
-            if font_to_use:
-                 # Draw directly on DisplayManager's image
-                self.display_manager.draw.text((5, 10), "Music N/A", font=font_to_use, fill=(255,0,0))
+        display_info = self.current_music_info # Use the centrally updated info
+
+        if not display_info or not display_info.get('is_playing', False) or display_info.get('title') == 'Nothing Playing':
+            if not hasattr(self, '_last_nothing_playing_log_time') or time.time() - self._last_nothing_playing_log_time > 30:
+                logger.info("Music Screen: Nothing playing or info unavailable.")
+                self._last_nothing_playing_log_time = time.time()
+            
+            self.display_manager.clear() # Clear if nothing is playing
+            text_width = self.display_manager.get_text_width("Nothing Playing", self.display_manager.regular_font)
+            x_pos = (self.display_manager.matrix.width - text_width) // 2
+            y_pos = (self.display_manager.matrix.height // 2) - 4 # Center vertically
+            self.display_manager.draw_text("Nothing Playing", x=x_pos, y=y_pos, font=self.display_manager.regular_font)
+            self.display_manager.update_display()
+            # Reset scroll positions when nothing is playing
+            self.scroll_position_title = 0
+            self.scroll_position_artist = 0
+            self.album_art_image = None # Clear album art when nothing is playing
+            return
+
+        self.display_manager.draw.rectangle([0, 0, self.display_manager.matrix.width, self.display_manager.matrix.height], fill=(0, 0, 0)) # Clear with black
+
+        # Album Art Configuration
+        matrix_height = self.display_manager.matrix.height
+        album_art_size = matrix_height - 2 # Slightly smaller than matrix height, with 1px padding top/bottom
+        album_art_target_size = (album_art_size, album_art_size)
+        album_art_x = 1
+        album_art_y = 1
+        text_area_x_start = album_art_x + album_art_size + 2 # Start text 2px to the right of art
+        text_area_width = self.display_manager.matrix.width - text_area_x_start - 1 # 1px padding on right
+
+        # Fetch and display album art
+        if self.last_album_art_url and not self.album_art_image:
+            logger.info(f"Fetching album art from: {self.last_album_art_url}")
+            self.album_art_image = self._fetch_and_resize_image(self.last_album_art_url, album_art_target_size)
+            if self.album_art_image:
+                 logger.info(f"Album art fetched and processed successfully.")
             else:
-                logger.error("Suitable font not found on DisplayManager for 'Music N/A' message.")
-            self.display_manager.update_display() # Update with no arguments
-            return
+                logger.warning(f"Failed to fetch or process album art.")
 
-        track_info = self.music_manager.get_current_display_info()
-        
-        if force_clear:
-            self.display_manager.clear() # Clear the display_manager's internal image
+        if self.album_art_image:
+            self.display_manager.image.paste(self.album_art_image, (album_art_x, album_art_y))
+        else:
+            # No album art, text area uses full width
+            text_area_x_start = 1
+            text_area_width = self.display_manager.matrix.width - 2
+            # Optionally draw a placeholder for album art
+            self.display_manager.draw.rectangle([album_art_x, album_art_y, 
+                                                 album_art_x + album_art_size -1, album_art_y + album_art_size -1],
+                                                 outline=(50,50,50), fill=(10,10,10))
+            self.display_manager.draw_text("?", x=album_art_x + album_art_size//2 - 3, y=album_art_y + album_art_size//2 - 4, color=(100,100,100))
 
-        # Use DisplayManager's drawing capabilities and its font
-        # Let's try to use 'small_font' if available, otherwise 'font'
-        font_small = getattr(self.display_manager, 'small_font', None)
-        if not font_small:
-            font_small = getattr(self.display_manager, 'font', None) # Fallback to the default 'font'
 
-        if not font_small:
-            logger.error("Suitable font (small_font or font) not found on DisplayManager. Music screen cannot be rendered.")
-            self.display_manager.update_display() # Update to show cleared screen or previous state
-            return
+        title = display_info.get('title', ' ')
+        artist = display_info.get('artist', ' ')
+        album = display_info.get('album', ' ') # Added album
+
+        font_title = self.display_manager.small_font
+        font_artist_album = self.display_manager.extra_small_font
+        line_height_title = 8 # Approximate height for PressStart2P 8px
+        line_height_artist_album = 7 # Approximate height for 4x6 font 6px
+        padding_between_lines = 1 
+
+        # --- Title --- 
+        y_pos_title = 2 # Small top margin for title
+        title_width = self.display_manager.get_text_width(title, font_title)
+        if title_width > text_area_width:
+            self.display_manager.draw_text(title[self.scroll_position_title:] + "   " + title[:self.scroll_position_title], 
+                                         x=text_area_x_start, y=y_pos_title, color=(255, 255, 255), font=font_title)
+            self.scroll_position_title = (self.scroll_position_title + 1) % len(title)
+        else:
+            self.display_manager.draw_text(title, x=text_area_x_start, y=y_pos_title, color=(255, 255, 255), font=font_title)
+            self.scroll_position_title = 0
+
+        # --- Artist --- 
+        y_pos_artist = y_pos_title + line_height_title + padding_between_lines
+        artist_width = self.display_manager.get_text_width(artist, font_artist_album)
+        if artist_width > text_area_width:
+            self.display_manager.draw_text(artist[self.scroll_position_artist:] + "   " + artist[:self.scroll_position_artist], 
+                                          x=text_area_x_start, y=y_pos_artist, color=(180, 180, 180), font=font_artist_album)
+            self.scroll_position_artist = (self.scroll_position_artist + 1) % len(artist)
+        else:
+            self.display_manager.draw_text(artist, x=text_area_x_start, y=y_pos_artist, color=(180, 180, 180), font=font_artist_album)
+            self.scroll_position_artist = 0
             
-        white = (255, 255, 255)
-        dim_white = (180, 180, 180)
+        # --- Album (optional, if space permits, or scroll, or alternate with artist) ---
+        # For now, let's place it below artist if it fits, otherwise omit or consider more complex layouts later.
+        y_pos_album = y_pos_artist + line_height_artist_album + padding_between_lines
+        # Check if album can fit before progress bar.
+        # Progress bar height: ~3px + padding. Let's say 5px total.
+        # Available space for album: matrix_height - y_pos_album - 5
+        if (matrix_height - y_pos_album - 5) >= line_height_artist_album : 
+            album_width = self.display_manager.get_text_width(album, font_artist_album)
+            if album_width <= text_area_width: # Only display if it fits without scrolling for now
+                 self.display_manager.draw_text(album, x=text_area_x_start, y=y_pos_album, color=(150, 150, 150), font=font_artist_album)
 
-        # We are drawing directly on self.display_manager.image via self.display_manager.draw
-        draw_surface = self.display_manager.draw 
-        display_width = self.display_manager.matrix.width # Get width for potential centering or wrapping
+        # --- Progress Bar --- 
+        progress_bar_height = 3
+        progress_bar_y = matrix_height - progress_bar_height - 1 # 1px from bottom
+        duration_ms = display_info.get('duration_ms', 0)
+        progress_ms = display_info.get('progress_ms', 0)
 
-        line_height = font_small.getbbox("A")[3] - font_small.getbbox("A")[1] + 3 #Approximate line height with padding
-        
-        y_pos = 1 # Starting Y position
+        if duration_ms > 0:
+            bar_total_width = text_area_width
+            filled_ratio = progress_ms / duration_ms
+            filled_width = int(filled_ratio * bar_total_width)
 
-        if track_info and track_info.get('is_playing'):
-            title = track_info.get('title', 'No Title')
-            artist = track_info.get('artist', 'No Artist')
-            source = track_info.get('source', 'Music')
-
-            # Line 1: Title 
-            # For now, simple draw. Add text wrapping/scrolling later if needed.
-            draw_surface.text((1, y_pos), title, font=font_small, fill=white)
-            y_pos += line_height
+            # Draw background/empty part of progress bar
+            self.display_manager.draw.rectangle([
+                text_area_x_start, progress_bar_y, 
+                text_area_x_start + bar_total_width -1, progress_bar_y + progress_bar_height -1
+            ], outline=(60, 60, 60), fill=(30,30,30)) # Dim outline and fill for empty part
             
-            # Line 2: Artist
-            draw_surface.text((1, y_pos), artist, font=font_small, fill=dim_white)
-            y_pos += line_height
-            
-            # Line 3: Source
-            source_text = f"via {source}"
-            draw_surface.text((1, y_pos), source_text, font=font_small, fill=dim_white)
+            # Draw filled part of progress bar
+            if filled_width > 0:
+                self.display_manager.draw.rectangle([
+                    text_area_x_start, progress_bar_y, 
+                    text_area_x_start + filled_width -1, progress_bar_y + progress_bar_height -1
+                ], fill=(200, 200, 200)) # Brighter fill for progress
 
-        elif track_info and track_info.get('source') != 'None': # Music loaded but paused
-            title = track_info.get('title', 'No Title')
-            draw_surface.text((1, y_pos), "Paused:", font=font_small, fill=white)
-            y_pos += line_height
-            draw_surface.text((1, y_pos), title, font=font_small, fill=dim_white)
-            y_pos += line_height
-            source_text = f"({track_info.get('source')})"
-            draw_surface.text((1, y_pos), source_text, font=font_small, fill=dim_white)
-        else: # Nothing playing or source is None
-            # Center "Nothing Playing"
-            text_width = draw_surface.textlength("Nothing Playing", font=font_small)
-            x_pos = (display_width - text_width) // 2
-            draw_surface.text((x_pos, y_pos + line_height // 2), "Nothing Playing", font=font_small, fill=white)
-            
-        self.display_manager.update_display() # Update with no arguments
+        self.display_manager.update_display()
 
     def run(self):
         """Run the display controller, switching between displays."""
