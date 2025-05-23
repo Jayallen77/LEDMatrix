@@ -408,12 +408,9 @@ class MusicManager:
         if self.album_art_image:
             self.display_manager.image.paste(self.album_art_image, (album_art_x, album_art_y))
         else:
-            text_area_x_start = 1
-            text_area_width = self.display_manager.matrix.width - 2
             self.display_manager.draw.rectangle([album_art_x, album_art_y, 
                                                  album_art_x + album_art_size -1, album_art_y + album_art_size -1],
                                                  outline=(50,50,50), fill=(10,10,10))
-            self.display_manager.draw_text("?", x=album_art_x + album_art_size//2 - 3, y=album_art_y + album_art_size//2 - 4, color=(100,100,100))
 
 
         title = display_info.get('title', ' ')
