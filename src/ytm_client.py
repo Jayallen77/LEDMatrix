@@ -22,7 +22,7 @@ class YTMClient:
         self.base_url = None
         self.ytm_token = None # To store the auth token
         self.load_config()
-        self.sio = socketio.Client(logger=True, engineio_logger=False)
+        self.sio = socketio.Client(engineio_logger=True)
         self.last_known_track_data = None
         self.is_connected = False
         self._data_lock = threading.Lock()
