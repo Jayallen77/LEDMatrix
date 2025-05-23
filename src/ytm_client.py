@@ -52,9 +52,9 @@ class YTMClient:
             logging.info(f"Disconnected from YTM Companion Socket.IO server at {self.base_url} on namespace /api/v1/realtime")
             self.is_connected = False
 
-        @self.sio.on('ytm_track_update', namespace='/api/v1/realtime')
-        def on_track_update(data):
-            logging.debug(f"Received track update from YTM Companion on /api/v1/realtime: {data}")
+        @self.sio.on('state-update', namespace='/api/v1/realtime')
+        def on_state_update(data):
+            logging.debug(f"Received state update from YTM Companion on /api/v1/realtime: {data}")
             with self._data_lock:
                 self.last_known_track_data = data
 
