@@ -18,6 +18,12 @@ logging.getLogger('engineio.server').setLevel(logging.WARNING)
 # Define paths relative to this file's location
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), '..', 'config')
 CONFIG_PATH = os.path.join(CONFIG_DIR, 'config.json')
+# Resolve to an absolute path
+CONFIG_PATH = os.path.abspath(CONFIG_PATH)
+
+# Path for the separate YTM authentication token file
+YTM_AUTH_CONFIG_PATH = os.path.join(CONFIG_DIR, 'ytm_auth.json')
+YTM_AUTH_CONFIG_PATH = os.path.abspath(YTM_AUTH_CONFIG_PATH)
 
 # YTM Companion App Constants
 YTM_APP_ID = "ledmatrixcontroller"
@@ -28,7 +34,7 @@ class YTMClient:
     def __init__(self):
         self.base_url = None
         self.ytm_token = None # To store the auth token
-        self.load_config()
+        self.load_config() # This will now load URL from main config and token from ytm_auth.json
         # Explicitly disable internal loggers, rely on global config above
         self.sio = socketio.Client(logger=False, engineio_logger=False)
         self.last_known_track_data = None
@@ -62,38 +68,47 @@ class YTMClient:
     def load_config(self):
         default_url = "http://localhost:9863"
         loaded_config = {} # To store the whole config for saving later
+        
+        # Load base_url from main config.json
         if not os.path.exists(CONFIG_PATH):
-            logging.error(f"Config file not found at {CONFIG_PATH}")
+            logging.error(f"Main config file not found at {CONFIG_PATH}")
+            # We can still try to load a token if ytm_auth.json exists
+            # and use default URL
+        else:
+            try:
+                with open(CONFIG_PATH, 'r') as f:
+                    loaded_config = json.load(f)
+                    music_config = loaded_config.get("music", {})
+                    self.base_url = music_config.get("YTM_COMPANION_URL", default_url)
+                    if not self.base_url:
+                        logging.warning("YTM_COMPANION_URL missing or empty in config.json music section, using default.")
+                        self.base_url = default_url
+            except json.JSONDecodeError:
+                logging.error(f"Error decoding JSON from main config {CONFIG_PATH}")
+            except Exception as e:
+                logging.error(f"Error loading YTM_COMPANION_URL from main config {CONFIG_PATH}: {e}")
+
+        if not self.base_url: # If main config was missing or URL not found
             self.base_url = default_url
-            self.ytm_token = None
             logging.warning(f"Using default YTM URL: {self.base_url}")
-            # No config to save, so just return
-            return
 
-        try:
-            with open(CONFIG_PATH, 'r') as f:
-                loaded_config = json.load(f) # Load the entire config
-                music_config = loaded_config.get("music", {})
-                self.base_url = music_config.get("YTM_COMPANION_URL", default_url)
-                self.ytm_token = music_config.get("YTM_COMPANION_TOKEN") # Load the token
-
-                if not self.base_url:
-                     logging.warning("YTM_COMPANION_URL missing or empty in config.json music section, using default.")
-                     self.base_url = default_url
-        except json.JSONDecodeError:
-            logging.error(f"Error decoding JSON from {CONFIG_PATH}")
-            self.base_url = default_url
-            self.ytm_token = None
-        except Exception as e:
-            logging.error(f"Error loading YTM config: {e}")
-            self.base_url = default_url
-            self.ytm_token = None
+        # Load ytm_token from ytm_auth.json
+        self.ytm_token = None # Reset token before trying to load
+        if os.path.exists(YTM_AUTH_CONFIG_PATH):
+            try:
+                with open(YTM_AUTH_CONFIG_PATH, 'r') as f:
+                    auth_data = json.load(f)
+                    self.ytm_token = auth_data.get("YTM_COMPANION_TOKEN")
+            except json.JSONDecodeError:
+                logging.error(f"Error decoding JSON from YTM auth file {YTM_AUTH_CONFIG_PATH}")
+            except Exception as e:
+                logging.error(f"Error loading YTM auth config {YTM_AUTH_CONFIG_PATH}: {e}")
         
         logging.info(f"YTM Companion URL set to: {self.base_url}")
         if self.ytm_token:
-            logging.info("YTM Companion token loaded from config.")
+            logging.info(f"YTM Companion token loaded from {YTM_AUTH_CONFIG_PATH}.")
         else:
-            logging.info("No YTM Companion token found in config. Will attempt to register.")
+            logging.info(f"No YTM Companion token found in {YTM_AUTH_CONFIG_PATH}. Will attempt to register.")
 
         if self.base_url and self.base_url.startswith("ws://"):
             self.base_url = "http://" + self.base_url[5:]
@@ -101,33 +116,30 @@ class YTMClient:
             self.base_url = "https://" + self.base_url[6:]
         
         # Store the loaded config for potential saving later
-        self._loaded_config_data = loaded_config
+        self._loaded_config_data = loaded_config # Still keep main config data if needed elsewhere, but not for token saving
 
-    def _save_config(self):
-        """Saves the current configuration, including the YTM token, back to config.json."""
-        if not hasattr(self, '_loaded_config_data') or not self._loaded_config_data:
-            logging.warning("No configuration data loaded, cannot save token.")
-            # If config.json didn't exist or was empty, we might need to create it.
-            # For now, let's assume it exists if we're trying to save a token.
-            # A more robust approach would be to create/update the structure.
-            if not os.path.exists(CONFIG_DIR):
-                try:
-                    os.makedirs(CONFIG_DIR)
-                except OSError as e:
-                    logging.error(f"Could not create config directory {CONFIG_DIR}: {e}")
-                    return
-            self._loaded_config_data = {"music": {}} # Initialize if totally empty
+    def _save_ytm_token(self):
+        """Saves the YTM token to ytm_auth.json."""
+        if not self.ytm_token:
+            logging.warning("No YTM token to save.")
+            return
 
-        self._loaded_config_data.setdefault("music", {}) # Ensure music section exists
-        self._loaded_config_data["music"]["YTM_COMPANION_URL"] = self.base_url # Save current base_url too
-        self._loaded_config_data["music"]["YTM_COMPANION_TOKEN"] = self.ytm_token
+        if not os.path.exists(CONFIG_DIR):
+            try:
+                os.makedirs(CONFIG_DIR)
+                logging.info(f"Created config directory: {CONFIG_DIR}")
+            except OSError as e:
+                logging.error(f"Could not create config directory {CONFIG_DIR}: {e}")
+                return
+
+        token_data = {"YTM_COMPANION_TOKEN": self.ytm_token}
 
         try:
-            with open(CONFIG_PATH, 'w') as f:
-                json.dump(self._loaded_config_data, f, indent=4)
-            logging.info(f"YTM Companion token saved to {CONFIG_PATH}")
+            with open(YTM_AUTH_CONFIG_PATH, 'w') as f:
+                json.dump(token_data, f, indent=4)
+            logging.info(f"YTM Companion token saved to {YTM_AUTH_CONFIG_PATH}")
         except Exception as e:
-            logging.error(f"Error saving YTM config with token: {e}")
+            logging.error(f"Error saving YTM token to {YTM_AUTH_CONFIG_PATH}: {e}")
 
     def _request_auth_code(self):
         """Requests an authentication code from the YTM Companion server."""
@@ -198,7 +210,7 @@ class YTMClient:
         token = self._request_auth_token(code)
         if token:
             self.ytm_token = token
-            self._save_config() # Save the new token
+            self._save_ytm_token() # Save the new token to ytm_auth.json
             return True
         else:
             logging.error("Failed to get YTM auth token.")
