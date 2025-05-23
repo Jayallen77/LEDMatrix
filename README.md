@@ -417,18 +417,42 @@ The Music Display module shows information about the currently playing track fro
 *   `"spotify"`: Only uses Spotify. Ignores YTM.
 *   `"ytm"`: Only uses the YTM Companion Server. Ignores Spotify.
 
-**First Spotify Run (Headless Setup):**
+**First Spotify Run / Spotify Token Refresh (Headless Setup):**
 
-Since the display runs on a headless Raspberry Pi, the Spotify authorization process requires a few manual steps:
+Spotify authentication is now handled by a separate script. This process is needed for the initial setup or if the Spotify token expires or is revoked.
 
-1.  **Start the Application:** Run the display controller script (`sudo python3 display_controller.py`).
-2.  **Copy Auth URL:** When Spotify needs authorization for the first time (or after a token expires), the application will **print a URL** to the console. Copy this full URL.
-3.  **Authorize in Browser (on another device):** Paste the copied URL into a web browser on your computer or phone. Log in to Spotify if prompted and click "Agree" to authorize the application.
-4.  **Get Redirected URL:** Your browser will be redirected to a URL starting with your `SPOTIFY_REDIRECT_URI` (e.g., `http://localhost:8888/callback`) followed by `?code=...`. The page will likely show an error like "Site can't be reached" - **this is expected and perfectly fine.**
-5.  **Copy Full Redirected URL:** **Immediately copy the complete URL** from your browser's address bar. Make sure you copy the *entire* thing, including the `?code=...` part.
-6.  **Paste URL Back to Pi:** Go back to the Raspberry Pi console where the display script is running. It should now be prompting you to "Enter the URL you were redirected to:". **Paste the full URL you just copied** from your browser into the console and press Enter.
+**Step 1: Run the Authentication Script (as the `ledpi` user)**
 
-The application will then use the provided code to get the necessary tokens and cache them (usually in a `.cache` file). Subsequent runs should not require this process unless the token expires.
+1.  Log in or `su` to the user account that will run the main display application (e.g., `ledpi`). **Do not use `sudo` for this step.**
+    ```bash
+    su ledpi
+    # or if connecting via SSH directly as ledpi, just proceed
+    ```
+2.  Navigate to the project directory:
+    ```bash
+    cd /path/to/your/LEDMatrix # Replace with the actual path to your project
+    ```
+3.  Run the `authenticate_spotify.py` script:
+    ```bash
+    python3 src/authenticate_spotify.py
+    ```
+4.  **Copy Auth URL:** The script will print an authorization URL to the console. Copy this full URL.
+5.  **Authorize in Browser (on another device):** Paste the copied URL into a web browser on your computer or phone. Log in to Spotify if prompted and click "Agree" to authorize the application.
+6.  **Get Redirected URL:** Your browser will be redirected to a URL starting with your `SPOTIFY_REDIRECT_URI` (e.g., `http://localhost:8888/callback`) followed by `?code=...`. The page will likely show an error like "Site can't be reached" - **this is expected and perfectly fine.**
+7.  **Copy Full Redirected URL:** **Immediately copy the complete URL** from your browser's address bar. Make sure you copy the *entire* thing, including the `?code=...` part.
+8.  **Paste URL Back to Pi:** Go back to the Raspberry Pi console where the `authenticate_spotify.py` script is running. It will prompt you to "Paste the full redirected URL here and press Enter:". Paste the full URL you just copied and press Enter.
+
+The script will then fetch the necessary tokens and save them to `config/spotify_auth.json`. If successful, you'll see a confirmation message. If you were previously logged in as a different user (e.g. `root` or `pi`), you can now `exit` back to that session.
+
+**Step 2: Run the Main Application**
+
+Once the `spotify_auth.json` file has been created by the authentication script, you can run the main display controller as usual (e.g., with `sudo` if required for hardware access):
+
+```bash
+sudo python3 display_controller.py
+```
+
+The application will automatically load and use the cached token from `config/spotify_auth.json`. It will also attempt to refresh the token automatically when needed. If the token cannot be refreshed (e.g., if it's been too long or permissions were revoked via Spotify's website), you will need to repeat **Step 1**.
 
 ### Music Display (YouTube Music)
 
@@ -438,8 +462,8 @@ The system can display currently playing music information from YouTube Music De
 
 1.  **Enable Companion Server in YTMD:**
     *   In the YouTube Music Desktop application, go to `Settings` -> `Integrations`.
-    *   Enable the "Companion Server" (it might also be labeled as "JSON RPC" or similar).
-    *   Note the IP address and Port it's listening on (default is usually `http://localhost:9863`).
+    *   Enable the "Companion Server".
+    *   Note the IP address and Port it's listening on (default is usually `http://localhost:9863`), you'll need to know the local ip address if playing music on a device other than your rpi (probably are).
 
 2.  **Configure `config/config.json`:**
     *   Update the `music` section in your `config/config.json`:
@@ -448,26 +472,16 @@ The system can display currently playing music information from YouTube Music De
             "enabled": true,
             "preferred_source": "ytm",
             "YTM_COMPANION_URL": "http://YOUR_YTMD_IP_ADDRESS:PORT", // e.g., "http://localhost:9863" or "http://192.168.1.100:9863"
-            "POLLING_INTERVAL_SECONDS": 2
+            "POLLING_INTERVAL_SECONDS": 1
         }
         ```
 
 3.  **Initial Authentication & Token Storage:**
-    *   The first time you run `display_controller.py` after enabling YTM, it will attempt to register itself with the YTMD Companion Server.
+    *   The first time you run ` python3 src/authenticate_ytm.py` after enabling YTM, it will attempt to register itself with the YTMD Companion Server.
     *   You will see log messages in the terminal prompting you to **approve the "LEDMatrixController" application within the YouTube Music Desktop app.** You typically have 30 seconds to do this.
-    *   Once approved, an authentication token is saved to your `config/config.json`.
-
-4.  **File Permissions for Token Saving (Important if running as a specific user e.g., `ledpi`):**
-    *   If the script (e.g., `display_controller.py` or the systemd service) runs as a user like `ledpi`, that user needs permission to write the authentication token to `config/config.json`.
-    *   Execute the following commands, replacing `ledpi` if you use a different user:
-        ```bash
-        sudo chown ledpi:ledpi /home/ledpi/LEDMatrix/config /home/ledpi/LEDMatrix/config/config.json
-        sudo chmod 664 /home/ledpi/LEDMatrix/config/config.json
-        sudo chmod 775 /home/ledpi/LEDMatrix/config
-        ```
+    *   Once approved, an authentication token is saved to your `config/ytm_auth.json`.
     *   This ensures the `ledpi` user owns the config directory and file, and has the necessary write permissions.
 
 **Troubleshooting:**
 *   "No authorized companions" in YTMD: Ensure you've approved the `LEDMatrixController` in YTMD settings after the first run.
 *   Connection errors: Double-check the `YTM_COMPANION_URL` in `config.json` matches what YTMD's companion server is set to.
-*   Permission denied saving token: Ensure you've run the `chown` and `chmod` commands above.

@@ -9,6 +9,12 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # Define paths relative to this file's location
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), '..', 'config')
 SECRETS_PATH = os.path.join(CONFIG_DIR, 'config_secrets.json')
+SPOTIFY_AUTH_CACHE_PATH = os.path.join(CONFIG_DIR, 'spotify_auth.json') # Explicit cache path for token
+
+# Resolve to absolute paths
+CONFIG_DIR = os.path.abspath(CONFIG_DIR)
+SECRETS_PATH = os.path.abspath(SECRETS_PATH)
+SPOTIFY_AUTH_CACHE_PATH = os.path.abspath(SPOTIFY_AUTH_CACHE_PATH)
 
 class SpotifyClient:
     def __init__(self):
@@ -19,14 +25,14 @@ class SpotifyClient:
         self.sp = None
         self.load_credentials()
         if self.client_id and self.client_secret and self.redirect_uri:
+            # Attempt to authenticate once using the cache path
             self._authenticate()
         else:
-            logging.warning("Spotify credentials not loaded. Cannot authenticate.")
-
+            logging.warning("Spotify credentials not loaded. Spotify client will not be functional.")
 
     def load_credentials(self):
         if not os.path.exists(SECRETS_PATH):
-            logging.error(f"Secrets file not found at {SECRETS_PATH}")
+            logging.error(f"Secrets file not found at {SECRETS_PATH}. Spotify features will be unavailable.")
             return
 
         try:
@@ -37,96 +43,76 @@ class SpotifyClient:
                 self.client_secret = music_secrets.get("SPOTIFY_CLIENT_SECRET")
                 self.redirect_uri = music_secrets.get("SPOTIFY_REDIRECT_URI")
                 if not all([self.client_id, self.client_secret, self.redirect_uri]):
-                    logging.warning("One or more Spotify credentials missing in config_secrets.json under the 'music' key.")
+                    logging.warning("One or more Spotify credentials missing in config_secrets.json. Spotify will be unavailable.")
         except json.JSONDecodeError:
-            logging.error(f"Error decoding JSON from {SECRETS_PATH}")
+            logging.error(f"Error decoding JSON from {SECRETS_PATH}. Spotify will be unavailable.")
         except Exception as e:
-            logging.error(f"Error loading Spotify credentials: {e}")
+            logging.error(f"Error loading Spotify credentials: {e}. Spotify will be unavailable.")
 
     def _authenticate(self):
-        """Handles the OAuth authentication flow."""
+        """Initializes Spotipy with SpotifyOAuth, relying on a cached token."""
+        if not self.client_id or not self.client_secret or not self.redirect_uri:
+            logging.warning("Cannot authenticate Spotify: credentials missing.")
+            return
         try:
-            # Spotipy handles token caching in .cache file by default
-            self.sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
+            # Use the explicit cache path. Spotipy will try to load/refresh token from here.
+            auth_manager = SpotifyOAuth(
                 client_id=self.client_id,
                 client_secret=self.client_secret,
                 redirect_uri=self.redirect_uri,
                 scope=self.scope,
-                open_browser=False # Important for headless environments
-            ))
-            # Try making a call to ensure authentication is working or trigger refresh
-            self.sp.current_user()
-            logging.info("Spotify authenticated successfully.")
+                cache_path=SPOTIFY_AUTH_CACHE_PATH, # Use the defined cache path
+                open_browser=False
+            )
+            self.sp = spotipy.Spotify(auth_manager=auth_manager)
+            
+            # Try making a lightweight call to verify if the token from cache is valid or can be refreshed.
+            self.sp.current_user() # This will raise an exception if token is invalid/expired and cannot be refreshed.
+            logging.info("Spotify client initialized and authenticated using cached token.")
         except Exception as e:
-            logging.error(f"Spotify authentication failed: {e}")
+            logging.warning(f"Spotify client initialization/authentication failed: {e}. Run authenticate_spotify.py if needed.")
             self.sp = None # Ensure sp is None if auth fails
 
     def is_authenticated(self):
-        """Checks if the client is authenticated."""
-        # Check if sp object exists and try a lightweight API call
-        if not self.sp:
-            return False
-        try:
-            # A simple call to verify token validity
-            self.sp.current_user()
-            return True
-        except Exception as e:
-            # Log specific auth errors if needed
-            logging.warning(f"Spotify token validation failed: {e}")
-            return False
+        """Checks if the client is currently considered authenticated and usable."""
+        return self.sp is not None # Relies on _authenticate setting sp to None on failure
 
-    def get_auth_url(self):
-         """Gets the authorization URL for the user."""
-         # Create a temporary auth manager just to get the URL
-         try:
-             auth_manager = SpotifyOAuth(
-                 client_id=self.client_id,
-                 client_secret=self.client_secret,
-                 redirect_uri=self.redirect_uri,
-                 scope=self.scope,
-                 open_browser=False
-             )
-             return auth_manager.get_authorize_url()
-         except Exception as e:
-            logging.error(f"Could not get Spotify auth URL: {e}")
-            return None
+    # Removed get_auth_url method - this is now handled by authenticate_spotify.py
 
     def get_current_track(self):
         """Fetches the currently playing track from Spotify."""
-        if not self.is_authenticated():
-            logging.warning("Spotify not authenticated. Cannot fetch track.")
-            # Maybe try re-authenticating?
-            self._authenticate()
-            if not self.is_authenticated():
-                 return None
+        if not self.is_authenticated(): # Check our internal state
+            # Do not attempt to re-authenticate here. User must run authenticate_spotify.py
+            # logging.debug("Spotify not authenticated. Cannot fetch track. Run authenticate_spotify.py if needed.")
+            return None
 
         try:
             track_info = self.sp.current_playback()
             if track_info and track_info['item']:
-                 # Simplify structure slightly if needed, or return raw
                  return track_info
             else:
-                 return None # Nothing playing or unavailable
-        except Exception as e:
-            logging.error(f"Error fetching current track from Spotify: {e}")
-            # Check for specific errors like token expiration if spotipy doesn't handle it
-            if "expired" in str(e).lower():
-                 logging.info("Spotify token might be expired, attempting refresh...")
-                 self._authenticate() # Try to refresh/re-authenticate
+                 return None 
+        except spotipy.exceptions.SpotifyException as e:
+            logging.error(f"Spotify API error when fetching current track: {e}")
+            # If it's an auth error (e.g. token revoked server-side), set sp to None so is_authenticated reflects it.
+            if e.http_status == 401 or e.http_status == 403: 
+                logging.warning("Spotify authentication error (token may be revoked or expired). Please re-run authenticate_spotify.py.")
+                self.sp = None # Mark as not authenticated
+            return None
+        except Exception as e: # Catch other potential errors (network, etc.)
+            logging.error(f"Unexpected error fetching current track from Spotify: {e}")
             return None
 
-# Example Usage (for testing)
+# Example Usage (for testing, adapt to new auth flow)
 # if __name__ == '__main__':
+#     # First, ensure you have run authenticate_spotify.py successfully as the user.
 #     client = SpotifyClient()
 #     if client.is_authenticated():
+#         print("Spotify client is authenticated.")
 #         track = client.get_current_track()
 #         if track:
 #             print(json.dumps(track, indent=2))
 #         else:
 #             print("No track currently playing or error fetching.")
 #     else:
-#         auth_url = client.get_auth_url()
-#         if auth_url:
-#             print(f"Please authorize here: {auth_url}")
-#         else:
-#             print("Could not authenticate or get auth URL. Check credentials and config.") 
+#         print("Spotify client not authenticated. Please run src/authenticate_spotify.py as the correct user.") 
