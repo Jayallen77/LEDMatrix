@@ -25,7 +25,7 @@ YTM_AUTH_CONFIG_PATH = os.path.join(CONFIG_DIR, 'ytm_auth.json')
 YTM_AUTH_CONFIG_PATH = os.path.abspath(YTM_AUTH_CONFIG_PATH)
 
 class YTMClient:
-    def __init__(self):
+    def __init__(self, update_callback=None):
         self.base_url = None
         self.ytm_token = None
         self.load_config() # Loads URL and token
@@ -34,6 +34,7 @@ class YTMClient:
         self.is_connected = False
         self._data_lock = threading.Lock()
         self._connection_event = threading.Event()
+        self.external_update_callback = update_callback
 
         @self.sio.event(namespace='/api/v1/realtime')
         def connect():
@@ -55,8 +56,17 @@ class YTMClient:
         @self.sio.on('state-update', namespace='/api/v1/realtime')
         def on_state_update(data):
             logging.debug(f"Received state update from YTM Companion on /api/v1/realtime: {data}")
+            new_data_received = False
             with self._data_lock:
-                self.last_known_track_data = data
+                if self.last_known_track_data != data:
+                    self.last_known_track_data = data
+                    new_data_received = True
+            
+            if new_data_received and self.external_update_callback:
+                try:
+                    self.external_update_callback(data)
+                except Exception as cb_ex:
+                    logging.error(f"Error executing YTMClient external_update_callback: {cb_ex}")
 
     def load_config(self):
         default_url = "http://localhost:9863"

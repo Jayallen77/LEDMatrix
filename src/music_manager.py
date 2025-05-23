@@ -119,7 +119,7 @@ class MusicManager:
         # Initialize YTM Client if needed
         if self.preferred_source in ["auto", "ytm"]:
             try:
-                self.ytm = YTMClient()
+                self.ytm = YTMClient(update_callback=self._handle_ytm_direct_update)
                 if not self.ytm.is_available():
                     logging.warning(f"YTM Companion server not reachable at {self.ytm.base_url}. YTM features disabled.")
                     self.ytm = None
@@ -131,6 +131,73 @@ class MusicManager:
         else:
             logging.info("YTM client initialization skipped due to preferred_source setting.")
             self.ytm = None
+
+    def _handle_ytm_direct_update(self, ytm_data):
+        """Handles a direct state update from YTMClient."""
+        logger.debug(f"MusicManager received direct YTM update: {ytm_data.get('track', {}).get('title') if ytm_data else 'No Data'}")
+
+        if not self.enabled:
+            return
+
+        # Only process if YTM is the preferred source, or if auto and Spotify isn't actively playing.
+        # This check is to ensure we don't override an active Spotify session if preferred_source is 'auto'
+        # and Spotify just happens to be paused but YTM starts playing something.
+        # The main polling loop has more robust logic for who 'wins' in auto mode.
+        # This direct callback should primarily act when YTM is the clear choice or nothing else is playing.
+        
+        spotify_is_playing = False
+        if self.current_source == MusicSource.SPOTIFY and self.current_track_info and self.current_track_info.get('is_playing'):
+            spotify_is_playing = True
+
+        if not (self.preferred_source == "ytm" or (self.preferred_source == "auto" and not spotify_is_playing)):
+            logger.debug("Skipping YTM direct update due to preferred_source/Spotify state.")
+            return
+
+        # Check if player is actually playing (not paused, not an ad)
+        player_info = ytm_data.get('player', {})
+        video_info = ytm_data.get('video', {})
+        is_actually_playing_ytm = (player_info.get('trackState') == 1) and not player_info.get('adPlaying', False)
+
+        if not ytm_data or not is_actually_playing_ytm:
+            # If YTM is not playing or data is null, and we were on YTM, treat as a stop.
+            if self.current_source == MusicSource.YTM:
+                logger.info("YTM direct update indicates YTM stopped. Clearing YTM info.")
+                simplified_info = self.get_simplified_track_info(None, MusicSource.NONE)
+                polled_source = MusicSource.NONE # Effectively, nothing is playing from YTM's perspective
+            else:
+                # Not currently on YTM, and YTM is not playing, so no change to announce from YTM's side.
+                return
+        else:
+            simplified_info = self.get_simplified_track_info(ytm_data, MusicSource.YTM)
+            polled_source = MusicSource.YTM
+
+        has_changed = False
+        if simplified_info != self.current_track_info:
+            has_changed = True
+            
+            old_album_art_url = self.current_track_info.get('album_art_url') if self.current_track_info else None
+            new_album_art_url = simplified_info.get('album_art_url') if simplified_info else None
+
+            self.current_track_info = simplified_info
+            # Only set current_source to YTM if YTM is actually playing and preferred or auto
+            self.current_source = polled_source if is_actually_playing_ytm and polled_source == MusicSource.YTM else self.current_source
+            if not is_actually_playing_ytm and self.current_source == MusicSource.YTM:
+                 self.current_source = MusicSource.NONE # If YTM stopped, it's no longer the source
+
+            if new_album_art_url != old_album_art_url:
+                self.album_art_image = None
+                self.last_album_art_url = new_album_art_url
+            
+            display_title = self.current_track_info.get('title', 'None') if self.current_track_info else 'None'
+            logger.info(f"YTM Direct Update: Track change detected. Source: {self.current_source.name}. Track: {display_title}")
+        else:
+            logger.debug("YTM Direct Update: No change in simplified track info.")
+
+        if has_changed and self.update_callback:
+            try:
+                self.update_callback(self.current_track_info) # This is the callback to DisplayController
+            except Exception as e:
+                logger.error(f"Error executing DisplayController update callback from YTM direct update: {e}")
 
     def _fetch_and_resize_image(self, url: str, target_size: tuple[int, int]) -> Image.Image | None:
         """Fetches an image from a URL, resizes it, and returns a PIL Image object."""
