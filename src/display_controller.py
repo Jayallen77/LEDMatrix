@@ -301,15 +301,23 @@ class DisplayController:
             if key not in self.display_durations:
                  self.display_durations[key] = value
         
-        logger.info("DisplayController initialized with display_manager: %s", id(self.display_manager))
+        # Log favorite teams only if the respective sport is enabled
+        if nhl_enabled:
+            logger.info(f"NHL Favorite teams: {self.nhl_favorite_teams}")
+        if nba_enabled:
+            logger.info(f"NBA Favorite teams: {self.nba_favorite_teams}")
+        if mlb_enabled:
+            logger.info(f"MLB Favorite teams: {self.mlb_favorite_teams}")
+        if soccer_enabled: # Check if soccer is enabled
+            logger.info(f"Soccer Favorite teams: {self.soccer_favorite_teams}")
+        if nfl_enabled: # Check if NFL is enabled
+            logger.info(f"NFL Favorite teams: {self.nfl_favorite_teams}")
+        if ncaa_fb_enabled: # Check if NCAA FB is enabled
+            logger.info(f"NCAA FB Favorite teams: {self.ncaa_fb_favorite_teams}")
+
         logger.info(f"Available display modes: {self.available_modes}")
-        logger.info(f"NHL Favorite teams: {self.nhl_favorite_teams}")
-        logger.info(f"NBA Favorite teams: {self.nba_favorite_teams}")
-        logger.info(f"MLB Favorite teams: {self.mlb_favorite_teams}")
-        logger.info(f"Soccer Favorite teams: {self.soccer_favorite_teams}") # Log Soccer teams
-        logger.info(f"NFL Favorite teams: {self.nfl_favorite_teams}") # Log NFL teams
-        logger.info(f"NCAA FB Favorite teams: {self.ncaa_fb_favorite_teams}") # Log NCAA FB teams
-        # Removed redundant NHL/MLB init time logs
+        logger.info(f"Initial display mode: {self.current_display_mode}")
+        logger.info("DisplayController initialized with display_manager: %s", id(self.display_manager))
 
     def _handle_music_update(self, track_info: Dict[str, Any]):
         """Callback for when music track info changes. (Simplified)"""
