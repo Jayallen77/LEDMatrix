@@ -318,9 +318,9 @@ class DisplayController:
         # for reasons other than directly re-drawing the music screen (e.g., logging, global state).
         # For now, we'll keep it simple. If the music screen is active, it will redraw on its own.
         if track_info:
-            logger.info(f"DisplayController received music update (via callback): Title - {track_info.get('title')}, Playing - {track_info.get('is_playing')}")
+            logger.debug(f"DisplayController received music update (via callback): Title - {track_info.get('title')}, Playing - {track_info.get('is_playing')}")
         else:
-            logger.info("DisplayController received music update (via callback): Track is None or not playing.")
+            logger.debug("DisplayController received music update (via callback): Track is None or not playing.")
 
         # If the current display mode is music, the MusicManager's display method will be called
         # in the main loop and will use its own updated internal state. No explicit action needed here
