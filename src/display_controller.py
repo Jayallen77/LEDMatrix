@@ -68,6 +68,8 @@ class DisplayController:
         self.last_album_art_url = None
         self.scroll_position_title = 0
         self.scroll_position_artist = 0
+        self.title_scroll_tick = 0      # For slowing down title scroll
+        self.artist_scroll_tick = 0     # For slowing down artist scroll
         # Ensure config is loaded before accessing it for music_manager
         if hasattr(self, 'config'):
             music_config_main = self.config.get('music', {})
@@ -618,26 +620,27 @@ class DisplayController:
             self.display_manager.clear()
             self.force_clear = False
 
-        display_info = self.current_music_info # Use the centrally updated info
+        display_info = self.current_music_info
 
         if not display_info or not display_info.get('is_playing', False) or display_info.get('title') == 'Nothing Playing':
             if not hasattr(self, '_last_nothing_playing_log_time') or time.time() - self._last_nothing_playing_log_time > 30:
                 logger.info("Music Screen: Nothing playing or info unavailable.")
                 self._last_nothing_playing_log_time = time.time()
             
-            self.display_manager.clear() # Clear if nothing is playing
+            self.display_manager.clear()
             text_width = self.display_manager.get_text_width("Nothing Playing", self.display_manager.regular_font)
             x_pos = (self.display_manager.matrix.width - text_width) // 2
-            y_pos = (self.display_manager.matrix.height // 2) - 4 # Center vertically
+            y_pos = (self.display_manager.matrix.height // 2) - 4
             self.display_manager.draw_text("Nothing Playing", x=x_pos, y=y_pos, font=self.display_manager.regular_font)
             self.display_manager.update_display()
-            # Reset scroll positions when nothing is playing
             self.scroll_position_title = 0
             self.scroll_position_artist = 0
-            self.album_art_image = None # Clear album art when nothing is playing
+            self.title_scroll_tick = 0 # Reset ticks
+            self.artist_scroll_tick = 0
+            self.album_art_image = None
             return
 
-        self.display_manager.draw.rectangle([0, 0, self.display_manager.matrix.width, self.display_manager.matrix.height], fill=(0, 0, 0)) # Clear with black
+        self.display_manager.draw.rectangle([0, 0, self.display_manager.matrix.width, self.display_manager.matrix.height], fill=(0, 0, 0))
 
         # Album Art Configuration
         matrix_height = self.display_manager.matrix.height
@@ -680,27 +683,43 @@ class DisplayController:
         line_height_artist_album = 7 # Approximate height for 4x6 font 6px
         padding_between_lines = 1 
 
+        TEXT_SCROLL_DIVISOR = 5 # Adjust this value to change scroll speed (higher is slower)
+
         # --- Title --- 
         y_pos_title = 2 # Small top margin for title
         title_width = self.display_manager.get_text_width(title, font_title)
+        # Always draw the current state of the text based on scroll_position_title
+        current_title_display_text = title
         if title_width > text_area_width:
-            self.display_manager.draw_text(title[self.scroll_position_title:] + "   " + title[:self.scroll_position_title], 
-                                         x=text_area_x_start, y=y_pos_title, color=(255, 255, 255), font=font_title)
-            self.scroll_position_title = (self.scroll_position_title + 1) % len(title)
+            current_title_display_text = title[self.scroll_position_title:] + "   " + title[:self.scroll_position_title]
+        self.display_manager.draw_text(current_title_display_text, 
+                                     x=text_area_x_start, y=y_pos_title, color=(255, 255, 255), font=font_title)
+        # Only update scroll position based on the divisor
+        if title_width > text_area_width:
+            self.title_scroll_tick += 1
+            if self.title_scroll_tick % TEXT_SCROLL_DIVISOR == 0:
+                self.scroll_position_title = (self.scroll_position_title + 1) % len(title)
+                self.title_scroll_tick = 0 # Reset tick to avoid large numbers
         else:
-            self.display_manager.draw_text(title, x=text_area_x_start, y=y_pos_title, color=(255, 255, 255), font=font_title)
             self.scroll_position_title = 0
+            self.title_scroll_tick = 0
 
         # --- Artist --- 
         y_pos_artist = y_pos_title + line_height_title + padding_between_lines
         artist_width = self.display_manager.get_text_width(artist, font_artist_album)
+        current_artist_display_text = artist
         if artist_width > text_area_width:
-            self.display_manager.draw_text(artist[self.scroll_position_artist:] + "   " + artist[:self.scroll_position_artist], 
-                                          x=text_area_x_start, y=y_pos_artist, color=(180, 180, 180), font=font_artist_album)
-            self.scroll_position_artist = (self.scroll_position_artist + 1) % len(artist)
+            current_artist_display_text = artist[self.scroll_position_artist:] + "   " + artist[:self.scroll_position_artist]
+        self.display_manager.draw_text(current_artist_display_text, 
+                                      x=text_area_x_start, y=y_pos_artist, color=(180, 180, 180), font=font_artist_album)
+        if artist_width > text_area_width:
+            self.artist_scroll_tick += 1
+            if self.artist_scroll_tick % TEXT_SCROLL_DIVISOR == 0:
+                self.scroll_position_artist = (self.scroll_position_artist + 1) % len(artist)
+                self.artist_scroll_tick = 0
         else:
-            self.display_manager.draw_text(artist, x=text_area_x_start, y=y_pos_artist, color=(180, 180, 180), font=font_artist_album)
             self.scroll_position_artist = 0
+            self.artist_scroll_tick = 0
             
         # --- Album (optional, if space permits, or scroll, or alternate with artist) ---
         # For now, let's place it below artist if it fits, otherwise omit or consider more complex layouts later.
