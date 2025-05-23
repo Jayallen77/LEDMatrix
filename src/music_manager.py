@@ -421,7 +421,7 @@ class MusicManager:
         album = display_info.get('album', ' ') 
 
         font_title = self.display_manager.small_font
-        font_artist_album = self.display_manager.extra_small_font
+        font_artist_album = self.display_manager.bdf_5x7_font
         line_height_title = 8 
         line_height_artist_album = 7 
         padding_between_lines = 1 

@@ -199,6 +199,11 @@ class DisplayManager:
                 logger.error("Falling back to small font")
                 self.calendar_font = self.small_font
 
+            # Assign the loaded calendar_font (which should be 5x7 BDF or its fallback) 
+            # to a new attribute for specific use, e.g., in MusicManager.
+            self.bdf_5x7_font = self.calendar_font 
+            logger.info(f"Assigned calendar_font (type: {type(self.bdf_5x7_font).__name__}) to bdf_5x7_font.")
+
             # Load 4x6 font as extra_small_font
             try:
                 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -219,6 +224,8 @@ class DisplayManager:
             self.calendar_font = self.regular_font
             if not hasattr(self, 'extra_small_font'): 
                 self.extra_small_font = self.regular_font
+            if not hasattr(self, 'bdf_5x7_font'): # Ensure bdf_5x7_font also gets a fallback
+                self.bdf_5x7_font = self.regular_font
 
     def get_text_width(self, text, font):
         """Get the width of text when rendered with the given font."""
