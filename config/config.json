@@ -68,13 +68,13 @@
         "update_interval": 1
     },
     "weather": {
-        "enabled": false,
+        "enabled": true,
         "update_interval": 600,
         "units": "imperial",
         "display_format": "{temp}°F\n{condition}"
     },
     "stocks": {
-        "enabled": false,
+        "enabled": true,
         "update_interval": 300,
         "symbols": [
             "ASTS", "SCHD", "INTC", "NVDA", "T", "VOO", "SPEST", "SMCI"
@@ -82,7 +82,7 @@
         "display_format": "{symbol}: ${price} ({change}%)"
     },
     "crypto": {
-        "enabled": false,
+        "enabled": true,
         "update_interval": 300,
         "symbols": [
             "BTC-USD", "ETH-USD"
@@ -90,7 +90,7 @@
         "display_format": "{symbol}: ${price} ({change}%)"
     },
     "stock_news": {
-        "enabled": false,
+        "enabled": true,
         "update_interval": 3600,
         "scroll_speed": 1,
         "scroll_delay": 0.001,
@@ -98,7 +98,7 @@
         "headlines_per_rotation": 2
     },
     "calendar": {
-        "enabled": false,
+        "enabled": true,
         "credentials_file": "credentials.json",
         "token_file": "token.pickle",
         "update_interval": 3600,
@@ -106,7 +106,7 @@
         "calendars": ["birthdays"]
     },
     "nhl_scoreboard": {
-        "enabled": false,
+        "enabled": true,
         "test_mode": false,
         "update_interval_seconds": 300,
         "live_update_interval": 15,
@@ -202,7 +202,7 @@
         "update_interval": 3600
     },
     "mlb": {
-        "enabled": false,
+        "enabled": true,
         "test_mode": false,
         "update_interval_seconds": 300,
         "live_update_interval": 20,
@@ -218,7 +218,7 @@
         }
     },
     "text_display": {
-        "enabled": false,
+        "enabled": true,
         "text": "Subscribe to ChuckBuilds",
         "font_path": "assets/fonts/5x7.bdf", 
         "font_size": 7,
@@ -247,7 +247,7 @@
     },
     "music": {
         "enabled": true,
-        "preferred_source": "spotify", 
+        "preferred_source": "ytm", 
         "YTM_COMPANION_URL": "http://192.168.86.12:9863",
         "POLLING_INTERVAL_SECONDS": 1
     }
