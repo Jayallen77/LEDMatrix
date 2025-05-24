@@ -98,14 +98,9 @@ class MusicManager:
             try:
                 self.spotify = SpotifyClient()
                 if not self.spotify.is_authenticated():
-                    logging.warning("Spotify client initialized but not authenticated.")
-                    # We still might need manual intervention by the user based on console output
-                    auth_url = self.spotify.get_auth_url()
-                    if auth_url:
-                        print(f"---> Spotify requires authorization. Please visit: {auth_url}")
-                        print("---> After authorizing, restart the application.")
-                    else:
-                         print("---> Could not get Spotify auth URL. Check config/config_secrets.json")
+                    logging.warning("Spotify client initialized but not authenticated. Please run src/authenticate_spotify.py if you want to use Spotify.")
+                    # The SpotifyClient will log more details if cache loading failed.
+                    # No need to attempt auth URL generation here.
                 else:
                     logging.info("Spotify client authenticated.")
 
