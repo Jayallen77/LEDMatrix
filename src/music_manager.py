@@ -6,7 +6,7 @@ import json
 import os
 from io import BytesIO
 import requests
-from PIL import Image
+from PIL import Image, ImageEnhance
 
 # Use relative imports for clients within the same package (src)
 from .spotify_client import SpotifyClient
@@ -208,6 +208,14 @@ class MusicManager:
             img = img.convert("RGB") 
             
             img.thumbnail(target_size, Image.Resampling.LANCZOS)
+
+            # Enhance contrast
+            enhancer_contrast = ImageEnhance.Contrast(img)
+            img = enhancer_contrast.enhance(1.3) # Adjust 1.3 as needed
+
+            # Enhance saturation (Color)
+            enhancer_saturation = ImageEnhance.Color(img)
+            img = enhancer_saturation.enhance(1.3) # Adjust 1.3 as needed
             
             final_img = Image.new("RGB", target_size, (0,0,0)) # Black background
             paste_x = (target_size[0] - img.width) // 2

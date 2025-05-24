@@ -364,7 +364,7 @@ The Music Display module shows information about the currently playing track fro
     *   You need to register an application on the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard/) to get API credentials.
         *   Go to the dashboard, log in, and click "Create App".
         *   Give it a name (e.g., "LEDMatrix Display") and description.
-        *   For the "Redirect URI", enter `http://localhost:8888/callback` (or another unused port if 8888 is taken). You **must** add this exact URI in your app settings on the Spotify dashboard.
+        *   For the "Redirect URI", enter `http://127.0.0.1:8888/callback` (or another unused port if 8888 is taken). You **must** add this exact URI in your app settings on the Spotify dashboard.
         *   Note down the `Client ID` and `Client Secret`.
 
 2.  **YouTube Music (YTM):**
@@ -379,7 +379,7 @@ The Music Display module shows information about the currently playing track fro
         "music": {
             "SPOTIFY_CLIENT_ID": "YOUR_SPOTIFY_CLIENT_ID_HERE",
             "SPOTIFY_CLIENT_SECRET": "YOUR_SPOTIFY_CLIENT_SECRET_HERE",
-            "SPOTIFY_REDIRECT_URI": "http://localhost:8888/callback" 
+            "SPOTIFY_REDIRECT_URI": "http://127.0.0.1:8888/callback" 
         }
         // ... other secrets ...
     }
@@ -417,42 +417,55 @@ The Music Display module shows information about the currently playing track fro
 *   `"spotify"`: Only uses Spotify. Ignores YTM.
 *   `"ytm"`: Only uses the YTM Companion Server. Ignores Spotify.
 
-**First Spotify Run / Spotify Token Refresh (Headless Setup):**
+## Spotify Authentication for Music Display
 
-Spotify authentication is now handled by a separate script. This process is needed for the initial setup or if the Spotify token expires or is revoked.
+If you are using the Spotify integration to display currently playing music, you will need to authenticate with Spotify. This project uses an authentication flow that requires a one-time setup. Due to how the display controller script may run with specific user permissions (even when using `sudo`), the following steps are crucial:
 
-**Step 1: Run the Authentication Script (as the `ledpi` user)**
+1.  **Initial Setup & Secrets:**
+    *   Ensure you have your Spotify API Client ID, Client Secret, and Redirect URI.
+    *   The Redirect URI should be set to `http://127.0.0.1:8888/callback` in your Spotify Developer Dashboard.
+    *   Copy `config/config_secrets.template.json` to `config/config_secrets.json`.
+    *   Edit `config/config_secrets.json` and fill in your Spotify credentials under the `"music"` section:
+        ```json
+        {
+          "music": {
+            "SPOTIFY_CLIENT_ID": "YOUR_SPOTIFY_CLIENT_ID",
+            "SPOTIFY_CLIENT_SECRET": "YOUR_SPOTIFY_CLIENT_SECRET",
+            "SPOTIFY_REDIRECT_URI": "http://127.0.0.1:8888/callback"
+          }
+        }
+        ```
 
-1.  Log in or `su` to the user account that will run the main display application (e.g., `ledpi`). **Do not use `sudo` for this step.**
-    ```bash
-    su ledpi
-    # or if connecting via SSH directly as ledpi, just proceed
-    ```
-2.  Navigate to the project directory:
-    ```bash
-    cd /path/to/your/LEDMatrix # Replace with the actual path to your project
-    ```
-3.  Run the `authenticate_spotify.py` script:
-    ```bash
-    python3 src/authenticate_spotify.py
-    ```
-4.  **Copy Auth URL:** The script will print an authorization URL to the console. Copy this full URL.
-5.  **Authorize in Browser (on another device):** Paste the copied URL into a web browser on your computer or phone. Log in to Spotify if prompted and click "Agree" to authorize the application.
-6.  **Get Redirected URL:** Your browser will be redirected to a URL starting with your `SPOTIFY_REDIRECT_URI` (e.g., `http://localhost:8888/callback`) followed by `?code=...`. The page will likely show an error like "Site can't be reached" - **this is expected and perfectly fine.**
-7.  **Copy Full Redirected URL:** **Immediately copy the complete URL** from your browser's address bar. Make sure you copy the *entire* thing, including the `?code=...` part.
-8.  **Paste URL Back to Pi:** Go back to the Raspberry Pi console where the `authenticate_spotify.py` script is running. It will prompt you to "Paste the full redirected URL here and press Enter:". Paste the full URL you just copied and press Enter.
+2.  **Run the Authentication Script:**
+    *   Execute the authentication script using `sudo`. This is important because it needs to create an authentication cache file (`spotify_auth.json`) that will be owned by root.
+        ```bash
+        sudo python3 src/authenticate_spotify.py
+        ```
+    *   The script will output a URL. Copy this URL and paste it into a web browser on any device.
+    *   Log in to Spotify and authorize the application.
+    *   Your browser will be redirected to a URL starting with `http://127.0.0.1:8888/callback?code=...`. It will likely show an error page like "This site can't be reached" – this is expected.
+    *   Copy the **entire** redirected URL from your browser's address bar.
+    *   Paste this full URL back into the terminal when prompted by the script.
+    *   If successful, it will indicate that token info has been cached.
 
-The script will then fetch the necessary tokens and save them to `config/spotify_auth.json`. If successful, you'll see a confirmation message. If you were previously logged in as a different user (e.g. `root` or `pi`), you can now `exit` back to that session.
+3.  **Adjust Cache File Permissions:**
+    *   The main display script (`display_controller.py`), even when run with `sudo`, might operate with an effective User ID (e.g., UID 1 for 'daemon') that doesn't have permission to read the `spotify_auth.json` file created by `root` (which has -rw------- permissions by default).
+    *   To allow the display script to read this cache file, change its permissions:
+        ```bash
+        sudo chmod 644 config/spotify_auth.json
+        ```
+    This makes the file readable by all users, including the effective user of the display script.
 
-**Step 2: Run the Main Application**
+4.  **Run the Main Application:**
+    *   You should now be able to run your main display controller script using `sudo`:
+        ```bash
+        sudo python3 display_controller.py
+        ```
+    *   The Spotify client should now authenticate successfully using the cached token.
 
-Once the `spotify_auth.json` file has been created by the authentication script, you can run the main display controller as usual (e.g., with `sudo` if required for hardware access):
+**Why these specific permissions steps?**
 
-```bash
-sudo python3 display_controller.py
-```
-
-The application will automatically load and use the cached token from `config/spotify_auth.json`. It will also attempt to refresh the token automatically when needed. If the token cannot be refreshed (e.g., if it's been too long or permissions were revoked via Spotify's website), you will need to repeat **Step 1**.
+The `authenticate_spotify.py` script, when run with `sudo`, creates `config/spotify_auth.json` owned by `root`. If the main `display_controller.py` (also run with `sudo`) effectively runs as a different user (e.g., UID 1/daemon, as observed during troubleshooting), that user won't be able to read the `root`-owned file unless its permissions are relaxed (e.g., to `644`). The `chmod 644` command allows the owner (`root`) to read/write, and everyone else (including the `daemon` user) to read.
 
 ### Music Display (YouTube Music)
 
