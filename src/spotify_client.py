@@ -54,6 +54,34 @@ class SpotifyClient:
         if not self.client_id or not self.client_secret or not self.redirect_uri:
             logging.warning("Cannot authenticate Spotify: credentials missing.")
             return
+
+        # ---- START DIAGNOSTIC BLOCK ----
+        logging.info(f"Attempting to use cache path: {SPOTIFY_AUTH_CACHE_PATH}")
+        if os.path.exists(SPOTIFY_AUTH_CACHE_PATH):
+            logging.info(f"Cache file {SPOTIFY_AUTH_CACHE_PATH} EXISTS.")
+            if os.access(SPOTIFY_AUTH_CACHE_PATH, os.R_OK):
+                logging.info(f"Cache file {SPOTIFY_AUTH_CACHE_PATH} IS R_OK readable by UID {os.geteuid()}.")
+                try:
+                    with open(SPOTIFY_AUTH_CACHE_PATH, 'r') as f_test:
+                        content = f_test.read()
+                        logging.info(f"Cache file content (first 100 chars): '{content[:100]}'")
+                        if not content.strip():
+                            logging.warning("Cache file IS EMPTY or whitespace only upon manual inspection!")
+                except Exception as e_test:
+                    logging.error(f"Error during manual read test of cache file: {e_test}")
+            else:
+                logging.warning(f"Cache file {SPOTIFY_AUTH_CACHE_PATH} is NOT R_OK readable by UID {os.geteuid()}.")
+            
+            # Additionally, let's check permissions with stat
+            try:
+                stat_info = os.stat(SPOTIFY_AUTH_CACHE_PATH)
+                logging.info(f"Cache file stat info: UID={stat_info.st_uid}, GID={stat_info.st_gid}, Mode={oct(stat_info.st_mode)}")
+            except Exception as e_stat:
+                logging.error(f"Error getting stat info for cache file: {e_stat}")
+        else:
+            logging.warning(f"Cache file {SPOTIFY_AUTH_CACHE_PATH} does NOT exist when _authenticate is called.")
+        # ---- END DIAGNOSTIC BLOCK ----
+
         try:
             # Use the explicit cache path. Spotipy will try to load/refresh token from here.
             auth_manager = SpotifyOAuth(
