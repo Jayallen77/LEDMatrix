@@ -56,30 +56,37 @@ class SpotifyClient:
             return
 
         # ---- START DIAGNOSTIC BLOCK ----
-        logging.info(f"Attempting to use cache path: {SPOTIFY_AUTH_CACHE_PATH}")
+        logging.info(f"SpotifyClient using cache path: {SPOTIFY_AUTH_CACHE_PATH}")
         if os.path.exists(SPOTIFY_AUTH_CACHE_PATH):
-            logging.info(f"Cache file {SPOTIFY_AUTH_CACHE_PATH} EXISTS.")
-            if os.access(SPOTIFY_AUTH_CACHE_PATH, os.R_OK):
-                logging.info(f"Cache file {SPOTIFY_AUTH_CACHE_PATH} IS R_OK readable by UID {os.geteuid()}.")
-                try:
-                    with open(SPOTIFY_AUTH_CACHE_PATH, 'r') as f_test:
-                        content = f_test.read()
-                        logging.info(f"Cache file content (first 100 chars): '{content[:100]}'")
-                        if not content.strip():
-                            logging.warning("Cache file IS EMPTY or whitespace only upon manual inspection!")
-                except Exception as e_test:
-                    logging.error(f"Error during manual read test of cache file: {e_test}")
-            else:
-                logging.warning(f"Cache file {SPOTIFY_AUTH_CACHE_PATH} is NOT R_OK readable by UID {os.geteuid()}.")
+            logging.info(f"DIAG: Cache file {SPOTIFY_AUTH_CACHE_PATH} EXISTS.")
+            # Log effective UID of the current process
+            euid = os.geteuid()
+            logging.info(f"DIAG: Current process Effective UID: {euid}")
             
-            # Additionally, let's check permissions with stat
             try:
                 stat_info = os.stat(SPOTIFY_AUTH_CACHE_PATH)
-                logging.info(f"Cache file stat info: UID={stat_info.st_uid}, GID={stat_info.st_gid}, Mode={oct(stat_info.st_mode)}")
-            except Exception as e_stat:
-                logging.error(f"Error getting stat info for cache file: {e_stat}")
+                logging.info(f"DIAG: Cache file stat: UID={stat_info.st_uid}, GID={stat_info.st_gid}, Mode={oct(stat_info.st_mode)}")
+                
+                # Explicit check if EUID is the owner and has read permission
+                if euid == stat_info.st_uid and (stat_info.st_mode & 0o400): # 0o400 is S_IRUSR
+                    logging.info("DIAG: Effective UID is owner AND has read permission (stat).")
+                elif (stat_info.st_mode & 0o040) and euid in os.getgroups(): # Check group read
+                     logging.info("DIAG: Effective UID is in group AND group has read permission (stat).")
+                elif stat_info.st_mode & 0o004: # Check other read
+                     logging.info("DIAG: Others have read permission (stat).")
+                else:
+                    logging.warning("DIAG: Stat check indicates NO READ PERMISSION for effective UID.")
+
+                # Attempt to open and read directly
+                with open(SPOTIFY_AUTH_CACHE_PATH, 'r') as f_test:
+                    content_preview = f_test.read(120) # Read a bit more
+                    logging.info(f"DIAG: Cache file manual read successful. Content (first 120 chars): '{content_preview}'")
+                    if not content_preview.strip():
+                        logging.warning("DIAG: Cache file IS EMPTY or whitespace only (manual inspection).")
+            except Exception as e_diag:
+                logging.error(f"DIAG: Error during diagnostic check/read of cache file: {e_diag}")
         else:
-            logging.warning(f"Cache file {SPOTIFY_AUTH_CACHE_PATH} does NOT exist when _authenticate is called.")
+            logging.warning(f"DIAG: Cache file {SPOTIFY_AUTH_CACHE_PATH} does NOT exist when _authenticate is called.")
         # ---- END DIAGNOSTIC BLOCK ----
 
         try:
