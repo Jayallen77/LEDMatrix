@@ -38,7 +38,7 @@ class MusicManager:
         self.update_callback = update_callback
         self.polling_interval = 2 # Default
         self.enabled = False # Default
-        self.preferred_source = "auto" # Default
+        self.preferred_source = "spotify" # Default changed from "auto"
         self.stop_event = threading.Event()
         self.track_info_lock = threading.Lock() # Added lock
 
@@ -57,7 +57,7 @@ class MusicManager:
 
     def _load_config(self):
         default_interval = 2
-        default_preferred_source = "auto"
+        # default_preferred_source = "auto" # Removed
         self.enabled = False # Assume disabled until config proves otherwise
 
         if not os.path.exists(CONFIG_PATH):
@@ -70,14 +70,20 @@ class MusicManager:
                 music_config = config_data.get("music", {})
 
                 self.enabled = music_config.get("enabled", False)
-                self.polling_interval = music_config.get("POLLING_INTERVAL_SECONDS", default_interval)
-                self.preferred_source = music_config.get("preferred_source", default_preferred_source).lower()
-
                 if not self.enabled:
-                    logging.info("Music manager is disabled in config.json.")
+                    logging.info("Music manager is disabled in config.json (top level 'enabled': false).")
                     return # Don't proceed further if disabled
 
-                logging.info(f"Music manager enabled. Polling interval: {self.polling_interval}s. Preferred source: {self.preferred_source}")
+                self.polling_interval = music_config.get("POLLING_INTERVAL_SECONDS", default_interval)
+                configured_source = music_config.get("preferred_source", "spotify").lower()
+
+                if configured_source in ["spotify", "ytm"]:
+                    self.preferred_source = configured_source
+                    logging.info(f"Music manager enabled. Polling interval: {self.polling_interval}s. Preferred source: {self.preferred_source}")
+                else:
+                    logging.warning(f"Invalid 'preferred_source' ('{configured_source}') in config.json. Must be 'spotify' or 'ytm'. Music manager disabled.")
+                    self.enabled = False
+                    return
 
         except json.JSONDecodeError:
             logging.error(f"Error decoding JSON from {CONFIG_PATH}. Music manager disabled.")
@@ -96,40 +102,34 @@ class MusicManager:
         logging.info("Initializing music clients...")
 
         # Initialize Spotify Client if needed
-        if self.preferred_source in ["auto", "spotify"]:
+        if self.preferred_source == "spotify":
             try:
                 self.spotify = SpotifyClient()
                 if not self.spotify.is_authenticated():
                     logging.warning("Spotify client initialized but not authenticated. Please run src/authenticate_spotify.py if you want to use Spotify.")
-                    # The SpotifyClient will log more details if cache loading failed.
-                    # No need to attempt auth URL generation here.
                 else:
                     logging.info("Spotify client authenticated.")
-
             except Exception as e:
                 logging.error(f"Failed to initialize Spotify client: {e}")
                 self.spotify = None
         else:
-            logging.info("Spotify client initialization skipped due to preferred_source setting.")
-            self.spotify = None
+            self.spotify = None # Ensure it's None if not preferred
 
         # Initialize YTM Client if needed
-        if self.preferred_source in ["auto", "ytm"]:
+        if self.preferred_source == "ytm":
             try:
                 self.ytm = YTMClient(update_callback=self._handle_ytm_direct_update)
-                # We no longer check is_available() or connect here. Connection is on-demand.
                 logging.info(f"YTMClient initialized. Connection will be managed on-demand. Configured URL: {self.ytm.base_url}")
             except Exception as e:
                 logging.error(f"Failed to initialize YTM client: {e}")
                 self.ytm = None
         else:
-            logging.info("YTM client initialization skipped due to preferred_source setting.")
-            self.ytm = None
+            self.ytm = None # Ensure it's None if not preferred
 
     def activate_music_display(self):
         logger.info("Music display activated.")
         self.is_music_display_active = True
-        if self.ytm and self.preferred_source in ["auto", "ytm"]:
+        if self.ytm and self.preferred_source == "ytm": # Only connect YTM if it's the preferred source
             if not self.ytm.is_connected:
                 logger.info("Attempting to connect YTM client due to music display activation.")
                 # Pass a reasonable timeout for on-demand connection
@@ -155,18 +155,14 @@ class MusicManager:
             logger.debug("Skipping YTM direct update: Manager disabled or music display not active.")
             return
 
-        # Only process if YTM is the preferred source, or if auto and Spotify isn't actively playing.
-        spotify_is_playing_flag = False
-        with self.track_info_lock:
-            if self.current_source == MusicSource.SPOTIFY and self.current_track_info and self.current_track_info.get('is_playing'):
-                spotify_is_playing_flag = True
-
-        if not (self.preferred_source == "ytm" or (self.preferred_source == "auto" and not spotify_is_playing_flag)):
-            logger.debug("Skipping YTM direct update due to preferred_source/Spotify state.")
+        # Only process if YTM is the preferred source
+        if self.preferred_source != "ytm":
+            logger.debug(f"Skipping YTM direct update: Preferred source is '{self.preferred_source}', not 'ytm'.")
             return
 
-        player_info = ytm_data.get('player', {})
-        is_actually_playing_ytm = (player_info.get('trackState') == 1) and not player_info.get('adPlaying', False)
+        ytm_player_info = ytm_data.get('player', {}) if ytm_data else {}
+        is_actually_playing_ytm = (ytm_player_info.get('trackState') == 1) and \
+                                  not ytm_player_info.get('adPlaying', False)
 
         simplified_info = self.get_simplified_track_info(ytm_data if is_actually_playing_ytm else None, 
                                                        MusicSource.YTM if is_actually_playing_ytm else MusicSource.NONE)
@@ -251,10 +247,7 @@ class MusicManager:
             polled_source = MusicSource.NONE
             is_playing_from_poll = False # Renamed to avoid conflict
 
-            poll_spotify = self.preferred_source in ["auto", "spotify"] and self.spotify and self.spotify.is_authenticated()
-            poll_ytm = self.preferred_source in ["auto", "ytm"] and self.ytm
-
-            if poll_spotify:
+            if self.preferred_source == "spotify" and self.spotify and self.spotify.is_authenticated():
                 try:
                     spotify_track = self.spotify.get_current_track()
                     if spotify_track and spotify_track.get('is_playing'):
@@ -269,25 +262,29 @@ class MusicManager:
                     if "token" in str(e).lower():
                         logging.warning("Spotify auth token issue detected during polling.")
             
-            should_poll_ytm_now = poll_ytm and (self.preferred_source == "ytm" or (self.preferred_source == "auto" and not is_playing_from_poll))
-
-            if should_poll_ytm_now:
-                if self.ytm and self.ytm.is_connected:
-                    try:
-                        ytm_track_data = self.ytm.get_current_track() # Data from YTMClient's cache
-                        if ytm_track_data and ytm_track_data.get('player') and not ytm_track_data.get('player', {}).get('isPaused') and not ytm_track_data.get('player',{}).get('adPlaying', False):
-                            if self.preferred_source == "ytm" or not is_playing_from_poll:
-                                polled_track_info_data = ytm_track_data
-                                polled_source = MusicSource.YTM
-                                is_playing_from_poll = True # YTM is now considered playing
-                                logger.debug(f"Polling YTM: Active track - {ytm_track_data.get('track', {}).get('title')}")
-                        else:
-                            logging.debug("Polling YTM: No active track or player paused (or track data missing player info).")
-                    except Exception as e:
-                        logging.error(f"Error polling YTM: {e}")
-                else:
-                    logging.debug("Skipping YTM poll: Client not initialized or not connected.")
-                     # Consider setting self.ytm = None if it becomes unavailable repeatedly?
+            elif self.preferred_source == "ytm" and self.ytm and self.ytm.is_connected:
+                try:
+                    ytm_track_data = self.ytm.get_current_track() # Data from YTMClient's cache
+                    if ytm_track_data and ytm_track_data.get('player') and \
+                       not ytm_track_data.get('player', {}).get('isPaused') and \
+                       not ytm_track_data.get('player',{}).get('adPlaying', False):
+                        polled_track_info_data = ytm_track_data
+                        polled_source = MusicSource.YTM
+                        is_playing_from_poll = True # YTM is now considered playing
+                        logger.debug(f"Polling YTM: Active track - {ytm_track_data.get('track', {}).get('title')}")
+                    else:
+                        logging.debug("Polling YTM: No active track or player paused (or track data missing player info).")
+                except Exception as e:
+                    logging.error(f"Error polling YTM: {e}")
+            elif self.preferred_source == "ytm" and self.ytm and not self.ytm.is_connected:
+                 logging.debug("Skipping YTM poll: Client not connected. Will attempt reconnect on next cycle if display active.")
+                 # Attempt to reconnect YTM if music display is active and it's the preferred source
+                 if self.is_music_display_active:
+                     logger.info("YTM is preferred and display active, attempting reconnect during poll cycle.")
+                     if self.ytm.connect_client(timeout=5):
+                         logger.info("YTM reconnected during poll cycle.")
+                     else:
+                         logger.warning("YTM failed to reconnect during poll cycle.")
 
             simplified_info_poll = self.get_simplified_track_info(polled_track_info_data, polled_source)
 
