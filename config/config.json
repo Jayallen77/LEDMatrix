@@ -63,7 +63,7 @@
         }
     },
     "clock": {
-        "enabled": true,
+        "enabled": false,
         "format": "%H:%M:%S",
         "update_interval": 1
     },
@@ -98,7 +98,7 @@
         "headlines_per_rotation": 2
     },
     "calendar": {
-        "enabled": true,
+        "enabled": false,
         "credentials_file": "credentials.json",
         "token_file": "token.pickle",
         "update_interval": 3600,
@@ -106,7 +106,7 @@
         "calendars": ["birthdays"]
     },
     "nhl_scoreboard": {
-        "enabled": true,
+        "enabled": false,
         "test_mode": false,
         "update_interval_seconds": 300,
         "live_update_interval": 15,
@@ -168,7 +168,7 @@
         }
     },
     "ncaam_scoreboard": {
-        "enabled": true,
+        "enabled": false,
         "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 15,
@@ -182,7 +182,7 @@
         }
     },
     "ncaa_bb_scoreboard": {
-        "enabled": true,
+        "enabled": false,
         "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 20,
@@ -202,7 +202,7 @@
         "update_interval": 3600
     },
     "mlb": {
-        "enabled": true,
+        "enabled": false,
         "test_mode": false,
         "update_interval_seconds": 300,
         "live_update_interval": 20,
@@ -220,10 +220,10 @@
     "text_display": {
         "enabled": true,
         "text": "Subscribe to ChuckBuilds",
-        "font_path": "assets/fonts/5x7.bdf", 
-        "font_size": 7,
-        "scroll": false,
-        "scroll_speed": 25, 
+        "font_path": "assets/fonts/press-start-2p.ttf", 
+        "font_size": 8,
+        "scroll": true,
+        "scroll_speed": 10, 
         "text_color": [255, 0, 0], 
         "background_color": [0, 0, 0]
     },

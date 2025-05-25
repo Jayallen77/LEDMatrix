@@ -48,6 +48,7 @@ class MusicManager:
         self.scroll_position_artist = 0
         self.title_scroll_tick = 0
         self.artist_scroll_tick = 0
+        self.is_music_display_active = False # New state variable
         
         self._load_config() # Load config first
         self._initialize_clients() # Initialize based on loaded config
@@ -115,11 +116,8 @@ class MusicManager:
         if self.preferred_source in ["auto", "ytm"]:
             try:
                 self.ytm = YTMClient(update_callback=self._handle_ytm_direct_update)
-                if not self.ytm.is_available():
-                    logging.warning(f"YTM Companion server not reachable at {self.ytm.base_url}. YTM features disabled.")
-                    self.ytm = None
-                else:
-                    logging.info(f"YTM Companion server connected at {self.ytm.base_url}.")
+                # We no longer check is_available() or connect here. Connection is on-demand.
+                logging.info(f"YTMClient initialized. Connection will be managed on-demand. Configured URL: {self.ytm.base_url}")
             except Exception as e:
                 logging.error(f"Failed to initialize YTM client: {e}")
                 self.ytm = None
@@ -127,11 +125,33 @@ class MusicManager:
             logging.info("YTM client initialization skipped due to preferred_source setting.")
             self.ytm = None
 
+    def activate_music_display(self):
+        logger.info("Music display activated.")
+        self.is_music_display_active = True
+        if self.ytm and self.preferred_source in ["auto", "ytm"]:
+            if not self.ytm.is_connected():
+                logger.info("Attempting to connect YTM client due to music display activation.")
+                # Pass a reasonable timeout for on-demand connection
+                if self.ytm.connect_client(timeout=10):
+                    logger.info("YTM client connected successfully on display activation.")
+                else:
+                    logger.warning("YTM client failed to connect on display activation.")
+            else:
+                logger.debug("YTM client already connected during music display activation.")
+
+    def deactivate_music_display(self):
+        logger.info("Music display deactivated.")
+        self.is_music_display_active = False
+        if self.ytm and self.ytm.is_connected():
+            logger.info("Disconnecting YTM client due to music display deactivation.")
+            self.ytm.disconnect_client()
+
     def _handle_ytm_direct_update(self, ytm_data):
         """Handles a direct state update from YTMClient."""
         logger.debug(f"MusicManager received direct YTM update: {ytm_data.get('track', {}).get('title') if ytm_data else 'No Data'}")
 
-        if not self.enabled:
+        if not self.enabled or not self.is_music_display_active: # Check if display is active
+            logger.debug("Skipping YTM direct update: Manager disabled or music display not active.")
             return
 
         # Only process if YTM is the preferred source, or if auto and Spotify isn't actively playing.
@@ -271,10 +291,11 @@ class MusicManager:
 
             if should_poll_ytm_now:
                 # Re-check availability just before polling
-                if self.ytm.is_available():
+                if self.ytm and self.ytm.is_connected(): # Check if connected instead of is_available()
                     try:
                         ytm_track = self.ytm.get_current_track()
-                        if ytm_track and not ytm_track.get('player', {}).get('isPaused'):
+                        # Ensure ytm_track is not None before trying to access its player info
+                        if ytm_track and ytm_track.get('player') and not ytm_track.get('player', {}).get('isPaused'):
                             # If YTM is preferred, it overrides Spotify even if Spotify was playing
                             if self.preferred_source == "ytm" or not is_playing:
                                 polled_track_info = ytm_track
@@ -282,11 +303,11 @@ class MusicManager:
                                 is_playing = True
                                 logging.debug(f"Polling YTM: Active track - {ytm_track.get('track', {}).get('title')}")
                         else:
-                             logging.debug("Polling YTM: No active track or player paused.")
+                            logging.debug("Polling YTM: No active track or player paused (or track data missing player info).")
                     except Exception as e:
                         logging.error(f"Error polling YTM: {e}")
                 else:
-                     logging.debug("Skipping YTM poll: Server not available.")
+                    logging.debug("Skipping YTM poll: Client not initialized or not connected.")
                      # Consider setting self.ytm = None if it becomes unavailable repeatedly?
 
             # --- Consolidate and Check for Changes ---
@@ -420,12 +441,16 @@ class MusicManager:
         else:
             logger.info("Music manager: Polling thread stopped.")
         self.poll_thread = None # Clear the thread object
+        # Also ensure YTM client is disconnected when polling stops completely
+        self.deactivate_music_display() # This will also handle YTM disconnect if needed
 
     # Method moved from DisplayController and renamed
     def display(self, force_clear: bool = False):
         if force_clear: # Removed self.force_clear as it's passed directly
             self.display_manager.clear()
             # self.force_clear = False # Not needed here
+            # If forcing clear, it implies the music display might be stopping or resetting.
+            self.deactivate_music_display() # Deactivate YTM if display is forced clear.
 
         # Use self.current_track_info which is updated by _poll_music_data
         display_info = self.current_track_info 
@@ -437,6 +462,9 @@ class MusicManager:
                 logger.info("Music Screen (MusicManager): Nothing playing or info unavailable.")
                 self._last_nothing_playing_log_time = time.time()
             
+            if self.is_music_display_active: # If we were showing music and now we are not
+                self.deactivate_music_display()
+
             self.display_manager.clear() # Clear before drawing "Nothing Playing"
             text_width = self.display_manager.get_text_width("Nothing Playing", self.display_manager.regular_font)
             x_pos = (self.display_manager.matrix.width - text_width) // 2
@@ -450,6 +478,11 @@ class MusicManager:
             self.album_art_image = None # Clear album art if nothing is playing
             self.last_album_art_url = None # Also clear the URL
             return
+
+        # If we've reached here, it means we are about to display actual music info.
+        # Ensure YTM is active if it's a potential source.
+        if not self.is_music_display_active:
+            self.activate_music_display()
 
         # Ensure screen is cleared if not force_clear but needed (e.g. transition from "Nothing Playing")
         # This might be handled by DisplayController's force_clear logic, but can be an internal check too.

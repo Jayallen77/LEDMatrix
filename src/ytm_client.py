@@ -114,75 +114,71 @@ class YTMClient:
         else:
             logging.warning(f"YTM auth file not found at {YTM_AUTH_CONFIG_PATH}. Run the authentication script to generate it. YTM features will be disabled.")
 
-    def _ensure_connected(self, timeout=5):
+    def connect_client(self, timeout=10):
         if not self.ytm_token:
-            # No token, so cannot authenticate or connect. Log this clearly.
-            # load_config already warns if token file or token itself is missing.
-            # logging.warning("No YTM token loaded. Cannot connect to Socket.IO. Run authentication script.")
+            logging.warning("No YTM token loaded. Cannot connect to Socket.IO. Run authentication script.")
             self.is_connected = False
             return False
 
-        if not self.is_connected:
-            logging.info(f"Attempting to connect to YTM Socket.IO server: {self.base_url} on namespace /api/v1/realtime")
-            auth_payload = {"token": self.ytm_token}
+        if self.is_connected:
+            logging.debug("YTM client already connected.")
+            return True
 
-            try:
-                self._connection_event.clear() # Clear event before attempting connection
-                self.sio.connect(
-                    self.base_url, 
-                    transports=['websocket'], 
-                    wait_timeout=timeout, 
-                    namespaces=['/api/v1/realtime'],
-                    auth=auth_payload
-                )
-                # self._connection_event.clear() # No longer clear here
-                # Use a slightly longer timeout for the event wait than the connect call itself
-                # to ensure the connect event has time to be processed.
-                event_wait_timeout = timeout + 5 # e.g., if connect timeout is 10s, wait 15s for the event
-                if not self._connection_event.wait(timeout=event_wait_timeout):
-                    logging.warning(f"YTM Socket.IO connection event not received within {event_wait_timeout}s (connect timeout was {timeout}s).")
-                    self.is_connected = False # Ensure is_connected is false on timeout
-                    return False
-                return self.is_connected # This should be true if connect event fired and no timeout
-            except socketio.exceptions.ConnectionError as e:
-                logging.error(f"YTM Socket.IO connection error: {e}")
+        logging.info(f"Attempting to connect to YTM Socket.IO server: {self.base_url} on namespace /api/v1/realtime")
+        auth_payload = {"token": self.ytm_token}
+
+        try:
+            self._connection_event.clear()
+            self.sio.connect(
+                self.base_url,
+                transports=['websocket'],
+                wait_timeout=timeout,
+                namespaces=['/api/v1/realtime'],
+                auth=auth_payload
+            )
+            event_wait_timeout = timeout + 5
+            if not self._connection_event.wait(timeout=event_wait_timeout):
+                logging.warning(f"YTM Socket.IO connection event not received within {event_wait_timeout}s (connect timeout was {timeout}s).")
                 self.is_connected = False
                 return False
-            except Exception as e:
-                logging.error(f"Unexpected error during YTM Socket.IO connection: {e}")
-                self.is_connected = False
-                return False
-        return True # Already connected
+            logging.info(f"YTM Socket.IO connection successful: {self.is_connected}")
+            return self.is_connected
+        except socketio.exceptions.ConnectionError as e:
+            logging.error(f"YTM Socket.IO connection error: {e}")
+            self.is_connected = False
+            return False
+        except Exception as e:
+            logging.error(f"Unexpected error during YTM Socket.IO connection: {e}")
+            self.is_connected = False
+            return False
 
     def is_available(self):
-        if not self.ytm_token: # Quick check: if no token, definitely not available.
+        if not self.ytm_token:
             return False
-        if not self.is_connected:
-            return self._ensure_connected(timeout=10) 
-        return True
+        return self.is_connected
 
     def get_current_track(self):
-        if not self.is_available(): # is_available will attempt to connect if not connected and token exists
-            # logging.warning("YTM client not available, cannot get current track.") # is_available() or _ensure_connected() already logs issues.
+        if not self.is_connected:
             return None
 
         with self._data_lock:
             if self.last_known_track_data:
                 return self.last_known_track_data
             else:
-                # This is a normal state if no music is playing or just connected
-                # logging.debug("No track data received yet from YTM Companion Socket.IO.") 
                 return None
 
     def disconnect_client(self):
         if self.is_connected:
             self.sio.disconnect()
             logging.info("YTM Socket.IO client disconnected.")
+            self.is_connected = False
+        else:
+            logging.debug("YTM Socket.IO client already disconnected or not connected.")
 
 # Example Usage (for testing - needs to be adapted for Socket.IO async nature)
 # if __name__ == '__main__':
 # client = YTMClient()
-# if client.is_available(): 
+# if client.connect_client(): 
 # print("YTM Server is available (Socket.IO).")
 # try:
 # for _ in range(10): # Poll for a few seconds
