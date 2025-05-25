@@ -68,7 +68,7 @@
         "update_interval": 1
     },
     "weather": {
-        "enabled": true,
+        "enabled": false,
         "update_interval": 600,
         "units": "imperial",
         "display_format": "{temp}°F\n{condition}"
@@ -247,7 +247,7 @@
     },
     "music": {
         "enabled": true,
-        "preferred_source": "ytm",
+        "preferred_source": "spotify",
         "YTM_COMPANION_URL": "http://192.168.86.12:9863",
         "POLLING_INTERVAL_SECONDS": 1
     }
