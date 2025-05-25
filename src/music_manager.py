@@ -357,20 +357,23 @@ class MusicManager:
             video_info = track_data.get('video', {})
             player_info = track_data.get('player', {})
 
-            title = video_info.get('title') # Check if title exists
+            title = video_info.get('title') 
             artist = video_info.get('author')
             
-            # Play state: player_info.trackState: -1 Unknown, 0 Paused, 1 Playing, 2 Buffering
             track_state = player_info.get('trackState')
-            is_playing_ytm = (track_state == 1) # 1 means Playing
+            is_playing_ytm = (track_state == 1) 
 
             if player_info.get('adPlaying', False):
                 is_playing_ytm = False 
                 logging.debug("YTM: Ad is playing, reporting track as not actively playing.")
+            
+            logger.debug(f"[get_simplified_track_info YTM] Title: {title}, Artist: {artist}, TrackState: {track_state}, IsPlayingYTM: {is_playing_ytm}, AdPlaying: {player_info.get('adPlaying')}")
 
-            if not title or not artist or not is_playing_ytm: # If no title/artist, or not truly playing
+            if not title or not artist or not is_playing_ytm: 
+                logger.debug("[get_simplified_track_info YTM] Condition met for Nothing Playing.")
                 return nothing_playing_info.copy()
 
+            logger.debug("[get_simplified_track_info YTM] Proceeding to return full track details.")
             album = video_info.get('album')
             duration_seconds = video_info.get('durationSeconds')
             duration_ms = int(duration_seconds * 1000) if duration_seconds is not None else 0
@@ -444,10 +447,9 @@ class MusicManager:
             local_last_album_art_url = self.last_album_art_url
             local_album_art_image = self.album_art_image
 
-        # Simplified condition to prevent "Nothing Playing" flicker:
-        # Show screen if we have any track info, unless it's explicitly "Nothing Playing".
-        # The 'is_playing' check within get_simplified_track_info should handle ads/paused state correctly by returning 'Nothing Playing' title if appropriate.
+        logger.debug(f"[MusicManager.display] Current display info before check: {current_display_info}")
         if not current_display_info or current_display_info.get('title') == 'Nothing Playing':
+            logger.debug("[MusicManager.display] Entered 'Nothing Playing' block.")
             if not hasattr(self, '_last_nothing_playing_log_time') or \
                time.time() - getattr(self, '_last_nothing_playing_log_time', 0) > 30:
                 logger.info("Music Screen (MusicManager): Nothing playing or info explicitly 'Nothing Playing'.")
@@ -461,6 +463,7 @@ class MusicManager:
             y_pos = (self.display_manager.matrix.height // 2) - 4
             self.display_manager.draw_text("Nothing Playing", x=x_pos, y=y_pos, font=self.display_manager.regular_font)
             self.display_manager.update_display()
+            logger.debug("[MusicManager.display] 'Nothing Playing' text drawn and display updated.")
 
             with self.track_info_lock: # Protect writes to shared state
                 self.scroll_position_title = 0
@@ -471,6 +474,7 @@ class MusicManager:
                 # self.last_album_art_url = None # Keep last_album_art_url so we don't re-fetch if it was a brief flicker
             return
 
+        logger.debug("[MusicManager.display] Proceeding to display actual music info.")
         # If we've reached here, it means we are about to display actual music info.
         if not self.is_music_display_active:
             self.activate_music_display()
