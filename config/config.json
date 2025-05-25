@@ -90,7 +90,7 @@
         "display_format": "{symbol}: ${price} ({change}%)"
     },
     "stock_news": {
-        "enabled": true,
+        "enabled": false,
         "update_interval": 3600,
         "scroll_speed": 1,
         "scroll_delay": 0.001,
@@ -198,7 +198,7 @@
         }
     },
     "youtube": {
-        "enabled":  true,
+        "enabled":  false,
         "update_interval": 3600
     },
     "mlb": {
