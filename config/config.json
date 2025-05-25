@@ -247,7 +247,7 @@
     },
     "music": {
         "enabled": true,
-        "preferred_source": "spotify",
+        "preferred_source": "ytm",
         "YTM_COMPANION_URL": "http://192.168.86.12:9863",
         "POLLING_INTERVAL_SECONDS": 1
     }
