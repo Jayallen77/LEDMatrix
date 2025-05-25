@@ -675,12 +675,16 @@ class DisplayController:
 
                 if not is_currently_live:
                     # --- Currently in a Regular Mode (or just exited Live) ---
+                    previous_mode_before_switch = self.current_display_mode # Capture mode before potential change
+
                     if has_live_games:
                         # Not currently live, but live games ARE available. Switch IN.
-                        # (This check ensures we only switch *in* if we weren't already live)
-                        new_mode = f"{live_sport_type}_live" # live_sport_type has the highest priority
-                        if self.current_display_mode != new_mode: # Avoid unnecessary resets if somehow already correct
+                        new_mode = f"{live_sport_type}_live"
+                        if self.current_display_mode != new_mode:
                              logger.info(f"Switching into LIVE mode: {new_mode} from {self.current_display_mode}")
+                             if previous_mode_before_switch == 'music' and self.music_manager:
+                                 logger.info("Deactivating music manager due to switch from music to live mode.")
+                                 self.music_manager.deactivate_music_display()
                              self.current_display_mode = new_mode
                              self.force_clear = True
                              self.last_switch = current_time
@@ -695,37 +699,55 @@ class DisplayController:
                         # No live games detected, and not in live mode. Regular rotation.
                         needs_switch = False
                         if self.current_display_mode.endswith('_live'):
-                             # This case handles the explicit transition OUT of live mode 
+                             # This case handles the explicit transition OUT of live mode
                              # initiated in the block above.
                              logger.info(f"Transitioning from live mode to regular rotation.")
-                             needs_switch = True 
-                             # Find the next *regular* mode index cleanly
+                             needs_switch = True
+                             # current_mode_index would have been advanced if coming from regular timer expiry.
+                             # If coming from live mode exit, we need to ensure it's set for the *next* regular mode.
+                             # The logic below assumes current_mode_index is for the *new* mode.
                              try:
-                                 # Find where we *would* be if we weren't live
-                                 # This assumes self.current_mode_index tracks the regular rotation position
-                                 self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
-                             except Exception: # Catch potential issues if available_modes changed etc.
-                                 logger.warning("Error advancing regular mode index after live mode exit. Resetting.")
-                                 self.current_mode_index = 0 
-                             
-                             if not self.available_modes: # Safety check
+                                 # If previous_mode_before_switch was a live mode, current_mode_index might be stale.
+                                 # We need to find the next available regular mode from self.available_modes
+                                 # This part can be tricky. Let's assume current_mode_index is either current or needs +1.
+                                 # If just exiting live, self.current_mode_index hasn't been incremented by timer logic yet.
+                                 # So, we just use its current value to pick from available_modes.
+                                 # If it was already pointing at 'music' and music is next, it's fine.
+                                 # If it was stale, it will pick an available mode.
+                                 pass # The original logic for picking mode is below.
+                             except Exception:
+                                 logger.warning("Error finding next regular mode index after live mode exit. Resetting.")
+                                 self.current_mode_index = 0
+                            
+                             if not self.available_modes:
                                  logger.error("No available regular modes to switch to!")
-                                 self.current_display_mode = 'none' # Or handle error appropriately
-                                 # Consider exiting or sleeping
+                                 self.current_display_mode = 'none'
                              else:
-                                 self.current_display_mode = self.available_modes[self.current_mode_index]
+                                 # This is where the new regular mode is chosen after exiting live
+                                 new_regular_mode_after_live = self.available_modes[self.current_mode_index]
+                                 if previous_mode_before_switch == 'music' and self.music_manager and new_regular_mode_after_live != 'music':
+                                     logger.info(f"Deactivating music manager due to switch from music (via live exit) to {new_regular_mode_after_live}.")
+                                     self.music_manager.deactivate_music_display()
+                                 # If previous_mode_before_switch was live, and new_regular_mode_after_live is music, MusicManager.display will handle activation.
+                                 self.current_display_mode = new_regular_mode_after_live
+
 
                         elif current_time - self.last_switch >= self.get_current_duration():
                              # Regular timer expired, advance to next mode
                              logger.debug(f"Timer expired for regular mode {self.current_display_mode}. Switching.")
-                             # Advance calendar event *before* potentially switching away
                              if self.current_display_mode == 'calendar' and self.calendar:
                                  self.calendar.advance_event()
                              needs_switch = True
                              self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
-                             self.current_display_mode = self.available_modes[self.current_mode_index]
+                             new_mode_after_timer = self.available_modes[self.current_mode_index]
+                             if previous_mode_before_switch == 'music' and self.music_manager and new_mode_after_timer != 'music':
+                                 logger.info(f"Deactivating music manager due to timer switch from music to {new_mode_after_timer}.")
+                                 self.music_manager.deactivate_music_display()
+                             # If switching to music, MusicManager.display will handle activation.
+                             self.current_display_mode = new_mode_after_timer
                         
                         if needs_switch:
+                             # This log now reflects the already updated self.current_display_mode
                              logger.info(f"Switching to regular mode: {self.current_display_mode}")
                              self.force_clear = True
                              self.last_switch = current_time
