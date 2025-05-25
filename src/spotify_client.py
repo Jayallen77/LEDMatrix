@@ -6,6 +6,9 @@ import os
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# Suppress spotipy.cache_handler warnings about not being able to write cache
+logging.getLogger('spotipy.cache_handler').setLevel(logging.ERROR)
+
 # Define paths relative to this file's location
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), '..', 'config')
 SECRETS_PATH = os.path.join(CONFIG_DIR, 'config_secrets.json')
