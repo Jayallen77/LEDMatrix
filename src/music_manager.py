@@ -449,29 +449,32 @@ class MusicManager:
         if force_clear: # When DisplayController switches to music mode, it likely sets force_clear=True
             self.display_manager.clear()
             # If force_clear is used to initiate/reset the music display, we should activate.
-            self.activate_music_display() # Changed from deactivate_music_display
-            # Note: current_track_info might be empty this exact frame.
-            # The logic below will show "Nothing Playing" if so, but YTM connection is started.
+            self.activate_music_display()
+            # Note: current_track_info might be empty this exact frame if YTM just connected.
+            # The logic below will show "Nothing Playing" if so for this frame,
+            # but YTM connection is now active and data should arrive for the next frame.
 
         # Use self.current_track_info which is updated by _poll_music_data or YTM direct update
-        display_info = self.current_track_info 
+        display_info = self.current_track_info
 
         if not display_info or not display_info.get('is_playing', False) or display_info.get('title') == 'Nothing Playing':
             # Music is not playing or info is not available.
-            # Debounce "Nothing playing" log for this manager
             if not hasattr(self, '_last_nothing_playing_log_time') or \
                time.time() - getattr(self, '_last_nothing_playing_log_time', 0) > 30:
                 logger.info("Music Screen (MusicManager): Nothing playing or info unavailable.")
                 self._last_nothing_playing_log_time = time.time()
-            
-            # If we thought we were active (e.g., activate_music_display was just called due to force_clear,
-            # or we were active from a previous frame) but current data shows nothing is playing, then deactivate.
-            if self.is_music_display_active: 
+
+            # Only deactivate if:
+            # 1. Music display was previously active.
+            # 2. force_clear was FALSE in this call (meaning we are not in the initial activation frame).
+            if not force_clear and self.is_music_display_active:
                 self.deactivate_music_display()
 
-            # Ensure screen is clear if not already by force_clear (it usually would be if force_clear was true)
+            # Ensure screen is clear if not already by force_clear.
+            # If force_clear was true, it was cleared at the top.
+            # If force_clear was false and we are here, we need to clear for "Nothing Playing".
             if not force_clear:
-                 self.display_manager.clear() # Clear before drawing "Nothing Playing"
+                 self.display_manager.clear()
 
             text_width = self.display_manager.get_text_width("Nothing Playing", self.display_manager.regular_font)
             x_pos = (self.display_manager.matrix.width - text_width) // 2
@@ -487,12 +490,15 @@ class MusicManager:
             return
 
         # If we've reached here, it means we are about to display actual music info.
-        # Ensure YTM is active if it's a potential source (activate_music_display might have already been called if force_clear was true)
+        # Ensure music display components (like YTM connection) are active.
+        # This will be true if force_clear was set, or if it was active from a previous frame.
+        # If it's somehow not active (e.g., error or specific sequence), activate it.
         if not self.is_music_display_active:
-            self.activate_music_display()
+            self.activate_music_display() # This will attempt to connect YTM if needed
 
-        # Ensure screen is cleared if not force_clear but needed (e.g. transition from "Nothing Playing")
-        if not force_clear: # If force_clear was true, screen is already blank
+        # Ensure screen is cleared if not force_clear but needed (e.g. transition from "Nothing Playing" to actual music)
+        # If force_clear was true, screen is already blank and ready.
+        if not force_clear:
             self.display_manager.draw.rectangle([0, 0, self.display_manager.matrix.width, self.display_manager.matrix.height], fill=(0, 0, 0))
 
         # Album Art Configuration
