@@ -457,6 +457,7 @@ class MusicManager:
 
             if not force_clear:
                  self.display_manager.clear()
+                 logger.debug("[MusicManager.display] Display cleared (not force_clear path).")
 
             text_width = self.display_manager.get_text_width("Nothing Playing", self.display_manager.regular_font)
             x_pos = (self.display_manager.matrix.width - text_width) // 2
