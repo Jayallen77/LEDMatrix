@@ -129,7 +129,7 @@ class MusicManager:
         logger.info("Music display activated.")
         self.is_music_display_active = True
         if self.ytm and self.preferred_source in ["auto", "ytm"]:
-            if not self.ytm.is_connected():
+            if not self.ytm.is_connected:
                 logger.info("Attempting to connect YTM client due to music display activation.")
                 # Pass a reasonable timeout for on-demand connection
                 if self.ytm.connect_client(timeout=10):
@@ -142,7 +142,7 @@ class MusicManager:
     def deactivate_music_display(self):
         logger.info("Music display deactivated.")
         self.is_music_display_active = False
-        if self.ytm and self.ytm.is_connected():
+        if self.ytm and self.ytm.is_connected:
             logger.info("Disconnecting YTM client due to music display deactivation.")
             self.ytm.disconnect_client()
 
@@ -291,7 +291,7 @@ class MusicManager:
 
             if should_poll_ytm_now:
                 # Re-check availability just before polling
-                if self.ytm and self.ytm.is_connected(): # Check if connected instead of is_available()
+                if self.ytm and self.ytm.is_connected:
                     try:
                         ytm_track = self.ytm.get_current_track()
                         # Ensure ytm_track is not None before trying to access its player info
