@@ -446,26 +446,33 @@ class MusicManager:
 
     # Method moved from DisplayController and renamed
     def display(self, force_clear: bool = False):
-        if force_clear: # Removed self.force_clear as it's passed directly
+        if force_clear: # When DisplayController switches to music mode, it likely sets force_clear=True
             self.display_manager.clear()
-            # self.force_clear = False # Not needed here
-            # If forcing clear, it implies the music display might be stopping or resetting.
-            self.deactivate_music_display() # Deactivate YTM if display is forced clear.
+            # If force_clear is used to initiate/reset the music display, we should activate.
+            self.activate_music_display() # Changed from deactivate_music_display
+            # Note: current_track_info might be empty this exact frame.
+            # The logic below will show "Nothing Playing" if so, but YTM connection is started.
 
-        # Use self.current_track_info which is updated by _poll_music_data
+        # Use self.current_track_info which is updated by _poll_music_data or YTM direct update
         display_info = self.current_track_info 
 
         if not display_info or not display_info.get('is_playing', False) or display_info.get('title') == 'Nothing Playing':
+            # Music is not playing or info is not available.
             # Debounce "Nothing playing" log for this manager
             if not hasattr(self, '_last_nothing_playing_log_time') or \
                time.time() - getattr(self, '_last_nothing_playing_log_time', 0) > 30:
                 logger.info("Music Screen (MusicManager): Nothing playing or info unavailable.")
                 self._last_nothing_playing_log_time = time.time()
             
-            if self.is_music_display_active: # If we were showing music and now we are not
+            # If we thought we were active (e.g., activate_music_display was just called due to force_clear,
+            # or we were active from a previous frame) but current data shows nothing is playing, then deactivate.
+            if self.is_music_display_active: 
                 self.deactivate_music_display()
 
-            self.display_manager.clear() # Clear before drawing "Nothing Playing"
+            # Ensure screen is clear if not already by force_clear (it usually would be if force_clear was true)
+            if not force_clear:
+                 self.display_manager.clear() # Clear before drawing "Nothing Playing"
+
             text_width = self.display_manager.get_text_width("Nothing Playing", self.display_manager.regular_font)
             x_pos = (self.display_manager.matrix.width - text_width) // 2
             y_pos = (self.display_manager.matrix.height // 2) - 4
@@ -480,15 +487,13 @@ class MusicManager:
             return
 
         # If we've reached here, it means we are about to display actual music info.
-        # Ensure YTM is active if it's a potential source.
+        # Ensure YTM is active if it's a potential source (activate_music_display might have already been called if force_clear was true)
         if not self.is_music_display_active:
             self.activate_music_display()
 
         # Ensure screen is cleared if not force_clear but needed (e.g. transition from "Nothing Playing")
-        # This might be handled by DisplayController's force_clear logic, but can be an internal check too.
-        # For now, assuming DisplayController manages the initial clear for a new mode.
-        self.display_manager.draw.rectangle([0, 0, self.display_manager.matrix.width, self.display_manager.matrix.height], fill=(0, 0, 0))
-
+        if not force_clear: # If force_clear was true, screen is already blank
+            self.display_manager.draw.rectangle([0, 0, self.display_manager.matrix.width, self.display_manager.matrix.height], fill=(0, 0, 0))
 
         # Album Art Configuration
         matrix_height = self.display_manager.matrix.height
