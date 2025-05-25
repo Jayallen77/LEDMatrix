@@ -20,7 +20,7 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-class BaseNCAAMBManager:
+class BaseNCAAMBasketballManager:
     """Base class for NCAA MB managers with common functionality."""
     # Class variables for warning tracking
     _no_data_warning_logged = False
@@ -30,21 +30,21 @@ class BaseNCAAMBManager:
     _shared_data = None
     _last_shared_update = 0
     cache_manager = CacheManager()  # Make cache_manager a class attribute
-    logger = logging.getLogger('NCAAMB')  # Make logger a class attribute
+    logger = logging.getLogger('NCAAMBasketball')  # Make logger a class attribute
     
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         self.display_manager = display_manager
         self.config = config
-        self.ncaam_config = config.get("ncaam_scoreboard", {})
-        self.is_enabled = self.ncaam_config.get("enabled", False)
-        self.test_mode = self.ncaam_config.get("test_mode", False)
-        self.logo_dir = self.ncaam_config.get("logo_dir", "assets/sports/ncaam_logos")
-        self.update_interval = self.ncaam_config.get("update_interval_seconds", 300)
+        self.ncaam_basketball_config = config.get("ncaam_basketball_scoreboard", {})
+        self.is_enabled = self.ncaam_basketball_config.get("enabled", False)
+        self.test_mode = self.ncaam_basketball_config.get("test_mode", False)
+        self.logo_dir = self.ncaam_basketball_config.get("logo_dir", "assets/sports/ncaam_logos")
+        self.update_interval = self.ncaam_basketball_config.get("update_interval_seconds", 300)
         self.last_update = 0
         self.current_game = None
         self.fonts = self._load_fonts()
-        self.favorite_teams = self.ncaam_config.get("favorite_teams", [])
-        self.recent_hours = self.ncaam_config.get("recent_game_hours", 72)  # Default 72 hours
+        self.favorite_teams = self.ncaam_basketball_config.get("favorite_teams", [])
+        self.recent_hours = self.ncaam_basketball_config.get("recent_game_hours", 72)  # Default 72 hours
         
         # Set logging level to INFO to reduce noise
         self.logger.setLevel(logging.INFO)
@@ -60,7 +60,7 @@ class BaseNCAAMBManager:
         # Cache for loaded logos
         self._logo_cache = {}
         
-        self.logger.info(f"Initialized NCAAMB manager with display dimensions: {self.display_width}x{self.display_height}")
+        self.logger.info(f"Initialized NCAAMBasketball manager with display dimensions: {self.display_width}x{self.display_height}")
         self.logger.info(f"Logo directory: {self.logo_dir}")
 
     def _should_log(self, message_type: str, cooldown: int = 300) -> bool:
@@ -75,7 +75,7 @@ class BaseNCAAMBManager:
 
     def _load_test_data(self) -> Dict:
         """Load test data for development and testing."""
-        self.logger.info("[NCAAMB] Loading test data")
+        self.logger.info("[NCAAMBasketball] Loading test data")
         
         # Create test data with current time
         now = datetime.now(timezone.utc)
@@ -178,18 +178,18 @@ class BaseNCAAMBManager:
             fonts['time'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
             fonts['team'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
             fonts['status'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6)
-            logging.info("[NCAAMB] Successfully loaded Press Start 2P font for all text elements")
+            logging.info("[NCAAMBasketball] Successfully loaded Press Start 2P font for all text elements")
         except IOError:
-            logging.warning("[NCAAMB] Press Start 2P font not found, trying 4x6 font.")
+            logging.warning("[NCAAMBasketball] Press Start 2P font not found, trying 4x6 font.")
             try:
                 # Try to load the 4x6 font as a fallback
                 fonts['score'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 12)
                 fonts['time'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 8)
                 fonts['team'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 8)
                 fonts['status'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 9)
-                logging.info("[NCAAMB] Successfully loaded 4x6 font for all text elements")
+                logging.info("[NCAAMBasketball] Successfully loaded 4x6 font for all text elements")
             except IOError:
-                logging.warning("[NCAAMB] 4x6 font not found, using default PIL font.")
+                logging.warning("[NCAAMBasketball] 4x6 font not found, using default PIL font.")
                 # Use default PIL font as a last resort
                 fonts['score'] = ImageFont.load_default()
                 fonts['time'] = ImageFont.load_default()
@@ -260,10 +260,10 @@ class BaseNCAAMBManager:
             
         try:
             # Check cache first
-            cache_key = f"ncaam_{date_str}" if date_str else 'ncaam_today' # Prefix cache key
+            cache_key = f"ncaam_basketball_{date_str}" if date_str else 'ncaam_basketball_today' # Prefix cache key
             cached_data = cls.cache_manager.get_cached_data(cache_key, max_age=300)  # 5 minutes cache
             if cached_data:
-                cls.logger.info(f"[NCAAMB] Using cached data for {cache_key}")
+                cls.logger.info(f"[NCAAMBasketball] Using cached data for {cache_key}")
                 cls._shared_data = cached_data
                 cls._last_shared_update = current_time
                 return cached_data
@@ -277,7 +277,7 @@ class BaseNCAAMBManager:
             response = requests.get(url, params=params)
             response.raise_for_status()
             data = response.json()
-            cls.logger.info(f"[NCAAMB] Successfully fetched data from ESPN API")
+            cls.logger.info(f"[NCAAMBasketball] Successfully fetched data from ESPN API")
             
             # Cache the response
             cls.cache_manager.save_cache(cache_key, data)
@@ -298,11 +298,11 @@ class BaseNCAAMBManager:
                 all_events = []
                 for fetch_date in dates_to_fetch:
                     if fetch_date != today.strftime('%Y%m%d'):  # Skip today as we already have it
-                        date_cache_key = f"ncaam_{fetch_date}" # Prefix cache key
+                        date_cache_key = f"ncaam_basketball_{fetch_date}" # Prefix cache key
                         # Check cache for this date
                         cached_date_data = cls.cache_manager.get_cached_data(date_cache_key, max_age=300)
                         if cached_date_data:
-                            cls.logger.info(f"[NCAAMB] Using cached data for date {fetch_date}")
+                            cls.logger.info(f"[NCAAMBasketball] Using cached data for date {fetch_date}")
                             if "events" in cached_date_data:
                                 all_events.extend(cached_date_data["events"])
                             continue
@@ -313,26 +313,26 @@ class BaseNCAAMBManager:
                         date_data = response.json()
                         if date_data and "events" in date_data:
                             all_events.extend(date_data["events"])
-                            cls.logger.info(f"[NCAAMB] Fetched {len(date_data['events'])} events for date {fetch_date}")
+                            cls.logger.info(f"[NCAAMBasketball] Fetched {len(date_data['events'])} events for date {fetch_date}")
                             # Cache the response
                             cls.cache_manager.save_cache(date_cache_key, date_data)
                 
                 # Combine events from all dates
                 if all_events:
                     data["events"].extend(all_events)
-                    cls.logger.info(f"[NCAAMB] Combined {len(data['events'])} total events from all dates")
+                    cls.logger.info(f"[NCAAMBasketball] Combined {len(data['events'])} total events from all dates")
                     cls._shared_data = data
                     cls._last_shared_update = current_time
             
             return data
         except requests.exceptions.RequestException as e:
-            cls.logger.error(f"[NCAAMB] Error fetching data from ESPN: {e}")
+            cls.logger.error(f"[NCAAMBasketball] Error fetching data from ESPN: {e}")
             return None
 
     def _fetch_data(self, date_str: str = None) -> Optional[Dict]:
         """Fetch data using shared data mechanism."""
         # For live games, bypass the shared cache to ensure fresh data
-        if isinstance(self, NCAAMBLiveManager):
+        if isinstance(self, NCAAMBasketballLiveManager):
             try:
                 url = ESPN_NCAAMB_SCOREBOARD_URL
                 params = {}
@@ -342,10 +342,10 @@ class BaseNCAAMBManager:
                 response = requests.get(url, params=params)
                 response.raise_for_status()
                 data = response.json()
-                self.logger.info(f"[NCAAMB] Successfully fetched live game data from ESPN API")
+                self.logger.info(f"[NCAAMBasketball] Successfully fetched live game data from ESPN API")
                 return data
             except requests.exceptions.RequestException as e:
-                self.logger.error(f"[NCAAMB] Error fetching live game data from ESPN: {e}")
+                self.logger.error(f"[NCAAMBasketball] Error fetching live game data from ESPN: {e}")
                 return None
         else:
             # For non-live games, use the shared cache
@@ -365,9 +365,9 @@ class BaseNCAAMBManager:
             # Parse game date/time
             try:
                 start_time_utc = datetime.fromisoformat(game_date_str.replace("Z", "+00:00"))
-                self.logger.debug(f"[NCAAMB] Parsed game time: {start_time_utc}")
+                self.logger.debug(f"[NCAAMBasketball] Parsed game time: {start_time_utc}")
             except ValueError:
-                logging.warning(f"[NCAAMB] Could not parse game date: {game_date_str}")
+                logging.warning(f"[NCAAMBasketball] Could not parse game date: {game_date_str}")
                 start_time_utc = None
 
             home_team = next(c for c in competitors if c.get("homeAway") == "home")
@@ -387,7 +387,7 @@ class BaseNCAAMBManager:
             if start_time_utc:
                 cutoff_time = datetime.now(timezone.utc) - timedelta(hours=self.recent_hours)
                 is_within_window = start_time_utc > cutoff_time
-                self.logger.debug(f"[NCAAMB] Game time: {start_time_utc}, Cutoff time: {cutoff_time}, Within window: {is_within_window}")
+                self.logger.debug(f"[NCAAMBasketball] Game time: {start_time_utc}, Cutoff time: {cutoff_time}, Within window: {is_within_window}")
 
             details = {
                 "start_time_utc": start_time_utc,
@@ -410,12 +410,12 @@ class BaseNCAAMBManager:
             }
 
             # Log game details for debugging
-            self.logger.debug(f"[NCAAMB] Extracted game details: {details['away_abbr']} vs {details['home_abbr']}")
-            self.logger.debug(f"[NCAAMB] Game status: is_final={details['is_final']}, is_within_window={details['is_within_window']}")
+            self.logger.debug(f"[NCAAMBasketball] Extracted game details: {details['away_abbr']} vs {details['home_abbr']}")
+            self.logger.debug(f"[NCAAMBasketball] Game status: is_final={details['is_final']}, is_within_window={details['is_within_window']}")
 
             return details
         except Exception as e:
-            logging.error(f"[NCAAMB] Error extracting game details: {e}")
+            logging.error(f"[NCAAMBasketball] Error extracting game details: {e}")
             return None
 
     def _draw_scorebug_layout(self, game: Dict, force_clear: bool = False) -> None:
@@ -546,30 +546,30 @@ class BaseNCAAMBManager:
             self.logger.error(f"Error displaying game: {e}", exc_info=True)
 
     def display(self, force_clear: bool = False) -> None:
-        """Common display method for all NCAAMB managers"""
+        """Common display method for all NCAAMBasketball managers"""
         if not self.current_game:
             current_time = time.time()
             if not hasattr(self, '_last_warning_time'):
                 self._last_warning_time = 0
             if current_time - self._last_warning_time > 300:  # 5 minutes cooldown
-                self.logger.warning("[NCAAMB] No game data available to display")
+                self.logger.warning("[NCAAMBasketball] No game data available to display")
                 self._last_warning_time = current_time
             return
             
         self._draw_scorebug_layout(self.current_game, force_clear)
 
-class NCAAMBLiveManager(BaseNCAAMBManager):
+class NCAAMBasketballLiveManager(BaseNCAAMBasketballManager):
     """Manager for live NCAA MB games."""
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         super().__init__(config, display_manager)
-        self.update_interval = self.ncaam_config.get("live_update_interval", 15)  # 15 seconds for live games
+        self.update_interval = self.ncaam_basketball_config.get("live_update_interval", 15)  # 15 seconds for live games
         self.no_data_interval = 300  # 5 minutes when no live games
         self.last_update = 0
-        self.logger.info("Initialized NCAAMB Live Manager")
+        self.logger.info("Initialized NCAAMBasketball Live Manager")
         self.live_games = []  # List to store all live games
         self.current_game_index = 0  # Index to track which game to show
         self.last_game_switch = 0  # Track when we last switched games
-        self.game_display_duration = self.ncaam_config.get("live_game_duration", 20)  # Display each live game for 20 seconds
+        self.game_display_duration = self.ncaam_basketball_config.get("live_game_duration", 20)  # Display each live game for 20 seconds
         self.last_display_update = 0  # Track when we last updated the display
         self.last_log_time = 0
         self.log_interval = 300  # Only log status every 5 minutes
@@ -584,11 +584,11 @@ class NCAAMBLiveManager(BaseNCAAMBManager):
                  self.current_game = self._extract_game_details(live_test_event)
                  if self.current_game:
                     self.live_games = [self.current_game]
-                    self.logger.info(f"[NCAAMB] Initialized NCAAMBLiveManager with test game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
+                    self.logger.info(f"[NCAAMBasketball] Initialized NCAAMBasketballLiveManager with test game: {self.current_game['away_abbr']} vs {self.current_game['home_abbr']}")
             else:
-                 self.logger.warning("[NCAAMB] Could not find live test game data to initialize.")
+                 self.logger.warning("[NCAAMBasketball] Could not find live test game data to initialize.")
         else:
-            self.logger.info("[NCAAMB] Initialized NCAAMBLiveManager in live mode")
+            self.logger.info("[NCAAMBasketball] Initialized NCAAMBasketballLiveManager in live mode")
 
     def update(self):
         """Update live game data."""
@@ -663,14 +663,14 @@ class NCAAMBLiveManager(BaseNCAAMBManager):
                     
                     if should_log:
                         if new_live_games:
-                            self.logger.info(f"[NCAAMB] Found {len(new_live_games)} live games")
+                            self.logger.info(f"[NCAAMBasketball] Found {len(new_live_games)} live games")
                             for game in new_live_games:
                                 status_str = f"H{game['period']}" if game['period'] <=2 else f"OT{game['period']-2 if game['period'] > 3 else ''}"
-                                self.logger.info(f"[NCAAMB] Live game: {game['away_abbr']} vs {game['home_abbr']} - {status_str}, {game['clock']}")
+                                self.logger.info(f"[NCAAMBasketball] Live game: {game['away_abbr']} vs {game['home_abbr']} - {status_str}, {game['clock']}")
                             if has_favorite_team:
-                                self.logger.info("[NCAAMB] Found live game(s) for favorite team(s)")
+                                self.logger.info("[NCAAMBasketball] Found live game(s) for favorite team(s)")
                         else:
-                            self.logger.info("[NCAAMB] No live games found")
+                            self.logger.info("[NCAAMBasketball] No live games found")
                         self.last_log_time = current_time
                     
                     if new_live_games:
@@ -723,7 +723,7 @@ class NCAAMBLiveManager(BaseNCAAMBManager):
              return
         super().display(force_clear)  # Call parent class's display method
 
-class NCAAMBRecentManager(BaseNCAAMBManager):
+class NCAAMBasketballRecentManager(BaseNCAAMBasketballManager):
     """Manager for recently completed NCAA MB games."""
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         super().__init__(config, display_manager)
@@ -731,14 +731,14 @@ class NCAAMBRecentManager(BaseNCAAMBManager):
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = 3600  # 1 hour for recent games
-        self.recent_hours = self.ncaam_config.get("recent_game_hours", 48)
+        self.recent_hours = self.ncaam_basketball_config.get("recent_game_hours", 48)
         self.last_game_switch = 0
-        self.game_display_duration = self.ncaam_config.get("recent_game_duration", 15) # Configurable duration
+        self.game_display_duration = self.ncaam_basketball_config.get("recent_game_duration", 15) # Configurable duration
         self.last_log_time = 0
         self.log_interval = 300  # Only log status every 5 minutes
         self.last_warning_time = 0
         self.warning_cooldown = 300  # Only show warning every 5 minutes
-        self.logger.info(f"Initialized NCAAMBRecentManager with {len(self.favorite_teams)} favorite teams")
+        self.logger.info(f"Initialized NCAAMBasketballRecentManager with {len(self.favorite_teams)} favorite teams")
         
     def update(self):
         """Update recent games data."""
@@ -751,7 +751,7 @@ class NCAAMBRecentManager(BaseNCAAMBManager):
             data = self._fetch_data()
             if not data or 'events' not in data:
                 if self._should_log("no_events", 600): # Log less frequently for no events
-                    self.logger.warning("[NCAAMB] No events found in ESPN API response for recent games")
+                    self.logger.warning("[NCAAMBasketball] No events found in ESPN API response for recent games")
                 self.recent_games = []
                 self.current_game = None
                 self.last_update = current_time
@@ -785,9 +785,9 @@ class NCAAMBRecentManager(BaseNCAAMBManager):
 
             if should_log:
                 if new_team_games:
-                    self.logger.info(f"[NCAAMB] Found {len(new_team_games)} recent games for favorite teams")
+                    self.logger.info(f"[NCAAMBasketball] Found {len(new_team_games)} recent games for favorite teams")
                 elif self.favorite_teams: # Only log "none found" if favorites are configured
-                    self.logger.info("[NCAAMB] No recent games found for favorite teams")
+                    self.logger.info("[NCAAMBasketball] No recent games found for favorite teams")
                 self.last_log_time = current_time
 
             if new_team_games:
@@ -806,7 +806,7 @@ class NCAAMBRecentManager(BaseNCAAMBManager):
             self.last_update = current_time
 
         except Exception as e:
-            self.logger.error(f"[NCAAMB] Error updating recent games: {e}", exc_info=True)
+            self.logger.error(f"[NCAAMBasketball] Error updating recent games: {e}", exc_info=True)
             self.recent_games = [] # Clear games on error
             self.current_game = None
             self.last_update = current_time # Still update time to prevent fast retry loops
@@ -818,9 +818,9 @@ class NCAAMBRecentManager(BaseNCAAMBManager):
             if current_time - self.last_warning_time > self.warning_cooldown:
                  # Only log if favorite teams are configured
                 if self.favorite_teams:
-                    self.logger.info("[NCAAMB] No recent games for favorite teams to display")
+                    self.logger.info("[NCAAMBasketball] No recent games for favorite teams to display")
                 else:
-                    self.logger.info("[NCAAMB] No recent games to display")
+                    self.logger.info("[NCAAMBasketball] No recent games to display")
                 self.last_warning_time = current_time
             # Explicitly clear display if there's nothing to show
             img = Image.new('RGB', (self.display_width, self.display_height), (0, 0, 0))
@@ -849,13 +849,13 @@ class NCAAMBRecentManager(BaseNCAAMBManager):
                  # Update display
                  self.display_manager.update_display()
             else:
-                 self.logger.warning("[NCAAMB] Current game is None in RecentManager display, despite having recent_games list.")
+                 self.logger.warning("[NCAAMBasketball] Current game is None in RecentManager display, despite having recent_games list.")
 
 
         except Exception as e:
-            self.logger.error(f"[NCAAMB] Error displaying recent game: {e}", exc_info=True)
+            self.logger.error(f"[NCAAMBasketball] Error displaying recent game: {e}", exc_info=True)
 
-class NCAAMBUpcomingManager(BaseNCAAMBManager):
+class NCAAMBasketballUpcomingManager(BaseNCAAMBasketballManager):
     """Manager for upcoming NCAA MB games."""
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         super().__init__(config, display_manager)
@@ -866,8 +866,8 @@ class NCAAMBUpcomingManager(BaseNCAAMBManager):
         self.last_warning_time = 0
         self.warning_cooldown = 300  # Only show warning every 5 minutes
         self.last_game_switch = 0
-        self.game_display_duration = self.ncaam_config.get("upcoming_game_duration", 15) # Configurable duration
-        self.logger.info(f"Initialized NCAAMBUpcomingManager with {len(self.favorite_teams)} favorite teams")
+        self.game_display_duration = self.ncaam_basketball_config.get("upcoming_game_duration", 15) # Configurable duration
+        self.logger.info(f"Initialized NCAAMBasketballUpcomingManager with {len(self.favorite_teams)} favorite teams")
 
     def update(self):
         """Update upcoming games data."""
@@ -880,7 +880,7 @@ class NCAAMBUpcomingManager(BaseNCAAMBManager):
             data = self._fetch_data()
             if not data or 'events' not in data:
                 if self._should_log("no_events_upcoming", 600):
-                     self.logger.warning("[NCAAMB] No events found in ESPN API response for upcoming games")
+                     self.logger.warning("[NCAAMBasketball] No events found in ESPN API response for upcoming games")
                 self.upcoming_games = []
                 self.current_game = None
                 self.last_update = current_time
@@ -888,7 +888,7 @@ class NCAAMBUpcomingManager(BaseNCAAMBManager):
 
             events = data['events']
             if self._should_log("fetch_success_upcoming", 300):
-                self.logger.info(f"[NCAAMB] Successfully fetched {len(events)} events from ESPN API for upcoming check")
+                self.logger.info(f"[NCAAMBasketball] Successfully fetched {len(events)} events from ESPN API for upcoming check")
 
             # Process games
             new_upcoming_games = []
@@ -910,9 +910,9 @@ class NCAAMBUpcomingManager(BaseNCAAMBManager):
 
             if self._should_log("team_games_upcoming", 300):
                  if team_games:
-                    self.logger.info(f"[NCAAMB] Found {len(team_games)} upcoming games for favorite teams")
+                    self.logger.info(f"[NCAAMBasketball] Found {len(team_games)} upcoming games for favorite teams")
                  elif self.favorite_teams: # Only log "none found" if favorites configured
-                     self.logger.info("[NCAAMB] No upcoming games found for favorite teams")
+                     self.logger.info("[NCAAMBasketball] No upcoming games found for favorite teams")
 
 
             if team_games:
@@ -930,7 +930,7 @@ class NCAAMBUpcomingManager(BaseNCAAMBManager):
             self.last_update = current_time
 
         except Exception as e:
-            self.logger.error(f"[NCAAMB] Error updating upcoming games: {e}", exc_info=True)
+            self.logger.error(f"[NCAAMBasketball] Error updating upcoming games: {e}", exc_info=True)
             self.upcoming_games = [] # Clear games on error
             self.current_game = None
             self.last_update = current_time # Still update time
@@ -941,9 +941,9 @@ class NCAAMBUpcomingManager(BaseNCAAMBManager):
             current_time = time.time()
             if current_time - self.last_warning_time > self.warning_cooldown:
                 if self.favorite_teams:
-                     self.logger.info("[NCAAMB] No upcoming games for favorite teams to display")
+                     self.logger.info("[NCAAMBasketball] No upcoming games for favorite teams to display")
                 else:
-                    self.logger.info("[NCAAMB] No upcoming games to display")
+                    self.logger.info("[NCAAMBasketball] No upcoming games to display")
                 self.last_warning_time = current_time
              # Explicitly clear display if there's nothing to show
             img = Image.new('RGB', (self.display_width, self.display_height), (0, 0, 0))
@@ -973,8 +973,8 @@ class NCAAMBUpcomingManager(BaseNCAAMBManager):
                  # Update display
                  self.display_manager.update_display()
             else:
-                 self.logger.warning("[NCAAMB] Current game is None in UpcomingManager display, despite having upcoming_games list.")
+                 self.logger.warning("[NCAAMBasketball] Current game is None in UpcomingManager display, despite having upcoming_games list.")
 
 
         except Exception as e:
-            self.logger.error(f"[NCAAMB] Error displaying upcoming game: {e}", exc_info=True) 
+            self.logger.error(f"[NCAAMBasketball] Error displaying upcoming game: {e}", exc_info=True) 
