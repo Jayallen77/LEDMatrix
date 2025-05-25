@@ -74,7 +74,7 @@
         "display_format": "{temp}°F\n{condition}"
     },
     "stocks": {
-        "enabled": true,
+        "enabled": false,
         "update_interval": 300,
         "symbols": [
             "ASTS", "SCHD", "INTC", "NVDA", "T", "VOO", "SPEST", "SMCI"
@@ -82,7 +82,7 @@
         "display_format": "{symbol}: ${price} ({change}%)"
     },
     "crypto": {
-        "enabled": true,
+        "enabled": false,
         "update_interval": 300,
         "symbols": [
             "BTC-USD", "ETH-USD"

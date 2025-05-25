@@ -459,9 +459,12 @@ class MusicManager:
                  self.display_manager.clear()
                  logger.debug("[MusicManager.display] Display cleared (not force_clear path).")
 
+            logger.debug(f"[MusicManager.display] Font for 'Nothing Playing': {self.display_manager.regular_font}, Type: {type(self.display_manager.regular_font)}")
             text_width = self.display_manager.get_text_width("Nothing Playing", self.display_manager.regular_font)
+            logger.debug(f"[MusicManager.display] Calculated text_width for 'Nothing Playing': {text_width}")
             x_pos = (self.display_manager.matrix.width - text_width) // 2
             y_pos = (self.display_manager.matrix.height // 2) - 4
+            logger.debug(f"[MusicManager.display] Drawing 'Nothing Playing' at x={x_pos}, y={y_pos}")
             self.display_manager.draw_text("Nothing Playing", x=x_pos, y=y_pos, font=self.display_manager.regular_font)
             self.display_manager.update_display()
             logger.debug("[MusicManager.display] 'Nothing Playing' text drawn and display updated.")
