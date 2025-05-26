@@ -177,38 +177,32 @@ class DisplayManager:
             logger.info("Press Start 2P small font loaded successfully")
 
             # Load 5x7 BDF font for calendar events
-            self.calendar_font = None # Initialize to None
-            self.bdf_5x7_font = None  # Initialize to None
-
-            if self.config.get('calendar', {}).get('enabled', False):
-                try:
-                    script_dir = os.path.dirname(os.path.abspath(__file__))
-                    relative_font_path = os.path.join(script_dir, "../assets/fonts/5x7.bdf")
-                    self.calendar_font_path = os.path.abspath(relative_font_path)
-                    logger.info(f"Attempting to load 5x7 font from: {self.calendar_font_path}")
+            try:
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                relative_font_path = os.path.join(script_dir, "../assets/fonts/5x7.bdf")
+                self.calendar_font_path = os.path.abspath(relative_font_path)
+                logger.info(f"Attempting to load 5x7 font from: {self.calendar_font_path}")
+                
+                if not os.path.exists(self.calendar_font_path):
+                    raise FileNotFoundError(f"Font file not found at {self.calendar_font_path}")
+                
+                # Load with freetype for proper BDF handling
+                face = freetype.Face(self.calendar_font_path)
+                logger.info(f"5x7 calendar font loaded successfully from {self.calendar_font_path}")
+                logger.info(f"Calendar font size: {face.size.height >> 6} pixels")
+                
+                # Store the face for later use
+                self.calendar_font = face
                     
-                    if not os.path.exists(self.calendar_font_path):
-                        raise FileNotFoundError(f"Font file not found at {self.calendar_font_path}")
-                    
-                    # Load with freetype for proper BDF handling
-                    face = freetype.Face(self.calendar_font_path)
-                    logger.info(f"5x7 calendar font loaded successfully from {self.calendar_font_path}")
-                    logger.info(f"Calendar font size: {face.size.height >> 6} pixels")
-                    
-                    # Store the face for later use
-                    self.calendar_font = face
-                    self.bdf_5x7_font = face # Assign to bdf_5x7_font as well if loaded
-                    logger.info(f"Assigned calendar_font (type: {type(self.bdf_5x7_font).__name__}) to bdf_5x7_font.")
-                        
-                except Exception as font_err:
-                    logger.error(f"Failed to load 5x7 font: {str(font_err)}", exc_info=True)
-                    logger.error("Falling back to small font for calendar/bdf.")
-                    self.calendar_font = self.small_font
-                    self.bdf_5x7_font = self.small_font
-            else:
-                logger.info("Calendar module disabled, 5x7 BDF font not loaded. Falling back to small_font for calendar/bdf if needed.")
+            except Exception as font_err:
+                logger.error(f"Failed to load 5x7 font: {str(font_err)}", exc_info=True)
+                logger.error("Falling back to small font")
                 self.calendar_font = self.small_font
-                self.bdf_5x7_font = self.small_font
+
+            # Assign the loaded calendar_font (which should be 5x7 BDF or its fallback) 
+            # to a new attribute for specific use, e.g., in MusicManager.
+            self.bdf_5x7_font = self.calendar_font 
+            logger.info(f"Assigned calendar_font (type: {type(self.bdf_5x7_font).__name__}) to bdf_5x7_font.")
 
             # Load 4x6 font as extra_small_font
             try:
