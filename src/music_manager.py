@@ -539,6 +539,8 @@ class MusicManager:
     # Method moved from DisplayController and renamed
     def display(self, force_clear: bool = False):
         perform_full_refresh_this_cycle = force_clear
+        art_url_currently_in_cache = None # Initialize to None
+        image_currently_in_cache = None   # Initialize to None
         
         # Check if an event previously signaled a need for immediate refresh (and populated the queue)
         initial_data_from_queue_due_to_event = None
@@ -600,7 +602,7 @@ class MusicManager:
             if perform_full_refresh_this_cycle : # This is always true in this block
                  self.last_periodic_refresh_time = time.time()
 
-            # --- Define cache variables after snapshot is finalized ---
+            # --- Update cache variables after snapshot is finalized ---
             with self.track_info_lock: # Ensure thread-safe access to shared cache attributes
                 art_url_currently_in_cache = self.last_album_art_url
                 image_currently_in_cache = self.album_art_image
@@ -617,6 +619,11 @@ class MusicManager:
 
         # At this point, current_track_info_snapshot is set for this display cycle.
         # The perform_full_refresh_this_cycle flag dictates screen clearing and scroll resets.
+
+        # --- Update cache variables after snapshot is finalized ---
+        with self.track_info_lock: # Ensure thread-safe access to shared cache attributes
+            art_url_currently_in_cache = self.last_album_art_url
+            image_currently_in_cache = self.album_art_image
 
         snapshot_title_for_log = current_track_info_snapshot.get('title', 'N/A') if current_track_info_snapshot else 'N/A'
         if perform_full_refresh_this_cycle: # Log added for clarity on what snapshot is used in full refresh
