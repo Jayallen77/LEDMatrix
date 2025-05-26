@@ -54,6 +54,8 @@ class MusicManager:
         self.is_currently_showing_nothing_playing = False # To prevent flashing
         self._needs_immediate_full_refresh = False # Flag for forcing refresh from YTM updates
         self.ytm_event_data_queue = queue.Queue(maxsize=1) # Queue for event data
+        self.periodic_refresh_interval = 5 # Seconds
+        self.last_periodic_refresh_time = 0
         
         self._load_config() # Load config first
         self._initialize_clients() # Initialize based on loaded config
@@ -539,9 +541,15 @@ class MusicManager:
         perform_full_refresh_this_cycle = force_clear 
         data_from_event_queue = None
 
+        # Check for periodic refresh if music display is active
+        if self.is_music_display_active and (time.time() - self.last_periodic_refresh_time >= self.periodic_refresh_interval):
+            logger.info(f"MusicManager.display: Triggering periodic full refresh (interval: {self.periodic_refresh_interval}s).")
+            perform_full_refresh_this_cycle = True
+            self.last_periodic_refresh_time = time.time()
+
         if self._needs_immediate_full_refresh:
             logger.debug("MusicManager.display: _needs_immediate_full_refresh is True.")
-            perform_full_refresh_this_cycle = True
+            perform_full_refresh_this_cycle = True # Ensure it's true
             self._needs_immediate_full_refresh = False # Consume the flag
             try:
                 data_from_event_queue = self.ytm_event_data_queue.get_nowait()
@@ -573,11 +581,26 @@ class MusicManager:
 
         if perform_full_refresh_this_cycle:
             self.display_manager.clear()
+            # Only call activate_music_display if it's a genuine switch or forced refresh, 
+            # not just a periodic refresh if already active and connected.
+            # activate_music_display handles YTM connection.
+            # If it's a periodic refresh and YTM is already connected, calling it might be redundant
+            # but it's generally safe. Let's keep it for consistency of a "full refresh".
             self.activate_music_display() 
+            self.last_periodic_refresh_time = time.time() # Also reset timer if full refresh happens for other reasons
 
         with self.track_info_lock:
-            current_track_info_snapshot = self.current_track_info.copy() if self.current_track_info else None
-            # Get the URL of the currently cached image and the image itself
+            # Re-fetch current_track_info_snapshot if it wasn't from queue,
+            # as activate_music_display or other logic might have changed it.
+            # However, the snapshot decision is made earlier based on queue/current_track_info.
+            # For this display cycle, current_track_info_snapshot is what we're using.
+            # The important part is that perform_full_refresh_this_cycle dictates clearing and scroll resets.
+
+            # Snapshot current_track_info again *after* potential activate_music_display,
+            # but only if we didn't get data from the event queue.
+            # This is tricky. The original snapshot logic before perform_full_refresh_this_cycle is better.
+            # Let's rely on the snapshot taken at the start of the method.
+            # current_track_info_snapshot = self.current_track_info.copy() if self.current_track_info else None
             art_url_currently_in_cache = self.last_album_art_url
             image_currently_in_cache = self.album_art_image
 
@@ -615,9 +638,10 @@ class MusicManager:
 
         # Reset scroll positions if force_clear was true (now stored in should_reset_scroll_for_music)
         # and we are about to display a new track.
+        # This should now be perform_full_refresh_this_cycle
         if perform_full_refresh_this_cycle and not self.is_currently_showing_nothing_playing : # only reset if showing actual music
             title_being_displayed = current_track_info_snapshot.get('title','N/A') if current_track_info_snapshot else "N/A"
-            logger.debug(f"MusicManager: Resetting scroll positions for track '{title_being_displayed}' due to full refresh signal.")
+            logger.debug(f"MusicManager: Resetting scroll positions for track '{title_being_displayed}' due to full refresh signal (periodic or event-driven).")
             self.scroll_position_title = 0
             self.scroll_position_artist = 0
 
