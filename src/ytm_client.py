@@ -88,7 +88,7 @@ class YTMClient:
                 except Exception as cb_ex:
                     logging.error(f"Error executing YTMClient external_update_callback: {cb_ex}")
             elif not significant_change_detected:
-                logger.debug(f"YTM state update received but no significant change to key fields. Title: {current_key_data.get('title') if current_key_data else 'N/A'}")
+                logging.debug(f"YTM state update received but no significant change to key fields. Title: {current_key_data.get('title') if current_key_data else 'N/A'}")
 
     def load_config(self):
         default_url = "http://localhost:9863"
