@@ -36,6 +36,7 @@ class YTMClient:
         self._connection_event = threading.Event()
         self.external_update_callback = update_callback
         self.last_processed_key_data = None # Stores key fields of the last update that triggered a callback
+        self.previous_key_data_for_debug_logging = None # Helps reduce repetitive non-significant change logs
 
         @self.sio.event(namespace='/api/v1/realtime')
         def connect():
@@ -91,8 +92,12 @@ class YTMClient:
                     self.external_update_callback(data) 
                 except Exception as cb_ex:
                     logging.error(f"Error executing YTMClient external_update_callback: {cb_ex}")
-            elif not significant_change_detected:
-                logging.debug(f"YTM state update received but no significant change to key fields. Title: {current_key_data.get('title') if current_key_data else 'N/A'}")
+            elif not significant_change_detected and current_key_data:
+                if current_key_data != self.previous_key_data_for_debug_logging:
+                    logging.debug(f"YTM state update received but no significant change to callback. Title: {current_key_data.get('title')}, State: {current_key_data.get('trackState')}")
+                    self.previous_key_data_for_debug_logging = current_key_data
+            elif not current_key_data:
+                 logging.debug("YTM state update received but current_key_data was None/empty.")
 
     def load_config(self):
         default_url = "http://localhost:9863"

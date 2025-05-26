@@ -150,7 +150,12 @@ class MusicManager:
 
     def _handle_ytm_direct_update(self, ytm_data):
         """Handles a direct state update from YTMClient."""
-        logger.debug(f"MusicManager received direct YTM update: {ytm_data.get('track', {}).get('title') if ytm_data else 'No Data'}")
+        # Correctly log the title from the ytm_data structure
+        title_from_data = None
+        if ytm_data and isinstance(ytm_data, dict):
+            video_info = ytm_data.get('video', {})
+            title_from_data = video_info.get('title')
+        logger.debug(f"MusicManager received direct YTM update. Title from data: {title_from_data if title_from_data else 'No Title in video block'}")
 
         if not self.enabled or not self.is_music_display_active: # Check if display is active
             logger.debug("Skipping YTM direct update: Manager disabled or music display not active.")
