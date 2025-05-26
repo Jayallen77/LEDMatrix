@@ -35,6 +35,7 @@ class YTMClient:
         self._data_lock = threading.Lock()
         self._connection_event = threading.Event()
         self.external_update_callback = update_callback
+        self.last_processed_key_data = None # Stores key fields of the last update that triggered a callback
 
         @self.sio.event(namespace='/api/v1/realtime')
         def connect():
@@ -55,18 +56,39 @@ class YTMClient:
 
         @self.sio.on('state-update', namespace='/api/v1/realtime')
         def on_state_update(data):
-            logging.debug(f"Received state update from YTM Companion on /api/v1/realtime: {data}")
-            new_data_received = False
-            with self._data_lock:
-                if self.last_known_track_data != data:
-                    self.last_known_track_data = data
-                    new_data_received = True
+            logging.debug(f"Received state update from YTM Companion on /api/v1/realtime: {data.get('video',{}).get('title')}")
             
-            if new_data_received and self.external_update_callback:
+            # Always update the full last_known_track_data for polling purposes
+            with self._data_lock:
+                self.last_known_track_data = data
+
+            # Extract key fields for deciding if a significant change occurred
+            current_key_data = None
+            if data and isinstance(data, dict):
+                video_info = data.get('video', {})
+                player_info = data.get('player', {})
+                current_key_data = {
+                    'title': video_info.get('title'),
+                    'author': video_info.get('author'),
+                    'album': video_info.get('album'), # Added album for more robust change detection
+                    'trackState': player_info.get('trackState'),
+                    'adPlaying': player_info.get('adPlaying', False)
+                }
+
+            significant_change_detected = False
+            if current_key_data and (self.last_processed_key_data != current_key_data):
+                significant_change_detected = True
+                self.last_processed_key_data = current_key_data # Update only on significant change
+            
+            if significant_change_detected and self.external_update_callback:
+                logging.info(f"Significant YTM state change detected, calling update callback. Title: {current_key_data.get('title')}")
                 try:
-                    self.external_update_callback(data)
+                    # Pass the full 'data' object to the callback
+                    self.external_update_callback(data) 
                 except Exception as cb_ex:
                     logging.error(f"Error executing YTMClient external_update_callback: {cb_ex}")
+            elif not significant_change_detected:
+                logger.debug(f"YTM state update received but no significant change to key fields. Title: {current_key_data.get('title') if current_key_data else 'N/A'}")
 
     def load_config(self):
         default_url = "http://localhost:9863"
