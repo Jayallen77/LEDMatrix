@@ -600,6 +600,10 @@ class MusicManager:
             if perform_full_refresh_this_cycle : # This is always true in this block
                  self.last_periodic_refresh_time = time.time()
 
+            # --- Define cache variables after snapshot is finalized ---
+            with self.track_info_lock: # Ensure thread-safe access to shared cache attributes
+                art_url_currently_in_cache = self.last_album_art_url
+                image_currently_in_cache = self.album_art_image
 
         else: # Not a full refresh cycle (i.e., force_clear=False from DC, AND periodic timer not elapsed, AND no prior event demanding full refresh)
               # This path means we are just doing a regular, non-clearing display update.
