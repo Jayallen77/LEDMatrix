@@ -30,7 +30,14 @@ class YTMClient:
         self.base_url = None
         self.ytm_token = None
         self.load_config() # Loads URL and token
-        self.sio = socketio.Client(logger=False, engineio_logger=False)
+        self.sio = socketio.Client(
+            logger=False, 
+            engineio_logger=False,
+            reconnection=True,
+            reconnection_attempts=0,  # Infinite attempts
+            reconnection_delay=1,     # Initial delay in seconds
+            reconnection_delay_max=10 # Maximum delay in seconds
+        )
         self.last_known_track_data = None
         self.is_connected = False
         self._data_lock = threading.Lock()
