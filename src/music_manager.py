@@ -165,10 +165,11 @@ class MusicManager:
             elif self.current_track_info is not None and (
                 simplified_info.get('title') != self.current_track_info.get('title') or
                 simplified_info.get('artist') != self.current_track_info.get('artist') or
-                simplified_info.get('album_art_url') != self.current_track_info.get('album_art_url')
+                simplified_info.get('album_art_url') != self.current_track_info.get('album_art_url') or
+                simplified_info.get('is_playing') != self.current_track_info.get('is_playing')
             ):
                 significant_change_detected = True
-                logger.debug(f"({source_description}): Significant change (title/artist/art) detected.")
+                logger.debug(f"({source_description}): Significant change (title/artist/art/is_playing) detected.")
 
             if simplified_info != self.current_track_info:
                 processed_a_meaningful_update = True
@@ -486,40 +487,47 @@ class MusicManager:
             video_info = track_data.get('video', {})
             player_info = track_data.get('player', {})
 
-            title = video_info.get('title') 
+            title = video_info.get('title')
             artist = video_info.get('author')
-            
-            track_state = player_info.get('trackState')
-            is_playing_ytm = (track_state == 1) 
+            thumbnails = video_info.get('thumbnails', [])
+            album_art_url = thumbnails[0].get('url') if thumbnails else None
 
+            # Primary conditions for "Nothing Playing" for YTM:
+            # 1. An ad is currently playing.
+            # 2. Essential metadata (title or artist) is missing from the source data.
             if player_info.get('adPlaying', False):
-                is_playing_ytm = False 
-                logging.debug("YTM: Ad is playing, reporting track as not actively playing.")
+                logging.debug("YTM (get_simplified_track_info): Ad is playing, reporting as Nothing Playing.")
+                return nothing_playing_info.copy()
             
-            # logger.debug(f"[get_simplified_track_info YTM] Title: {title}, Artist: {artist}, TrackState: {track_state}, IsPlayingYTM: {is_playing_ytm}, AdPlaying: {player_info.get('adPlaying')}")
-
-            if not title or not artist or not is_playing_ytm: 
-                # logger.debug("[get_simplified_track_info YTM] Condition met for Nothing Playing.")
+            if not title or not artist:
+                logging.debug(f"YTM (get_simplified_track_info): No title ('{title}') or artist ('{artist}'), reporting as Nothing Playing.")
                 return nothing_playing_info.copy()
 
-            # logger.debug("[get_simplified_track_info YTM] Proceeding to return full track details.")
+            # If we've reached this point, we have a title and artist, and it's not an ad.
+            # Proceed to determine the accurate playback state and construct full track details.
+            track_state = player_info.get('trackState')
+            # is_playing_ytm is True ONLY if trackState is 1 (actively playing).
+            # Other states: 0 (loading/buffering), 2 (paused), 3 (stopped/ended) will result in is_playing_ytm = False.
+            is_playing_ytm = (track_state == 1) 
+
+            # logging.debug(f"[get_simplified_track_info YTM] Title: {title}, Artist: {artist}, TrackState: {track_state}, IsPlayingYTM: {is_playing_ytm}")
+
             album = video_info.get('album')
             duration_seconds = video_info.get('durationSeconds')
             duration_ms = int(duration_seconds * 1000) if duration_seconds is not None else 0
             progress_seconds = player_info.get('videoProgress')
             progress_ms = int(progress_seconds * 1000) if progress_seconds is not None else 0
-            thumbnails = video_info.get('thumbnails', [])
-            album_art_url = thumbnails[0].get('url') if thumbnails else None
+            # album_art_url was already fetched earlier
 
             return {
                 'source': 'YouTube Music',
                 'title': title,
                 'artist': artist,
-                'album': album if album else '',
+                'album': album if album else '', # Ensure album is not None
                 'album_art_url': album_art_url,
                 'duration_ms': duration_ms,
                 'progress_ms': progress_ms,
-                'is_playing': is_playing_ytm, # Should be true here
+                'is_playing': is_playing_ytm, # This now accurately reflects if YTM reports the track as playing
             }
         else:
             # This covers cases where source is NONE, or track_data is None for Spotify/YTM
