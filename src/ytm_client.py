@@ -83,8 +83,9 @@ class YTMClient:
                 significant_change_detected = True
                 self.last_processed_key_data = current_key_data # Update only on significant change
             
+            logging.debug(f"[YTMClient Decision] Significant Change: {significant_change_detected}, Callback Exists: {self.external_update_callback is not None}")
             if significant_change_detected and self.external_update_callback:
-                logging.info(f"Significant YTM state change detected, calling update callback. Title: {current_key_data.get('title')}")
+                logging.info(f"--> Attempting to call YTM external_update_callback for title: {current_key_data.get('title')}")
                 try:
                     # Pass the full 'data' object to the callback
                     self.external_update_callback(data) 
