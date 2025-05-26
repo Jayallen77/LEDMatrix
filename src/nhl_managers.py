@@ -426,14 +426,14 @@ class BaseNHLManager:
             center_y = self.display_height // 2
 
             # Draw home team logo (far right, extending beyond screen)
-            home_x = self.display_width - home_logo.width + 12  # Shifted in by 3 pixels (from 15 to 12)
+            home_x = self.display_width - home_logo.width
             home_y = center_y - (home_logo.height // 2)
             
             # Paste the home logo onto the overlay
             overlay.paste(home_logo, (home_x, home_y), home_logo)
 
             # Draw away team logo (far left, extending beyond screen)
-            away_x = -12  # Shifted in by 3 pixels (from -15 to -12)
+            away_x = 0
             away_y = center_y - (away_logo.height // 2)
             
             # Paste the away logo onto the overlay
