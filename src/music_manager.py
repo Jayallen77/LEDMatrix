@@ -132,6 +132,119 @@ class MusicManager:
         else:
             self.ytm = None # Ensure it's None if not preferred
 
+    def _process_ytm_data_update(self, ytm_data, source_description: str):
+        """
+        Core processing logic for YTM data.
+        Updates self.current_track_info, handles album art, queues data for display,
+        and determines if the update is significant.
+
+        Args:
+            ytm_data: The raw data from YTM.
+            source_description: A string for logging (e.g., "YTM Event", "YTM Activate Sync").
+
+        Returns:
+            tuple: (simplified_info, significant_change_detected)
+        """
+        if not ytm_data: # Handle case where ytm_data might be None
+            simplified_info = self.get_simplified_track_info(None, MusicSource.NONE)
+        else:
+            ytm_player_info = ytm_data.get('player', {})
+            is_actually_playing_ytm = (ytm_player_info.get('trackState') == 1) and not ytm_player_info.get('adPlaying', False)
+            simplified_info = self.get_simplified_track_info(ytm_data if is_actually_playing_ytm else None,
+                                                           MusicSource.YTM if is_actually_playing_ytm else MusicSource.NONE)
+
+        significant_change_detected = False
+        processed_a_meaningful_update = False # Renamed from has_changed
+
+        with self.track_info_lock:
+            current_track_info_before_update_str = json.dumps(self.current_track_info) if self.current_track_info else "None"
+            simplified_info_str = json.dumps(simplified_info)
+            logger.debug(f"MusicManager._process_ytm_data_update ({source_description}): PRE-COMPARE - SimplifiedInfo: {simplified_info_str}, CurrentTrackInfo: {current_track_info_before_update_str}")
+
+            if self.current_track_info is None and simplified_info.get('title') != 'Nothing Playing':
+                significant_change_detected = True
+                logger.debug(f"({source_description}): First valid track data, marking as significant.")
+            elif self.current_track_info is not None and (
+                simplified_info.get('title') != self.current_track_info.get('title') or
+                simplified_info.get('artist') != self.current_track_info.get('artist') or
+                simplified_info.get('album_art_url') != self.current_track_info.get('album_art_url')
+            ):
+                significant_change_detected = True
+                logger.debug(f"({source_description}): Significant change (title/artist/art) detected.")
+
+            if simplified_info != self.current_track_info:
+                processed_a_meaningful_update = True
+                old_album_art_url = self.current_track_info.get('album_art_url') if self.current_track_info else None
+                
+                self.current_track_info = simplified_info # Update main state
+                logger.debug(f"MusicManager._process_ytm_data_update ({source_description}): POST-UPDATE (inside lock) - self.current_track_info now: {json.dumps(self.current_track_info)}")
+
+                # Determine current source based on this update
+                if simplified_info.get('source') == 'YouTube Music' and simplified_info.get('is_playing'):
+                    self.current_source = MusicSource.YTM
+                elif self.current_source == MusicSource.YTM and not simplified_info.get('is_playing'): # YTM stopped
+                    self.current_source = MusicSource.NONE
+                elif simplified_info.get('source') == 'None':
+                    self.current_source = MusicSource.NONE
+                
+                new_album_art_url = simplified_info.get('album_art_url')
+
+                logger.debug(f"({source_description}) Track info comparison: simplified_info != self.current_track_info was TRUE.")
+                logger.debug(f"({source_description}) Old Album Art URL: {old_album_art_url}, New Album Art URL: {new_album_art_url}")
+
+                if new_album_art_url != old_album_art_url:
+                    logger.info(f"({source_description}) Album art URL changed. Clearing self.album_art_image to force re-fetch.")
+                    self.album_art_image = None # Clear cached image
+                    self.last_album_art_url = new_album_art_url # Update last known URL
+                elif not self.last_album_art_url and new_album_art_url: # New art URL appeared
+                    logger.info(f"({source_description}) New album art URL appeared. Clearing image.")
+                    self.album_art_image = None
+                    self.last_album_art_url = new_album_art_url
+                elif new_album_art_url is None and old_album_art_url is not None: # Art URL disappeared
+                    logger.info(f"({source_description}) Album art URL disappeared. Clearing image and URL.")
+                    self.album_art_image = None
+                    self.last_album_art_url = None
+                elif self.current_track_info and self.current_track_info.get('album_art_url') and not self.last_album_art_url:
+                    # This case might be redundant if new_album_art_url logic covers it
+                    self.last_album_art_url = self.current_track_info.get('album_art_url')
+                    self.album_art_image = None
+
+                display_title = self.current_track_info.get('title', 'None')
+                logger.info(f"({source_description}) Track info updated. Source: {self.current_source.name}. New Track: {display_title}")
+            else:
+                # simplified_info IS THE SAME as self.current_track_info
+                processed_a_meaningful_update = False
+                logger.debug(f"({source_description}) No change in simplified track info (simplified_info == self.current_track_info).")
+                if self.current_track_info is None and simplified_info.get('title') != 'Nothing Playing':
+                    # This ensures that if current_track_info was None and simplified_info is valid,
+                    # it's treated as processed and current_track_info gets set.
+                    significant_change_detected = True # First load is always significant
+                    processed_a_meaningful_update = True
+                    self.current_track_info = simplified_info
+                    logger.info(f"({source_description}) First valid track data received (was None), marking significant.")
+
+        # Queueing logic - for events or activate_display syncs, not for polling.
+        # Polling updates current_track_info directly; display() picks it up.
+        # Events and activate_display syncs use queue to ensure display() picks up event-specific data.
+        if source_description in ["YTM Event", "YTM Activate Sync"]:
+            try:
+                while not self.ytm_event_data_queue.empty():
+                    self.ytm_event_data_queue.get_nowait()
+                self.ytm_event_data_queue.put_nowait(simplified_info)
+                logger.debug(f"MusicManager._process_ytm_data_update ({source_description}): Put simplified_info (Title: {simplified_info.get('title')}) into ytm_event_data_queue.")
+            except queue.Full:
+                logger.warning(f"MusicManager._process_ytm_data_update ({source_description}): ytm_event_data_queue was full.")
+
+        if significant_change_detected:
+            logger.info(f"({source_description}) Significant track change detected. Signaling for an immediate full refresh of MusicManager display.")
+            self._needs_immediate_full_refresh = True
+        elif processed_a_meaningful_update : # A change occurred but wasn't "significant" (e.g. just progress)
+            logger.debug(f"({source_description}) Minor track data update (e.g. progress). Display will update without full refresh.")
+            # _needs_immediate_full_refresh remains False or as it was.
+            # If an event put data on queue, display() will still pick it up.
+
+        return simplified_info, significant_change_detected
+
     def activate_music_display(self):
         logger.info("Music display activated.")
         self.is_music_display_active = True
@@ -140,13 +253,26 @@ class MusicManager:
                 logger.info("Attempting to connect YTM client due to music display activation.")
                 if self.ytm.connect_client(timeout=10):
                     logger.info("YTM client connected successfully on display activation.")
-                    # First event from YTM will populate the queue via _handle_ytm_direct_update
+                    # YTM often sends an immediate state update on connect, handled by _handle_ytm_direct_update.
+                    # If not, or to be sure, we can fetch current state.
+                    latest_data = self.ytm.get_current_track()
+                    if latest_data:
+                        logger.debug("YTM Activate Sync: Processing current track data after successful connection.")
+                        self._process_ytm_data_update(latest_data, "YTM Activate Sync")
+                        # Callback to DisplayController will be handled by the display loop picking up queue/flag
                 else:
                     logger.warning("YTM client failed to connect on display activation.")
-            else:
-                logger.debug("YTM client already connected during music display activation.")
-                # If already connected, a state update might be useful to ensure queue has latest
-                # For now, rely on continuous updates or next explicit song change via YTM events.
+            else: # Already connected
+                logger.debug("YTM client already connected during music display activation. Syncing state.")
+                latest_data = self.ytm.get_current_track() # Get latest from YTMClient's cache
+                if latest_data:
+                    self._process_ytm_data_update(latest_data, "YTM Activate Sync")
+                    # Callback to DisplayController will be handled by the display loop picking up queue/flag
+                else:
+                    logger.debug("YTM Activate Sync: No track data available from connected YTM client.")
+                    # Process "Nothing Playing" to ensure state is clean if YTM has nothing.
+                    self._process_ytm_data_update(None, "YTM Activate Sync (No Data)")
+
 
     def deactivate_music_display(self):
         logger.info("Music display deactivated.")
@@ -157,132 +283,24 @@ class MusicManager:
 
     def _handle_ytm_direct_update(self, ytm_data):
         """Handles a direct state update from YTMClient."""
-        # Correctly log the title from the ytm_data structure
         raw_title_from_event = ytm_data.get('video', {}).get('title', 'No Title') if isinstance(ytm_data, dict) else 'Data not a dict'
-        raw_artist_from_event = ytm_data.get('video', {}).get('author', 'No Author') if isinstance(ytm_data, dict) else 'Data not a dict'
-        raw_album_art_from_event = ytm_data.get('video', {}).get('thumbnails', [{}])[0].get('url') if isinstance(ytm_data, dict) and ytm_data.get('video', {}).get('thumbnails') else 'No Album Art'
-        raw_track_state_from_event = ytm_data.get('player', {}).get('trackState') if isinstance(ytm_data, dict) else 'No Track State'
-        logger.debug(f"MusicManager._handle_ytm_direct_update: RAW EVENT DATA - Title: '{raw_title_from_event}', Artist: '{raw_artist_from_event}', ArtURL: '{raw_album_art_from_event}', TrackState: {raw_track_state_from_event}")
+        logger.debug(f"MusicManager._handle_ytm_direct_update: RAW EVENT DATA - Title: '{raw_title_from_event}'")
 
-        if not self.enabled or not self.is_music_display_active: # Check if display is active
+        if not self.enabled or not self.is_music_display_active:
             logger.debug("Skipping YTM direct update: Manager disabled or music display not active.")
             return
 
-        # Only process if YTM is the preferred source
         if self.preferred_source != "ytm":
             logger.debug(f"Skipping YTM direct update: Preferred source is '{self.preferred_source}', not 'ytm'.")
             return
+        
+        # Process the data and get outcomes
+        simplified_info, significant_change = self._process_ytm_data_update(ytm_data, "YTM Event")
 
-        ytm_player_info = ytm_data.get('player', {}) if ytm_data else {}
-        is_actually_playing_ytm = (ytm_player_info.get('trackState') == 1) and \
-                                  not ytm_player_info.get('adPlaying', False)
-
-        simplified_info = self.get_simplified_track_info(ytm_data if is_actually_playing_ytm else None, 
-                                                       MusicSource.YTM if is_actually_playing_ytm else MusicSource.NONE)
-
-        # Log simplified_info and current_track_info before comparison
-        with self.track_info_lock: # Lock to safely read current_track_info for logging
-            current_track_info_before_update_str = json.dumps(self.current_track_info) if self.current_track_info else "None"
-        simplified_info_str = json.dumps(simplified_info)
-        logger.debug(f"MusicManager._handle_ytm_direct_update: PRE-COMPARE - SimplifiedInfo: {simplified_info_str}, CurrentTrackInfo: {current_track_info_before_update_str}")
-
-        processed_a_meaningful_update = False
-        significant_track_change_detected = False # New flag
-
-        with self.track_info_lock:
-            # Determine if it's a significant change (title, artist, or album_art_url different)
-            # or if current_track_info is None (first update is always significant)
-            if self.current_track_info is None:
-                significant_track_change_detected = True
-            else:
-                if (simplified_info.get('title') != self.current_track_info.get('title') or
-                    simplified_info.get('artist') != self.current_track_info.get('artist') or
-                    simplified_info.get('album_art_url') != self.current_track_info.get('album_art_url')):
-                    significant_track_change_detected = True
-
-            if simplified_info != self.current_track_info:
-                processed_a_meaningful_update = True
-                old_album_art_url = self.current_track_info.get('album_art_url') if self.current_track_info else None
-                
-                self.current_track_info = simplified_info
-                logger.debug(f"MusicManager._handle_ytm_direct_update: POST-UPDATE (inside lock) - self.current_track_info now: {json.dumps(self.current_track_info)}")
-                
-                if is_actually_playing_ytm and simplified_info.get('source') == 'YouTube Music':
-                    self.current_source = MusicSource.YTM
-                elif not is_actually_playing_ytm and self.current_source == MusicSource.YTM: # YTM stopped
-                    self.current_source = MusicSource.NONE
-                # If simplified_info became 'Nothing Playing', current_source would be NONE from get_simplified_track_info
-
-                new_album_art_url = simplified_info.get('album_art_url') if simplified_info else None
-
-                logger.debug(f"[YTM Direct Update] Track info comparison: simplified_info != self.current_track_info was TRUE.")
-                logger.debug(f"[YTM Direct Update] Old Album Art URL: {old_album_art_url}, New Album Art URL: {new_album_art_url}")
-
-                if new_album_art_url != old_album_art_url:
-                    logger.info("[YTM Direct Update] Album art URL changed. Clearing self.album_art_image to force re-fetch.")
-                    self.album_art_image = None
-                    self.last_album_art_url = new_album_art_url
-                elif not self.last_album_art_url and new_album_art_url:
-                    logger.info("[YTM Direct Update] New album art URL appeared (was None). Clearing self.album_art_image.")
-                    self.album_art_image = None
-                    self.last_album_art_url = new_album_art_url
-                elif new_album_art_url is None and old_album_art_url is not None:
-                    logger.info("[YTM Direct Update] Album art URL disappeared (became None). Clearing image and URL.")
-                    self.album_art_image = None
-                    self.last_album_art_url = None
-                elif self.current_track_info and self.current_track_info.get('album_art_url') and not self.last_album_art_url:
-                    self.last_album_art_url = self.current_track_info.get('album_art_url')
-                    self.album_art_image = None
-                
-                display_title = self.current_track_info.get('title', 'None') if self.current_track_info else 'None'
-                logger.info(f"YTM Direct Update: Track info updated. Source: {self.current_source.name}. New Track: {display_title}")
-            else:
-                # simplified_info IS THE SAME as self.current_track_info
-                processed_a_meaningful_update = False
-                logger.debug("YTM Direct Update: No change in simplified track info (simplified_info == self.current_track_info).")
-                # Even if simplified_info is same, if self.current_track_info was None, it's a first load.
-                if self.current_track_info is None and simplified_info.get('title') != 'Nothing Playing':
-                    # This edge case might mean the very first update after 'Nothing Playing'
-                    # was identical to what was already in simplified_info due to a rapid event.
-                    # Consider it a significant change if we are moving from None to something.
-                    significant_track_change_detected = True
-                    processed_a_meaningful_update = True # Ensure current_track_info gets set
-                    self.current_track_info = simplified_info # Explicitly set if it was None
-                    logger.info("YTM Direct Update: First valid track data received, marking as significant change.")
-
-        # Always try to update queue and signal refresh if YTM is source and display active
-        # This ensures even progress updates (if simplified_info is the same) can trigger a UI refresh if needed.
-        # And new songs will definitely pass their data via queue.
-        try:
-            # Clear previous item if any - we only want the latest
-            while not self.ytm_event_data_queue.empty():
-                try:
-                    self.ytm_event_data_queue.get_nowait()
-                except queue.Empty:
-                    break # Should not happen with check but good for safety
-            self.ytm_event_data_queue.put_nowait(simplified_info) # Pass the LATEST processed info
-            logger.debug(f"MusicManager._handle_ytm_direct_update: Put simplified_info (Title: {simplified_info.get('title')}) into ytm_event_data_queue.")
-        except queue.Full:
-            logger.warning("MusicManager._handle_ytm_direct_update: ytm_event_data_queue was full. This should not happen with maxsize=1 and clearing.")
-            # If full, the old item remains, which is fine, display will pick it up.
-
-        if significant_track_change_detected:
-            logger.info("YTM Direct Update: Significant track change detected. Signaling for an immediate full refresh of MusicManager display.")
-            self._needs_immediate_full_refresh = True
-        else:
-            logger.debug("YTM Direct Update: No significant track change. UI will update progress/state without full refresh.")
-            # Ensure _needs_immediate_full_refresh is False if no significant change,
-            # in case it was somehow set by a rapid previous event that didn't get consumed.
-            # self._needs_immediate_full_refresh = False # This might be too aggressive, display() consumes it.
-
+        # Callback to DisplayController
         if self.update_callback:
-            # Callback to DisplayController still useful to signal generic music update
-            # DisplayController uses it to set its own force_clear, ensuring sync
             try:
-                # Send a copy of what's now in current_track_info for consistency with polling path
-                # Or send simplified_info if we want DisplayController to log the absolute latest event data.
-                # Let's send simplified_info to make it consistent with what's put on the queue.
-                self.update_callback(simplified_info, significant_track_change_detected) 
+                self.update_callback(simplified_info, significant_change) 
             except Exception as e:
                 logger.error(f"Error executing DisplayController update callback from YTM direct update: {e}")
 
@@ -333,90 +351,103 @@ class MusicManager:
 
         while not self.stop_event.is_set():
             polled_track_info_data = None
-            polled_source = MusicSource.NONE
-            is_playing_from_poll = False # Renamed to avoid conflict
+            source_for_callback = MusicSource.NONE # Used to determine if callback is needed
+            significant_change_for_callback = False
+            simplified_info_for_callback = None
 
             if self.preferred_source == "spotify" and self.spotify and self.spotify.is_authenticated():
                 try:
                     spotify_track = self.spotify.get_current_track()
                     if spotify_track and spotify_track.get('is_playing'):
                         polled_track_info_data = spotify_track
-                        polled_source = MusicSource.SPOTIFY
-                        is_playing_from_poll = True
-                        logging.debug(f"Polling Spotify: Active track - {spotify_track.get('item', {}).get('name')}")
+                        source_for_callback = MusicSource.SPOTIFY
+                        simplified_info_poll = self.get_simplified_track_info(polled_track_info_data, MusicSource.SPOTIFY)
+                        
+                        with self.track_info_lock:
+                            if simplified_info_poll != self.current_track_info:
+                                self.current_track_info = simplified_info_poll
+                                self.current_source = MusicSource.SPOTIFY
+                                significant_change_for_callback = True # Spotify poll changes always considered significant
+                                simplified_info_for_callback = simplified_info_poll.copy()
+                                # Handle album art for Spotify if needed (similar to _process_ytm_data_update)
+                                old_album_art_url = self.current_track_info.get('album_art_url_prev_spotify') # Need a way to store prev
+                                new_album_art_url = simplified_info_poll.get('album_art_url')
+                                if new_album_art_url != old_album_art_url:
+                                     self.album_art_image = None
+                                     self.last_album_art_url = new_album_art_url
+                                self.current_track_info['album_art_url_prev_spotify'] = new_album_art_url
+
+
+                                logger.debug(f"Polling Spotify: Active track - {spotify_track.get('item', {}).get('name')}")
+                            else:
+                                logger.debug("Polling Spotify: No change in simplified track info.")
+                        
                     else:
-                        logging.debug("Polling Spotify: No active track or player paused.")
+                        logger.debug("Polling Spotify: No active track or player paused.")
+                        # If Spotify was playing and now it's not
+                        with self.track_info_lock:
+                            if self.current_source == MusicSource.SPOTIFY:
+                                simplified_info_for_callback = self.get_simplified_track_info(None, MusicSource.NONE)
+                                self.current_track_info = simplified_info_for_callback
+                                self.current_source = MusicSource.NONE
+                                significant_change_for_callback = True
+                                self.album_art_image = None # Clear art
+                                self.last_album_art_url = None
+                                logger.info("Polling Spotify: Player stopped. Updating to Nothing Playing.")
+
+
                 except Exception as e:
                     logging.error(f"Error polling Spotify: {e}")
                     if "token" in str(e).lower():
                         logging.warning("Spotify auth token issue detected during polling.")
             
-            elif self.preferred_source == "ytm" and self.ytm and self.ytm.is_connected:
+            elif self.preferred_source == "ytm" and self.ytm: # YTM is preferred
+                if self.ytm.is_connected:
+                    try:
+                        ytm_track_data = self.ytm.get_current_track() # Data from YTMClient's cache
+                        # Let _process_ytm_data_update handle the logic
+                        simplified_info_for_callback, significant_change_for_callback = self._process_ytm_data_update(ytm_track_data, "YTM Poll")
+                        source_for_callback = MusicSource.YTM # Mark that YTM was polled
+                        # Note: _process_ytm_data_update updates self.current_track_info
+                        if significant_change_for_callback:
+                             logger.debug(f"Polling YTM: Change detected via _process_ytm_data_update. Title: {simplified_info_for_callback.get('title')}")
+                        else:
+                             logger.debug(f"Polling YTM: No change detected via _process_ytm_data_update. Title: {simplified_info_for_callback.get('title')}")
+
+                    except Exception as e:
+                        logging.error(f"Error during YTM poll processing: {e}")
+                else: # YTM not connected
+                    logging.debug("Skipping YTM poll: Client not connected. Will attempt reconnect on next cycle if display active.")
+                    if self.is_music_display_active:
+                        logger.info("YTM is preferred and display active, attempting reconnect during poll cycle.")
+                        if self.ytm.connect_client(timeout=5):
+                            logger.info("YTM reconnected during poll cycle. Will process data on next poll/event.")
+                            # Potentially sync state right here?
+                            latest_data = self.ytm.get_current_track()
+                            if latest_data:
+                                simplified_info_for_callback, significant_change_for_callback = self._process_ytm_data_update(latest_data, "YTM Poll Reconnect Sync")
+                                source_for_callback = MusicSource.YTM
+                        else:
+                            logger.warning("YTM failed to reconnect during poll cycle.")
+                            # If YTM was the source, and failed to reconnect, set to Nothing Playing
+                            with self.track_info_lock:
+                                if self.current_source == MusicSource.YTM:
+                                    simplified_info_for_callback = self.get_simplified_track_info(None, MusicSource.NONE)
+                                    self.current_track_info = simplified_info_for_callback
+                                    self.current_source = MusicSource.NONE
+                                    significant_change_for_callback = True
+                                    self.album_art_image = None
+                                    self.last_album_art_url = None
+                                    logger.info("Polling YTM: Reconnect failed. Updating to Nothing Playing.")
+
+
+            # Callback to DisplayController if a significant change occurred from any source via polling
+            if significant_change_for_callback and self.update_callback and simplified_info_for_callback:
                 try:
-                    ytm_track_data = self.ytm.get_current_track() # Data from YTMClient's cache
-                    if ytm_track_data and ytm_track_data.get('player') and \
-                       not ytm_track_data.get('player', {}).get('isPaused') and \
-                       not ytm_track_data.get('player',{}).get('adPlaying', False):
-                        polled_track_info_data = ytm_track_data
-                        polled_source = MusicSource.YTM
-                        is_playing_from_poll = True # YTM is now considered playing
-                        logger.debug(f"Polling YTM: Active track - {ytm_track_data.get('track', {}).get('title')}")
-                    else:
-                        # logger.debug("Polling YTM: No active track or player paused (or track data missing player info).") # Potentially noisy
-                        pass # Keep it quiet if no track or paused via polling
+                    # simplified_info_for_callback already contains the latest data
+                    self.update_callback(simplified_info_for_callback, True) # True for significant change from poll
                 except Exception as e:
-                    logging.error(f"Error polling YTM: {e}")
-            elif self.preferred_source == "ytm" and self.ytm and not self.ytm.is_connected:
-                 logging.debug("Skipping YTM poll: Client not connected. Will attempt reconnect on next cycle if display active.")
-                 # Attempt to reconnect YTM if music display is active and it's the preferred source
-                 if self.is_music_display_active:
-                     logger.info("YTM is preferred and display active, attempting reconnect during poll cycle.")
-                     if self.ytm.connect_client(timeout=5):
-                         logger.info("YTM reconnected during poll cycle.")
-                     else:
-                         logger.warning("YTM failed to reconnect during poll cycle.")
-
-            simplified_info_poll = self.get_simplified_track_info(polled_track_info_data, polled_source)
-
-            has_changed_poll = False
-            with self.track_info_lock:
-                if simplified_info_poll != self.current_track_info:
-                    has_changed_poll = True
-                    old_album_art_url_poll = self.current_track_info.get('album_art_url') if self.current_track_info else None
-                    new_album_art_url_poll = simplified_info_poll.get('album_art_url') if simplified_info_poll else None
-
-                    self.current_track_info = simplified_info_poll
-                    self.current_source = polled_source
-
-                    logger.debug(f"[Poll Update] Old Album Art URL: {old_album_art_url_poll}, New Album Art URL: {new_album_art_url_poll}")
-                    if new_album_art_url_poll != old_album_art_url_poll:
-                        logger.info("[Poll Update] Album art URL changed. Clearing self.album_art_image to force re-fetch.")
-                        self.album_art_image = None
-                        self.last_album_art_url = new_album_art_url_poll
-                    elif not self.last_album_art_url and new_album_art_url_poll: # Case where old was None, new is something
-                        logger.info("[Poll Update] New album art URL appeared (was None). Clearing self.album_art_image.")
-                        self.album_art_image = None
-                        self.last_album_art_url = new_album_art_url_poll
-                    elif new_album_art_url_poll is None and old_album_art_url_poll is not None:
-                        logger.info("[Poll Update] Album art URL disappeared (became None). Clearing image and URL.")
-                        self.album_art_image = None
-                        self.last_album_art_url = None
-                    elif self.current_track_info and self.current_track_info.get('album_art_url') and not self.last_album_art_url:
-                         self.last_album_art_url = self.current_track_info.get('album_art_url')
-                         self.album_art_image = None # Ensure image is cleared if URL was just populated from None
-                    
-                    display_title_poll = self.current_track_info.get('title', 'None') if self.current_track_info else 'None'
-                    logger.debug(f"Poll Update: Track change detected. Source: {self.current_source.name}. Track: {display_title_poll}")
-                else:
-                    logger.debug("Poll Update: No change in simplified track info.")
-
-            if has_changed_poll and self.update_callback:
-                try:
-                    with self.track_info_lock:
-                        track_info_copy_poll = self.current_track_info.copy() if self.current_track_info else None
-                    self.update_callback(track_info_copy_poll, True) # Poll changes are considered significant
-                except Exception as e:
-                    logger.error(f"Error executing update callback from poll: {e}")
+                    logger.error(f"Error executing update callback from poll ({source_for_callback.name}): {e}")
             
             time.sleep(self.polling_interval)
 
@@ -467,13 +498,13 @@ class MusicManager:
                 is_playing_ytm = False 
                 logging.debug("YTM: Ad is playing, reporting track as not actively playing.")
             
-            logger.debug(f"[get_simplified_track_info YTM] Title: {title}, Artist: {artist}, TrackState: {track_state}, IsPlayingYTM: {is_playing_ytm}, AdPlaying: {player_info.get('adPlaying')}")
+            # logger.debug(f"[get_simplified_track_info YTM] Title: {title}, Artist: {artist}, TrackState: {track_state}, IsPlayingYTM: {is_playing_ytm}, AdPlaying: {player_info.get('adPlaying')}")
 
             if not title or not artist or not is_playing_ytm: 
-                logger.debug("[get_simplified_track_info YTM] Condition met for Nothing Playing.")
+                # logger.debug("[get_simplified_track_info YTM] Condition met for Nothing Playing.")
                 return nothing_playing_info.copy()
 
-            logger.debug("[get_simplified_track_info YTM] Proceeding to return full track details.")
+            # logger.debug("[get_simplified_track_info YTM] Proceeding to return full track details.")
             album = video_info.get('album')
             duration_seconds = video_info.get('durationSeconds')
             duration_ms = int(duration_seconds * 1000) if duration_seconds is not None else 0
@@ -560,7 +591,7 @@ class MusicManager:
             if not perform_full_refresh_this_cycle: # Log only if periodic is the one setting the flag now
                  logger.info(f"MusicManager.display: Triggering periodic full refresh (interval: {self.periodic_refresh_interval}s).")
             perform_full_refresh_this_cycle = True
-            self.last_periodic_refresh_time = time.time()
+            # self.last_periodic_refresh_time = time.time() # Moved this update to *after* activate_music_display
 
         current_track_info_snapshot = None
 
@@ -571,54 +602,30 @@ class MusicManager:
             self.display_manager.clear()
             self.activate_music_display() # Call this BEFORE snapshotting data for this cycle.
                                         # This might trigger YTM events if it reconnects.
-            
-            # After activate_music_display, determine the snapshot.
-            # Priority: data from an event that just came in (if _needs_immediate_full_refresh was re-triggered by activate_music_display).
-            # Secondary: data from an event that was pending BEFORE this periodic/force_clear cycle.
-            # Fallback: self.current_track_info.
+            self.last_periodic_refresh_time = time.time() # Update timer *after* potential processing in activate
             
             data_from_queue_post_activate = None
-            if self._needs_immediate_full_refresh: # Check if activate_music_display triggered a new event
-                self._needs_immediate_full_refresh = False # Consume it
-                try:
-                    data_from_queue_post_activate = self.ytm_event_data_queue.get_nowait()
-                    logger.info(f"MusicManager.display (Full Refresh): Got data from queue POST activate_music_display: Title {data_from_queue_post_activate.get('title') if data_from_queue_post_activate else 'None'}")
-                except queue.Empty:
-                    logger.warning("MusicManager.display (Full Refresh): _needs_immediate_full_refresh true POST activate, but queue empty.")
+            # Check queue again, activate_music_display might have put fresh data via _process_ytm_data_update
+            try:
+                data_from_queue_post_activate = self.ytm_event_data_queue.get_nowait()
+                logger.info(f"MusicManager.display (Full Refresh): Got data from queue POST activate_music_display: Title {data_from_queue_post_activate.get('title') if data_from_queue_post_activate else 'None'}")
+            except queue.Empty:
+                logger.debug("MusicManager.display (Full Refresh): Queue empty POST activate_music_display.")
+
 
             if data_from_queue_post_activate:
                 current_track_info_snapshot = data_from_queue_post_activate
-            elif initial_data_from_queue_due_to_event: # Use data if an event triggered this refresh cycle initially
+            elif initial_data_from_queue_due_to_event: 
                 current_track_info_snapshot = initial_data_from_queue_due_to_event
                 logger.debug("MusicManager.display (Full Refresh): Using data from initial event queue for snapshot.")
             else:
                 with self.track_info_lock:
                     current_track_info_snapshot = self.current_track_info.copy() if self.current_track_info else None
                 logger.debug("MusicManager.display (Full Refresh): Using self.current_track_info for snapshot.")
-            
-            # Ensure periodic timer is updated if this full refresh was due to it.
-            # self.last_periodic_refresh_time was already updated if periodic triggered this.
-            # If force_clear or event triggered it, also reset the periodic timer to avoid quick succession.
-            if perform_full_refresh_this_cycle : # This is always true in this block
-                 self.last_periodic_refresh_time = time.time()
-
-            # --- Update cache variables after snapshot is finalized ---
-            with self.track_info_lock: # Ensure thread-safe access to shared cache attributes
-                art_url_currently_in_cache = self.last_album_art_url
-                image_currently_in_cache = self.album_art_image
-
-        else: # Not a full refresh cycle (i.e., force_clear=False from DC, AND periodic timer not elapsed, AND no prior event demanding full refresh)
-              # This path means we are just doing a regular, non-clearing display update.
-              # _needs_immediate_full_refresh should have been consumed if it was to force a *full* refresh.
-              # For a non-full refresh, we just use current_track_info. Event-driven changes that are *not* significant
-              # would have updated current_track_info but not necessarily triggered a full refresh path.
+        else: # This is the correctly paired else for 'if perform_full_refresh_this_cycle:'
             with self.track_info_lock:
                 current_track_info_snapshot = self.current_track_info.copy() if self.current_track_info else None
-            # logger.debug(f"MusicManager.display (Standard Update): Using self.current_track_info. Snapshot: {current_track_info_snapshot.get('title') if current_track_info_snapshot else 'None'}")
 
-
-        # At this point, current_track_info_snapshot is set for this display cycle.
-        # The perform_full_refresh_this_cycle flag dictates screen clearing and scroll resets.
 
         # --- Update cache variables after snapshot is finalized ---
         with self.track_info_lock: # Ensure thread-safe access to shared cache attributes
@@ -626,13 +633,12 @@ class MusicManager:
             image_currently_in_cache = self.album_art_image
 
         snapshot_title_for_log = current_track_info_snapshot.get('title', 'N/A') if current_track_info_snapshot else 'N/A'
-        if perform_full_refresh_this_cycle: # Log added for clarity on what snapshot is used in full refresh
+        if perform_full_refresh_this_cycle: 
              logger.debug(f"MusicManager.display (Full Refresh Render): Using snapshot - Title: '{snapshot_title_for_log}'")
         
         # --- Original Nothing Playing Logic ---
         if not current_track_info_snapshot or current_track_info_snapshot.get('title') == 'Nothing Playing':
-            if not hasattr(self, '_last_nothing_playing_log_time') or \
-               time.time() - getattr(self, '_last_nothing_playing_log_time', 0) > 30:
+            if not hasattr(self, '_last_nothing_playing_log_time') or time.time() - getattr(self, '_last_nothing_playing_log_time', 0) > 30:
                 logger.debug("Music Screen (MusicManager): Nothing playing or info explicitly 'Nothing Playing'.")
                 self._last_nothing_playing_log_time = time.time()
 
@@ -652,29 +658,32 @@ class MusicManager:
                 self.scroll_position_artist = 0
                 self.title_scroll_tick = 0
                 self.artist_scroll_tick = 0
-                # If showing "Nothing Playing", ensure no stale art is cached for an invalid URL
                 if self.album_art_image is not None or self.last_album_art_url is not None:
                     logger.debug("Clearing album art cache as 'Nothing Playing' is displayed.")
                     self.album_art_image = None
                     self.last_album_art_url = None
             return
 
-        # If we're here, we are displaying actual music info.
         self.is_currently_showing_nothing_playing = False 
 
-        # Reset scroll positions if force_clear was true (now stored in should_reset_scroll_for_music)
-        # and we are about to display a new track.
-        # This should now be perform_full_refresh_this_cycle
-        if perform_full_refresh_this_cycle and not self.is_currently_showing_nothing_playing : # only reset if showing actual music
+        if perform_full_refresh_this_cycle and not self.is_currently_showing_nothing_playing : 
             title_being_displayed = current_track_info_snapshot.get('title','N/A') if current_track_info_snapshot else "N/A"
             logger.debug(f"MusicManager: Resetting scroll positions for track '{title_being_displayed}' due to full refresh signal (periodic or event-driven).")
             self.scroll_position_title = 0
             self.scroll_position_artist = 0
 
-        if not self.is_music_display_active: 
-            self.activate_music_display()
+        if not self.is_music_display_active and not perform_full_refresh_this_cycle : 
+             # If display wasn't active, and this isn't a full refresh cycle that would activate it,
+             # then we shouldn't proceed to draw music. This case might be rare if DisplayController
+             # manages music display activation properly on mode switch.
+             logger.warning("MusicManager.display called when music display not active and not a full refresh. Aborting draw.")
+             return
+        elif not self.is_music_display_active and perform_full_refresh_this_cycle:
+             # This is handled by activate_music_display() called within the full_refresh_this_cycle block
+             pass
 
-        if not perform_full_refresh_this_cycle: # if not force_clear (which clears whole screen)
+
+        if not perform_full_refresh_this_cycle: 
             self.display_manager.draw.rectangle([0, 0, self.display_manager.matrix.width, self.display_manager.matrix.height], fill=(0, 0, 0))
 
         matrix_height = self.display_manager.matrix.height
@@ -685,62 +694,48 @@ class MusicManager:
         text_area_x_start = album_art_x + album_art_size + 2 
         text_area_width = self.display_manager.matrix.width - text_area_x_start - 1 
 
-        # Album art logic using the snapshot and careful cache updates
         image_to_render_this_cycle = None
         target_art_url_for_current_track = current_track_info_snapshot.get('album_art_url')
 
         if target_art_url_for_current_track:
             if image_currently_in_cache and art_url_currently_in_cache == target_art_url_for_current_track:
-                # Cached image is valid for the track we are rendering
                 image_to_render_this_cycle = image_currently_in_cache
-                logger.debug(f"Using cached album art for {target_art_url_for_current_track}")
+                # logger.debug(f"Using cached album art for {target_art_url_for_current_track}") # Can be noisy
             else:
-                # No valid cached image; need to fetch.
                 logger.info(f"MusicManager: Fetching album art for: {target_art_url_for_current_track}")
                 fetched_image = self._fetch_and_resize_image(target_art_url_for_current_track, album_art_target_size)
                 if fetched_image:
                     logger.info(f"MusicManager: Album art for {target_art_url_for_current_track} fetched successfully.")
                     with self.track_info_lock:
-                        # Critical check: Before updating shared cache, ensure this URL is STILL the latest one.
-                        # self.current_track_info (the live one) might have updated again during the fetch.
                         latest_known_art_url_in_live_info = self.current_track_info.get('album_art_url') if self.current_track_info else None
                         if target_art_url_for_current_track == latest_known_art_url_in_live_info:
                             self.album_art_image = fetched_image
-                            self.last_album_art_url = target_art_url_for_current_track # Mark cache as valid for this URL
+                            self.last_album_art_url = target_art_url_for_current_track 
                             image_to_render_this_cycle = fetched_image
                             logger.debug(f"Cached and will render new art for {target_art_url_for_current_track}")
                         else:
                             logger.info(f"MusicManager: Discarding fetched art for {target_art_url_for_current_track}; "
                                         f"track changed to '{self.current_track_info.get('title', 'N/A')}' "
                                         f"with art '{latest_known_art_url_in_live_info}' during fetch.")
-                            # image_to_render_this_cycle remains None, placeholder will be shown.
                 else:
                     logger.warning(f"MusicManager: Failed to fetch or process album art for {target_art_url_for_current_track}.")
-                    # If fetch failed, ensure we don't use an older image for this URL.
-                    # And mark that we tried for this URL, so we don't immediately retry unless track changes.
                     with self.track_info_lock:
                         if self.last_album_art_url == target_art_url_for_current_track:
-                             self.album_art_image = None # Clear any potentially older image for this specific failed URL
-                        # self.last_album_art_url is typically already set to target_art_url_for_current_track by update handlers.
-                        # So, if fetch fails, self.album_art_image becomes None for this URL.
-                        # We won't re-fetch unless target_art_url_for_current_track changes (new song or art update).
+                             self.album_art_image = None 
         else:
-            # No art URL for the current track (current_track_info_snapshot.get('album_art_url') is None).
-            logger.debug(f"No album art URL for track: {current_track_info_snapshot.get('title', 'N/A')}. Clearing cache.")
+            # logger.debug(f"No album art URL for track: {current_track_info_snapshot.get('title', 'N/A')}. Clearing cache.")
             with self.track_info_lock:
                 if self.album_art_image is not None or self.last_album_art_url is not None:
                     self.album_art_image = None
-                    self.last_album_art_url = None # Reflects no art is currently desired/available
+                    self.last_album_art_url = None 
 
         if image_to_render_this_cycle:
             self.display_manager.image.paste(image_to_render_this_cycle, (album_art_x, album_art_y))
         else:
-            # Display placeholder if no image is to be rendered
             self.display_manager.draw.rectangle([album_art_x, album_art_y, 
                                                  album_art_x + album_art_size -1, album_art_y + album_art_size -1],
                                                  outline=(50,50,50), fill=(10,10,10))
 
-        # Use current_track_info_snapshot for text, which is consistent for this render cycle
         title = current_track_info_snapshot.get('title', ' ')
         artist = current_track_info_snapshot.get('artist', ' ')
         album = current_track_info_snapshot.get('album', ' ') 
