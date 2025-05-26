@@ -8,6 +8,7 @@ Special Thanks to:
 - ESPN for their sports API
 - Yahoo Finance for their Stock API
 - OpenWeatherMap for their Free Weather API
+- Randomwire @ https://www.thingiverse.com/thing:5169867 for their 4mm Pixel Pitch LED Matrix Stand 
 
 
 ## Core Features
