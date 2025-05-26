@@ -538,72 +538,87 @@ class MusicManager:
 
     # Method moved from DisplayController and renamed
     def display(self, force_clear: bool = False):
-        perform_full_refresh_this_cycle = force_clear 
-        data_from_event_queue = None
+        perform_full_refresh_this_cycle = force_clear
+        
+        # Check if an event previously signaled a need for immediate refresh (and populated the queue)
+        initial_data_from_queue_due_to_event = None
+        if self._needs_immediate_full_refresh:
+            logger.debug("MusicManager.display: _needs_immediate_full_refresh is True (event-driven).")
+            perform_full_refresh_this_cycle = True # An event demanding refresh also implies a full refresh
+            try:
+                # Try to get data now, it's the freshest from the event
+                initial_data_from_queue_due_to_event = self.ytm_event_data_queue.get_nowait()
+                logger.info(f"MusicManager.display: Got data from ytm_event_data_queue (due to event flag): Title {initial_data_from_queue_due_to_event.get('title') if initial_data_from_queue_due_to_event else 'None'}")
+            except queue.Empty:
+                logger.warning("MusicManager.display: _needs_immediate_full_refresh was true, but queue empty. Will refresh with current_track_info.")
+            self._needs_immediate_full_refresh = False # Consume the event flag
 
-        # Check for periodic refresh if music display is active
+        # Check for periodic refresh, can also set perform_full_refresh_this_cycle
         if self.is_music_display_active and (time.time() - self.last_periodic_refresh_time >= self.periodic_refresh_interval):
-            logger.info(f"MusicManager.display: Triggering periodic full refresh (interval: {self.periodic_refresh_interval}s).")
+            if not perform_full_refresh_this_cycle: # Log only if periodic is the one setting the flag now
+                 logger.info(f"MusicManager.display: Triggering periodic full refresh (interval: {self.periodic_refresh_interval}s).")
             perform_full_refresh_this_cycle = True
             self.last_periodic_refresh_time = time.time()
 
-        if self._needs_immediate_full_refresh:
-            logger.debug("MusicManager.display: _needs_immediate_full_refresh is True.")
-            perform_full_refresh_this_cycle = True # Ensure it's true
-            self._needs_immediate_full_refresh = False # Consume the flag
-            try:
-                data_from_event_queue = self.ytm_event_data_queue.get_nowait()
-                logger.info(f"MusicManager.display: Got data from ytm_event_data_queue (Title: {data_from_event_queue.get('title') if data_from_event_queue else 'None'}).")
-            except queue.Empty:
-                logger.warning("MusicManager.display: _needs_immediate_full_refresh was true, but ytm_event_data_queue was empty. Falling back to current_track_info.")
-        
         current_track_info_snapshot = None
-        if data_from_event_queue:
-            # Priority to data from the event queue that signaled this refresh
-            current_track_info_snapshot = data_from_event_queue
-            # Also, make sure self.current_track_info reflects this event data if it's what we're displaying.
-            # This is important if an event was so fast it didn't get written to self.current_track_info
-            # by the _handle_ytm_direct_update's main path before display() runs with queue data.
-            # However, _handle_ytm_direct_update already updates self.current_track_info under lock.
-            # So, if queue has data, self.current_track_info should ideally match it or be about to.
-            # For simplicity, we'll primarily use the queued data for *this render* if available.
-            # The main self.current_track_info is updated by the callback thread.
-            logger.debug(f"MusicManager.display: Using data_from_event_queue for snapshot.")
-        else:
-            # Fallback or standard operation (e.g. polling update, or regular display cycle without fresh event)
-            with self.track_info_lock: 
-                current_track_info_snapshot = self.current_track_info.copy() if self.current_track_info else None
-            logger.debug(f"MusicManager.display: Using self.current_track_info for snapshot.")
 
         if perform_full_refresh_this_cycle:
-            snapshot_title_for_log = current_track_info_snapshot.get('title', 'N/A') if current_track_info_snapshot else 'N/A'
-            logger.debug(f"MusicManager.display (Full Refresh): Using track_info_snapshot - Title: '{snapshot_title_for_log}'")
-
-        if perform_full_refresh_this_cycle:
+            log_msg_detail = f"force_clear_from_DC={force_clear}, event_driven_refresh_attempted={'Yes' if initial_data_from_queue_due_to_event is not None else 'No'}"
+            logger.debug(f"MusicManager.display: Performing full refresh cycle. Details: {log_msg_detail}")
+            
             self.display_manager.clear()
-            # Only call activate_music_display if it's a genuine switch or forced refresh, 
-            # not just a periodic refresh if already active and connected.
-            # activate_music_display handles YTM connection.
-            # If it's a periodic refresh and YTM is already connected, calling it might be redundant
-            # but it's generally safe. Let's keep it for consistency of a "full refresh".
-            self.activate_music_display() 
-            self.last_periodic_refresh_time = time.time() # Also reset timer if full refresh happens for other reasons
+            self.activate_music_display() # Call this BEFORE snapshotting data for this cycle.
+                                        # This might trigger YTM events if it reconnects.
+            
+            # After activate_music_display, determine the snapshot.
+            # Priority: data from an event that just came in (if _needs_immediate_full_refresh was re-triggered by activate_music_display).
+            # Secondary: data from an event that was pending BEFORE this periodic/force_clear cycle.
+            # Fallback: self.current_track_info.
+            
+            data_from_queue_post_activate = None
+            if self._needs_immediate_full_refresh: # Check if activate_music_display triggered a new event
+                self._needs_immediate_full_refresh = False # Consume it
+                try:
+                    data_from_queue_post_activate = self.ytm_event_data_queue.get_nowait()
+                    logger.info(f"MusicManager.display (Full Refresh): Got data from queue POST activate_music_display: Title {data_from_queue_post_activate.get('title') if data_from_queue_post_activate else 'None'}")
+                except queue.Empty:
+                    logger.warning("MusicManager.display (Full Refresh): _needs_immediate_full_refresh true POST activate, but queue empty.")
 
-        with self.track_info_lock:
-            # Re-fetch current_track_info_snapshot if it wasn't from queue,
-            # as activate_music_display or other logic might have changed it.
-            # However, the snapshot decision is made earlier based on queue/current_track_info.
-            # For this display cycle, current_track_info_snapshot is what we're using.
-            # The important part is that perform_full_refresh_this_cycle dictates clearing and scroll resets.
+            if data_from_queue_post_activate:
+                current_track_info_snapshot = data_from_queue_post_activate
+            elif initial_data_from_queue_due_to_event: # Use data if an event triggered this refresh cycle initially
+                current_track_info_snapshot = initial_data_from_queue_due_to_event
+                logger.debug("MusicManager.display (Full Refresh): Using data from initial event queue for snapshot.")
+            else:
+                with self.track_info_lock:
+                    current_track_info_snapshot = self.current_track_info.copy() if self.current_track_info else None
+                logger.debug("MusicManager.display (Full Refresh): Using self.current_track_info for snapshot.")
+            
+            # Ensure periodic timer is updated if this full refresh was due to it.
+            # self.last_periodic_refresh_time was already updated if periodic triggered this.
+            # If force_clear or event triggered it, also reset the periodic timer to avoid quick succession.
+            if perform_full_refresh_this_cycle : # This is always true in this block
+                 self.last_periodic_refresh_time = time.time()
 
-            # Snapshot current_track_info again *after* potential activate_music_display,
-            # but only if we didn't get data from the event queue.
-            # This is tricky. The original snapshot logic before perform_full_refresh_this_cycle is better.
-            # Let's rely on the snapshot taken at the start of the method.
-            # current_track_info_snapshot = self.current_track_info.copy() if self.current_track_info else None
-            art_url_currently_in_cache = self.last_album_art_url
-            image_currently_in_cache = self.album_art_image
 
+        else: # Not a full refresh cycle (i.e., force_clear=False from DC, AND periodic timer not elapsed, AND no prior event demanding full refresh)
+              # This path means we are just doing a regular, non-clearing display update.
+              # _needs_immediate_full_refresh should have been consumed if it was to force a *full* refresh.
+              # For a non-full refresh, we just use current_track_info. Event-driven changes that are *not* significant
+              # would have updated current_track_info but not necessarily triggered a full refresh path.
+            with self.track_info_lock:
+                current_track_info_snapshot = self.current_track_info.copy() if self.current_track_info else None
+            # logger.debug(f"MusicManager.display (Standard Update): Using self.current_track_info. Snapshot: {current_track_info_snapshot.get('title') if current_track_info_snapshot else 'None'}")
+
+
+        # At this point, current_track_info_snapshot is set for this display cycle.
+        # The perform_full_refresh_this_cycle flag dictates screen clearing and scroll resets.
+
+        snapshot_title_for_log = current_track_info_snapshot.get('title', 'N/A') if current_track_info_snapshot else 'N/A'
+        if perform_full_refresh_this_cycle: # Log added for clarity on what snapshot is used in full refresh
+             logger.debug(f"MusicManager.display (Full Refresh Render): Using snapshot - Title: '{snapshot_title_for_log}'")
+        
+        # --- Original Nothing Playing Logic ---
         if not current_track_info_snapshot or current_track_info_snapshot.get('title') == 'Nothing Playing':
             if not hasattr(self, '_last_nothing_playing_log_time') or \
                time.time() - getattr(self, '_last_nothing_playing_log_time', 0) > 30:
