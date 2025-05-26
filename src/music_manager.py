@@ -460,62 +460,59 @@ class MusicManager:
             logger.info("Music manager: Polling thread stopped.")
         self.poll_thread = None # Clear the thread object
         # Also ensure YTM client is disconnected when polling stops completely
-        self.deactivate_music_display() # This will also handle YTM disconnect if needed
+        if self.ytm:
+            logger.info("MusicManager: Shutting down YTMClient resources.")
+            if self.ytm.is_connected:
+                 self.ytm.disconnect_client()
+            self.ytm.shutdown() # Call the new shutdown method for the executor
 
     # Method moved from DisplayController and renamed
     def display(self, force_clear: bool = False):
         if force_clear: 
             self.display_manager.clear()
+            # When force_clear is true (typically on mode switch to music),
+            # ensure YTM client is active if it's the preferred source.
+            # activate_music_display handles this.
             self.activate_music_display() 
 
         with self.track_info_lock:
-            current_display_info = self.current_track_info.copy() if self.current_track_info else None
-            # We also need self.last_album_art_url and self.album_art_image under the same lock if they are read here and written elsewhere
-            # For now, last_album_art_url is updated along with current_track_info under the lock
-            # album_art_image is assigned here or if it's None and last_album_art_url exists, fetched.
-            # Let's assume current_display_info correctly snapshots necessary parts or that album art fetching uses locked members.
-            local_last_album_art_url = self.last_album_art_url
-            local_album_art_image = self.album_art_image
+            current_track_info_snapshot = self.current_track_info.copy() if self.current_track_info else None
+            # Get the URL of the currently cached image and the image itself
+            art_url_currently_in_cache = self.last_album_art_url
+            image_currently_in_cache = self.album_art_image
 
-        # logger.debug(f"[MusicManager.display] Current display info before check: {current_display_info}") # Commented out for less verbose logging
-        if not current_display_info or current_display_info.get('title') == 'Nothing Playing':
-            # logger.debug("[MusicManager.display] Entered 'Nothing Playing' block.") # Commented out for less verbose logging
+        if not current_track_info_snapshot or current_track_info_snapshot.get('title') == 'Nothing Playing':
             if not hasattr(self, '_last_nothing_playing_log_time') or \
                time.time() - getattr(self, '_last_nothing_playing_log_time', 0) > 30:
-                logger.debug("Music Screen (MusicManager): Nothing playing or info explicitly 'Nothing Playing'.") # Changed from INFO to DEBUG
+                logger.debug("Music Screen (MusicManager): Nothing playing or info explicitly 'Nothing Playing'.")
                 self._last_nothing_playing_log_time = time.time()
 
-            # Only redraw "Nothing Playing" if we weren't already showing it or if force_clear is true
             if not self.is_currently_showing_nothing_playing or force_clear:
-                if force_clear or not self.is_currently_showing_nothing_playing: # Ensure clear if forced or first time
+                if force_clear or not self.is_currently_showing_nothing_playing:
                     self.display_manager.clear()
-                    # logger.debug("[MusicManager.display] Display cleared for 'Nothing Playing'.") # Commented out
                 
-                # logger.debug(f"[MusicManager.display] Font for 'Nothing Playing': {self.display_manager.regular_font}, Type: {type(self.display_manager.regular_font)}") # Commented out
                 text_width = self.display_manager.get_text_width("Nothing Playing", self.display_manager.regular_font)
-                # logger.debug(f"[MusicManager.display] Calculated text_width for 'Nothing Playing': {text_width}") # Commented out
                 x_pos = (self.display_manager.matrix.width - text_width) // 2
                 y_pos = (self.display_manager.matrix.height // 2) - 4
-                # logger.debug(f"[MusicManager.display] Drawing 'Nothing Playing' at x={x_pos}, y={y_pos}") # Commented out
                 self.display_manager.draw_text("Nothing Playing", x=x_pos, y=y_pos, font=self.display_manager.regular_font)
                 self.display_manager.update_display()
-                # logger.debug("[MusicManager.display] 'Nothing Playing' text drawn and display updated.") # Commented out
                 self.is_currently_showing_nothing_playing = True
 
-            with self.track_info_lock: # Protect writes to shared state
+            with self.track_info_lock: 
                 self.scroll_position_title = 0
                 self.scroll_position_artist = 0
                 self.title_scroll_tick = 0
                 self.artist_scroll_tick = 0
-                self.album_art_image = None # Clear any fetched art if we are showing Nothing Playing
-                # self.last_album_art_url = None # Keep last_album_art_url so we don't re-fetch if it was a brief flicker
+                # If showing "Nothing Playing", ensure no stale art is cached for an invalid URL
+                if self.album_art_image is not None or self.last_album_art_url is not None:
+                    logger.debug("Clearing album art cache as 'Nothing Playing' is displayed.")
+                    self.album_art_image = None
+                    self.last_album_art_url = None
             return
 
-        # If we've reached here, it means we are about to display actual music info.
-        self.is_currently_showing_nothing_playing = False # Reset flag
-        # logger.debug("[MusicManager.display] Proceeding to display actual music info.") # Commented out for less verbose logging
-        if not self.is_music_display_active:
-            self.activate_music_display()
+        self.is_currently_showing_nothing_playing = False 
+        if not self.is_music_display_active: # Should be active if we are displaying music
+            self.activate_music_display() # Redundant if called above, but safe
 
         if not force_clear:
             self.display_manager.draw.rectangle([0, 0, self.display_manager.matrix.width, self.display_manager.matrix.height], fill=(0, 0, 0))
@@ -528,30 +525,65 @@ class MusicManager:
         text_area_x_start = album_art_x + album_art_size + 2 
         text_area_width = self.display_manager.matrix.width - text_area_x_start - 1 
 
-        # Fetch and display album art using local_last_album_art_url and potentially updating self.album_art_image
-        if local_last_album_art_url and not local_album_art_image: # Check local_album_art_image
-            logger.info(f"MusicManager: Fetching album art from: {local_last_album_art_url}")
-            fetched_image = self._fetch_and_resize_image(local_last_album_art_url, album_art_target_size)
-            if fetched_image:
-                 logger.info(f"MusicManager: Album art fetched and processed successfully.")
-                 with self.track_info_lock:
-                    self.album_art_image = fetched_image # Update shared state
-                    local_album_art_image = fetched_image # Update local copy for current render
-            else:
-                logger.warning(f"MusicManager: Failed to fetch or process album art.")
-                # Do not clear self.album_art_image here, might be a temporary glitch
+        # Album art logic using the snapshot and careful cache updates
+        image_to_render_this_cycle = None
+        target_art_url_for_current_track = current_track_info_snapshot.get('album_art_url')
 
-        if local_album_art_image: # Use local_album_art_image for display
-            self.display_manager.image.paste(local_album_art_image, (album_art_x, album_art_y))
+        if target_art_url_for_current_track:
+            if image_currently_in_cache and art_url_currently_in_cache == target_art_url_for_current_track:
+                # Cached image is valid for the track we are rendering
+                image_to_render_this_cycle = image_currently_in_cache
+                logger.debug(f"Using cached album art for {target_art_url_for_current_track}")
+            else:
+                # No valid cached image; need to fetch.
+                logger.info(f"MusicManager: Fetching album art for: {target_art_url_for_current_track}")
+                fetched_image = self._fetch_and_resize_image(target_art_url_for_current_track, album_art_target_size)
+                if fetched_image:
+                    logger.info(f"MusicManager: Album art for {target_art_url_for_current_track} fetched successfully.")
+                    with self.track_info_lock:
+                        # Critical check: Before updating shared cache, ensure this URL is STILL the latest one.
+                        # self.current_track_info (the live one) might have updated again during the fetch.
+                        latest_known_art_url_in_live_info = self.current_track_info.get('album_art_url') if self.current_track_info else None
+                        if target_art_url_for_current_track == latest_known_art_url_in_live_info:
+                            self.album_art_image = fetched_image
+                            self.last_album_art_url = target_art_url_for_current_track # Mark cache as valid for this URL
+                            image_to_render_this_cycle = fetched_image
+                            logger.debug(f"Cached and will render new art for {target_art_url_for_current_track}")
+                        else:
+                            logger.info(f"MusicManager: Discarding fetched art for {target_art_url_for_current_track}; "
+                                        f"track changed to '{self.current_track_info.get('title', 'N/A')}' "
+                                        f"with art '{latest_known_art_url_in_live_info}' during fetch.")
+                            # image_to_render_this_cycle remains None, placeholder will be shown.
+                else:
+                    logger.warning(f"MusicManager: Failed to fetch or process album art for {target_art_url_for_current_track}.")
+                    # If fetch failed, ensure we don't use an older image for this URL.
+                    # And mark that we tried for this URL, so we don't immediately retry unless track changes.
+                    with self.track_info_lock:
+                        if self.last_album_art_url == target_art_url_for_current_track:
+                             self.album_art_image = None # Clear any potentially older image for this specific failed URL
+                        # self.last_album_art_url is typically already set to target_art_url_for_current_track by update handlers.
+                        # So, if fetch fails, self.album_art_image becomes None for this URL.
+                        # We won't re-fetch unless target_art_url_for_current_track changes (new song or art update).
         else:
+            # No art URL for the current track (current_track_info_snapshot.get('album_art_url') is None).
+            logger.debug(f"No album art URL for track: {current_track_info_snapshot.get('title', 'N/A')}. Clearing cache.")
+            with self.track_info_lock:
+                if self.album_art_image is not None or self.last_album_art_url is not None:
+                    self.album_art_image = None
+                    self.last_album_art_url = None # Reflects no art is currently desired/available
+
+        if image_to_render_this_cycle:
+            self.display_manager.image.paste(image_to_render_this_cycle, (album_art_x, album_art_y))
+        else:
+            # Display placeholder if no image is to be rendered
             self.display_manager.draw.rectangle([album_art_x, album_art_y, 
                                                  album_art_x + album_art_size -1, album_art_y + album_art_size -1],
                                                  outline=(50,50,50), fill=(10,10,10))
 
-        # Use current_display_info for text, which is a snapshot from the beginning of the method
-        title = current_display_info.get('title', ' ')
-        artist = current_display_info.get('artist', ' ')
-        album = current_display_info.get('album', ' ') 
+        # Use current_track_info_snapshot for text, which is consistent for this render cycle
+        title = current_track_info_snapshot.get('title', ' ')
+        artist = current_track_info_snapshot.get('artist', ' ')
+        album = current_track_info_snapshot.get('album', ' ') 
 
         font_title = self.display_manager.small_font
         font_artist_album = self.display_manager.bdf_5x7_font
@@ -611,8 +643,8 @@ class MusicManager:
         # --- Progress Bar --- 
         progress_bar_height = 3
         progress_bar_y = matrix_height - progress_bar_height - 1 
-        duration_ms = current_display_info.get('duration_ms', 0)
-        progress_ms = current_display_info.get('progress_ms', 0)
+        duration_ms = current_track_info_snapshot.get('duration_ms', 0)
+        progress_ms = current_track_info_snapshot.get('progress_ms', 0)
 
         if duration_ms > 0:
             bar_total_width = text_area_width

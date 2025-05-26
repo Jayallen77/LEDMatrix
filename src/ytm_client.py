@@ -4,6 +4,7 @@ import json
 import os
 import time
 import threading
+from concurrent.futures import ThreadPoolExecutor
 
 # Ensure application-level logging is configured (as it is)
 # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -35,6 +36,8 @@ class YTMClient:
         self._data_lock = threading.Lock()
         self._connection_event = threading.Event()
         self.external_update_callback = update_callback
+        # For offloading external_update_callback to prevent blocking socketio thread
+        self._callback_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='ytm_callback_worker')
 
         @self.sio.event(namespace='/api/v1/realtime')
         def connect():
@@ -66,12 +69,12 @@ class YTMClient:
             logging.debug(f"YTM state update received. Title: {title}. Callback Exists: {self.external_update_callback is not None}")
 
             if self.external_update_callback:
-                logging.debug(f"--> Attempting to call YTM external_update_callback for title: {title}")
+                logging.debug(f"--> Submitting YTM external_update_callback for title: {title} to executor")
                 try:
-                    # Pass the full 'data' object to the callback
-                    self.external_update_callback(data) 
+                    # Offload the callback to the executor
+                    self._callback_executor.submit(self.external_update_callback, data)
                 except Exception as cb_ex:
-                    logging.error(f"Error executing YTMClient external_update_callback: {cb_ex}")
+                    logging.error(f"Error submitting YTMClient external_update_callback to executor: {cb_ex}")
 
     def load_config(self):
         default_url = "http://localhost:9863"
@@ -179,6 +182,16 @@ class YTMClient:
             self.is_connected = False
         else:
             logging.debug("YTM Socket.IO client already disconnected or not connected.")
+
+    def shutdown(self):
+        """Shuts down the callback executor."""
+        logging.info("YTMClient: Shutting down callback executor...")
+        if self._callback_executor:
+            self._callback_executor.shutdown(wait=True) # Wait for pending tasks to complete
+            self._callback_executor = None # Clear reference
+            logging.info("YTMClient: Callback executor shut down.")
+        else:
+            logging.debug("YTMClient: Callback executor already None or not initialized.")
 
 # Example Usage (for testing - needs to be adapted for Socket.IO async nature)
 # if __name__ == '__main__':
