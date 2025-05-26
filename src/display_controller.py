@@ -397,9 +397,7 @@ class DisplayController:
             logger.debug("DisplayController received music update (via callback): Track is None or not playing.")
 
         if self.current_display_mode == 'music' and self.music_manager:
-            logger.info("Music is current display mode and track updated. Signaling immediate refresh and resetting mode timer.")
-            # Force the main loop to re-evaluate and re-display the current mode.
-            self.last_switch = time.time() # Reset the timer to ensure this update is shown
+            logger.info("Music is current display mode and track updated. Signaling immediate refresh.")
             self.force_clear = True # Tell the display method to clear before drawing
         # If the current display mode is music, the MusicManager's display method will be called
         # in the main loop and will use its own updated internal state. No explicit action needed here

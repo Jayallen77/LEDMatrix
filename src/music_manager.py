@@ -450,12 +450,12 @@ class MusicManager:
             local_last_album_art_url = self.last_album_art_url
             local_album_art_image = self.album_art_image
 
-        logger.debug(f"[MusicManager.display] Current display info before check: {current_display_info}")
+        # logger.debug(f"[MusicManager.display] Current display info before check: {current_display_info}") # Commented out for less verbose logging
         if not current_display_info or current_display_info.get('title') == 'Nothing Playing':
-            logger.debug("[MusicManager.display] Entered 'Nothing Playing' block.")
+            # logger.debug("[MusicManager.display] Entered 'Nothing Playing' block.") # Commented out for less verbose logging
             if not hasattr(self, '_last_nothing_playing_log_time') or \
                time.time() - getattr(self, '_last_nothing_playing_log_time', 0) > 30:
-                logger.info("Music Screen (MusicManager): Nothing playing or info explicitly 'Nothing Playing'.")
+                logger.debug("Music Screen (MusicManager): Nothing playing or info explicitly 'Nothing Playing'.") # Changed from INFO to DEBUG
                 self._last_nothing_playing_log_time = time.time()
 
             # Only redraw "Nothing Playing" if we weren't already showing it or if force_clear is true
@@ -486,7 +486,7 @@ class MusicManager:
 
         # If we've reached here, it means we are about to display actual music info.
         self.is_currently_showing_nothing_playing = False # Reset flag
-        logger.debug("[MusicManager.display] Proceeding to display actual music info.")
+        # logger.debug("[MusicManager.display] Proceeding to display actual music info.") # Commented out for less verbose logging
         if not self.is_music_display_active:
             self.activate_music_display()
 
