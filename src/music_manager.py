@@ -7,6 +7,7 @@ import os
 from io import BytesIO
 import requests
 from PIL import Image, ImageEnhance
+import queue # Added import
 
 # Use relative imports for clients within the same package (src)
 from .spotify_client import SpotifyClient
@@ -52,6 +53,7 @@ class MusicManager:
         self.is_music_display_active = False # New state variable
         self.is_currently_showing_nothing_playing = False # To prevent flashing
         self._needs_immediate_full_refresh = False # Flag for forcing refresh from YTM updates
+        self.ytm_event_data_queue = queue.Queue(maxsize=1) # Queue for event data
         
         self._load_config() # Load config first
         self._initialize_clients() # Initialize based on loaded config
@@ -131,16 +133,18 @@ class MusicManager:
     def activate_music_display(self):
         logger.info("Music display activated.")
         self.is_music_display_active = True
-        if self.ytm and self.preferred_source == "ytm": # Only connect YTM if it's the preferred source
+        if self.ytm and self.preferred_source == "ytm":
             if not self.ytm.is_connected:
                 logger.info("Attempting to connect YTM client due to music display activation.")
-                # Pass a reasonable timeout for on-demand connection
                 if self.ytm.connect_client(timeout=10):
                     logger.info("YTM client connected successfully on display activation.")
+                    # First event from YTM will populate the queue via _handle_ytm_direct_update
                 else:
                     logger.warning("YTM client failed to connect on display activation.")
             else:
                 logger.debug("YTM client already connected during music display activation.")
+                # If already connected, a state update might be useful to ensure queue has latest
+                # For now, rely on continuous updates or next explicit song change via YTM events.
 
     def deactivate_music_display(self):
         logger.info("Music display deactivated.")
@@ -180,25 +184,15 @@ class MusicManager:
         simplified_info_str = json.dumps(simplified_info)
         logger.debug(f"MusicManager._handle_ytm_direct_update: PRE-COMPARE - SimplifiedInfo: {simplified_info_str}, CurrentTrackInfo: {current_track_info_before_update_str}")
 
-        has_changed = False
         processed_a_meaningful_update = False
-
-        # For YTM direct updates, we want to ensure the DisplayController is notified
-        # to potentially refresh the display, even if simplified_info is identical (e.g. progress update).
-        # The DisplayController's force_clear will handle scroll resets.
-        # The internal current_track_info update should still only happen if data truly differs.
-        force_callback_for_ytm_event = True 
-
         with self.track_info_lock:
             if simplified_info != self.current_track_info:
-                has_changed = True
                 processed_a_meaningful_update = True
-
                 old_album_art_url = self.current_track_info.get('album_art_url') if self.current_track_info else None
                 
-                # Update main track info
                 self.current_track_info = simplified_info
-                # Update current_source based on whether YTM is actually playing and info exists
+                logger.debug(f"MusicManager._handle_ytm_direct_update: POST-UPDATE (inside lock) - self.current_track_info now: {json.dumps(self.current_track_info)}")
+                
                 if is_actually_playing_ytm and simplified_info.get('source') == 'YouTube Music':
                     self.current_source = MusicSource.YTM
                 elif not is_actually_playing_ytm and self.current_source == MusicSource.YTM: # YTM stopped
@@ -230,35 +224,38 @@ class MusicManager:
                 logger.info(f"YTM Direct Update: Track info updated. Source: {self.current_source.name}. New Track: {display_title}")
             else:
                 # simplified_info IS THE SAME as self.current_track_info
-                has_changed = False
                 processed_a_meaningful_update = False
                 logger.debug("YTM Direct Update: No change in simplified track info (simplified_info == self.current_track_info).")
 
-        # Decide whether to call the update_callback
-        # We force it for YTM events to ensure DisplayController can react (e.g. set force_clear)
-        # The 'has_changed' is more about whether MusicManager itself logged a data change.
-        # 'processed_a_meaningful_update' indicates if self.current_track_info was actually changed.
-        if force_callback_for_ytm_event and self.update_callback:
-            if not processed_a_meaningful_update:
-                 logger.debug("YTM Direct Update: Forcing callback to DisplayController despite no change in MusicManager's current_track_info, due to YTM event.")
-            
-            logger.info("YTM Direct Update: Signaling for an immediate full refresh of MusicManager display.")
-            self._needs_immediate_full_refresh = True # Signal self to do a full refresh
+        # Always try to update queue and signal refresh if YTM is source and display active
+        # This ensures even progress updates (if simplified_info is the same) can trigger a UI refresh if needed.
+        # And new songs will definitely pass their data via queue.
+        try:
+            # Clear previous item if any - we only want the latest
+            while not self.ytm_event_data_queue.empty():
+                try:
+                    self.ytm_event_data_queue.get_nowait()
+                except queue.Empty:
+                    break # Should not happen with check but good for safety
+            self.ytm_event_data_queue.put_nowait(simplified_info) # Pass the LATEST processed info
+            logger.debug(f"MusicManager._handle_ytm_direct_update: Put simplified_info (Title: {simplified_info.get('title')}) into ytm_event_data_queue.")
+        except queue.Full:
+            logger.warning("MusicManager._handle_ytm_direct_update: ytm_event_data_queue was full. This should not happen with maxsize=1 and clearing.")
+            # If full, the old item remains, which is fine, display will pick it up.
 
+        logger.info("YTM Direct Update: Signaling for an immediate full refresh of MusicManager display.")
+        self._needs_immediate_full_refresh = True
+
+        if self.update_callback:
+            # Callback to DisplayController still useful to signal generic music update
+            # DisplayController uses it to set its own force_clear, ensuring sync
             try:
-                with self.track_info_lock: # Get a fresh copy for the callback
-                    track_info_copy = self.current_track_info.copy() if self.current_track_info else None
-                self.update_callback(track_info_copy) 
+                # Send a copy of what's now in current_track_info for consistency with polling path
+                # Or send simplified_info if we want DisplayController to log the absolute latest event data.
+                # Let's send simplified_info to make it consistent with what's put on the queue.
+                self.update_callback(simplified_info) 
             except Exception as e:
                 logger.error(f"Error executing DisplayController update callback from YTM direct update: {e}")
-        elif has_changed and self.update_callback: # Fallback if force_callback_for_ytm_event was false (not currently possible here)
-            logger.info("YTM Direct Update: (Fallback logic) Calling DisplayController update_callback because track info changed.")
-            try:
-                with self.track_info_lock:
-                    track_info_copy = self.current_track_info.copy() if self.current_track_info else None
-                self.update_callback(track_info_copy)
-            except Exception as e:
-                logger.error(f"Error executing DisplayController update callback from YTM direct update (fallback logic): {e}")
 
     def _fetch_and_resize_image(self, url: str, target_size: tuple[int, int]) -> Image.Image | None:
         """Fetches an image from a URL, resizes it, and returns a PIL Image object."""
@@ -512,16 +509,37 @@ class MusicManager:
 
     # Method moved from DisplayController and renamed
     def display(self, force_clear: bool = False):
-        perform_full_refresh_this_cycle = force_clear
+        perform_full_refresh_this_cycle = force_clear 
+        data_from_event_queue = None
+
         if self._needs_immediate_full_refresh:
-            logger.debug("MusicManager.display: Performing an immediate full refresh due to internal YTM update signal.")
+            logger.debug("MusicManager.display: _needs_immediate_full_refresh is True.")
             perform_full_refresh_this_cycle = True
             self._needs_immediate_full_refresh = False # Consume the flag
-
-        with self.track_info_lock: # Ensure consistent read for the snapshot
-            current_track_info_snapshot = self.current_track_info.copy() if self.current_track_info else None
+            try:
+                data_from_event_queue = self.ytm_event_data_queue.get_nowait()
+                logger.info(f"MusicManager.display: Got data from ytm_event_data_queue (Title: {data_from_event_queue.get('title') if data_from_event_queue else 'None'}).")
+            except queue.Empty:
+                logger.warning("MusicManager.display: _needs_immediate_full_refresh was true, but ytm_event_data_queue was empty. Falling back to current_track_info.")
         
-        # Log the snapshot being used, especially if a refresh is happening
+        current_track_info_snapshot = None
+        if data_from_event_queue:
+            # Priority to data from the event queue that signaled this refresh
+            current_track_info_snapshot = data_from_event_queue
+            # Also, make sure self.current_track_info reflects this event data if it's what we're displaying.
+            # This is important if an event was so fast it didn't get written to self.current_track_info
+            # by the _handle_ytm_direct_update's main path before display() runs with queue data.
+            # However, _handle_ytm_direct_update already updates self.current_track_info under lock.
+            # So, if queue has data, self.current_track_info should ideally match it or be about to.
+            # For simplicity, we'll primarily use the queued data for *this render* if available.
+            # The main self.current_track_info is updated by the callback thread.
+            logger.debug(f"MusicManager.display: Using data_from_event_queue for snapshot.")
+        else:
+            # Fallback or standard operation (e.g. polling update, or regular display cycle without fresh event)
+            with self.track_info_lock: 
+                current_track_info_snapshot = self.current_track_info.copy() if self.current_track_info else None
+            logger.debug(f"MusicManager.display: Using self.current_track_info for snapshot.")
+
         if perform_full_refresh_this_cycle:
             snapshot_title_for_log = current_track_info_snapshot.get('title', 'N/A') if current_track_info_snapshot else 'N/A'
             logger.debug(f"MusicManager.display (Full Refresh): Using track_info_snapshot - Title: '{snapshot_title_for_log}'")
