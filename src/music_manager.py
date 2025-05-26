@@ -51,6 +51,7 @@ class MusicManager:
         self.artist_scroll_tick = 0
         self.is_music_display_active = False # New state variable
         self.is_currently_showing_nothing_playing = False # To prevent flashing
+        self._needs_immediate_full_refresh = False # Flag for forcing refresh from YTM updates
         
         self._load_config() # Load config first
         self._initialize_clients() # Initialize based on loaded config
@@ -151,11 +152,11 @@ class MusicManager:
     def _handle_ytm_direct_update(self, ytm_data):
         """Handles a direct state update from YTMClient."""
         # Correctly log the title from the ytm_data structure
-        title_from_data = None
-        if ytm_data and isinstance(ytm_data, dict):
-            video_info = ytm_data.get('video', {})
-            title_from_data = video_info.get('title')
-        logger.debug(f"MusicManager received direct YTM update. Title from data: {title_from_data if title_from_data else 'No Title in video block'}")
+        raw_title_from_event = ytm_data.get('video', {}).get('title', 'No Title') if isinstance(ytm_data, dict) else 'Data not a dict'
+        raw_artist_from_event = ytm_data.get('video', {}).get('author', 'No Author') if isinstance(ytm_data, dict) else 'Data not a dict'
+        raw_album_art_from_event = ytm_data.get('video', {}).get('thumbnails', [{}])[0].get('url') if isinstance(ytm_data, dict) and ytm_data.get('video', {}).get('thumbnails') else 'No Album Art'
+        raw_track_state_from_event = ytm_data.get('player', {}).get('trackState') if isinstance(ytm_data, dict) else 'No Track State'
+        logger.debug(f"MusicManager._handle_ytm_direct_update: RAW EVENT DATA - Title: '{raw_title_from_event}', Artist: '{raw_artist_from_event}', ArtURL: '{raw_album_art_from_event}', TrackState: {raw_track_state_from_event}")
 
         if not self.enabled or not self.is_music_display_active: # Check if display is active
             logger.debug("Skipping YTM direct update: Manager disabled or music display not active.")
@@ -172,6 +173,12 @@ class MusicManager:
 
         simplified_info = self.get_simplified_track_info(ytm_data if is_actually_playing_ytm else None, 
                                                        MusicSource.YTM if is_actually_playing_ytm else MusicSource.NONE)
+
+        # Log simplified_info and current_track_info before comparison
+        with self.track_info_lock: # Lock to safely read current_track_info for logging
+            current_track_info_before_update_str = json.dumps(self.current_track_info) if self.current_track_info else "None"
+        simplified_info_str = json.dumps(simplified_info)
+        logger.debug(f"MusicManager._handle_ytm_direct_update: PRE-COMPARE - SimplifiedInfo: {simplified_info_str}, CurrentTrackInfo: {current_track_info_before_update_str}")
 
         has_changed = False
         processed_a_meaningful_update = False
@@ -234,6 +241,10 @@ class MusicManager:
         if force_callback_for_ytm_event and self.update_callback:
             if not processed_a_meaningful_update:
                  logger.debug("YTM Direct Update: Forcing callback to DisplayController despite no change in MusicManager's current_track_info, due to YTM event.")
+            
+            logger.info("YTM Direct Update: Signaling for an immediate full refresh of MusicManager display.")
+            self._needs_immediate_full_refresh = True # Signal self to do a full refresh
+
             try:
                 with self.track_info_lock: # Get a fresh copy for the callback
                     track_info_copy = self.current_track_info.copy() if self.current_track_info else None
@@ -501,11 +512,21 @@ class MusicManager:
 
     # Method moved from DisplayController and renamed
     def display(self, force_clear: bool = False):
-        # Determine if scroll positions should be reset based on force_clear
-        # This flag will be used if we are displaying actual music.
-        should_reset_scroll_for_music = force_clear
+        perform_full_refresh_this_cycle = force_clear
+        if self._needs_immediate_full_refresh:
+            logger.debug("MusicManager.display: Performing an immediate full refresh due to internal YTM update signal.")
+            perform_full_refresh_this_cycle = True
+            self._needs_immediate_full_refresh = False # Consume the flag
 
-        if force_clear:
+        with self.track_info_lock: # Ensure consistent read for the snapshot
+            current_track_info_snapshot = self.current_track_info.copy() if self.current_track_info else None
+        
+        # Log the snapshot being used, especially if a refresh is happening
+        if perform_full_refresh_this_cycle:
+            snapshot_title_for_log = current_track_info_snapshot.get('title', 'N/A') if current_track_info_snapshot else 'N/A'
+            logger.debug(f"MusicManager.display (Full Refresh): Using track_info_snapshot - Title: '{snapshot_title_for_log}'")
+
+        if perform_full_refresh_this_cycle:
             self.display_manager.clear()
             self.activate_music_display() 
 
@@ -521,8 +542,8 @@ class MusicManager:
                 logger.debug("Music Screen (MusicManager): Nothing playing or info explicitly 'Nothing Playing'.")
                 self._last_nothing_playing_log_time = time.time()
 
-            if not self.is_currently_showing_nothing_playing or force_clear:
-                if force_clear or not self.is_currently_showing_nothing_playing:
+            if not self.is_currently_showing_nothing_playing or perform_full_refresh_this_cycle:
+                if perform_full_refresh_this_cycle or not self.is_currently_showing_nothing_playing:
                     self.display_manager.clear()
                 
                 text_width = self.display_manager.get_text_width("Nothing Playing", self.display_manager.regular_font)
@@ -549,18 +570,16 @@ class MusicManager:
 
         # Reset scroll positions if force_clear was true (now stored in should_reset_scroll_for_music)
         # and we are about to display a new track.
-        if should_reset_scroll_for_music:
-            title_being_displayed = current_track_info_snapshot.get('title','N/A')
-            logger.debug(f"MusicManager: Resetting scroll positions for track '{title_being_displayed}' due to force_clear.")
+        if perform_full_refresh_this_cycle and not self.is_currently_showing_nothing_playing : # only reset if showing actual music
+            title_being_displayed = current_track_info_snapshot.get('title','N/A') if current_track_info_snapshot else "N/A"
+            logger.debug(f"MusicManager: Resetting scroll positions for track '{title_being_displayed}' due to full refresh signal.")
             self.scroll_position_title = 0
             self.scroll_position_artist = 0
-            self.title_scroll_tick = 0
-            self.artist_scroll_tick = 0
 
         if not self.is_music_display_active: 
             self.activate_music_display()
 
-        if not force_clear:
+        if not perform_full_refresh_this_cycle: # if not force_clear (which clears whole screen)
             self.display_manager.draw.rectangle([0, 0, self.display_manager.matrix.width, self.display_manager.matrix.height], fill=(0, 0, 0))
 
         matrix_height = self.display_manager.matrix.height
