@@ -1,11 +1,21 @@
 # LEDMatrix
-A sophisticated LED matrix display system that provides real-time information display capabilities for various data sources. The system is highly configurable and supports multiple display modes that can be enabled or disabled based on user preferences.
+An LED matrix display system that provides real-time information display capabilities for various data sources. The system is highly configurable and supports multiple display modes that can be enabled or disabled based on user preferences.
+
+Special Thanks to:
+- Hzeller @ https://github.com/hzeller/rpi-rgb-led-matrix for his groundwork on controlling an LED Matrix from the Raspberry Pi
+- Basmilius @ https://github.com/basmilius/weather-icons/ for his free and extensive weather icons
+- nvstly @ https://github.com/nvstly/icons for their Stock and Crypto Icons
+- ESPN for their sports API
+- Yahoo Finance for their Stock API
+- OpenWeatherMap for their Free Weather API
+
 
 ## Core Features
+Modular, rotating Displays that can be individually enabled or disabled per the user's needs with some configuration around display durations, teams, stocks, weather, timezones, and more. Displays include:
 
 ### Time and Weather
 - Real-time clock display
-- Weather information with custom icons
+- Current Weather, Daily Weather, and Hourly Weather Forecasts with icons from 
 - Google Calendar event display
 
 ### Sports Information
@@ -18,7 +28,7 @@ The system supports live, recent, and upcoming game information for multiple spo
 - NCAA Men's Basketball
 - NCAA Men's Baseball
 - Soccer
-(Note, some of these sports seasons were not active during development and might need fine tuning when games are active)
+- (Note, some of these sports seasons were not active during development and might need fine tuning when games are active)
 
 ### Financial Information
 - Near real-time stock & crypto price updates
@@ -33,11 +43,10 @@ The system supports live, recent, and upcoming game information for multiple spo
 - Now playing information with scrolling text
 
 ### Custom Display Features
-- Text display capabilities
+- Custom Text display 
+- Youtube Subscriber Count Display
 - Font testing and customization
 - Configurable display modes
-- Cache management for improved performance
-
 
 ## System Architecture
 
@@ -45,7 +54,7 @@ The system is built with a modular architecture that allows for easy extension a
 - `DisplayController`: Main orchestrator managing all display modes
 - Individual managers for each feature (sports, weather, music, etc.)
 - Separate authentication handlers for different services
-- Configurable display modes and rotation patterns
+- Configurable display modes and rotation patterns from one file - config.json
 
 ## Configuration
 
@@ -59,11 +68,14 @@ The system can be configured through a JSON configuration file that allows users
 
 
 ## Hardware Requirements
-- Raspberry Pi 3b or 4
- - Amazon Affiliate Links: 
-- Adafruit RGB Matrix Bonnet/HAT
-- 2x LED Matrix panels (64x32)
+- Raspberry Pi 3b or 4 (NOT RPI5!)
+-- Amazon Affiliate Link: Raspberry Pi 4 4GB (https://amzn.to/4dJixuX)
+- Adafruit RGB Matrix Bonnet/HAT 
+-- https://www.adafruit.com/product/3211
+- 2x LED Matrix panels (64x32) (Designed for 128x32 but has a lot of dynamic scaling elements that could work on a variety of displays, pixel pitch is user preference)
+-- https://www.adafruit.com/product/2278 
 - DC Power Supply for Adafruit RGB HAT
+-- https://www.adafruit.com/product/658
 
 
 -----------------------------------------------------------------------------------
@@ -76,16 +88,11 @@ git clone https://github.com/ChuckBuilds/LEDMatrix.git
 cd LEDMatrix
 ```
 
-
 2. Install dependencies:
 ```bash
 pip3 install --break-system-packages -r requirements.txt
 ```
 --break-system-packages allows us to install without a virtual environment
-
-## Configuration
-
-1.Edit `config/config.json` with your preferences via `sudo nano config/config.json`
 
 
 ## Important: Sound Module Configuration
@@ -129,36 +136,12 @@ sudo nano /boot/firmware/cmdline.txt
 sudo reboot
 ```
 
-### Running without Sudo (Optional and not recommended)
-
-To run the display script without `sudo`, the user executing the script needs access to GPIO pins. Add the user to the `gpio` group:
-
-```bash
-sudo usermod -a -G gpio <your_username>
-# Example for user 'ledpi':
-# sudo usermod -a -G gpio ledpi
-```
-
-**Important:** You must **reboot** the Raspberry Pi after adding the user to the group for the change to take effect.
-
-You also need to disable hardware pulsing in the code (see `src/display_manager.py`, set `options.disable_hardware_pulsing = True`). This may result in a flickerying display
-
-If configured correctly, you can then run:
-
-```bash
-python3 display_controller.py
-```
-
 ## Running the Display
 
 From the project root directory:
 ```bash
 sudo python3 display_controller.py
 ```
-
-The display will alternate between showing:
-- Current time
-- Weather information (requires API key configuration)
 
 ## Systemd Service Installation
 
@@ -223,6 +206,12 @@ Then use them to control the service:
 sudo ./start_display.sh
 sudo ./stop_display.sh
 ```
+
+# Configuration
+
+1.Edit `config/config.json` with your preferences via `sudo nano config/config.json`
+
+
 ## API Keys
 
 For sensitive settings like API keys:
@@ -232,9 +221,8 @@ For sensitive settings like API keys:
 
 3. Ctrl + X to exit, Y to overwrite, Enter to save 
 
-## NHL, NBA, MLB Scoreboard Display
-
-The LEDMatrix system includes a comprehensive NHL, NBA scoreboard display system with three display modes:
+## NHL, NBA, MLB, Soccer, NCAA FB, NCAA Men's Baseball, NCAA Men's Basketball Scoreboard Display
+The LEDMatrix system includes a comprehensive scoreboard display system with three display modes:
 
 ### Display Modes
 - **Live Games**: Shows currently playing games with live scores and game status
@@ -245,34 +233,11 @@ The LEDMatrix system includes a comprehensive NHL, NBA scoreboard display system
 - Real-time score updates from ESPN API
 - Team logo display
 - Game status indicators (period, time remaining)
-- Power play and penalty information
 - Configurable favorite teams
 - Automatic game switching
 - Built-in caching to reduce API calls
 - Test mode for development
 
-### Configuration
-In `config.json`, under the `nhl_scoreboard` section:
-```json
-{
-    "nhl_scoreboard": {
-        "enabled": true,
-        "test_mode": false,
-        "update_interval_seconds": 300,
-        "live_update_interval": 60,
-        "recent_update_interval": 1800,
-        "upcoming_update_interval": 1800,
-        "recent_game_hours": 48,
-        "favorite_teams": ["TB", "DAL"],
-        "logo_dir": "assets/sports/nhl_logos",
-        "display_modes": {
-            "nhl_live": true,
-            "nhl_recent": true,
-            "nhl_upcoming": true
-        }
-    }
-}
-```
 
 ### YouTube Display Configuration
 
@@ -340,72 +305,6 @@ The calendar display will show:
 - Event title (wrapped to fit the display)
 - Up to 3 upcoming events (configurable)
 
-## Development
-
-The project structure is organized as follows:
-```
-LEDMatrix/
-├── config/                 # Configuration files
-│   ├── config.json         # Main configuration
-│   └── config_secrets.json # API keys and sensitive data
-├── src/                    # Source code
-│   ├── config_manager.py   # Configuration loading
-│   ├── display_manager.py  # LED matrix display handling
-│   ├── clock.py            # Clock display module
-│   ├── weather_manager.py  # Weather display module
-│   ├── stock_manager.py    # Stock ticker display module
-│   └── stock_news_manager.py # Stock news display module
-└── display_controller.py   # Main application controller
-```
-## Project Structure
-
-- `src/`
-  - `display_controller.py` - Main application controller
-  - `config_manager.py` - Configuration management
-  - `display_manager.py` - LED matrix display handling
-  - `clock.py` - Clock display module
-  - `weather_manager.py` - Weather display module
-  - `stock_manager.py` - Stock ticker display module
-  - `stock_news_manager.py` - Stock news display module
-- `config/`
-  - `config.json` - Configuration settings
-  - `config_secrets.json` - Private settings (not in git) 
-
-## Caching System
-
-The LEDMatrix system includes a robust caching mechanism to optimize API calls and reduce network traffic:
-
-### Cache Location
-- Default cache directory: `/tmp/ledmatrix_cache`
-- Cache files are stored with proper permissions (755 for directories, 644 for files)
-- When running as root/sudo, cache ownership is automatically adjusted to the real user
-
-### Cached Data Types
-- Weather data (current conditions and forecasts)
-- Stock prices and market data
-- Stock news headlines
-- NHL game information
-- NBA game information
-
-### Cache Behavior
-- Data is cached based on update intervals defined in `config.json`
-- Cache is automatically invalidated when:
-  - Update interval has elapsed
-  - Market is closed (for stock data)
-  - Data has changed significantly
-- Failed API calls fall back to cached data when available
-- Cache files use atomic operations to prevent corruption
-
-### Cache Management
-- Cache files are automatically created and managed
-- No manual intervention required
-- Cache directory is created with proper permissions on first run
-- Temporary files are used for safe updates
-- JSON serialization handles all data types including timestamps
-
-## Fonts
-You can add any font to the assets/fonts/ folder but they need to be .ttf and updated in display_manager.py
-
 ### Music Display Configuration
 
 The Music Display module shows information about the currently playing track from either Spotify or YouTube Music (via the [YouTube Music Desktop App](https://ytmdesktop.app/) companion server).
@@ -413,7 +312,7 @@ The Music Display module shows information about the currently playing track fro
 **Setup Requirements:**
 
 1.  **Spotify:**
-    *   Requires a Spotify Premium account (for API access).
+    *   Requires a Spotify account (for API access).
     *   You need to register an application on the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard/) to get API credentials.
         *   Go to the dashboard, log in, and click "Create App".
         *   Give it a name (e.g., "LEDMatrix Display") and description.
@@ -424,49 +323,7 @@ The Music Display module shows information about the currently playing track fro
     *   Requires the [YouTube Music Desktop App](https://ytmdesktop.app/) (YTMD) to be installed and running on a computer on the *same network* as the Raspberry Pi.
     *   In YTMD settings, enable the "Companion Server" under Integration options. Note the URL it provides (usually `http://localhost:9863` if running on the same machine, or `http://<YTMD-Computer-IP>:9863` if running on a different computer).
 
-**Configuration:**
-
-1.  In `config/config_secrets.json`, add your Spotify API credentials under the `music` key:
-    ```json
-    {
-        "music": {
-            "SPOTIFY_CLIENT_ID": "YOUR_SPOTIFY_CLIENT_ID_HERE",
-            "SPOTIFY_CLIENT_SECRET": "YOUR_SPOTIFY_CLIENT_SECRET_HERE",
-            "SPOTIFY_REDIRECT_URI": "http://127.0.0.1:8888/callback" 
-        }
-        // ... other secrets ...
-    }
-    ```
-    *(Ensure the `SPOTIFY_REDIRECT_URI` here matches exactly what you entered in the Spotify Developer Dashboard).*
-
-2.  In `config/config.json`, add/modify the `music` section:
-    ```json
-    {
-        "music": {
-            "enabled": true, // Set to false to disable this display
-            "preferred_source": "auto", // Options: "auto", "spotify", "ytm"
-            "YTM_COMPANION_URL": "http://<YTMD-Computer-IP>:9863", // Replace with actual URL if YTMD is not on the Pi
-            "POLLING_INTERVAL_SECONDS": 2 // How often to check for track updates
-        }
-        // ... other configurations ...
-    }
-    ```
-    Also, ensure the display duration is set in the `display_durations` section:
-    ```json
-    {
-        "display": {
-            "display_durations": {
-                "music": 20, // Duration in seconds
-                // ... other durations ...
-            }
-        }
-        // ... other configurations ...
-    }
-    ```
-
 **`preferred_source` Options:**
-
-*   `"auto"`: (Default) Checks Spotify first. If Spotify is playing, shows its track. If not, checks YTM.
 *   `"spotify"`: Only uses Spotify. Ignores YTM.
 *   `"ytm"`: Only uses the YTM Companion Server. Ignores Spotify.
 
@@ -551,3 +408,117 @@ The system can display currently playing music information from YouTube Music De
 **Troubleshooting:**
 *   "No authorized companions" in YTMD: Ensure you've approved the `LEDMatrixController` in YTMD settings after the first run.
 *   Connection errors: Double-check the `YTM_COMPANION_URL` in `config.json` matches what YTMD's companion server is set to.
+*   Ensure your firewall (Windows Firewall) allows YTM Desktop app to access local networks.
+
+## Project Structure
+
+```
+LEDMatrix/
+├── assets/                  # Static assets like fonts and icons
+├── config/                  # Configuration files
+│   ├── config.json         # Main configuration
+│   └── config_secrets.template.json # Template for API keys and sensitive data
+├── src/                    # Source code
+│   ├── display_controller.py    # Main application controller
+│   ├── config_manager.py        # Configuration management
+│   ├── display_manager.py       # LED matrix display handling
+│   ├── cache_manager.py         # Caching system for API data
+│   ├── clock.py                 # Clock display module
+│   ├── weather_manager.py       # Weather display module
+│   ├── weather_icons.py         # Weather icon definitions
+│   ├── stock_manager.py         # Stock ticker display module
+│   ├── stock_news_manager.py    # Stock news display module
+│   ├── music_manager.py         # Music display orchestration
+│   ├── spotify_client.py        # Spotify API integration
+│   ├── ytm_client.py           # YouTube Music integration
+│   ├── authenticate_spotify.py  # Spotify authentication
+│   ├── authenticate_ytm.py      # YouTube Music authentication
+│   ├── calendar_manager.py      # Google Calendar integration
+│   ├── youtube_display.py       # YouTube channel stats display
+│   ├── text_display.py          # Custom text display module
+│   ├── font_test_manager.py     # Font testing utility
+│   ├── nhl_managers.py          # NHL game display
+│   ├── nba_managers.py          # NBA game display
+│   ├── mlb_manager.py           # MLB game display
+│   ├── nfl_managers.py          # NFL game display
+│   ├── soccer_managers.py       # Soccer game display
+│   ├── ncaa_fb_managers.py      # NCAA Football display
+│   ├── ncaa_baseball_managers.py # NCAA Baseball display
+│   └── ncaam_basketball_managers.py # NCAA Basketball display
+├── rpi-rgb-led-matrix-master/  # LED matrix library
+├── run.py                      # Main entry point
+├── display_controller.py       # Legacy entry point
+├── calendar_registration.py    # Calendar API setup
+├── run_font_test.py           # Font testing entry point
+├── ChuckBuilds.py             # Custom display module
+├── start_display.sh           # Service start script
+├── stop_display.sh            # Service stop script
+├── install_service.sh         # Service installation script
+├── ledmatrix.service          # Systemd service definition
+├── requirements.txt           # Python dependencies
+└── config.example.json        # Example configuration
+```
+
+The project is organized into several key components:
+
+- `src/`: Contains all the Python source code, organized by feature
+- `config/`: Configuration files for the application
+- `assets/`: Static assets like fonts and icons
+- `rpi-rgb-led-matrix-master/`: The LED matrix control library
+- Various utility scripts for running and managing the service
+
+Each display module in `src/` is responsible for a specific feature (weather, sports, music, etc.) and follows a consistent pattern of data fetching, processing, and display rendering.
+
+## Caching System
+
+The LEDMatrix system includes a robust caching mechanism to optimize API calls and reduce network traffic:
+
+### Cache Location
+- Default cache directory: `/tmp/ledmatrix_cache`
+- Cache files are stored with proper permissions (755 for directories, 644 for files)
+- When running as root/sudo, cache ownership is automatically adjusted to the real user
+
+### Cached Data Types
+- Weather data (current conditions and forecasts)
+- Stock prices and market data
+- Stock news headlines
+- ESPN game information
+
+### Cache Behavior
+- Data is cached based on update intervals defined in `config.json`
+- Cache is automatically invalidated when:
+  - Update interval has elapsed
+  - Market is closed (for stock data)
+  - Data has changed significantly
+- Failed API calls fall back to cached data when available
+- Cache files use atomic operations to prevent corruption
+
+### Cache Management
+- Cache files are automatically created and managed
+- No manual intervention required
+- Cache directory is created with proper permissions on first run
+- Temporary files are used for safe updates
+- JSON serialization handles all data types including timestamps
+
+## Fonts
+You can add any font to the assets/fonts/ folder but they need to be .ttf or .btf(less support) and updated in display_manager.py
+
+### Running without Sudo (Optional and not recommended)
+
+To run the display script without `sudo`, the user executing the script needs access to GPIO pins. Add the user to the `gpio` group:
+
+```bash
+sudo usermod -a -G gpio <your_username>
+# Example for user 'ledpi':
+# sudo usermod -a -G gpio ledpi
+```
+
+**Important:** You must **reboot** the Raspberry Pi after adding the user to the group for the change to take effect.
+
+You also need to disable hardware pulsing in the code (see `src/display_manager.py`, set `options.disable_hardware_pulsing = True`). This may result in a flickerying display
+
+If configured correctly, you can then run:
+
+```bash
+python3 display_controller.py
+```
