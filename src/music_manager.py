@@ -50,6 +50,7 @@ class MusicManager:
         self.title_scroll_tick = 0
         self.artist_scroll_tick = 0
         self.is_music_display_active = False # New state variable
+        self.is_currently_showing_nothing_playing = False # To prevent flashing
         
         self._load_config() # Load config first
         self._initialize_clients() # Initialize based on loaded config
@@ -452,19 +453,22 @@ class MusicManager:
                 logger.info("Music Screen (MusicManager): Nothing playing or info explicitly 'Nothing Playing'.")
                 self._last_nothing_playing_log_time = time.time()
 
-            if not force_clear:
-                 self.display_manager.clear()
-                 logger.debug("[MusicManager.display] Display cleared (not force_clear path).")
-
-            logger.debug(f"[MusicManager.display] Font for 'Nothing Playing': {self.display_manager.regular_font}, Type: {type(self.display_manager.regular_font)}")
-            text_width = self.display_manager.get_text_width("Nothing Playing", self.display_manager.regular_font)
-            logger.debug(f"[MusicManager.display] Calculated text_width for 'Nothing Playing': {text_width}")
-            x_pos = (self.display_manager.matrix.width - text_width) // 2
-            y_pos = (self.display_manager.matrix.height // 2) - 4
-            logger.debug(f"[MusicManager.display] Drawing 'Nothing Playing' at x={x_pos}, y={y_pos}")
-            self.display_manager.draw_text("Nothing Playing", x=x_pos, y=y_pos, font=self.display_manager.regular_font)
-            self.display_manager.update_display()
-            logger.debug("[MusicManager.display] 'Nothing Playing' text drawn and display updated.")
+            # Only redraw "Nothing Playing" if we weren't already showing it or if force_clear is true
+            if not self.is_currently_showing_nothing_playing or force_clear:
+                if force_clear or not self.is_currently_showing_nothing_playing: # Ensure clear if forced or first time
+                    self.display_manager.clear()
+                    logger.debug("[MusicManager.display] Display cleared for 'Nothing Playing'.")
+                
+                logger.debug(f"[MusicManager.display] Font for 'Nothing Playing': {self.display_manager.regular_font}, Type: {type(self.display_manager.regular_font)}")
+                text_width = self.display_manager.get_text_width("Nothing Playing", self.display_manager.regular_font)
+                logger.debug(f"[MusicManager.display] Calculated text_width for 'Nothing Playing': {text_width}")
+                x_pos = (self.display_manager.matrix.width - text_width) // 2
+                y_pos = (self.display_manager.matrix.height // 2) - 4
+                logger.debug(f"[MusicManager.display] Drawing 'Nothing Playing' at x={x_pos}, y={y_pos}")
+                self.display_manager.draw_text("Nothing Playing", x=x_pos, y=y_pos, font=self.display_manager.regular_font)
+                self.display_manager.update_display()
+                logger.debug("[MusicManager.display] 'Nothing Playing' text drawn and display updated.")
+                self.is_currently_showing_nothing_playing = True
 
             with self.track_info_lock: # Protect writes to shared state
                 self.scroll_position_title = 0
@@ -475,8 +479,9 @@ class MusicManager:
                 # self.last_album_art_url = None # Keep last_album_art_url so we don't re-fetch if it was a brief flicker
             return
 
-        logger.debug("[MusicManager.display] Proceeding to display actual music info.")
         # If we've reached here, it means we are about to display actual music info.
+        self.is_currently_showing_nothing_playing = False # Reset flag
+        logger.debug("[MusicManager.display] Proceeding to display actual music info.")
         if not self.is_music_display_active:
             self.activate_music_display()
 

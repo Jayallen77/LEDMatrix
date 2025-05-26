@@ -76,6 +76,9 @@ class YTMClient:
                 }
 
             significant_change_detected = False
+            if current_key_data:
+                logging.debug(f"[YTMClient Check] Current Key Data: {current_key_data}")
+                logging.debug(f"[YTMClient Check] Last Processed Key Data: {self.last_processed_key_data}")
             if current_key_data and (self.last_processed_key_data != current_key_data):
                 significant_change_detected = True
                 self.last_processed_key_data = current_key_data # Update only on significant change
