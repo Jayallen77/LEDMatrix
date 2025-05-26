@@ -98,7 +98,8 @@ class DisplayController:
             self.nhl_live = None
             self.nhl_recent = None
             self.nhl_upcoming = None
-        logger.info("NHL managers initialized in %.3f seconds", time.time() - nhl_time)
+        if nhl_enabled:
+            logger.info("NHL managers initialized in %.3f seconds", time.time() - nhl_time)
             
         # Initialize NBA managers if enabled
         nba_time = time.time()
@@ -113,7 +114,8 @@ class DisplayController:
             self.nba_live = None
             self.nba_recent = None
             self.nba_upcoming = None
-        logger.info("NBA managers initialized in %.3f seconds", time.time() - nba_time)
+        if nba_enabled:
+            logger.info("NBA managers initialized in %.3f seconds", time.time() - nba_time)
 
         # Initialize MLB managers if enabled
         mlb_time = time.time()
@@ -128,7 +130,8 @@ class DisplayController:
             self.mlb_live = None
             self.mlb_recent = None
             self.mlb_upcoming = None
-        logger.info("MLB managers initialized in %.3f seconds", time.time() - mlb_time)
+        if mlb_enabled:
+            logger.info("MLB managers initialized in %.3f seconds", time.time() - mlb_time)
             
         # Initialize Soccer managers if enabled
         soccer_time = time.time()
@@ -143,7 +146,8 @@ class DisplayController:
             self.soccer_live = None
             self.soccer_recent = None
             self.soccer_upcoming = None
-        logger.info("Soccer managers initialized in %.3f seconds", time.time() - soccer_time)
+        if soccer_enabled:
+            logger.info("Soccer managers initialized in %.3f seconds", time.time() - soccer_time)
             
         # Initialize NFL managers if enabled
         nfl_time = time.time()
@@ -158,7 +162,8 @@ class DisplayController:
             self.nfl_live = None
             self.nfl_recent = None
             self.nfl_upcoming = None
-        logger.info("NFL managers initialized in %.3f seconds", time.time() - nfl_time)
+        if nfl_enabled:
+            logger.info("NFL managers initialized in %.3f seconds", time.time() - nfl_time)
         
         # Initialize NCAA FB managers if enabled
         ncaa_fb_time = time.time()
@@ -173,7 +178,8 @@ class DisplayController:
             self.ncaa_fb_live = None
             self.ncaa_fb_recent = None
             self.ncaa_fb_upcoming = None
-        logger.info("NCAA FB managers initialized in %.3f seconds", time.time() - ncaa_fb_time)
+        if ncaa_fb_enabled:
+            logger.info("NCAA FB managers initialized in %.3f seconds", time.time() - ncaa_fb_time)
         
         # Initialize NCAA Baseball managers if enabled
         ncaa_baseball_time = time.time()
@@ -188,7 +194,8 @@ class DisplayController:
             self.ncaa_baseball_live = None
             self.ncaa_baseball_recent = None
             self.ncaa_baseball_upcoming = None
-        logger.info("NCAA Baseball managers initialized in %.3f seconds", time.time() - ncaa_baseball_time)
+        if ncaa_baseball_enabled:
+            logger.info("NCAA Baseball managers initialized in %.3f seconds", time.time() - ncaa_baseball_time)
 
         # Initialize NCAA Men's Basketball managers if enabled
         ncaam_basketball_time = time.time()
@@ -203,7 +210,8 @@ class DisplayController:
             self.ncaam_basketball_live = None
             self.ncaam_basketball_recent = None
             self.ncaam_basketball_upcoming = None
-        logger.info("NCAA Men's Basketball managers initialized in %.3f seconds", time.time() - ncaam_basketball_time)
+        if ncaam_basketball_enabled:
+            logger.info("NCAA Men's Basketball managers initialized in %.3f seconds", time.time() - ncaam_basketball_time)
         
         # Track MLB rotation state
         self.mlb_current_team_index = 0
@@ -668,325 +676,6 @@ class DisplayController:
                 # Move to next team if no games found for current one
                 self.ncaa_fb_current_team_index = (self.ncaa_fb_current_team_index + 1) % len(self.ncaa_fb_favorite_teams)
                 self.ncaa_fb_showing_recent = True # Reset to recent for the new team
-
-    def run(self):
-        """Run the display controller, switching between displays."""
-        if not self.available_modes:
-            logger.warning("No display modes are enabled. Exiting.")
-            self.display_manager.cleanup()
-            return
-             
-        try:
-            while True:
-                current_time = time.time()
-                
-                # Update data for all modules first
-                self._update_modules()
-                
-                # Check for live games
-                has_live_games, live_sport_type = self._check_live_games()
-                is_currently_live = self.current_display_mode.endswith('_live')
-
-                manager_to_display = None # Manager instance for the current frame
-
-                # --- State Machine for Display Logic ---
-
-                if is_currently_live:
-                    # --- Currently in a Live Game Mode ---
-                    if has_live_games:
-                        # Still live games available, check timer for rotation or continuation
-                        if current_time - self.last_switch >= self.get_current_duration():
-                            # Timer expired for the current live game, decide next step
-                            logger.debug(f"Timer expired for live mode {self.current_display_mode}. Checking for rotation.")
-                            
-                            active_live_sports = []
-                            # Use the same priority order as _check_live_games
-                            priority_order = ['soccer', 'nfl', 'nhl', 'nba', 'mlb', 'ncaa_fb', 'ncaam_basketball', 'ncaa_baseball']
-                            for sport in priority_order:
-                                live_attr = f"{sport}_live"
-                                if hasattr(self, live_attr) and getattr(self, live_attr) and getattr(self, live_attr).live_games:
-                                    active_live_sports.append(sport)
-                            
-                            logger.debug(f"Active live sports found: {active_live_sports}")
-
-                            if not active_live_sports:
-                                # Should not happen if has_live_games is True, but handle defensively
-                                logger.warning("In live mode, timer expired, but no active sports found. Falling back.")
-                                # Fallback: Exit live mode logic will handle this below implicitly
-                                is_currently_live = False # Force exit from live block
-                                has_live_games = False  # Ensure we enter regular rotation block
-
-                            elif len(active_live_sports) == 1:
-                                # Only one sport is live, stay on it (or switch if mode mismatch)
-                                new_mode = f"{active_live_sports[0]}_live"
-                                if self.current_display_mode != new_mode:
-                                    logger.info(f"Switching to only active live sport: {new_mode} from {self.current_display_mode}")
-                                    self.current_display_mode = new_mode
-                                    self.force_clear = True
-                                else:
-                                    logger.debug(f"Staying on single active live sport: {self.current_display_mode}")
-                                    self.force_clear = False # Just resetting timer, no need to clear
-                                self.last_switch = current_time
-                                manager_to_display = getattr(self, f"{active_live_sports[0]}_live", None)
-                            
-                            else:
-                                # Multiple sports live, rotate
-                                try:
-                                    current_sport = self.current_display_mode.replace('_live', '')
-                                    current_index = active_live_sports.index(current_sport)
-                                    next_index = (current_index + 1) % len(active_live_sports)
-                                    next_sport = active_live_sports[next_index]
-                                    next_mode = f"{next_sport}_live"
-                                    logger.info(f"Rotating live sports: {self.current_display_mode} -> {next_mode}")
-                                    self.current_display_mode = next_mode
-                                    self.force_clear = True
-                                    self.last_switch = current_time
-                                    manager_to_display = getattr(self, f"{next_sport}_live", None)
-                                except ValueError:
-                                    # Current sport is no longer active, switch to highest priority active one
-                                    logger.warning(f"Current live sport {current_sport} not found in active list {active_live_sports}. Switching to highest priority.")
-                                    next_sport = active_live_sports[0]
-                                    next_mode = f"{next_sport}_live"
-                                    self.current_display_mode = next_mode
-                                    self.force_clear = True
-                                    self.last_switch = current_time
-                                    manager_to_display = getattr(self, f"{next_sport}_live", None)
-                        else:
-                            # Timer not expired, continue showing current live game
-                            logger.debug(f"Continuing live mode {self.current_display_mode}. Timer not expired.")
-                            self.force_clear = False 
-                            current_sport_type = self.current_display_mode.replace('_live', '')
-                            manager_to_display = getattr(self, f"{current_sport_type}_live", None)
-                    
-                    else:
-                        # Was in live mode, but no live games detected *now*. Switch OUT.
-                        logger.info(f"Exiting live mode {self.current_display_mode} as no live games detected.")
-                        # Fall through to the 'not is_currently_live' block below
-                        is_currently_live = False # Update state for the next block
-                        # Let the regular mode selection logic handle the transition
-
-
-                if not is_currently_live:
-                    # --- Currently in a Regular Mode (or just exited Live) ---
-                    previous_mode_before_switch = self.current_display_mode # Capture mode before potential change
-
-                    if has_live_games:
-                        # Not currently live, but live games ARE available. Switch IN.
-                        new_mode = f"{live_sport_type}_live"
-                        if self.current_display_mode != new_mode:
-                             logger.info(f"Switching into LIVE mode: {new_mode} from {self.current_display_mode}")
-                             if previous_mode_before_switch == 'music' and self.music_manager:
-                                 logger.info("Deactivating music manager due to switch from music to live mode.")
-                                 self.music_manager.deactivate_music_display()
-                             self.current_display_mode = new_mode
-                             self.force_clear = True
-                             self.last_switch = current_time
-                             manager_to_display = getattr(self, f"{live_sport_type}_live", None)
-                        else:
-                             # Should technically not happen based on is_currently_live flag, but safety first
-                             self.force_clear = False
-                             self.last_switch = current_time # Reset timer anyway
-                             manager_to_display = getattr(self, f"{live_sport_type}_live", None)
-
-                    else:
-                        # No live games detected, and not in live mode. Regular rotation.
-                        needs_switch = False
-                        if self.current_display_mode.endswith('_live'):
-                             # This case handles the explicit transition OUT of live mode
-                             # initiated in the block above.
-                             logger.info(f"Transitioning from live mode to regular rotation.")
-                             needs_switch = True
-                             # current_mode_index would have been advanced if coming from regular timer expiry.
-                             # If coming from live mode exit, we need to ensure it's set for the *next* regular mode.
-                             # The logic below assumes current_mode_index is for the *new* mode.
-                             try:
-                                 # If previous_mode_before_switch was a live mode, current_mode_index might be stale.
-                                 # We need to find the next available regular mode from self.available_modes
-                                 # This part can be tricky. Let's assume current_mode_index is either current or needs +1.
-                                 # If just exiting live, self.current_mode_index hasn't been incremented by timer logic yet.
-                                 # So, we just use its current value to pick from available_modes.
-                                 # If it was already pointing at 'music' and music is next, it's fine.
-                                 # If it was stale, it will pick an available mode.
-                                 pass # The original logic for picking mode is below.
-                             except Exception:
-                                 logger.warning("Error finding next regular mode index after live mode exit. Resetting.")
-                                 self.current_mode_index = 0
-                            
-                             if not self.available_modes:
-                                 logger.error("No available regular modes to switch to!")
-                                 self.current_display_mode = 'none'
-                             else:
-                                 # This is where the new regular mode is chosen after exiting live
-                                 new_regular_mode_after_live = self.available_modes[self.current_mode_index]
-                                 if previous_mode_before_switch == 'music' and self.music_manager and new_regular_mode_after_live != 'music':
-                                     logger.info(f"Deactivating music manager due to switch from music (via live exit) to {new_regular_mode_after_live}.")
-                                     self.music_manager.deactivate_music_display()
-                                 # If previous_mode_before_switch was live, and new_regular_mode_after_live is music, MusicManager.display will handle activation.
-                                 self.current_display_mode = new_regular_mode_after_live
-
-
-                        elif current_time - self.last_switch >= self.get_current_duration():
-                             # Regular timer expired, advance to next mode
-                             logger.debug(f"Timer expired for regular mode {self.current_display_mode}. Switching.")
-                             if self.current_display_mode == 'calendar' and self.calendar:
-                                 self.calendar.advance_event()
-                             needs_switch = True
-                             self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
-                             new_mode_after_timer = self.available_modes[self.current_mode_index]
-                             if previous_mode_before_switch == 'music' and self.music_manager and new_mode_after_timer != 'music':
-                                 logger.info(f"Deactivating music manager due to timer switch from music to {new_mode_after_timer}.")
-                                 self.music_manager.deactivate_music_display()
-                             # If switching to music, MusicManager.display will handle activation.
-                             self.current_display_mode = new_mode_after_timer
-                        
-                        if needs_switch:
-                             # This log now reflects the already updated self.current_display_mode
-                             logger.info(f"Switching to regular mode: {self.current_display_mode}")
-                             self.force_clear = True
-                             self.last_switch = current_time
-                        else:
-                             # Timer not expired for current regular mode
-                             self.force_clear = False
-
-                        # Select the manager for the current regular mode
-                        # (This code block is largely the same as before)
-                        if self.current_display_mode == 'clock' and self.clock:
-                             manager_to_display = self.clock
-                        elif self.current_display_mode == 'weather_current' and self.weather:
-                             manager_to_display = self.weather
-                        elif self.current_display_mode == 'weather_hourly' and self.weather:
-                             manager_to_display = self.weather
-                        elif self.current_display_mode == 'weather_daily' and self.weather:
-                             manager_to_display = self.weather
-                        elif self.current_display_mode == 'stocks' and self.stocks:
-                             manager_to_display = self.stocks
-                        elif self.current_display_mode == 'stock_news' and self.news:
-                              manager_to_display = self.news
-                        elif self.current_display_mode == 'calendar' and self.calendar:
-                              manager_to_display = self.calendar
-                        elif self.current_display_mode == 'youtube' and self.youtube:
-                              manager_to_display = self.youtube
-                        elif self.current_display_mode == 'text_display' and self.text_display:
-                              manager_to_display = self.text_display
-                        # Add other regular managers (NHL recent/upcoming, NBA, MLB, Soccer, NFL, NCAA FB)
-                        elif self.current_display_mode == 'nhl_recent' and self.nhl_recent:
-                            manager_to_display = self.nhl_recent
-                        elif self.current_display_mode == 'nhl_upcoming' and self.nhl_upcoming:
-                            manager_to_display = self.nhl_upcoming
-                        elif self.current_display_mode == 'nba_recent' and self.nba_recent:
-                            manager_to_display = self.nba_recent
-                        elif self.current_display_mode == 'nba_upcoming' and self.nba_upcoming:
-                            manager_to_display = self.nba_upcoming
-                        elif self.current_display_mode == 'mlb_recent' and self.mlb_recent:
-                            manager_to_display = self.mlb_recent
-                        elif self.current_display_mode == 'mlb_upcoming' and self.mlb_upcoming:
-                            manager_to_display = self.mlb_upcoming
-                        elif self.current_display_mode == 'soccer_recent' and self.soccer_recent:
-                            manager_to_display = self.soccer_recent
-                        elif self.current_display_mode == 'soccer_upcoming' and self.soccer_upcoming:
-                            manager_to_display = self.soccer_upcoming
-                        elif self.current_display_mode == 'nfl_recent' and self.nfl_recent:
-                            manager_to_display = self.nfl_recent
-                        elif self.current_display_mode == 'nfl_upcoming' and self.nfl_upcoming:
-                            manager_to_display = self.nfl_upcoming
-                        elif self.current_display_mode == 'ncaa_fb_recent' and self.ncaa_fb_recent:
-                            manager_to_display = self.ncaa_fb_recent
-                        elif self.current_display_mode == 'ncaa_fb_upcoming' and self.ncaa_fb_upcoming:
-                            manager_to_display = self.ncaa_fb_upcoming
-                        elif self.current_display_mode == 'ncaa_baseball_recent' and self.ncaa_baseball_recent:
-                            manager_to_display = self.ncaa_baseball_recent
-                        elif self.current_display_mode == 'ncaa_baseball_upcoming' and self.ncaa_baseball_upcoming:
-                            manager_to_display = self.ncaa_baseball_upcoming
-                        elif self.current_display_mode == 'ncaam_basketball_recent' and self.ncaam_basketball_recent:
-                            manager_to_display = self.ncaam_basketball_recent
-                        elif self.current_display_mode == 'ncaam_basketball_upcoming' and self.ncaam_basketball_upcoming:
-                            manager_to_display = self.ncaam_basketball_upcoming
-
-
-                # --- Perform Display Update ---
-                try:
-                    if self.current_display_mode == 'music' and self.music_manager:
-                        # Call MusicManager's display method
-                        self.music_manager.display(force_clear=self.force_clear)
-                        # Reset force_clear if it was true for this mode
-                        if self.force_clear:
-                            self.force_clear = False
-                    elif manager_to_display:
-                        logger.debug(f"Attempting to display mode: {self.current_display_mode} using manager {type(manager_to_display).__name__} with force_clear={self.force_clear}")
-                        # Call the appropriate display method based on mode/manager type
-                        # Note: Some managers have different display methods or handle clearing internally
-                        if self.current_display_mode == 'clock':
-                            manager_to_display.display_time(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'weather_current':
-                            manager_to_display.display_weather(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'weather_hourly':
-                            manager_to_display.display_hourly_forecast(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'weather_daily':
-                            manager_to_display.display_daily_forecast(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'stocks':
-                            manager_to_display.display_stocks(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'stock_news':
-                             manager_to_display.display_news() # Assumes internal clearing
-                        elif self.current_display_mode == 'calendar':
-                             manager_to_display.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'youtube':
-                             manager_to_display.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'text_display':
-                             manager_to_display.display() # Assumes internal clearing
-                        elif self.current_display_mode == 'nfl_live' and self.nfl_live:
-                            self.nfl_live.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'ncaa_fb_live' and self.ncaa_fb_live:
-                            self.ncaa_fb_live.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'ncaam_basketball_live' and self.ncaam_basketball_live:
-                            self.ncaam_basketball_live.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'ncaa_baseball_live' and self.ncaa_baseball_live:
-                            self.ncaa_baseball_live.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'mlb_live' and self.mlb_live:
-                            self.mlb_live.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'ncaa_fb_upcoming' and self.ncaa_fb_upcoming:
-                            self.ncaa_fb_upcoming.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'ncaam_basketball_recent' and self.ncaam_basketball_recent:
-                            self.ncaam_basketball_recent.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'ncaam_basketball_upcoming' and self.ncaam_basketball_upcoming:
-                            self.ncaam_basketball_upcoming.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'ncaa_baseball_recent' and self.ncaa_baseball_recent:
-                            self.ncaa_baseball_recent.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'ncaa_baseball_upcoming' and self.ncaa_baseball_upcoming:
-                            self.ncaa_baseball_upcoming.display(force_clear=self.force_clear)
-                        elif hasattr(manager_to_display, 'display'): # General case for most managers
-                            manager_to_display.display(force_clear=self.force_clear)
-                        else:
-                            logger.warning(f"Manager {type(manager_to_display).__name__} for mode {self.current_display_mode} does not have a standard 'display' method.")
-                        
-                        # Reset force_clear *after* a successful display call that used it
-                        # Important: Only reset if the display method *might* have used it.
-                        # Internal clearing methods (news, text) don't necessitate resetting it here.
-                        if self.force_clear and self.current_display_mode not in ['stock_news', 'text_display']:
-                            self.force_clear = False 
-                    elif self.current_display_mode != 'none':
-                         logger.warning(f"No manager found or selected for display mode: {self.current_display_mode}")
-
-                except Exception as e:
-                    logger.error(f"Error during display update for mode {self.current_display_mode}: {e}", exc_info=True)
-                    # Force clear on the next iteration after an error to be safe
-                    self.force_clear = True 
-
-
-                # Small sleep removed - updates/drawing should manage timing
-                # time.sleep(self.update_interval) 
-                #time.sleep(self.update_interval) # Re-add the sleep
-
-        except KeyboardInterrupt:
-            logger.info("Display controller stopped by user")
-        except Exception as e:
-            logger.error(f"Critical error in display controller run loop: {e}", exc_info=True)
-        finally:
-            logger.info("Cleaning up display manager...")
-            self.display_manager.cleanup()
-            if self.music_manager: # Check if music_manager object exists
-                logger.info("Stopping music polling...")
-                self.music_manager.stop_polling()
-            logger.info("Cleanup complete.")
 
 def main():
     controller = DisplayController()
