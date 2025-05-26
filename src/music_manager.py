@@ -54,8 +54,6 @@ class MusicManager:
         self.is_currently_showing_nothing_playing = False # To prevent flashing
         self._needs_immediate_full_refresh = False # Flag for forcing refresh from YTM updates
         self.ytm_event_data_queue = queue.Queue(maxsize=1) # Queue for event data
-        self.periodic_refresh_interval = 5 # Seconds
-        self.last_periodic_refresh_time = 0
         
         self._load_config() # Load config first
         self._initialize_clients() # Initialize based on loaded config
@@ -585,13 +583,6 @@ class MusicManager:
             except queue.Empty:
                 logger.warning("MusicManager.display: _needs_immediate_full_refresh was true, but queue empty. Will refresh with current_track_info.")
             self._needs_immediate_full_refresh = False # Consume the event flag
-
-        # Check for periodic refresh, can also set perform_full_refresh_this_cycle
-        if self.is_music_display_active and (time.time() - self.last_periodic_refresh_time >= self.periodic_refresh_interval):
-            if not perform_full_refresh_this_cycle: # Log only if periodic is the one setting the flag now
-                 logger.info(f"MusicManager.display: Triggering periodic full refresh (interval: {self.periodic_refresh_interval}s).")
-            perform_full_refresh_this_cycle = True
-            # self.last_periodic_refresh_time = time.time() # Moved this update to *after* activate_music_display
 
         current_track_info_snapshot = None
 
