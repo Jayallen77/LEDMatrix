@@ -745,7 +745,18 @@ class MLBLiveManager(BaseMLBManager):
         self.display_manager.draw = draw 
         # self.display_manager._draw_bdf_text(count_text, count_x, count_y, text_color, font=bdf_font)
         # Use _draw_text_with_outline for count text
-        self._draw_text_with_outline(draw, count_text, (count_x, count_y), bdf_font, fill=text_color)
+        # self._draw_text_with_outline(draw, count_text, (count_x, count_y), bdf_font, fill=text_color)
+
+        # Draw Balls-Strikes Count with outline using BDF font
+        # Define outline color (consistent with _draw_text_with_outline default)
+        outline_color_for_bdf = (0, 0, 0)
+        
+        # Draw outline
+        for dx_offset, dy_offset in [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]:
+            self.display_manager._draw_bdf_text(count_text, count_x + dx_offset, count_y + dy_offset, color=outline_color_for_bdf, font=bdf_font)
+        
+        # Draw main text
+        self.display_manager._draw_bdf_text(count_text, count_x, count_y, color=text_color, font=bdf_font)
 
         # Draw Team:Score at the bottom
         score_font = self.display_manager.font # Use PressStart2P
