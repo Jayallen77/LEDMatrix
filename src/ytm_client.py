@@ -35,8 +35,6 @@ class YTMClient:
         self._data_lock = threading.Lock()
         self._connection_event = threading.Event()
         self.external_update_callback = update_callback
-        self.last_processed_key_data = None # Stores key fields of the last update that triggered a callback
-        self.previous_key_data_for_debug_logging = None # Helps reduce repetitive non-significant change logs
 
         @self.sio.event(namespace='/api/v1/realtime')
         def connect():
@@ -57,47 +55,23 @@ class YTMClient:
 
         @self.sio.on('state-update', namespace='/api/v1/realtime')
         def on_state_update(data):
-            logging.debug(f"Received state update from YTM Companion on /api/v1/realtime: {data.get('video',{}).get('title')}")
-            
+            # --- TEMPORARY DIAGNOSTIC LOGGING ---
+            # --- END TEMPORARY DIAGNOSTIC LOGGING ---
+
             # Always update the full last_known_track_data for polling purposes
             with self._data_lock:
                 self.last_known_track_data = data
 
-            # Extract key fields for deciding if a significant change occurred
-            current_key_data = None
-            if data and isinstance(data, dict):
-                video_info = data.get('video', {})
-                player_info = data.get('player', {})
-                current_key_data = {
-                    'title': video_info.get('title'),
-                    'author': video_info.get('author'),
-                    'album': video_info.get('album'), # Added album for more robust change detection
-                    'trackState': player_info.get('trackState'),
-                    'adPlaying': player_info.get('adPlaying', False)
-                }
+            title = data.get('video', {}).get('title', 'N/A') if isinstance(data, dict) else 'N/A'
+            logging.debug(f"YTM state update received. Title: {title}. Callback Exists: {self.external_update_callback is not None}")
 
-            significant_change_detected = False
-            if current_key_data:
-                logging.debug(f"[YTMClient Check] Current Key Data: {current_key_data}")
-                logging.debug(f"[YTMClient Check] Last Processed Key Data: {self.last_processed_key_data}")
-            if current_key_data and (self.last_processed_key_data != current_key_data):
-                significant_change_detected = True
-                self.last_processed_key_data = current_key_data # Update only on significant change
-            
-            logging.debug(f"[YTMClient Decision] Significant Change: {significant_change_detected}, Callback Exists: {self.external_update_callback is not None}")
-            if significant_change_detected and self.external_update_callback:
-                logging.info(f"--> Attempting to call YTM external_update_callback for title: {current_key_data.get('title')}")
+            if self.external_update_callback:
+                logging.debug(f"--> Attempting to call YTM external_update_callback for title: {title}")
                 try:
                     # Pass the full 'data' object to the callback
                     self.external_update_callback(data) 
                 except Exception as cb_ex:
                     logging.error(f"Error executing YTMClient external_update_callback: {cb_ex}")
-            elif not significant_change_detected and current_key_data:
-                if current_key_data != self.previous_key_data_for_debug_logging:
-                    logging.debug(f"YTM state update received but no significant change to callback. Title: {current_key_data.get('title')}, State: {current_key_data.get('trackState')}")
-                    self.previous_key_data_for_debug_logging = current_key_data
-            elif not current_key_data:
-                 logging.debug("YTM state update received but current_key_data was None/empty.")
 
     def load_config(self):
         default_url = "http://localhost:9863"
@@ -120,7 +94,7 @@ class YTMClient:
             except Exception as e:
                 logging.error(f"Error loading YTM_COMPANION_URL from main config {CONFIG_PATH}: {e}. Using default YTM URL.")
 
-        logging.info(f"YTM Companion URL set to: {self.base_url}")
+        logging.debug(f"YTM Companion URL set to: {self.base_url}")
 
         if self.base_url and self.base_url.startswith("ws://"):
             self.base_url = "http://" + self.base_url[5:]
@@ -137,17 +111,17 @@ class YTMClient:
                 if self.ytm_token:
                     logging.info(f"YTM Companion token loaded from {YTM_AUTH_CONFIG_PATH}.")
                 else:
-                    logging.warning(f"YTM_COMPANION_TOKEN not found in {YTM_AUTH_CONFIG_PATH}. YTM features will be disabled until token is present.")
+                    logging.warning(f"YTM_COMPANION_TOKEN not found in {YTM_AUTH_CONFIG_PATH}. YTM features may be limited or disabled.")
             except json.JSONDecodeError:
-                logging.error(f"Error decoding JSON from YTM auth file {YTM_AUTH_CONFIG_PATH}. YTM features will be disabled.")
+                logging.error(f"Error decoding JSON from YTM auth file {YTM_AUTH_CONFIG_PATH}. YTM features may be limited or disabled.")
             except Exception as e:
-                logging.error(f"Error loading YTM auth config {YTM_AUTH_CONFIG_PATH}: {e}. YTM features will be disabled.")
+                logging.error(f"Error loading YTM auth config {YTM_AUTH_CONFIG_PATH}: {e}. YTM features may be limited or disabled.")
         else:
-            logging.warning(f"YTM auth file not found at {YTM_AUTH_CONFIG_PATH}. Run the authentication script to generate it. YTM features will be disabled.")
+            logging.warning(f"YTM auth file not found at {YTM_AUTH_CONFIG_PATH}. Run the authentication script to generate it. YTM features may be limited or disabled.")
 
     def connect_client(self, timeout=10):
         if not self.ytm_token:
-            logging.warning("No YTM token loaded. Cannot connect to Socket.IO. Run authentication script.")
+            logging.warning("No YTM token loaded. Cannot connect to YTM Socket.IO. Run authentication script.")
             self.is_connected = False
             return False
 
@@ -155,7 +129,7 @@ class YTMClient:
             logging.debug("YTM client already connected.")
             return True
 
-        logging.info(f"Attempting to connect to YTM Socket.IO server: {self.base_url} on namespace /api/v1/realtime")
+        logging.info(f"Attempting to connect to YTM Socket.IO server: {self.base_url}")
         auth_payload = {"token": self.ytm_token}
 
         try:
@@ -172,7 +146,7 @@ class YTMClient:
                 logging.warning(f"YTM Socket.IO connection event not received within {event_wait_timeout}s (connect timeout was {timeout}s).")
                 self.is_connected = False
                 return False
-            logging.info(f"YTM Socket.IO connection successful: {self.is_connected}")
+            # Connection success/failure is logged by connect/connect_error events
             return self.is_connected
         except socketio.exceptions.ConnectionError as e:
             logging.error(f"YTM Socket.IO connection error: {e}")

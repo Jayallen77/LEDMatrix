@@ -185,9 +185,22 @@ class MusicManager:
                 if not is_actually_playing_ytm and self.current_source == MusicSource.YTM:
                     self.current_source = MusicSource.NONE 
 
+                logger.debug(f"[YTM Direct Update] Old Album Art URL: {old_album_art_url}, New Album Art URL: {new_album_art_url}")
                 if new_album_art_url != old_album_art_url:
+                    logger.info("[YTM Direct Update] Album art URL changed. Clearing self.album_art_image to force re-fetch.")
                     self.album_art_image = None
                     self.last_album_art_url = new_album_art_url
+                elif not self.last_album_art_url and new_album_art_url: # Case where old was None, new is something
+                    logger.info("[YTM Direct Update] New album art URL appeared (was None). Clearing self.album_art_image.")
+                    self.album_art_image = None
+                    self.last_album_art_url = new_album_art_url
+                elif new_album_art_url is None and old_album_art_url is not None:
+                    logger.info("[YTM Direct Update] Album art URL disappeared (became None). Clearing image and URL.")
+                    self.album_art_image = None
+                    self.last_album_art_url = None
+                elif self.current_track_info and self.current_track_info.get('album_art_url') and not self.last_album_art_url:
+                     self.last_album_art_url = self.current_track_info.get('album_art_url')
+                     self.album_art_image = None # Ensure image is cleared if URL was just populated from None
                 
                 display_title = self.current_track_info.get('title', 'None') if self.current_track_info else 'None'
                 logger.debug(f"YTM Direct Update: Track change detected. Source: {self.current_source.name}. Track: {display_title}")
@@ -279,7 +292,8 @@ class MusicManager:
                         is_playing_from_poll = True # YTM is now considered playing
                         logger.debug(f"Polling YTM: Active track - {ytm_track_data.get('track', {}).get('title')}")
                     else:
-                        logging.debug("Polling YTM: No active track or player paused (or track data missing player info).")
+                        # logger.debug("Polling YTM: No active track or player paused (or track data missing player info).") # Potentially noisy
+                        pass # Keep it quiet if no track or paused via polling
                 except Exception as e:
                     logging.error(f"Error polling YTM: {e}")
             elif self.preferred_source == "ytm" and self.ytm and not self.ytm.is_connected:
@@ -304,9 +318,22 @@ class MusicManager:
                     self.current_track_info = simplified_info_poll
                     self.current_source = polled_source
 
+                    logger.debug(f"[Poll Update] Old Album Art URL: {old_album_art_url_poll}, New Album Art URL: {new_album_art_url_poll}")
                     if new_album_art_url_poll != old_album_art_url_poll:
+                        logger.info("[Poll Update] Album art URL changed. Clearing self.album_art_image to force re-fetch.")
                         self.album_art_image = None
                         self.last_album_art_url = new_album_art_url_poll
+                    elif not self.last_album_art_url and new_album_art_url_poll: # Case where old was None, new is something
+                        logger.info("[Poll Update] New album art URL appeared (was None). Clearing self.album_art_image.")
+                        self.album_art_image = None
+                        self.last_album_art_url = new_album_art_url_poll
+                    elif new_album_art_url_poll is None and old_album_art_url_poll is not None:
+                        logger.info("[Poll Update] Album art URL disappeared (became None). Clearing image and URL.")
+                        self.album_art_image = None
+                        self.last_album_art_url = None
+                    elif self.current_track_info and self.current_track_info.get('album_art_url') and not self.last_album_art_url:
+                         self.last_album_art_url = self.current_track_info.get('album_art_url')
+                         self.album_art_image = None # Ensure image is cleared if URL was just populated from None
                     
                     display_title_poll = self.current_track_info.get('title', 'None') if self.current_track_info else 'None'
                     logger.debug(f"Poll Update: Track change detected. Source: {self.current_source.name}. Track: {display_title_poll}")
@@ -462,17 +489,17 @@ class MusicManager:
             if not self.is_currently_showing_nothing_playing or force_clear:
                 if force_clear or not self.is_currently_showing_nothing_playing: # Ensure clear if forced or first time
                     self.display_manager.clear()
-                    logger.debug("[MusicManager.display] Display cleared for 'Nothing Playing'.")
+                    # logger.debug("[MusicManager.display] Display cleared for 'Nothing Playing'.") # Commented out
                 
-                logger.debug(f"[MusicManager.display] Font for 'Nothing Playing': {self.display_manager.regular_font}, Type: {type(self.display_manager.regular_font)}")
+                # logger.debug(f"[MusicManager.display] Font for 'Nothing Playing': {self.display_manager.regular_font}, Type: {type(self.display_manager.regular_font)}") # Commented out
                 text_width = self.display_manager.get_text_width("Nothing Playing", self.display_manager.regular_font)
-                logger.debug(f"[MusicManager.display] Calculated text_width for 'Nothing Playing': {text_width}")
+                # logger.debug(f"[MusicManager.display] Calculated text_width for 'Nothing Playing': {text_width}") # Commented out
                 x_pos = (self.display_manager.matrix.width - text_width) // 2
                 y_pos = (self.display_manager.matrix.height // 2) - 4
-                logger.debug(f"[MusicManager.display] Drawing 'Nothing Playing' at x={x_pos}, y={y_pos}")
+                # logger.debug(f"[MusicManager.display] Drawing 'Nothing Playing' at x={x_pos}, y={y_pos}") # Commented out
                 self.display_manager.draw_text("Nothing Playing", x=x_pos, y=y_pos, font=self.display_manager.regular_font)
                 self.display_manager.update_display()
-                logger.debug("[MusicManager.display] 'Nothing Playing' text drawn and display updated.")
+                # logger.debug("[MusicManager.display] 'Nothing Playing' text drawn and display updated.") # Commented out
                 self.is_currently_showing_nothing_playing = True
 
             with self.track_info_lock: # Protect writes to shared state
