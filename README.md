@@ -370,6 +370,7 @@ The Music Display module shows information about the currently playing track fro
 2.  **YouTube Music (YTM):**
     *   Requires the [YouTube Music Desktop App](https://ytmdesktop.app/) (YTMD) to be installed and running on a computer on the *same network* as the Raspberry Pi.
     *   In YTMD settings, enable the "Companion Server" under Integration options. Note the URL it provides (usually `http://localhost:9863` if running on the same machine, or `http://<YTMD-Computer-IP>:9863` if running on a different computer).
+    * Note, The YTM Display seems to most reliably update on the display switch INTO the MusicManager Display. Song changes after this are less reliable in updating on time. I am trying to figure this quirk out but shouldn't be too disruptive. Spotify doesn't have this issue.
 
 **Configuration:**
 
@@ -413,7 +414,6 @@ The Music Display module shows information about the currently playing track fro
 
 **`preferred_source` Options:**
 
-*   `"auto"`: (Default) Checks Spotify first. If Spotify is playing, shows its track. If not, checks YTM.
 *   `"spotify"`: Only uses Spotify. Ignores YTM.
 *   `"ytm"`: Only uses the YTM Companion Server. Ignores Spotify.
 
