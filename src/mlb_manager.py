@@ -63,6 +63,27 @@ class BaseMLBManager:
             logger.error(f"Error loading logo for team {team_abbr}: {e}")
             return None
 
+    def _draw_text_with_outline(self, draw, text, position, font, fill=(255, 255, 255), outline_color=(0, 0, 0)):
+        """
+        Draw text with a black outline for better readability.
+        
+        Args:
+            draw: ImageDraw object
+            text: Text to draw
+            position: (x, y) position to draw the text
+            font: Font to use
+            fill: Text color (default: white)
+            outline_color: Outline color (default: black)
+        """
+        x, y = position
+        
+        # Draw the outline by drawing the text in black at 8 positions around the text
+        for dx, dy in [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]:
+            draw.text((x + dx, y + dy), text, font=font, fill=outline_color)
+        
+        # Draw the text in the specified color
+        draw.text((x, y), text, font=font, fill=fill)
+
     def _draw_base_indicators(self, draw: ImageDraw.Draw, bases_occupied: List[bool], center_x: int, y: int) -> None:
         """Draw base indicators on the display."""
         base_size = 8  # Increased from 6 to 8 for better visibility
@@ -165,13 +186,15 @@ class BaseMLBManager:
             date_width = draw.textlength(game_date, font=date_font)
             date_x = (width - date_width) // 2
             date_y = (height - date_font.size) // 2 - 3
-            draw.text((date_x, date_y), game_date, font=date_font, fill=(255, 255, 255))
+            # draw.text((date_x, date_y), game_date, font=date_font, fill=(255, 255, 255))
+            self._draw_text_with_outline(draw, game_date, (date_x, date_y), date_font)
             
             # Draw time below date
             time_width = draw.textlength(game_time_str, font=time_font)
             time_x = (width - time_width) // 2
             time_y = date_y + 10
-            draw.text((time_x, time_y), game_time_str, font=time_font, fill=(255, 255, 255))
+            # draw.text((time_x, time_y), game_time_str, font=time_font, fill=(255, 255, 255))
+            self._draw_text_with_outline(draw, game_time_str, (time_x, time_y), time_font)
         
         # For recent/final games, show scores and status
         elif game_data['status'] in ['status_final', 'final', 'completed']:
@@ -198,7 +221,8 @@ class BaseMLBManager:
             score_width = draw.textlength(score_text, font=score_font)
             score_x = (width - score_width) // 2
             score_y = height - score_font.size - 2
-            draw.text((score_x, score_y), score_text, font=score_font, fill=(255, 255, 255))
+            # draw.text((score_x, score_y), score_text, font=score_font, fill=(255, 255, 255))
+            self._draw_text_with_outline(draw, score_text, (score_x, score_y), score_font)
         
         return image
 
@@ -615,7 +639,8 @@ class MLBLiveManager(BaseMLBManager):
         inning_width = inning_bbox[2] - inning_bbox[0]
         inning_x = (width - inning_width) // 2
         inning_y = 0 # Position near top center
-        draw.text((inning_x, inning_y), inning_text, fill=(255, 255, 255), font=self.display_manager.font)
+        # draw.text((inning_x, inning_y), inning_text, fill=(255, 255, 255), font=self.display_manager.font)
+        self._draw_text_with_outline(draw, inning_text, (inning_x, inning_y), self.display_manager.font)
         
         # --- REVISED BASES AND OUTS DRAWING --- 
         bases_occupied = game_data['bases_occupied'] # [1st, 2nd, 3rd]
@@ -718,7 +743,9 @@ class MLBLiveManager(BaseMLBManager):
         
         # Ensure draw object is set and draw text
         self.display_manager.draw = draw 
-        self.display_manager._draw_bdf_text(count_text, count_x, count_y, text_color, font=bdf_font)
+        # self.display_manager._draw_bdf_text(count_text, count_x, count_y, text_color, font=bdf_font)
+        # Use _draw_text_with_outline for count text
+        self._draw_text_with_outline(draw, count_text, (count_x, count_y), bdf_font, fill=text_color)
 
         # Draw Team:Score at the bottom
         score_font = self.display_manager.font # Use PressStart2P
@@ -728,12 +755,13 @@ class MLBLiveManager(BaseMLBManager):
         # Helper function for outlined text
         def draw_bottom_outlined_text(x, y, text):
             # Draw outline
-            draw.text((x-1, y), text, font=score_font, fill=outline_color)
-            draw.text((x+1, y), text, font=score_font, fill=outline_color)
-            draw.text((x, y-1), text, font=score_font, fill=outline_color)
-            draw.text((x, y+1), text, font=score_font, fill=outline_color)
-            # Draw main text
-            draw.text((x, y), text, font=score_font, fill=score_text_color)
+            # draw.text((x-1, y), text, font=score_font, fill=outline_color)
+            # draw.text((x+1, y), text, font=score_font, fill=outline_color)
+            # draw.text((x, y-1), text, font=score_font, fill=outline_color)
+            # draw.text((x, y+1), text, font=score_font, fill=outline_color)
+            # # Draw main text
+            # draw.text((x, y), text, font=score_font, fill=score_text_color)
+            self._draw_text_with_outline(draw, text, (x,y), score_font, fill=score_text_color, outline_color=outline_color)
 
         away_abbr = game_data['away_team']
         home_abbr = game_data['home_team']

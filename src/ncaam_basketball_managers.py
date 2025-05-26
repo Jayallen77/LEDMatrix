@@ -249,6 +249,27 @@ class BaseNCAAMBasketballManager:
             self.logger.error(f"Error loading logo for {team_abbrev}: {e}", exc_info=True)
             return None
 
+    def _draw_text_with_outline(self, draw, text, position, font, fill=(255, 255, 255), outline_color=(0, 0, 0)):
+        """
+        Draw text with a black outline for better readability.
+        
+        Args:
+            draw: ImageDraw object
+            text: Text to draw
+            position: (x, y) position to draw the text
+            font: Font to use
+            fill: Text color (default: white)
+            outline_color: Outline color (default: black)
+        """
+        x, y = position
+        
+        # Draw the outline by drawing the text in black at 8 positions around the text
+        for dx, dy in [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]:
+            draw.text((x + dx, y + dy), text, font=font, fill=outline_color)
+        
+        # Draw the text in the specified color
+        draw.text((x, y), text, font=font, fill=fill)
+
     @classmethod
     def _fetch_shared_data(cls, date_str: str = None) -> Optional[Dict]:
         """Fetch and cache data for all managers to share."""
@@ -472,19 +493,19 @@ class BaseNCAAMBasketballManager:
                 status_width = draw.textlength(status_text, font=self.fonts['status'])
                 status_x = (self.display_width - status_width) // 2
                 status_y = 2
-                draw.text((status_x, status_y), status_text, font=self.fonts['status'], fill=(255, 255, 255))
+                self._draw_text_with_outline(draw, status_text, (status_x, status_y), self.fonts['status'])
                 
                 # Calculate position for the date text (centered horizontally, below "Next Game")
                 date_width = draw.textlength(game_date, font=self.fonts['time'])
                 date_x = (self.display_width - date_width) // 2
                 date_y = center_y - 5  # Position in center
-                draw.text((date_x, date_y), game_date, font=self.fonts['time'], fill=(255, 255, 255))
+                self._draw_text_with_outline(draw, game_date, (date_x, date_y), self.fonts['time'])
                 
                 # Calculate position for the time text (centered horizontally, in center)
                 time_width = draw.textlength(game_time, font=self.fonts['time'])
                 time_x = (self.display_width - time_width) // 2
                 time_y = date_y + 10  # Position below date
-                draw.text((time_x, time_y), game_time, font=self.fonts['time'], fill=(255, 255, 255))
+                self._draw_text_with_outline(draw, game_time, (time_x, time_y), self.fonts['time'])
             else:
                 # For live/final games, show scores and period/time
                 home_score = str(game.get("home_score", "0"))
@@ -495,7 +516,7 @@ class BaseNCAAMBasketballManager:
                 score_width = draw.textlength(score_text, font=self.fonts['score'])
                 score_x = (self.display_width - score_width) // 2
                 score_y = self.display_height - 10
-                draw.text((score_x, score_y), score_text, font=self.fonts['score'], fill=(255, 255, 255))
+                self._draw_text_with_outline(draw, score_text, (score_x, score_y), self.fonts['score'])
 
                 # Draw period and time or Final
                 if game.get("is_final", False):
@@ -503,13 +524,13 @@ class BaseNCAAMBasketballManager:
                     status_width = draw.textlength(status_text, font=self.fonts['time'])
                     status_x = (self.display_width - status_width) // 2
                     status_y = 5
-                    draw.text((status_x, status_y), status_text, font=self.fonts['time'], fill=(255, 255, 255))
+                    self._draw_text_with_outline(draw, status_text, (status_x, status_y), self.fonts['time'])
                 elif game.get("is_halftime", False):
                     status_text = "Halftime"
                     status_width = draw.textlength(status_text, font=self.fonts['time'])
                     status_x = (self.display_width - status_width) // 2
                     status_y = 5
-                    draw.text((status_x, status_y), status_text, font=self.fonts['time'], fill=(255, 255, 255))
+                    self._draw_text_with_outline(draw, status_text, (status_x, status_y), self.fonts['time'])
                 else:
                     period = game.get("period", 0)
                     clock = game.get("clock", "0:00")
@@ -530,13 +551,13 @@ class BaseNCAAMBasketballManager:
                     period_width = draw.textlength(period_text, font=self.fonts['time'])
                     period_x = (self.display_width - period_width) // 2
                     period_y = 1
-                    draw.text((period_x, period_y), period_text, font=self.fonts['time'], fill=(255, 255, 255))
+                    self._draw_text_with_outline(draw, period_text, (period_x, period_y), self.fonts['time'])
                     
                     # Draw clock below period
                     clock_width = draw.textlength(clock, font=self.fonts['time'])
                     clock_x = (self.display_width - clock_width) // 2
                     clock_y = period_y + 10  # Position below period
-                    draw.text((clock_x, clock_y), clock, font=self.fonts['time'], fill=(255, 255, 255))
+                    self._draw_text_with_outline(draw, clock, (clock_x, clock_y), self.fonts['time'])
 
             # Display the image
             self.display_manager.image.paste(main_img, (0, 0))
@@ -606,29 +627,33 @@ class NCAAMBasketballLiveManager(BaseNCAAMBasketballManager):
             if self.test_mode:
                 # For testing, update the clock and maybe period
                 if self.current_game:
-                    minutes = int(self.current_game["clock"].split(":")[0])
-                    seconds = int(self.current_game["clock"].split(":")[1])
-                    seconds -= 1
-                    if seconds < 0:
-                        seconds = 59
-                        minutes -= 1
-                        if minutes < 0:
-                             # Simulate moving from H1 to H2 or H2 to OT
-                            if self.current_game["period"] == 1:
-                                self.current_game["period"] = 2
-                                minutes = 19 # Reset clock for H2
-                                seconds = 59
-                            elif self.current_game["period"] == 2:
-                                self.current_game["period"] = 3 # Go to OT
-                                minutes = 4 # Reset clock for OT
-                                seconds = 59
-                            elif self.current_game["period"] >= 3: # OT+
-                                self.current_game["period"] += 1
-                                minutes = 4
-                                seconds = 59
-                    self.current_game["clock"] = f"{minutes:02d}:{seconds:02d}"
-                    # Always update display in test mode
-                    self.display(force_clear=True)
+                    try: # Add try-except for robust clock parsing
+                        minutes_str, seconds_str = self.current_game["clock"].split(":")
+                        minutes = int(minutes_str)
+                        seconds = int(seconds_str)
+                        seconds -= 1
+                        if seconds < 0:
+                            seconds = 59
+                            minutes -= 1
+                            if minutes < 0:
+                                # Simulate moving from H1 to H2 or H2 to OT
+                                if self.current_game["period"] == 1:
+                                    self.current_game["period"] = 2
+                                    minutes = 19 # Reset clock for H2
+                                    seconds = 59
+                                elif self.current_game["period"] == 2:
+                                    self.current_game["period"] = 3 # Go to OT
+                                    minutes = 4 # Reset clock for OT
+                                    seconds = 59
+                                elif self.current_game["period"] >= 3: # OT+
+                                    self.current_game["period"] += 1
+                                    minutes = 4
+                                    seconds = 59
+                        self.current_game["clock"] = f"{minutes:02d}:{seconds:02d}"
+                        # Always update display in test mode
+                        self.display(force_clear=True)
+                    except ValueError:
+                        self.logger.warning(f"[NCAAMBasketball] Could not parse clock in test mode: {self.current_game.get('clock')}")
             else:
                 # Fetch live game data from ESPN API
                 data = self._fetch_data()
@@ -665,7 +690,19 @@ class NCAAMBasketballLiveManager(BaseNCAAMBasketballManager):
                         if new_live_games:
                             self.logger.info(f"[NCAAMBasketball] Found {len(new_live_games)} live games")
                             for game in new_live_games:
-                                status_str = f"H{game['period']}" if game['period'] <=2 else f"OT{game['period']-2 if game['period'] > 3 else ''}"
+                                period = game.get('period', 0)
+                                if game.get('is_halftime'):
+                                    status_str = "Halftime"
+                                elif period == 1:
+                                    status_str = "H1"
+                                elif period == 2:
+                                    status_str = "H2"
+                                elif period == 3:
+                                    status_str = "OT"
+                                elif period > 3:
+                                    status_str = f"{period-2}OT"
+                                else:
+                                    status_str = f"P{period}" # Fallback
                                 self.logger.info(f"[NCAAMBasketball] Live game: {game['away_abbr']} vs {game['home_abbr']} - {status_str}, {game['clock']}")
                             if has_favorite_team:
                                 self.logger.info("[NCAAMBasketball] Found live game(s) for favorite team(s)")
@@ -676,24 +713,23 @@ class NCAAMBasketballLiveManager(BaseNCAAMBasketballManager):
                     if new_live_games:
                         # Update the current game with the latest data if it matches
                         current_game_updated = False
-                        for new_game in new_live_games:
-                             if self.current_game and (
-                                 (new_game["home_abbr"] == self.current_game["home_abbr"] and
-                                  new_game["away_abbr"] == self.current_game["away_abbr"]) or
-                                 (new_game["home_abbr"] == self.current_game["away_abbr"] and
-                                  new_game["away_abbr"] == self.current_game["home_abbr"])
-                             ):
-                                self.current_game = new_game
-                                current_game_updated = True
-                                break
+                        if self.current_game: # Ensure current_game is not None
+                            for new_game in new_live_games:
+                                if (new_game["home_abbr"] == self.current_game["home_abbr"] and
+                                    new_game["away_abbr"] == self.current_game["away_abbr"]) or \
+                                   (new_game["home_abbr"] == self.current_game["away_abbr"] and
+                                        new_game["away_abbr"] == self.current_game["home_abbr"]):
+                                    self.current_game = new_game
+                                    current_game_updated = True
+                                    break
 
                         # Only update the games list if there's a structural change
                         if not self.live_games or set(game["away_abbr"] + game["home_abbr"] for game in new_live_games) != set(game["away_abbr"] + game["home_abbr"] for game in self.live_games):
                             self.live_games = new_live_games
                             # If we don't have a current game, it's not in the new list, or the list was empty, reset
-                            if not self.current_game or not current_game_updated or not self.live_games:
+                            if not self.current_game or not current_game_updated or not self.live_games: # Check self.live_games is not empty
                                 self.current_game_index = 0
-                                self.current_game = self.live_games[0] if self.live_games else None
+                                self.current_game = self.live_games[0] if self.live_games else None # Handle empty self.live_games
                                 self.last_game_switch = current_time
 
                         # Cycle through games if multiple are present
