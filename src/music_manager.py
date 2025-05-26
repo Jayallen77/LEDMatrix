@@ -174,23 +174,40 @@ class MusicManager:
                                                        MusicSource.YTM if is_actually_playing_ytm else MusicSource.NONE)
 
         has_changed = False
+        processed_a_meaningful_update = False
+
+        # For YTM direct updates, we want to ensure the DisplayController is notified
+        # to potentially refresh the display, even if simplified_info is identical (e.g. progress update).
+        # The DisplayController's force_clear will handle scroll resets.
+        # The internal current_track_info update should still only happen if data truly differs.
+        force_callback_for_ytm_event = True 
+
         with self.track_info_lock:
             if simplified_info != self.current_track_info:
                 has_changed = True
+                processed_a_meaningful_update = True
+
                 old_album_art_url = self.current_track_info.get('album_art_url') if self.current_track_info else None
+                
+                # Update main track info
+                self.current_track_info = simplified_info
+                # Update current_source based on whether YTM is actually playing and info exists
+                if is_actually_playing_ytm and simplified_info.get('source') == 'YouTube Music':
+                    self.current_source = MusicSource.YTM
+                elif not is_actually_playing_ytm and self.current_source == MusicSource.YTM: # YTM stopped
+                    self.current_source = MusicSource.NONE
+                # If simplified_info became 'Nothing Playing', current_source would be NONE from get_simplified_track_info
+
                 new_album_art_url = simplified_info.get('album_art_url') if simplified_info else None
 
-                self.current_track_info = simplified_info
-                self.current_source = MusicSource.YTM if is_actually_playing_ytm and simplified_info.get('source') == 'YouTube Music' else self.current_source
-                if not is_actually_playing_ytm and self.current_source == MusicSource.YTM:
-                    self.current_source = MusicSource.NONE 
-
+                logger.debug(f"[YTM Direct Update] Track info comparison: simplified_info != self.current_track_info was TRUE.")
                 logger.debug(f"[YTM Direct Update] Old Album Art URL: {old_album_art_url}, New Album Art URL: {new_album_art_url}")
+
                 if new_album_art_url != old_album_art_url:
                     logger.info("[YTM Direct Update] Album art URL changed. Clearing self.album_art_image to force re-fetch.")
                     self.album_art_image = None
                     self.last_album_art_url = new_album_art_url
-                elif not self.last_album_art_url and new_album_art_url: # Case where old was None, new is something
+                elif not self.last_album_art_url and new_album_art_url:
                     logger.info("[YTM Direct Update] New album art URL appeared (was None). Clearing self.album_art_image.")
                     self.album_art_image = None
                     self.last_album_art_url = new_album_art_url
@@ -199,22 +216,38 @@ class MusicManager:
                     self.album_art_image = None
                     self.last_album_art_url = None
                 elif self.current_track_info and self.current_track_info.get('album_art_url') and not self.last_album_art_url:
-                     self.last_album_art_url = self.current_track_info.get('album_art_url')
-                     self.album_art_image = None # Ensure image is cleared if URL was just populated from None
+                    self.last_album_art_url = self.current_track_info.get('album_art_url')
+                    self.album_art_image = None
                 
                 display_title = self.current_track_info.get('title', 'None') if self.current_track_info else 'None'
-                logger.debug(f"YTM Direct Update: Track change detected. Source: {self.current_source.name}. Track: {display_title}")
+                logger.info(f"YTM Direct Update: Track info updated. Source: {self.current_source.name}. New Track: {display_title}")
             else:
-                logger.debug("YTM Direct Update: No change in simplified track info.")
+                # simplified_info IS THE SAME as self.current_track_info
+                has_changed = False
+                processed_a_meaningful_update = False
+                logger.debug("YTM Direct Update: No change in simplified track info (simplified_info == self.current_track_info).")
 
-        if has_changed and self.update_callback:
+        # Decide whether to call the update_callback
+        # We force it for YTM events to ensure DisplayController can react (e.g. set force_clear)
+        # The 'has_changed' is more about whether MusicManager itself logged a data change.
+        # 'processed_a_meaningful_update' indicates if self.current_track_info was actually changed.
+        if force_callback_for_ytm_event and self.update_callback:
+            if not processed_a_meaningful_update:
+                 logger.debug("YTM Direct Update: Forcing callback to DisplayController despite no change in MusicManager's current_track_info, due to YTM event.")
             try:
-                # Pass a copy of the track info to the callback
-                with self.track_info_lock:
+                with self.track_info_lock: # Get a fresh copy for the callback
                     track_info_copy = self.current_track_info.copy() if self.current_track_info else None
                 self.update_callback(track_info_copy) 
             except Exception as e:
                 logger.error(f"Error executing DisplayController update callback from YTM direct update: {e}")
+        elif has_changed and self.update_callback: # Fallback if force_callback_for_ytm_event was false (not currently possible here)
+            logger.info("YTM Direct Update: (Fallback logic) Calling DisplayController update_callback because track info changed.")
+            try:
+                with self.track_info_lock:
+                    track_info_copy = self.current_track_info.copy() if self.current_track_info else None
+                self.update_callback(track_info_copy)
+            except Exception as e:
+                logger.error(f"Error executing DisplayController update callback from YTM direct update (fallback logic): {e}")
 
     def _fetch_and_resize_image(self, url: str, target_size: tuple[int, int]) -> Image.Image | None:
         """Fetches an image from a URL, resizes it, and returns a PIL Image object."""
@@ -468,11 +501,12 @@ class MusicManager:
 
     # Method moved from DisplayController and renamed
     def display(self, force_clear: bool = False):
-        if force_clear: 
+        # Determine if scroll positions should be reset based on force_clear
+        # This flag will be used if we are displaying actual music.
+        should_reset_scroll_for_music = force_clear
+
+        if force_clear:
             self.display_manager.clear()
-            # When force_clear is true (typically on mode switch to music),
-            # ensure YTM client is active if it's the preferred source.
-            # activate_music_display handles this.
             self.activate_music_display() 
 
         with self.track_info_lock:
@@ -510,9 +544,21 @@ class MusicManager:
                     self.last_album_art_url = None
             return
 
+        # If we're here, we are displaying actual music info.
         self.is_currently_showing_nothing_playing = False 
-        if not self.is_music_display_active: # Should be active if we are displaying music
-            self.activate_music_display() # Redundant if called above, but safe
+
+        # Reset scroll positions if force_clear was true (now stored in should_reset_scroll_for_music)
+        # and we are about to display a new track.
+        if should_reset_scroll_for_music:
+            title_being_displayed = current_track_info_snapshot.get('title','N/A')
+            logger.debug(f"MusicManager: Resetting scroll positions for track '{title_being_displayed}' due to force_clear.")
+            self.scroll_position_title = 0
+            self.scroll_position_artist = 0
+            self.title_scroll_tick = 0
+            self.artist_scroll_tick = 0
+
+        if not self.is_music_display_active: 
+            self.activate_music_display()
 
         if not force_clear:
             self.display_manager.draw.rectangle([0, 0, self.display_manager.matrix.width, self.display_manager.matrix.height], fill=(0, 0, 0))
