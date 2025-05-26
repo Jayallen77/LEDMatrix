@@ -15,14 +15,24 @@ Modular, rotating Displays that can be individually enabled or disabled per the 
 
 ### Time and Weather
 - Real-time clock display
-- Current Weather, Daily Weather, and Hourly Weather Forecasts with icons from 
+- ![DSC01342](https://github.com/user-attachments/assets/a3c9d678-b812-4977-8aa8-f0c3d1663f05)
+- Current Weather, Daily Weather, and Hourly Weather Forecasts
+- ![DSC01332](https://github.com/user-attachments/assets/19b2182c-463c-458a-bf4e-5d04acd8d120)
+- ![DSC01335](https://github.com/user-attachments/assets/4bcae193-cbea-49da-aac4-72d6fc9a7acd)
+- ![DSC01333](https://github.com/user-attachments/assets/f0be5cf2-600e-4fae-a956-97327ef11d70)
+
 - Google Calendar event display
 
 ### Sports Information
 The system supports live, recent, and upcoming game information for multiple sports leagues:
 - NHL (Hockey)
+- ![DSC01347](https://github.com/user-attachments/assets/854b3e63-43f5-4bf9-8fed-14a96cf3e7dd)
+- ![DSC01339](https://github.com/user-attachments/assets/13aacd18-c912-439b-a2f4-82a7ec7a2831)
+- ![DSC01338](https://github.com/user-attachments/assets/8fbc8251-f573-4e2b-b981-428d6ff3ac61)
 - NBA (Basketball)
 - MLB (Baseball)
+- ![DSC01346](https://github.com/user-attachments/assets/fb82b662-98f8-499c-aaf8-f9241dc3d634)
+- ![DSC01341](https://github.com/user-attachments/assets/f79cbf2e-f3b4-4a14-8482-01f2a3d53963)
 - NFL (Football)
 - NCAA Football
 - NCAA Men's Basketball
@@ -34,6 +44,8 @@ The system supports live, recent, and upcoming game information for multiple spo
 - Near real-time stock & crypto price updates
 - Stock news headlines
 - Customizable stock & crypto watchlists
+- ![DSC01317](https://github.com/user-attachments/assets/01a01ecf-bef1-4f61-a7b2-d6658622f73d)
+
 
 ### Entertainment
 - Music playback information from multiple sources:
@@ -41,10 +53,13 @@ The system supports live, recent, and upcoming game information for multiple spo
   - YouTube Music integration
 - Album art display
 - Now playing information with scrolling text
+- ![DSC01354](https://github.com/user-attachments/assets/41b9e45f-8946-4213-87d2-6657b7f05757)
+
 
 ### Custom Display Features
 - Custom Text display 
 - Youtube Subscriber Count Display
+- ![DSC01319](https://github.com/user-attachments/assets/4d80fe99-839b-4d5e-9908-149cf1cce107)
 - Font testing and customization
 - Configurable display modes
 
@@ -76,6 +91,19 @@ The system can be configured through a JSON configuration file that allows users
 -- https://www.adafruit.com/product/2278 
 - DC Power Supply for Adafruit RGB HAT
 -- https://www.adafruit.com/product/658
+
+## Optional but recommended mod for Adafruit RGB Matrix Bonnet
+- By soldering a jumper between pins 4 and 18, you can run a specialized command for polling the matrix display. This provides better brightness, less flicker, and better color.
+- If you do the mod, we will use the command: --led-gpio-mapping=adafruit-hat-pwm, otherwise just use --led-gpio-mapping=adafruit-hat
+- More information available: https://github.com/hzeller/rpi-rgb-led-matrix/tree/master?tab=readme-ov-file
+![DSC00079](https://github.com/user-attachments/assets/4282d07d-dfa2-4546-8422-ff1f3a9c0703)
+
+
+
+Overall 2 Matrix display with Rpi connected.
+![DSC00073](https://github.com/user-attachments/assets/a0e167ae-37c6-4db9-b9ce-a2b957ca1a67)
+
+
 
 
 -----------------------------------------------------------------------------------
