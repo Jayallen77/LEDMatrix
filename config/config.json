@@ -77,7 +77,7 @@
         "enabled": true,
         "update_interval": 300,
         "symbols": [
-            "ASTS", "SCHD", "INTC", "NVDA", "T", "VOO", "SPEST", "SMCI"
+            "ASTS", "SCHD", "INTC", "NVDA", "T", "VOO", "SMCI"
         ],
         "display_format": "{symbol}: ${price} ({change}%)"
     },
