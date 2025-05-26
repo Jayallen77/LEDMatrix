@@ -385,8 +385,8 @@ class DisplayController:
         logger.info(f"Initial display mode: {self.current_display_mode}")
         logger.info("DisplayController initialized with display_manager: %s", id(self.display_manager))
 
-    def _handle_music_update(self, track_info: Dict[str, Any]):
-        """Callback for when music track info changes. (Simplified)"""
+    def _handle_music_update(self, track_info: Dict[str, Any], significant_change: bool = False):
+        """Callback for when music track info changes."""
         # MusicManager now handles its own display state (album art, etc.)
         # This callback might still be useful if DisplayController needs to react to music changes
         # for reasons other than directly re-drawing the music screen (e.g., logging, global state).
@@ -397,8 +397,12 @@ class DisplayController:
             logger.debug("DisplayController received music update (via callback): Track is None or not playing.")
 
         if self.current_display_mode == 'music' and self.music_manager:
-            logger.info("Music is current display mode and track updated. Signaling immediate refresh.")
-            self.force_clear = True # Tell the display method to clear before drawing
+            if significant_change:
+                logger.info("Music is current display mode and SIGNIFICANT track updated. Signaling immediate refresh.")
+                self.force_clear = True # Tell the display method to clear before drawing
+            else:
+                logger.debug("Music is current display mode and received a MINOR update (e.g. progress). No force_clear.")
+                # self.force_clear = False # Ensure it's false if not significant, or let run loop manage
         # If the current display mode is music, the MusicManager's display method will be called
         # in the main loop and will use its own updated internal state. No explicit action needed here
         # to force a redraw of the music screen itself, unless DisplayController wants to switch TO music mode.
@@ -970,6 +974,7 @@ class DisplayController:
 
                 # Small sleep removed - updates/drawing should manage timing
                 # time.sleep(self.update_interval) 
+                #time.sleep(self.update_interval) # Re-add the sleep
 
         except KeyboardInterrupt:
             logger.info("Display controller stopped by user")

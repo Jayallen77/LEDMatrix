@@ -185,7 +185,19 @@ class MusicManager:
         logger.debug(f"MusicManager._handle_ytm_direct_update: PRE-COMPARE - SimplifiedInfo: {simplified_info_str}, CurrentTrackInfo: {current_track_info_before_update_str}")
 
         processed_a_meaningful_update = False
+        significant_track_change_detected = False # New flag
+
         with self.track_info_lock:
+            # Determine if it's a significant change (title, artist, or album_art_url different)
+            # or if current_track_info is None (first update is always significant)
+            if self.current_track_info is None:
+                significant_track_change_detected = True
+            else:
+                if (simplified_info.get('title') != self.current_track_info.get('title') or
+                    simplified_info.get('artist') != self.current_track_info.get('artist') or
+                    simplified_info.get('album_art_url') != self.current_track_info.get('album_art_url')):
+                    significant_track_change_detected = True
+
             if simplified_info != self.current_track_info:
                 processed_a_meaningful_update = True
                 old_album_art_url = self.current_track_info.get('album_art_url') if self.current_track_info else None
@@ -226,6 +238,15 @@ class MusicManager:
                 # simplified_info IS THE SAME as self.current_track_info
                 processed_a_meaningful_update = False
                 logger.debug("YTM Direct Update: No change in simplified track info (simplified_info == self.current_track_info).")
+                # Even if simplified_info is same, if self.current_track_info was None, it's a first load.
+                if self.current_track_info is None and simplified_info.get('title') != 'Nothing Playing':
+                    # This edge case might mean the very first update after 'Nothing Playing'
+                    # was identical to what was already in simplified_info due to a rapid event.
+                    # Consider it a significant change if we are moving from None to something.
+                    significant_track_change_detected = True
+                    processed_a_meaningful_update = True # Ensure current_track_info gets set
+                    self.current_track_info = simplified_info # Explicitly set if it was None
+                    logger.info("YTM Direct Update: First valid track data received, marking as significant change.")
 
         # Always try to update queue and signal refresh if YTM is source and display active
         # This ensures even progress updates (if simplified_info is the same) can trigger a UI refresh if needed.
@@ -243,8 +264,14 @@ class MusicManager:
             logger.warning("MusicManager._handle_ytm_direct_update: ytm_event_data_queue was full. This should not happen with maxsize=1 and clearing.")
             # If full, the old item remains, which is fine, display will pick it up.
 
-        logger.info("YTM Direct Update: Signaling for an immediate full refresh of MusicManager display.")
-        self._needs_immediate_full_refresh = True
+        if significant_track_change_detected:
+            logger.info("YTM Direct Update: Significant track change detected. Signaling for an immediate full refresh of MusicManager display.")
+            self._needs_immediate_full_refresh = True
+        else:
+            logger.debug("YTM Direct Update: No significant track change. UI will update progress/state without full refresh.")
+            # Ensure _needs_immediate_full_refresh is False if no significant change,
+            # in case it was somehow set by a rapid previous event that didn't get consumed.
+            # self._needs_immediate_full_refresh = False # This might be too aggressive, display() consumes it.
 
         if self.update_callback:
             # Callback to DisplayController still useful to signal generic music update
@@ -253,7 +280,7 @@ class MusicManager:
                 # Send a copy of what's now in current_track_info for consistency with polling path
                 # Or send simplified_info if we want DisplayController to log the absolute latest event data.
                 # Let's send simplified_info to make it consistent with what's put on the queue.
-                self.update_callback(simplified_info) 
+                self.update_callback(simplified_info, significant_track_change_detected) 
             except Exception as e:
                 logger.error(f"Error executing DisplayController update callback from YTM direct update: {e}")
 
@@ -385,7 +412,7 @@ class MusicManager:
                 try:
                     with self.track_info_lock:
                         track_info_copy_poll = self.current_track_info.copy() if self.current_track_info else None
-                    self.update_callback(track_info_copy_poll)
+                    self.update_callback(track_info_copy_poll, True) # Poll changes are considered significant
                 except Exception as e:
                     logger.error(f"Error executing update callback from poll: {e}")
             
