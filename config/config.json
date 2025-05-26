@@ -225,7 +225,8 @@
         "scroll": true,
         "scroll_speed": 40, 
         "text_color": [255, 0, 0], 
-        "background_color": [0, 0, 0]
+        "background_color": [0, 0, 0],
+        "scroll_gap_width": 32
     },
     "soccer_scoreboard": {
         "enabled": false,
