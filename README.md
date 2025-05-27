@@ -90,8 +90,8 @@ The system can be configured through a JSON configuration file that allows users
 -- https://www.adafruit.com/product/3211
 - 2x LED Matrix panels (64x32) (Designed for 128x32 but has a lot of dynamic scaling elements that could work on a variety of displays, pixel pitch is user preference)
 -- https://www.adafruit.com/product/2278 
-- DC Power Supply for Adafruit RGB HAT
--- https://www.adafruit.com/product/658
+- 5V 4A DC Power Supply for Adafruit RGB HAT
+-- https://www.adafruit.com/product/1466
 
 ## Optional but recommended mod for Adafruit RGB Matrix Bonnet
 - By soldering a jumper between pins 4 and 18, you can run a specialized command for polling the matrix display. This provides better brightness, less flicker, and better color.
