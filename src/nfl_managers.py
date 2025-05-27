@@ -293,6 +293,14 @@ class BaseNFLManager: # Renamed class
                  self.logger.warning(f"[NFL] Could not find home or away team in event: {game_event.get('id')}")
                  return None
 
+            home_abbr = home_team["team"]["abbreviation"]
+            away_abbr = away_team["team"]["abbreviation"]
+
+            # Filter by favorite teams if the list is not empty
+            if self.favorite_teams and not (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams):
+                self.logger.debug(f"[NFL] Skipping non-favorite game: {away_abbr}@{home_abbr} in _extract_game_details")
+                return None
+
             game_time, game_date = "", ""
             if start_time_utc:
                 local_time = start_time_utc.astimezone()
@@ -349,13 +357,13 @@ class BaseNFLManager: # Renamed class
                 "is_final": status["type"]["state"] == "post",
                 "is_upcoming": status["type"]["state"] == "pre",
                 "is_halftime": status["type"]["state"] == "halftime", # Added halftime check
-                "home_abbr": home_team["team"]["abbreviation"],
+                "home_abbr": home_abbr,
                 "home_score": home_team.get("score", "0"),
-                "home_logo_path": os.path.join(self.logo_dir, f"{home_team['team']['abbreviation']}.png"),
+                "home_logo_path": os.path.join(self.logo_dir, f"{home_abbr}.png"),
                 "home_timeouts": home_timeouts,
-                "away_abbr": away_team["team"]["abbreviation"],
+                "away_abbr": away_abbr,
                 "away_score": away_team.get("score", "0"),
-                "away_logo_path": os.path.join(self.logo_dir, f"{away_team['team']['abbreviation']}.png"),
+                "away_logo_path": os.path.join(self.logo_dir, f"{away_abbr}.png"),
                 "away_timeouts": away_timeouts,
                 "game_time": game_time,
                 "game_date": game_date,
