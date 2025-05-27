@@ -643,10 +643,13 @@ class NCAABaseballRecentManager(BaseNCAABaseballManager):
         current_time = time.time()
         if current_time - self.last_update < self.update_interval:
             return
+        self.last_update = current_time
         try:
             games = self._fetch_ncaa_baseball_api_data()
             if not games:
                 logger.warning("[NCAABaseball] No games returned from API")
+                self.recent_games = []
+                self.current_game = None
                 return
             
             new_recent_games = []
@@ -688,7 +691,6 @@ class NCAABaseballRecentManager(BaseNCAABaseballManager):
                 self.recent_games = []
                 self.current_game = None
             
-            self.last_update = current_time
         except Exception as e:
             logger.error(f"[NCAABaseball] Error updating recent games: {e}", exc_info=True)
 
@@ -740,6 +742,7 @@ class NCAABaseballUpcomingManager(BaseNCAABaseballManager):
         current_time = time.time()
         if current_time - self.last_update < self.update_interval:
             return
+        self.last_update = current_time
         try:
             games = self._fetch_ncaa_baseball_api_data()
             if games:
@@ -779,8 +782,7 @@ class NCAABaseballUpcomingManager(BaseNCAABaseballManager):
                     logger.info("[NCAABaseball] No upcoming games found for favorite teams")
                     self.upcoming_games = []
                     self.current_game = None
-                
-                self.last_update = current_time
+            
         except Exception as e:
             logger.error(f"[NCAABaseball] Error updating upcoming games: {e}", exc_info=True)
 
