@@ -69,13 +69,13 @@
     },
     "weather": {
         "enabled": true,
-        "update_interval": 600,
+        "update_interval": 1800,
         "units": "imperial",
         "display_format": "{temp}°F\n{condition}"
     },
     "stocks": {
         "enabled": true,
-        "update_interval": 300,
+        "update_interval": 600,
         "symbols": [
             "ASTS", "SCHD", "INTC", "NVDA", "T", "VOO", "SMCI"
         ],
@@ -83,7 +83,7 @@
     },
     "crypto": {
         "enabled": true,
-        "update_interval": 300,
+        "update_interval": 600,
         "symbols": [
             "BTC-USD", "ETH-USD"
         ],
@@ -108,7 +108,7 @@
     "nhl_scoreboard": {
         "enabled": true,
         "test_mode": false,
-        "update_interval_seconds": 300,
+        "update_interval_seconds": 3600,
         "live_update_interval": 15,
         "recent_update_interval": 3600,
         "upcoming_update_interval": 3600,
@@ -125,7 +125,7 @@
         "enabled": false,
         "test_mode": false,
         "update_interval_seconds": 3600,
-        "live_update_interval": 20,
+        "live_update_interval": 15,
         "recent_update_interval": 3600,
         "upcoming_update_interval": 3600,
         "recent_game_hours": 72,
@@ -204,8 +204,8 @@
     "mlb": {
         "enabled":  true,
         "test_mode": false,
-        "update_interval_seconds": 300,
-        "live_update_interval": 20,
+        "update_interval_seconds": 3600,
+        "live_update_interval": 15,
         "recent_update_interval": 3600,
         "upcoming_update_interval": 3600,
         "recent_game_hours": 48,
@@ -231,7 +231,7 @@
     "soccer_scoreboard": {
         "enabled": false,
         "test_mode": false,
-        "update_interval_seconds": 300,
+        "update_interval_seconds": 3600,
         "live_update_interval": 20,
         "recent_update_interval": 3600,
         "upcoming_update_interval": 3600,
