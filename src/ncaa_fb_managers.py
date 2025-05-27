@@ -452,6 +452,21 @@ class NCAAFBLiveManager(BaseNCAAFBManager): # Renamed class
         else:
             logging.info("[NCAAFB] Initialized NCAAFBLiveManager in live mode") # Updated log message
 
+        # Define current_time and interval before the problematic line (originally line 455)
+        # Ensure 'import time' is present at the top of the file.
+        current_time = time.time()
+
+        # Define interval using a pattern similar to NFLLiveManager's update method.
+        # Uses getattr for robustness, assuming attributes for live_games, test_mode,
+        # no_data_interval, and update_interval are available on self.
+        _live_games_attr = getattr(self, 'live_games', [])
+        _test_mode_attr = getattr(self, 'test_mode', False) # test_mode is often from a base class or config
+        _no_data_interval_attr = getattr(self, 'no_data_interval', 300) # Default similar to NFLLiveManager
+        _update_interval_attr = getattr(self, 'update_interval', 15)   # Default similar to NFLLiveManager
+
+        interval = _no_data_interval_attr if not _live_games_attr and not _test_mode_attr else _update_interval_attr
+        
+        # Original line from traceback (line 455), now with variables defined:
         if current_time - self.last_update >= interval:
             self.last_update = current_time
 
