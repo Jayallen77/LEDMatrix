@@ -712,7 +712,7 @@ class NFLRecentManager(BaseNFLManager): # Renamed class
             for event in events:
                 game = self._extract_game_details(event)
                 # Filter criteria: must be final, within time window
-                if game and game['is_final'] and game['is_within_window']:
+                if game and game['is_final'] and game.get('is_within_window', True): # Assume within window if key missing
                     processed_games.append(game)
 
             # Filter for favorite teams
@@ -884,7 +884,7 @@ class NFLUpcomingManager(BaseNFLManager): # Renamed class
             for event in events:
                 game = self._extract_game_details(event)
                 # Filter criteria: must be upcoming ('pre' state) and within time window
-                if game and game['is_upcoming'] and game['is_within_window']:
+                if game and game['is_upcoming'] and game.get('is_within_window', True): # Assume within window if key missing
                      processed_games.append(game)
 
             # Filter for favorite teams

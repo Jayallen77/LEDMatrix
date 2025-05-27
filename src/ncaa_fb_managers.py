@@ -452,6 +452,11 @@ class NCAAFBLiveManager(BaseNCAAFBManager): # Renamed class
         else:
             logging.info("[NCAAFB] Initialized NCAAFBLiveManager in live mode") # Updated log message
 
+    def update(self):
+        """Update live game data and handle game switching."""
+        if not self.is_enabled:
+            return
+
         # Define current_time and interval before the problematic line (originally line 455)
         # Ensure 'import time' is present at the top of the file.
         current_time = time.time()
@@ -521,8 +526,9 @@ class NCAAFBLiveManager(BaseNCAAFBManager): # Renamed class
                                 new_live_games.append(details)
 
                     # Log changes or periodically
+                    current_time_for_log = time.time() # Use a consistent time for logging comparison
                     should_log = (
-                        current_time - self.last_log_time >= self.log_interval or
+                        current_time_for_log - self.last_log_time >= self.log_interval or
                         len(new_live_games) != len(self.live_games) or
                         any(g1['id'] != g2.get('id') for g1, g2 in zip(self.live_games, new_live_games)) or # Check if game IDs changed
                         (not self.live_games and new_live_games) # Log if games appeared
@@ -531,11 +537,11 @@ class NCAAFBLiveManager(BaseNCAAFBManager): # Renamed class
                     if should_log:
                         if new_live_games:
                             self.logger.info(f"[NCAAFB] Found {len(new_live_games)} live/halftime games for fav teams.") # Changed log prefix
-                            for game in new_live_games:
-                                self.logger.info(f"  - {game['away_abbr']}@{game['home_abbr']} ({game.get('status_text', 'N/A')})")
+                            for game_info in new_live_games: # Renamed game to game_info
+                                self.logger.info(f"  - {game_info['away_abbr']}@{game_info['home_abbr']} ({game_info.get('status_text', 'N/A')})")
                         else:
                             self.logger.info("[NCAAFB] No live/halftime games found for favorite teams.") # Changed log prefix
-                        self.last_log_time = current_time
+                        self.last_log_time = current_time_for_log
 
 
                     # Update game list and current game
@@ -1045,4 +1051,4 @@ class NCAAFBUpcomingManager(BaseNCAAFBManager): # Renamed class
             # update_display() is called within _draw_scorebug_layout for upcoming
 
         except Exception as e:
-            self.logger.error(f"[NCAAFB Upcoming] Error in display loop: {e}", exc_info=True) # Changed log prefix 
+            self.logger.error(f"[NCAAFB Upcoming] Error in display loop: {e}", exc_info=True) # Changed log prefix
