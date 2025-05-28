@@ -16,24 +16,19 @@ Modular, rotating Displays that can be individually enabled or disabled per the 
 
 ### Time and Weather
 - Real-time clock display
-- ![DSC01342](https://github.com/user-attachments/assets/a3c9d678-b812-4977-8aa8-f0c3d1663f05)
+
 - Current Weather, Daily Weather, and Hourly Weather Forecasts
-- ![DSC01332](https://github.com/user-attachments/assets/19b2182c-463c-458a-bf4e-5d04acd8d120)
-- ![DSC01335](https://github.com/user-attachments/assets/4bcae193-cbea-49da-aac4-72d6fc9a7acd)
-- ![DSC01333](https://github.com/user-attachments/assets/f0be5cf2-600e-4fae-a956-97327ef11d70)
+
 
 - Google Calendar event display
 
 ### Sports Information
 The system supports live, recent, and upcoming game information for multiple sports leagues:
 - NHL (Hockey)
-- ![DSC01347](https://github.com/user-attachments/assets/854b3e63-43f5-4bf9-8fed-14a96cf3e7dd)
-- ![DSC01339](https://github.com/user-attachments/assets/13aacd18-c912-439b-a2f4-82a7ec7a2831)
-- ![DSC01338](https://github.com/user-attachments/assets/8fbc8251-f573-4e2b-b981-428d6ff3ac61)
+
 - NBA (Basketball)
 - MLB (Baseball)
-- ![DSC01346](https://github.com/user-attachments/assets/fb82b662-98f8-499c-aaf8-f9241dc3d634)
-- ![DSC01341](https://github.com/user-attachments/assets/f79cbf2e-f3b4-4a14-8482-01f2a3d53963)
+
 - NFL (Football)
 - NCAA Football
 - NCAA Men's Basketball
@@ -45,7 +40,7 @@ The system supports live, recent, and upcoming game information for multiple spo
 - Near real-time stock & crypto price updates
 - Stock news headlines
 - Customizable stock & crypto watchlists
-- ![DSC01317](https://github.com/user-attachments/assets/01a01ecf-bef1-4f61-a7b2-d6658622f73d)
+
 
 
 ### Entertainment
@@ -54,13 +49,13 @@ The system supports live, recent, and upcoming game information for multiple spo
   - YouTube Music integration
 - Album art display
 - Now playing information with scrolling text
-- ![DSC01354](https://github.com/user-attachments/assets/41b9e45f-8946-4213-87d2-6657b7f05757)
+
 
 
 ### Custom Display Features
 - Custom Text display 
 - Youtube Subscriber Count Display
-- ![DSC01319](https://github.com/user-attachments/assets/4d80fe99-839b-4d5e-9908-149cf1cce107)
+
 - Font testing and customization
 - Configurable display modes
 
@@ -104,25 +99,63 @@ The system can be configured through a JSON configuration file that allows users
 Overall 2 Matrix display with Rpi connected.
 ![DSC00073](https://github.com/user-attachments/assets/a0e167ae-37c6-4db9-b9ce-a2b957ca1a67)
 
-
+-----------------------------------------------------------------------------------
+# Preparing the Raspberry Pi
+1. Create RPI Image on a Micro-SD card (I use 16gb because I have it, size is not too important but I would use 8gb or more) using [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
+2. Choose your Raspberry Pi (3B+ in my case) 
+3. For Operating System (OS), choose "Other", then choose Raspbian OS Lite (64-bit)
+4. For Storage, choose your micro-sd card
+![image](https://github.com/user-attachments/assets/05580e0a-86d5-4613-aadc-93207365c38f)
+5. Press Next then Edit Settings
+![image](https://github.com/user-attachments/assets/b392a2c9-6bf4-47d5-84b7-63a5f793a1df)
+6. Inside the OS Customization Settings, choose a name for your device. I use "ledpi". Choose a password, enter your WiFi information, and set your timezone.
+![image](https://github.com/user-attachments/assets/0c250e3e-ab3c-4f3c-ba60-6884121ab176)
+7. Under the Services Tab, make sure that SSH is enabled. I recommend using password authentication for ease of use - it is the password you just chose above.
+![image](https://github.com/user-attachments/assets/1d78d872-7bb1-466e-afb6-0ca26288673b)
+8. Then Click "Save" and Agree to Overwrite the Micro-SD card.
 
 
 -----------------------------------------------------------------------------------
 
-## Installation
+# System Setup & Installation
 
-1. Clone this repository:
+1. Open PowerShell and ssh into your Raspberry Pi with ledpi@ledpi
+
+
+2. Update repositories, upgrade raspberry pi OS, install git
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y git python3-pip cython3 build-essential python3-dev python3-pillow scons
+```
+
+3. Clone this repository:
 ```bash
 git clone https://github.com/ChuckBuilds/LEDMatrix.git
 cd LEDMatrix
 ```
 
-2. Install dependencies:
+4. Install dependencies:
 ```bash
-pip3 install --break-system-packages -r requirements.txt
+sudo pip3 install --break-system-packages -r requirements.txt
 ```
 --break-system-packages allows us to install without a virtual environment
 
+
+5. Install rpi-rgb-led-matrix dependenices:
+```bash
+cd rpi-rgb-led-matrix-master
+```
+```bash
+sudo make build-python PYTHON=$(which python3)
+```
+```bash
+cd bindings/python
+sudo python3 setup.py install
+```
+Test it with:
+```bash
+python3 -c 'from rgbmatrix import RGBMatrix, RGBMatrixOptions; print("Success!")'
+```
 
 ## Important: Sound Module Configuration
 
@@ -136,7 +169,11 @@ sudo apt-get remove bluez bluez-firmware pi-bluetooth triggerhappy pigpio
 cat <<EOF | sudo tee /etc/modprobe.d/blacklist-rgb-matrix.conf
 blacklist snd_bcm2835
 EOF
+```
 
+then execute
+
+```bash
 sudo update-initramfs -u
 ```
 
@@ -156,85 +193,42 @@ sudo nano /boot/firmware/cmdline.txt
 
 2. Add `isolcpus=3` at the end of the line
 
-3. Add `dtparam=audio=off` at the end of the line
+3. Ctrl + X to exit, Y to save
 
-4. Ctrl + X to exit, Y to save 
+4. Edit /boot/firmware/config.txt  with
+```bash
+sudo nano /boot/firmware/config.txt
+```  
 
-5. Save and reboot:
+6. Edit the `dtparam=audio=on` section to `dtparam=audio=off`
+
+7. Ctrl + X to exit, Y to save 
+
+8. Save and reboot:
 ```bash
 sudo reboot
 ```
 
-## Running the Display
+-----------------------------------------------------------------------------------
 
-From the project root directory:
-```bash
-sudo python3 display_controller.py
-```
+## Configuration
 
-## Systemd Service Installation
+1.Edit `config/config.json` with your preferences via `sudo nano config/config.json`
 
-The LEDMatrix can be installed as a systemd service to run automatically at boot and be managed easily. The service runs as root to ensure proper hardware timing access for the LED matrix.
+###API Keys
 
-### Installing the Service
+For sensitive settings like API keys:
+Copy the template: `cp config/config_secrets.template.json config/config_secrets.json`
+Edit `config/config_secrets.json` with your API keys via `sudo nano config/config_secrets.json`
+Ctrl + X to exit, Y to overwrite, Enter to save
 
-1. Make the install script executable:
-```bash
-chmod +x install_service.sh
-```
+Everything is configured via `config/config.json` and `config/config_secrets.json`.
 
-2. Run the install script with sudo:
-```bash
-sudo ./install_service.sh
-```
 
-The script will:
-- Detect your user account and home directory
-- Install the service file with the correct paths
-- Enable the service to start on boot
-- Start the service immediately
 
-### Managing the Service
+-----------------------------------------------------------------------------------
 
-The following commands are available to manage the service:
 
-```bash
-# Stop the display
-sudo systemctl stop ledmatrix.service
-
-# Start the display
-sudo systemctl start ledmatrix.service
-
-# Check service status
-sudo systemctl status ledmatrix.service
-
-# View logs
-journalctl -u ledmatrix.service
-
-# Disable autostart
-sudo systemctl disable ledmatrix.service
-
-# Enable autostart
-sudo systemctl enable ledmatrix.service
-```
-
-### Convenience Scripts
-
-Two convenience scripts are provided for easy service management:
-
-- `start_display.sh` - Starts the LED matrix display service
-- `stop_display.sh` - Stops the LED matrix display service
-
-Make them executable with:
-```bash
-chmod +x start_display.sh stop_display.sh
-```
-
-Then use them to control the service:
-```bash
-sudo ./start_display.sh
-sudo ./stop_display.sh
-```
 
 # Configuration
 
@@ -250,22 +244,7 @@ For sensitive settings like API keys:
 
 3. Ctrl + X to exit, Y to overwrite, Enter to save 
 
-## NHL, NBA, MLB, Soccer, NCAA FB, NCAA Men's Baseball, NCAA Men's Basketball Scoreboard Display
-The LEDMatrix system includes a comprehensive scoreboard display system with three display modes:
 
-### Display Modes
-- **Live Games**: Shows currently playing games with live scores and game status
-- **Recent Games**: Displays completed games from the last 48 hours (configurable)
-- **Upcoming Games**: Shows scheduled games for favorite teams
-
-### Features
-- Real-time score updates from ESPN API
-- Team logo display
-- Game status indicators (period, time remaining)
-- Configurable favorite teams
-- Automatic game switching
-- Built-in caching to reduce API calls
-- Test mode for development
 
 
 ### YouTube Display Configuration
@@ -320,12 +299,12 @@ The calendar display module shows upcoming events from your Google Calendar. To 
    2. Create a new project or select an existing one
    3. Enable the Google Calendar API
    4. Create OAuth 2.0 credentials:
-      - Application type: Desktop app
+      - Application type: TV and Limited Input Device
       - Download the credentials file as `credentials.json`
    5. Place the `credentials.json` file in your project root directory
 
 3. On first run, the application will:
-   - Open a browser window for Google authentication
+   - Provide a code to enter at https://www.google.com/device for Google authentication
    - Request calendar read-only access
    - Save the authentication token as `token.pickle`
 
@@ -406,9 +385,9 @@ If you are using the Spotify integration to display currently playing music, you
 
 The `authenticate_spotify.py` script, when run with `sudo`, creates `config/spotify_auth.json` owned by `root`. If the main `display_controller.py` (also run with `sudo`) effectively runs as a different user (e.g., UID 1/daemon, as observed during troubleshooting), that user won't be able to read the `root`-owned file unless its permissions are relaxed (e.g., to `644`). The `chmod 644` command allows the owner (`root`) to read/write, and everyone else (including the `daemon` user) to read.
 
-### Music Display (YouTube Music)
+### Youtube Music Authentication for Music Display
 
-The system can display currently playing music information from YouTube Music Desktop (YTMD) via its Companion server API.
+The system can display currently playing music information from [YouTube Music Desktop (YTMD)](https://ytmdesktop.app/) via its Companion server API.
 
 **Setup:**
 
@@ -438,6 +417,115 @@ The system can display currently playing music information from YouTube Music De
 *   "No authorized companions" in YTMD: Ensure you've approved the `LEDMatrixController` in YTMD settings after the first run.
 *   Connection errors: Double-check the `YTM_COMPANION_URL` in `config.json` matches what YTMD's companion server is set to.
 *   Ensure your firewall (Windows Firewall) allows YTM Desktop app to access local networks.
+
+
+## Before Running the Display
+- To allow the script to properly access fonts, you need to set the correct permissions on your home directory:
+  ```bash
+  sudo chmod o+x /home/ledpi
+  ```
+- Replace ledpi with your actual username, if different.
+You can confirm your username by executing:
+`whoami`
+
+
+## Running the Display
+
+From the project root directory:
+```bash
+sudo python3 display_controller.py
+```
+
+
+## Run on Startup Automatically with Systemd Service Installation
+
+The LEDMatrix can be installed as a systemd service to run automatically at boot and be managed easily. The service runs as root to ensure proper hardware timing access for the LED matrix.
+
+### Installing the Service
+
+1. Make the install script executable:
+```bash
+chmod +x install_service.sh
+```
+
+2. Run the install script with sudo:
+```bash
+sudo ./install_service.sh
+```
+
+The script will:
+- Detect your user account and home directory
+- Install the service file with the correct paths
+- Enable the service to start on boot
+- Start the service immediately
+
+### Managing the Service
+
+The following commands are available to manage the service:
+
+```bash
+# Stop the display
+sudo systemctl stop ledmatrix.service
+
+# Start the display
+sudo systemctl start ledmatrix.service
+
+# Check service status
+sudo systemctl status ledmatrix.service
+
+# View logs
+journalctl -u ledmatrix.service
+
+# Disable autostart
+sudo systemctl disable ledmatrix.service
+
+# Enable autostart
+sudo systemctl enable ledmatrix.service
+```
+
+### Convenience Scripts
+
+Two convenience scripts are provided for easy service management:
+
+- `start_display.sh` - Starts the LED matrix display service
+- `stop_display.sh` - Stops the LED matrix display service
+
+Make them executable with:
+```bash
+chmod +x start_display.sh stop_display.sh
+```
+
+Then use them to control the service:
+```bash
+sudo ./start_display.sh
+sudo ./stop_display.sh
+```
+
+
+## Fonts
+You can add any font to the assets/fonts/ folder but they need to be .ttf or .btf(less support) and updated in display_manager.py
+
+### Running without Sudo (Optional and not recommended but can be useful for troubleshooting or overcoming write errors)
+
+To run the display script without `sudo`, the user executing the script needs access to GPIO pins. Add the user to the `gpio` group:
+
+```bash
+sudo usermod -a -G gpio <your_username>
+# Example for user 'ledpi':
+# sudo usermod -a -G gpio ledpi
+```
+
+**Important:** You must **reboot** the Raspberry Pi after adding the user to the group for the change to take effect.
+
+You also need to disable hardware pulsing in the code (see `src/display_manager.py`, set `options.disable_hardware_pulsing = True`). This may result in a flickerying display
+
+If configured correctly, you can then run:
+
+```bash
+python3 display_controller.py
+```
+-----------------------------------------------------------------------------------
+
 
 ## Project Structure
 
@@ -498,6 +586,22 @@ The project is organized into several key components:
 
 Each display module in `src/` is responsible for a specific feature (weather, sports, music, etc.) and follows a consistent pattern of data fetching, processing, and display rendering.
 
+## NHL, NBA, MLB, Soccer, NCAA FB, NCAA Men's Baseball, NCAA Men's Basketball Scoreboard Display
+The LEDMatrix system includes a comprehensive scoreboard display system with three display modes:
+
+### Display Modes
+- **Live Games**: Shows currently playing games with live scores and game status
+- **Recent Games**: Displays completed games from the last 48 hours (configurable)
+- **Upcoming Games**: Shows scheduled games for favorite teams
+
+### Features
+- Real-time score updates from ESPN API
+- Team logo display
+- Game status indicators (period, time remaining)
+- Configurable favorite teams
+- Automatic game switching
+- Built-in caching to reduce API calls
+- Test mode for development
 ## Caching System
 
 The LEDMatrix system includes a robust caching mechanism to optimize API calls and reduce network traffic:
@@ -528,26 +632,3 @@ The LEDMatrix system includes a robust caching mechanism to optimize API calls a
 - Cache directory is created with proper permissions on first run
 - Temporary files are used for safe updates
 - JSON serialization handles all data types including timestamps
-
-## Fonts
-You can add any font to the assets/fonts/ folder but they need to be .ttf or .btf(less support) and updated in display_manager.py
-
-### Running without Sudo (Optional and not recommended)
-
-To run the display script without `sudo`, the user executing the script needs access to GPIO pins. Add the user to the `gpio` group:
-
-```bash
-sudo usermod -a -G gpio <your_username>
-# Example for user 'ledpi':
-# sudo usermod -a -G gpio ledpi
-```
-
-**Important:** You must **reboot** the Raspberry Pi after adding the user to the group for the change to take effect.
-
-You also need to disable hardware pulsing in the code (see `src/display_manager.py`, set `options.disable_hardware_pulsing = True`). This may result in a flickerying display
-
-If configured correctly, you can then run:
-
-```bash
-python3 display_controller.py
-```
