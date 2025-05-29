@@ -1,7 +1,11 @@
 # LEDMatrix
 An LED matrix display system that provides real-time information display capabilities for various data sources. The system is highly configurable and supports multiple display modes that can be enabled or disabled based on user preferences.
 
-Setup video and feature walkthrough on Youtube : https://youtu.be/_HaqfJy1Y54
+### Setup video and feature walkthrough on Youtube : 
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/_HaqfJy1Y54/0.jpg)](https://www.youtube.com/watch?v=_HaqfJy1Y54)
+
+-----------------------------------------------------------------------------------
+### Connect with ChuckBuilds
 
 - Show support on Youtube: https://www.youtube.com/@ChuckBuilds
 - Check out the write-up on my website: https://www.chuck-builds.com/led-matrix/
@@ -11,7 +15,7 @@ Setup video and feature walkthrough on Youtube : https://youtu.be/_HaqfJy1Y54
 
 -----------------------------------------------------------------------------------
 
-Special Thanks to:
+### Special Thanks to:
 - Hzeller @ https://github.com/hzeller/rpi-rgb-led-matrix for his groundwork on controlling an LED Matrix from the Raspberry Pi
 - Basmilius @ https://github.com/basmilius/weather-icons/ for his free and extensive weather icons
 - nvstly @ https://github.com/nvstly/icons for their Stock and Crypto Icons
