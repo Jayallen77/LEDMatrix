@@ -53,17 +53,61 @@ class BaseNCAABaseballManager:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
 
-    def _get_team_logo(self, team_abbr: str) -> Optional[Image.Image]:
-        """Get team logo from the configured directory."""
+    def _get_team_logo(self, team_abbr: str, logo_size: tuple[int, int]) -> Optional[Image.Image]:
+        """Get team logo from the configured directory or generate a fallback."""
         try:
             logo_path = os.path.join(self.logo_dir, f"{team_abbr}.png")
             if os.path.exists(logo_path):
                 return Image.open(logo_path)
             else:
-                logger.warning(f"[NCAABaseball] Logo not found for team {team_abbr}")
-                return None
+                logger.warning(f"[NCAABaseball] Logo not found for team {team_abbr}. Generating fallback.")
+                # Create a fallback image with the team abbreviation
+                image = Image.new('RGB', logo_size, color=(0, 0, 0))
+                draw = ImageDraw.Draw(image)
+                
+                # Attempt to use a small, clear font
+                try:
+                    font_path = "assets/fonts/PressStart2P-Regular.ttf"
+                    # Adjust font size dynamically or pick a generally good small size
+                    # For small logos (e.g., 32x32 or 35x35), a font size of 8-12 might work
+                    # Max 3 chars like "LSU"
+                    font_size = 0
+                    if logo_size[0] < 20 or len(team_abbr) > 3: # very small logo or long abbr
+                        font_size = 6
+                    elif len(team_abbr) > 2:
+                        font_size = 8
+                    else:
+                        font_size = 10
+
+                    if not os.path.exists(font_path): # Fallback if PressStart2P is missing
+                         font_path = "arial.ttf" # try a common system font
+                         font_size = logo_size[1] // 3 # Adjust size for arial
+
+                    font = ImageFont.truetype(font_path, font_size)
+                except IOError:
+                    logger.warning(f"Font {font_path} not found. Using default font for fallback logo.")
+                    font = ImageFont.load_default() # Fallback to default PIL font
+                    # For default font, textbbox might not be available or behave differently
+                    # We'll estimate text size or accept potentially non-centered text.
+
+                try:
+                    # Get text dimensions using textbbox if available
+                    text_bbox = draw.textbbox((0, 0), team_abbr, font=font)
+                    text_width = text_bbox[2] - text_bbox[0]
+                    text_height = text_bbox[3] - text_bbox[1]
+                except AttributeError: 
+                    # Fallback for older PIL/Pillow or default font if textbbox is not present
+                    text_width = len(team_abbr) * (font_size // 1.5 if hasattr(font, 'size') else 6) # Rough estimate
+                    text_height = font_size if hasattr(font, 'size') else 8 # Rough estimate
+
+
+                x = (logo_size[0] - text_width) / 2
+                y = (logo_size[1] - text_height) / 2
+                
+                self._draw_text_with_outline(draw, team_abbr, (x, y), font)
+                return image
         except Exception as e:
-            logger.error(f"[NCAABaseball] Error loading logo for team {team_abbr}: {e}")
+            logger.error(f"[NCAABaseball] Error loading or generating logo for team {team_abbr}: {e}")
             return None
 
     def _draw_text_with_outline(self, draw, text, position, font, fill=(255, 255, 255), outline_color=(0, 0, 0)):
@@ -120,8 +164,8 @@ class BaseNCAABaseballManager:
         logo_size = (max_width, max_height)
         logo_y_offset = (height - max_height) // 2
         
-        away_logo = self._get_team_logo(game_data['away_team'])
-        home_logo = self._get_team_logo(game_data['home_team'])
+        away_logo = self._get_team_logo(game_data['away_team'], logo_size)
+        home_logo = self._get_team_logo(game_data['home_team'], logo_size)
         
         if away_logo and home_logo:
             away_logo = away_logo.resize(logo_size, Image.Resampling.LANCZOS)
@@ -495,8 +539,8 @@ class NCAABaseballLiveManager(BaseNCAABaseballManager):
         logo_size = (new_logo_height, new_logo_height)
         logo_y_offset = 0
         
-        away_logo = self._get_team_logo(game_data['away_team'])
-        home_logo = self._get_team_logo(game_data['home_team'])
+        away_logo = self._get_team_logo(game_data['away_team'], logo_size)
+        home_logo = self._get_team_logo(game_data['home_team'], logo_size)
         
         if away_logo and home_logo:
             away_logo = away_logo.resize(logo_size, Image.Resampling.LANCZOS)
