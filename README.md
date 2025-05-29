@@ -1,6 +1,8 @@
 # LEDMatrix
 An LED matrix display system that provides real-time information display capabilities for various data sources. The system is highly configurable and supports multiple display modes that can be enabled or disabled based on user preferences.
 
+Setup video and feature walkthrough on Youtube : https://youtu.be/_HaqfJy1Y54
+
 - Show support on Youtube: https://www.youtube.com/@ChuckBuilds
 - Check out the write-up on my website: https://www.chuck-builds.com/led-matrix/
 - Stay in touch on Instagram: https://www.instagram.com/ChuckBuilds/
