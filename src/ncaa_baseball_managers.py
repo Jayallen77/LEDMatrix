@@ -58,11 +58,14 @@ class BaseNCAABaseballManager:
         try:
             logo_path = os.path.join(self.logo_dir, f"{team_abbr}.png")
             if os.path.exists(logo_path):
-                return Image.open(logo_path)
+                img = Image.open(logo_path)
+                if img.mode != 'RGBA':
+                    img = img.convert('RGBA')
+                return img
             else:
                 logger.warning(f"[NCAABaseball] Logo not found for team {team_abbr}. Generating fallback.")
-                # Create a fallback image with the team abbreviation
-                image = Image.new('RGB', logo_size, color=(0, 0, 0))
+                # Create a fallback image with the team abbreviation, ensure it's RGBA
+                image = Image.new('RGBA', logo_size, color=(0, 0, 0, 255)) # RGBA with full opacity
                 draw = ImageDraw.Draw(image)
                 
                 # Attempt to use a small, clear font
