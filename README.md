@@ -16,18 +16,30 @@ Modular, rotating Displays that can be individually enabled or disabled per the 
 
 ### Time and Weather
 - Real-time clock display
+![DSC01361](https://github.com/user-attachments/assets/c4487d40-5872-45f5-a553-debf8cea17e9)
+
 
 - Current Weather, Daily Weather, and Hourly Weather Forecasts
+![DSC01362](https://github.com/user-attachments/assets/d31df736-522f-4f61-9451-29151d69f164)
+![DSC01364](https://github.com/user-attachments/assets/eb2d16ad-6b12-49d9-ba41-e39a6a106682)
+![DSC01365](https://github.com/user-attachments/assets/f8a23426-e6fa-4774-8c87-19bb94cfbe73)
 
 
 - Google Calendar event display
+![DSC01374-1](https://github.com/user-attachments/assets/5bc89917-876e-489d-b944-4d60274266e3)
+
+
 
 ### Sports Information
 The system supports live, recent, and upcoming game information for multiple sports leagues:
 - NHL (Hockey)
+![DSC01356](https://github.com/user-attachments/assets/64c359b6-4b99-4dee-aca0-b74debda30e0)
+![DSC01339](https://github.com/user-attachments/assets/2ccc52af-b4ed-4c06-a341-581506c02153)
+![DSC01337](https://github.com/user-attachments/assets/f4faf678-9f43-4d37-be56-89ecbd09acf6)
 
 - NBA (Basketball)
 - MLB (Baseball)
+![DSC01359](https://github.com/user-attachments/assets/71e985f1-d2c9-4f0e-8ea1-13eaefeec01c)
 
 - NFL (Football)
 - NCAA Football
@@ -40,6 +52,8 @@ The system supports live, recent, and upcoming game information for multiple spo
 - Near real-time stock & crypto price updates
 - Stock news headlines
 - Customizable stock & crypto watchlists
+![DSC01366](https://github.com/user-attachments/assets/95b67f50-0f69-4479-89d0-1d87c3daefd3)
+![DSC01368](https://github.com/user-attachments/assets/c4b75546-388b-4d4a-8b8c-8c5a62f139f9)
 
 
 
@@ -49,15 +63,19 @@ The system supports live, recent, and upcoming game information for multiple spo
   - YouTube Music integration
 - Album art display
 - Now playing information with scrolling text
+![DSC01354](https://github.com/user-attachments/assets/7524b149-f55d-4eb7-b6c6-6e336e0d1ac1)
+![DSC01389](https://github.com/user-attachments/assets/3f768651-5446-4ff5-9357-129cd8b3900d)
 
 
 
 ### Custom Display Features
-- Custom Text display 
-- Youtube Subscriber Count Display
+- Custom Text display
+![DSC01379](https://github.com/user-attachments/assets/338b7578-9d4b-4465-851c-7e6a1d999e07)
 
-- Font testing and customization
-- Configurable display modes
+- Youtube Subscriber Count Display
+![DSC01376](https://github.com/user-attachments/assets/7ea5f42d-afce-422f-aa97-6b2a179aa7d2)
+
+- Font testing Display (not in rotation)
 
 ## System Architecture
 
@@ -79,24 +97,26 @@ The system can be configured through a JSON configuration file that allows users
 
 
 ## Hardware Requirements
-- Raspberry Pi 3b or 4 (NOT RPI5!)
--- Amazon Affiliate Link: Raspberry Pi 4 4GB (https://amzn.to/4dJixuX)
-- Adafruit RGB Matrix Bonnet/HAT 
--- https://www.adafruit.com/product/3211
-- 2x LED Matrix panels (64x32) (Designed for 128x32 but has a lot of dynamic scaling elements that could work on a variety of displays, pixel pitch is user preference)
--- https://www.adafruit.com/product/2278 
-- 5V 4A DC Power Supply for Adafruit RGB HAT
--- https://www.adafruit.com/product/1466
+- Raspberry Pi 3b or 4 (NOT RPI5!) : Amazon Affiliate Link: Raspberry Pi 4 4GB (https://amzn.to/4dJixuX)
+- Adafruit RGB Matrix Bonnet/HAT : https://www.adafruit.com/product/3211
+- 2x LED Matrix panels (64x32) (Designed for 128x32 but has a lot of dynamic scaling elements that could work on a variety of displays, pixel pitch is user preference) : https://www.adafruit.com/product/2278 
+- 5V 4A DC Power Supply for Adafruit RGB HAT : https://www.adafruit.com/product/1466
 
 ## Optional but recommended mod for Adafruit RGB Matrix Bonnet
 - By soldering a jumper between pins 4 and 18, you can run a specialized command for polling the matrix display. This provides better brightness, less flicker, and better color.
-- If you do the mod, we will use the command: --led-gpio-mapping=adafruit-hat-pwm, otherwise just use --led-gpio-mapping=adafruit-hat
+- If you do the mod, we will use the default config with led-gpio-mapping=adafruit-hat-pwm, otherwise just adjust your mapping in config.json to adafruit-hat
 - More information available: https://github.com/hzeller/rpi-rgb-led-matrix/tree/master?tab=readme-ov-file
 ![DSC00079](https://github.com/user-attachments/assets/4282d07d-dfa2-4546-8422-ff1f3a9c0703)
 
+-----------------------------------------------------------------------------------
+## Mount/Stand
+I 3D printed stands to keep the panels upright and snug. STL Files are included in the Repo but are also available at https://www.thingiverse.com/thing:5169867 Thanks to "Randomwire" for making these for the 4mm Pixel Pitch LED Matrix.
 
+These are not required and you can probably rig up something basic with stuff you have around the house. I used these screws: https://amzn.to/4mFwNJp (Amazon Affiliate Link)
 
-Overall 2 Matrix display with Rpi connected.
+-----------------------------------------------------------------------------------
+
+2 Matrix display with Rpi connected.
 ![DSC00073](https://github.com/user-attachments/assets/a0e167ae-37c6-4db9-b9ce-a2b957ca1a67)
 
 -----------------------------------------------------------------------------------
@@ -119,8 +139,10 @@ Overall 2 Matrix display with Rpi connected.
 
 # System Setup & Installation
 
-1. Open PowerShell and ssh into your Raspberry Pi with ledpi@ledpi
-
+1. Open PowerShell and ssh into your Raspberry Pi with ledpi@ledpi (or Username@Hostname)
+```bash
+ssh ledpi@ledpi
+```
 
 2. Update repositories, upgrade raspberry pi OS, install git
 ```bash
@@ -141,7 +163,7 @@ sudo pip3 install --break-system-packages -r requirements.txt
 --break-system-packages allows us to install without a virtual environment
 
 
-5. Install rpi-rgb-led-matrix dependenices:
+5. Install rpi-rgb-led-matrix dependencies:
 ```bash
 cd rpi-rgb-led-matrix-master
 ```
@@ -193,7 +215,7 @@ sudo nano /boot/firmware/cmdline.txt
 
 2. Add `isolcpus=3` at the end of the line
 
-3. Ctrl + X to exit, Y to save
+3. Ctrl + X to exit, Y to save, Enter to Confirm
 
 4. Edit /boot/firmware/config.txt  with
 ```bash
@@ -202,7 +224,7 @@ sudo nano /boot/firmware/config.txt
 
 6. Edit the `dtparam=audio=on` section to `dtparam=audio=off`
 
-7. Ctrl + X to exit, Y to save 
+7. Ctrl + X to exit, Y to save, Enter to Confirm
 
 8. Save and reboot:
 ```bash
@@ -220,7 +242,7 @@ sudo reboot
 For sensitive settings like API keys:
 Copy the template: `cp config/config_secrets.template.json config/config_secrets.json`
 Edit `config/config_secrets.json` with your API keys via `sudo nano config/config_secrets.json`
-Ctrl + X to exit, Y to overwrite, Enter to save
+Ctrl + X to exit, Y to overwrite, Enter to Confirm
 
 Everything is configured via `config/config.json` and `config/config_secrets.json`.
 
@@ -228,57 +250,7 @@ Everything is configured via `config/config.json` and `config/config_secrets.jso
 
 -----------------------------------------------------------------------------------
 
-
-
-# Configuration
-
-1.Edit `config/config.json` with your preferences via `sudo nano config/config.json`
-
-
-## API Keys
-
-For sensitive settings like API keys:
-1. Copy the template: `cp config/config_secrets.template.json config/config_secrets.json`
-
-2. Edit `config/config_secrets.json` with your API keys via `sudo nano config/config_secrets.json`
-
-3. Ctrl + X to exit, Y to overwrite, Enter to save 
-
-
-
-
-### YouTube Display Configuration
-
-The YouTube display module shows channel statistics for a specified YouTube channel. To configure it:
-
-1. In `config/config.json`, add the following section:
-```json
-{
-    "youtube": {
-        "enabled": true,
-        "update_interval": 300  // Update interval in seconds (default: 300)
-    }
-}
-```
-
-2. In `config/config_secrets.json`, add your YouTube API credentials:
-```json
-{
-    "youtube": {
-        "api_key": "YOUR_YOUTUBE_API_KEY",
-        "channel_id": "YOUR_CHANNEL_ID"
-    }
-}
-```
-
-To get these credentials:
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select an existing one
-3. Enable the YouTube Data API v3
-4. Create credentials (API key)
-5. For the channel ID, you can find it in your YouTube channel URL or use the YouTube Data API to look it up
-
-### Calendar Display Configuration
+## Calendar Display Configuration
 
 The calendar display module shows upcoming events from your Google Calendar. To configure it:
 
@@ -313,7 +285,7 @@ The calendar display will show:
 - Event title (wrapped to fit the display)
 - Up to 3 upcoming events (configurable)
 
-### Music Display Configuration
+## Music Display Configuration
 
 The Music Display module shows information about the currently playing track from either Spotify or YouTube Music (via the [YouTube Music Desktop App](https://ytmdesktop.app/) companion server).
 
@@ -335,7 +307,7 @@ The Music Display module shows information about the currently playing track fro
 *   `"spotify"`: Only uses Spotify. Ignores YTM.
 *   `"ytm"`: Only uses the YTM Companion Server. Ignores Spotify.
 
-## Spotify Authentication for Music Display
+### Spotify Authentication for Music Display
 
 If you are using the Spotify integration to display currently playing music, you will need to authenticate with Spotify. This project uses an authentication flow that requires a one-time setup. Due to how the display controller script may run with specific user permissions (even when using `sudo`), the following steps are crucial:
 
@@ -389,6 +361,37 @@ The `authenticate_spotify.py` script, when run with `sudo`, creates `config/spot
 
 The system can display currently playing music information from [YouTube Music Desktop (YTMD)](https://ytmdesktop.app/) via its Companion server API.
 
+### YouTube Display Configuration & API Key
+
+The YouTube display module shows channel statistics for a specified YouTube channel. To configure it:
+
+1. In `config/config.json`, add the following section:
+```json
+{
+    "youtube": {
+        "enabled": true,
+        "update_interval": 300  // Update interval in seconds (default: 300)
+    }
+}
+```
+
+2. In `config/config_secrets.json`, add your YouTube API credentials:
+```json
+{
+    "youtube": {
+        "api_key": "YOUR_YOUTUBE_API_KEY",
+        "channel_id": "YOUR_CHANNEL_ID"
+    }
+}
+```
+
+To get these credentials:
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Enable the YouTube Data API v3
+4. Create credentials (API key)
+5. For the channel ID, you can find it in your YouTube channel URL or use the YouTube Data API to look it up
+
 **Setup:**
 
 1.  **Enable Companion Server in YTMD:**
@@ -418,6 +421,7 @@ The system can display currently playing music information from [YouTube Music D
 *   Connection errors: Double-check the `YTM_COMPANION_URL` in `config.json` matches what YTMD's companion server is set to.
 *   Ensure your firewall (Windows Firewall) allows YTM Desktop app to access local networks.
 
+-----------------------------------------------------------------------------------
 
 ## Before Running the Display
 - To allow the script to properly access fonts, you need to set the correct permissions on your home directory:
@@ -435,6 +439,10 @@ From the project root directory:
 ```bash
 sudo python3 display_controller.py
 ```
+This will start the display cycle but only stays active as long as your ssh session is active.
+
+
+-----------------------------------------------------------------------------------
 
 
 ## Run on Startup Automatically with Systemd Service Installation
@@ -502,10 +510,17 @@ sudo ./stop_display.sh
 ```
 
 
-## Fonts
+-----------------------------------------------------------------------------------
+
+## Custom Fonts
 You can add any font to the assets/fonts/ folder but they need to be .ttf or .btf(less support) and updated in display_manager.py
 
-### Running without Sudo (Optional and not recommended but can be useful for troubleshooting or overcoming write errors)
+
+
+-----------------------------------------------------------------------------------
+
+
+### Running the display without Sudo (Not recommended but can be useful for troubleshooting or overcoming write errors)
 
 To run the display script without `sudo`, the user executing the script needs access to GPIO pins. Add the user to the `gpio` group:
 
@@ -525,6 +540,40 @@ If configured correctly, you can then run:
 python3 display_controller.py
 ```
 -----------------------------------------------------------------------------------
+
+## Display Settings
+If you are copying my setup, you can likely leave this alone. 
+- hardware: Configures how the matrix is driven.
+  - rows, cols, chain_length: Physical panel configuration.
+  - brightness: Display brightness (0–100).
+  - hardware_mapping: Use "adafruit-hat-pwm" for Adafruit bonnet WITH the jumper mod. Remove -pwm if you did not solder the jumper.
+  - pwm_bits, pwm_dither_bits, pwm_lsb_nanoseconds: Affect color fidelity.
+  - limit_refresh_rate_hz: Cap refresh rate for better stability.
+- runtime:
+  - gpio_slowdown: Tweak this depending on your Pi model. Match it to the generation (e.g., Pi 3 → 3, Pi 4 -> 4).
+- display_durations:
+  - Control how long each display module stays visible in seconds. For example, if you want more focus on stocks, increase that value.
+### Modules
+- Each module (weather, stocks, crypto, calendar, etc.) has enabled, update_interval, and often display_format settings.
+- Sports modules also support test_mode, live_update_interval, and favorite_teams.
+- Logos are loaded from the logo_dir path under assets/sports/...
+
+```bash
+Example: NHL Configuration"nhl_scoreboard": {
+  "enabled": true,
+  "test_mode": false,
+  "update_interval_seconds": 300,
+  "live_update_interval": 15,
+  "recent_game_hours": 48,
+  "favorite_teams": ["TB", "DAL"],
+  "logo_dir": "assets/sports/nhl_logos",
+  "display_modes": {
+    "nhl_live": true,
+    "nhl_recent": true,
+    "nhl_upcoming": true
+  }
+}
+```
 
 
 ## Project Structure
@@ -632,3 +681,19 @@ The LEDMatrix system includes a robust caching mechanism to optimize API calls a
 - Cache directory is created with proper permissions on first run
 - Temporary files are used for safe updates
 - JSON serialization handles all data types including timestamps
+
+## Final Notes
+- Most configuration is done via config/config.json
+- Refresh intervals for sports/weather/stocks are customizable
+- A caching system reduces API strain and helps ensure the display doesn’t hammer external services (and ruin it for everyone)
+- Font files should be placed in assets/fonts/
+- You can test each module individually for debugging
+
+
+##What's Next?
+- Adding MQTT/HomeAssistant integration
+- Gambling odds?
+- Building a user-friendly UI for easier configuration
+
+
+### If you’ve read this far — thanks!  
