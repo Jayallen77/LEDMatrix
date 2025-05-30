@@ -310,6 +310,7 @@ class BaseNFLManager: # Renamed class
             # --- NFL Specific Details ---
             situation = competition.get("situation")
             down_distance_text = ""
+            possession_indicator = None # Default to None
             if situation and status["type"]["state"] == "in":
                 down = situation.get("down")
                 distance = situation.get("distance")
@@ -319,6 +320,15 @@ class BaseNFLManager: # Renamed class
                     down_distance_text = f"{down_str} {dist_str}"
                 elif situation.get("isRedZone"):
                      down_distance_text = "Red Zone" # Simplified if down/distance not present but in redzone
+                
+                # Determine possession based on team ID
+                possession_team_id = situation.get("possession")
+                if possession_team_id:
+                    if possession_team_id == home_team.get("id"):
+                        possession_indicator = "home"
+                    elif possession_team_id == away_team.get("id"):
+                        possession_indicator = "away"
+
 
             # Format period/quarter
             period = status.get("period", 0)
@@ -369,6 +379,7 @@ class BaseNFLManager: # Renamed class
                 "game_date": game_date,
                 "down_distance_text": down_distance_text, # Added Down/Distance
                 "possession": situation.get("possession") if situation else None, # ID of team with possession
+                "possession_indicator": possession_indicator, # Added for easy home/away check
             }
 
             # Basic validation (can be expanded)
@@ -649,6 +660,39 @@ class NFLLiveManager(BaseNFLManager): # Renamed class
                 dd_x = (self.display_width - dd_width) // 2
                 dd_y = (self.display_height)- 7 #score_y + 12 # Below the status/clock line
                 self._draw_text_with_outline(draw_overlay, down_distance, (dd_x, dd_y), self.fonts['detail'], fill=(200, 200, 0)) # Yellowish text
+
+            # Possession Indicator (small football icon)
+            possession = game.get("possession_indicator")
+            if possession and game.get("is_live"):
+                ball_radius = 2
+                ball_color = (139, 69, 19) # Brown color for the football
+
+                if possession == "away":
+                    # Position near away team score/logo area (adjust as needed)
+                    ball_x = away_x + away_logo.width + 5 # Example: Right of away logo
+                    ball_y = away_y + away_logo.height // 2
+                    # Ensure it's not overlapping score or too far out
+                    ball_x = max(ball_x, 15) # Keep it some distance from left edge
+                    ball_y = min(ball_y, self.display_height - 10) # Keep it above timeouts
+                elif possession == "home":
+                    # Position near home team score/logo area (adjust as needed)
+                    ball_x = home_x - 5 - (ball_radius * 2) # Example: Left of home logo
+                    ball_y = home_y + home_logo.height // 2
+                    # Ensure it's not overlapping score or too far out
+                    ball_x = min(ball_x, self.display_width - 15 - (ball_radius*2)) # Keep some distance from right edge
+                    ball_y = min(ball_y, self.display_height - 10) # Keep it above timeouts
+                else:
+                    ball_x, ball_y = 0,0 # Should not happen if possession is 'home' or 'away'
+
+                if ball_x and ball_y: # Draw if position is valid
+                    # Draw a simple ellipse for the football shape
+                    draw_overlay.ellipse(
+                        (ball_x - ball_radius, ball_y - ball_radius,
+                         ball_x + ball_radius, ball_y + ball_radius),
+                        fill=ball_color, outline=(0,0,0)
+                    )
+                    # Optionally, add a small white stitch mark
+                    # draw_overlay.line((ball_x, ball_y - ball_radius, ball_x, ball_y + ball_radius), fill=(255,255,255), width=1)
 
             # Timeouts (Bottom corners) - 3 small bars per team
             timeout_bar_width = 4
