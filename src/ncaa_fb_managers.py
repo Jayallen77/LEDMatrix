@@ -459,7 +459,7 @@ class NCAAFBLiveManager(BaseNCAAFBManager): # Renamed class
                 "home_score": "28", "away_score": "21",
                 "period": 4, "period_text": "Q4", "clock": "01:15",
                 "down_distance_text": "2nd & 5", 
-                "possession": "UGA_ID", # Placeholder ID for home team
+                "possession": "UGA", # Placeholder ID for home team
                 "possession_indicator": "home", # Explicitly set for test
                 "home_timeouts": 1, "away_timeouts": 2,
                 "home_logo_path": os.path.join(self.logo_dir, "UGA.png"),
@@ -674,41 +674,38 @@ class NCAAFBLiveManager(BaseNCAAFBManager): # Renamed class
             if down_distance and game.get("is_live"): # Only show if live and available
                 dd_width = draw_overlay.textlength(down_distance, font=self.fonts['detail'])
                 dd_x = (self.display_width - dd_width) // 2
-                dd_y = (self.display_height)- 7 #score_y + 12 # Below the status/clock line
+                dd_y = (self.display_height)- 7 # Top of D&D text
                 self._draw_text_with_outline(draw_overlay, down_distance, (dd_x, dd_y), self.fonts['detail'], fill=(200, 200, 0)) # Yellowish text
 
-            # Possession Indicator (small football icon)
-            possession = game.get("possession_indicator")
-            if possession and game.get("is_live"):
-                ball_radius = 2
-                ball_color = (139, 69, 19) # Brown color for the football
+                # Possession Indicator (small football icon)
+                possession = game.get("possession_indicator")
+                if possession: # Only draw if possession is known
+                    ball_radius = 2
+                    ball_color = (139, 69, 19) # Brown color for the football
 
-                if possession == "away":
-                    # Position near away team score/logo area (adjust as needed)
-                    ball_x = away_x + away_logo.width + 5 # Example: Right of away logo
-                    ball_y = away_y + away_logo.height // 2
-                    # Ensure it's not overlapping score or too far out
-                    ball_x = max(ball_x, 15) # Keep it some distance from left edge
-                    ball_y = min(ball_y, self.display_height - 10) # Keep it above timeouts
-                elif possession == "home":
-                    # Position near home team score/logo area (adjust as needed)
-                    ball_x = home_x - 5 - (ball_radius * 2) # Example: Left of home logo
-                    ball_y = home_y + home_logo.height // 2
-                    # Ensure it's not overlapping score or too far out
-                    ball_x = min(ball_x, self.display_width - 15 - (ball_radius*2)) # Keep some distance from right edge
-                    ball_y = min(ball_y, self.display_height - 10) # Keep it above timeouts
-                else:
-                    ball_x, ball_y = 0,0 # Should not happen if possession is 'home' or 'away'
+                    # Approximate height of the detail font (4x6 font at size 6 is roughly 6px tall)
+                    detail_font_height_approx = 6
+                    ball_y_center = dd_y + (detail_font_height_approx // 2) # Center ball vertically with D&D text
 
-                if ball_x and ball_y: # Draw if position is valid
-                    # Draw a simple ellipse for the football shape
-                    draw_overlay.ellipse(
-                        (ball_x - ball_radius, ball_y - ball_radius,
-                         ball_x + ball_radius, ball_y + ball_radius),
-                        fill=ball_color, outline=(0,0,0)
-                    )
-                    # Optionally, add a small white stitch mark
-                    # draw_overlay.line((ball_x, ball_y - ball_radius, ball_x, ball_y + ball_radius), fill=(255,255,255), width=1)
+                    possession_ball_padding = 3 # Pixels between D&D text and ball
+
+                    if possession == "away":
+                        # Position ball to the left of D&D text
+                        ball_x_center = dd_x - possession_ball_padding - ball_radius
+                    elif possession == "home":
+                        # Position ball to the right of D&D text
+                        ball_x_center = dd_x + dd_width + possession_ball_padding + ball_radius
+                    else:
+                        ball_x_center = 0 # Should not happen / no indicator
+
+                    if ball_x_center > 0: # Draw if position is valid
+                        draw_overlay.ellipse(
+                            (ball_x_center - ball_radius, ball_y_center - ball_radius,
+                             ball_x_center + ball_radius, ball_y_center + ball_radius),
+                            fill=ball_color, outline=(0,0,0)
+                        )
+                        # Optionally, add a small white stitch mark
+                        # draw_overlay.line((ball_x_center, ball_y_center - ball_radius, ball_x_center, ball_y_center + ball_radius), fill=(255,255,255), width=1)
 
             # Timeouts (Bottom corners) - 3 small bars per team
             timeout_bar_width = 4
