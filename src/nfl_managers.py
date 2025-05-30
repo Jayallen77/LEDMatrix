@@ -666,32 +666,38 @@ class NFLLiveManager(BaseNFLManager): # Renamed class
                 # Possession Indicator (small football icon)
                 possession = game.get("possession_indicator")
                 if possession: # Only draw if possession is known
-                    ball_radius = 2
+                    ball_radius_x = 3  # Wider for football shape
+                    ball_radius_y = 2  # Shorter for football shape
                     ball_color = (139, 69, 19) # Brown color for the football
-                    
+                    lace_color = (255, 255, 255) # White for laces
+
                     # Approximate height of the detail font (4x6 font at size 6 is roughly 6px tall)
-                    detail_font_height_approx = 6 
+                    detail_font_height_approx = 6
                     ball_y_center = dd_y + (detail_font_height_approx // 2) # Center ball vertically with D&D text
 
                     possession_ball_padding = 3 # Pixels between D&D text and ball
 
                     if possession == "away":
                         # Position ball to the left of D&D text
-                        ball_x_center = dd_x - possession_ball_padding - ball_radius
+                        ball_x_center = dd_x - possession_ball_padding - ball_radius_x
                     elif possession == "home":
                         # Position ball to the right of D&D text
-                        ball_x_center = dd_x + dd_width + possession_ball_padding + ball_radius
+                        ball_x_center = dd_x + dd_width + possession_ball_padding + ball_radius_x
                     else:
                         ball_x_center = 0 # Should not happen / no indicator
 
                     if ball_x_center > 0: # Draw if position is valid
+                        # Draw the football shape (ellipse)
                         draw_overlay.ellipse(
-                            (ball_x_center - ball_radius, ball_y_center - ball_radius,
-                             ball_x_center + ball_radius, ball_y_center + ball_radius),
+                            (ball_x_center - ball_radius_x, ball_y_center - ball_radius_y,  # x0, y0
+                             ball_x_center + ball_radius_x, ball_y_center + ball_radius_y), # x1, y1
                             fill=ball_color, outline=(0,0,0)
                         )
-                        # Optionally, add a small white stitch mark
-                        # draw_overlay.line((ball_x_center, ball_y_center - ball_radius, ball_x_center, ball_y_center + ball_radius), fill=(255,255,255), width=1)
+                        # Draw a simple horizontal lace
+                        draw_overlay.line(
+                            (ball_x_center - 1, ball_y_center, ball_x_center + 1, ball_y_center),
+                            fill=lace_color, width=1
+                        )
 
             # Timeouts (Bottom corners) - 3 small bars per team
             timeout_bar_width = 4
