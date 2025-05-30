@@ -458,7 +458,9 @@ class NCAAFBLiveManager(BaseNCAAFBManager): # Renamed class
                 "home_abbr": "UGA", "away_abbr": "AUB", # NCAA Examples
                 "home_score": "28", "away_score": "21",
                 "period": 4, "period_text": "Q4", "clock": "01:15",
-                "down_distance_text": "2nd & 5", "possession": "UGA_ID", # Placeholder ID
+                "down_distance_text": "2nd & 5", 
+                "possession": "UGA_ID", # Placeholder ID for home team
+                "possession_indicator": "home", # Explicitly set for test
                 "home_timeouts": 1, "away_timeouts": 2,
                 "home_logo_path": os.path.join(self.logo_dir, "UGA.png"),
                 "away_logo_path": os.path.join(self.logo_dir, "AUB.png"),

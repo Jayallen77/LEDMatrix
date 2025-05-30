@@ -459,7 +459,9 @@ class NFLLiveManager(BaseNFLManager): # Renamed class
                 "home_abbr": "TB", "away_abbr": "DAL",
                 "home_score": "21", "away_score": "17",
                 "period": 4, "period_text": "Q4", "clock": "02:35",
-                "down_distance_text": "1st & 10", "possession": "TB_ID", # Placeholder ID
+                "down_distance_text": "1st & 10", 
+                "possession": "TB_ID", # Placeholder ID for home team
+                "possession_indicator": "home", # Explicitly set for test
                 "home_timeouts": 2, "away_timeouts": 3,
                 "home_logo_path": os.path.join(self.logo_dir, "TB.png"),
                 "away_logo_path": os.path.join(self.logo_dir, "DAL.png"),
