@@ -38,13 +38,48 @@ class ConfigManager:
             print(f"Error loading configuration: {str(e)}")
             raise
 
-    def save_config(self, config_data: Dict[str, Any]) -> None:
-        """Save configuration to the main JSON file."""
+    def _strip_secrets_recursive(self, data_to_filter: Dict[str, Any], secrets: Dict[str, Any]) -> Dict[str, Any]:
+        """Recursively remove secret keys from a dictionary."""
+        result = {}
+        for key, value in data_to_filter.items():
+            if key in secrets:
+                if isinstance(value, dict) and isinstance(secrets[key], dict):
+                    # This key is a shared group, recurse
+                    stripped_sub_dict = self._strip_secrets_recursive(value, secrets[key])
+                    if stripped_sub_dict: # Only add if there's non-secret data left
+                        result[key] = stripped_sub_dict
+                # Else, it's a secret key at this level, so we skip it
+            else:
+                # This key is not in secrets, so we keep it
+                result[key] = value
+        return result
+
+    def save_config(self, new_config_data: Dict[str, Any]) -> None:
+        """Save configuration to the main JSON file, stripping out secrets."""
+        secrets_content = {}
+        if os.path.exists(self.secrets_path):
+            try:
+                with open(self.secrets_path, 'r') as f_secrets:
+                    secrets_content = json.load(f_secrets)
+            except Exception as e:
+                print(f"Warning: Could not load secrets file {self.secrets_path} during save: {e}")
+                # Continue without stripping if secrets can't be loaded, or handle as critical error
+                # For now, we'll proceed cautiously and save the full new_config_data if secrets are unreadable
+                # to prevent accidental data loss if the secrets file is temporarily corrupt.
+                # A more robust approach might be to fail the save or use a cached version of secrets.
+
+        config_to_write = self._strip_secrets_recursive(new_config_data, secrets_content)
+
         try:
             with open(self.config_path, 'w') as f:
-                json.dump(config_data, f, indent=4)
-            self.config = config_data  # Update the in-memory config
+                json.dump(config_to_write, f, indent=4)
+            
+            # Update the in-memory config to the new state (which includes secrets for runtime)
+            self.config = new_config_data 
             print(f"Configuration successfully saved to {os.path.abspath(self.config_path)}")
+            if secrets_content:
+                 print("Secret values were preserved in memory and not written to the main config file.")
+
         except IOError as e:
             print(f"Error writing configuration to file {os.path.abspath(self.config_path)}: {e}")
             raise
