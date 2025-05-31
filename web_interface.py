@@ -221,8 +221,8 @@ def display_config_route():
     except Exception as e:
         flash(f"Error loading secrets config: {str(e)}", "error")
 
-    main_config_json = json.dumps(main_config_data, indent=4, sort_keys=True)
-    secrets_config_json = json.dumps(secrets_config_data, indent=4, sort_keys=True)
+    main_config_json = json.dumps(main_config_data, indent=4)
+    secrets_config_json = json.dumps(secrets_config_data, indent=4)
     
     return render_template_string(CONFIG_PAGE_TEMPLATE, 
                                 main_config_json=main_config_json, 
