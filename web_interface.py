@@ -1,6 +1,7 @@
 from flask import Flask, render_template_string, request, redirect, url_for, flash, jsonify
 import json
 import os # Added os import
+import subprocess # Added subprocess import
 from src.config_manager import ConfigManager
 
 app = Flask(__name__)
@@ -227,17 +228,17 @@ CONFIG_PAGE_TEMPLATE = """
             .then(response => response.json())
             .then(data => {
                 let outputText = `Action: ${actionName}\nStatus: ${data.status}\nMessage: ${data.message}\n`;
-                if (data.command_to_run) {
-                    outputText += `\nCommand for Assistant to run:\n${data.command_to_run}`;
+                if (data.stdout) {
+                    outputText += `\nStdout:\n${data.stdout}`;
                 }
-                if (data.explanation) {
-                    outputText += `\n\nExplanation:\n${data.explanation}`;
+                if (data.stderr) {
+                    outputText += `\nStderr:\n${data.stderr}`;
                 }
                 if (data.error) {
-                    outputText += `\n\nError from server:\n${data.error}`;
+                    outputText += `\nError: ${data.error}`;
                 }
                 outputElement.textContent = outputText;
-                flash(data.message, data.status === 'success' ? 'success' : (data.status === 'info' ? 'info' : 'error'));
+                flash(data.message, data.status);
             })
             .catch(error => {
                 outputElement.textContent = `Error running action ${actionName}: ${error}`;
@@ -331,20 +332,20 @@ def save_config_route():
 def run_action_route():
     data = request.get_json()
     action = data.get('action')
-    command = None
+    command_parts = [] # Use a list for subprocess
     explanation_msg = ""
 
     if action == 'start_display':
-        command = "sudo python display_controller.py"
+        command_parts = ["sudo", "python", "display_controller.py"] # Changed command
         explanation_msg = "Starts the LED matrix display by directly running display_controller.py with sudo."
     elif action == 'stop_display':
-        command = "bash stop_display.sh"
+        command_parts = ["bash", "stop_display.sh"]
         explanation_msg = "Stops the LED matrix display by executing the stop_display.sh script."
     elif action == 'enable_autostart':
-        command = "sudo systemctl enable ledmatrix.service"
+        command_parts = ["sudo", "systemctl", "enable", "ledmatrix.service"]
         explanation_msg = "Enables the LED matrix service to start automatically on boot."
     elif action == 'disable_autostart':
-        command = "sudo systemctl disable ledmatrix.service"
+        command_parts = ["sudo", "systemctl", "disable", "ledmatrix.service"]
         explanation_msg = "Disables the LED matrix service from starting automatically on boot."
     else:
         return jsonify({
@@ -353,14 +354,47 @@ def run_action_route():
             "error": "Unknown action"
         }), 400
 
-    # This route now prepares information about the command for the AI to execute.
-    # It does not execute the command itself.
-    return jsonify({
-        "status": "info", # Indicates information is being returned, not a direct success/failure of execution
-        "message": f"Action '{action}' is ready. Please ask the AI assistant to run the specified command.",
-        "command_to_run": command,
-        "explanation": explanation_msg
-    })
+    try:
+        # Direct execution using subprocess
+        process_result = subprocess.run(command_parts, capture_output=True, text=True, check=False)
+        
+        stdout_content = process_result.stdout
+        stderr_content = process_result.stderr
+        exit_code = process_result.returncode
+
+        current_status = "success"
+        message_to_user = f"Action '{action}' executed. Exit code: {exit_code}."
+
+        if exit_code != 0:
+            current_status = "error"
+            message_to_user = f"Action '{action}' failed. Exit code: {exit_code}."
+        elif stderr_content: # Even with exit code 0, stderr might contain warnings
+            current_status = "warning"
+            message_to_user = f"Action '{action}' executed with output in stderr (Exit code: {exit_code})."
+
+        return jsonify({
+            "status": current_status,
+            "message": message_to_user,
+            "stdout": stdout_content,
+            "stderr": stderr_content
+        })
+
+    except FileNotFoundError as e:
+        # This occurs if the command itself (e.g., 'bash', 'sudo', or the script) isn't found
+        return jsonify({
+            "status": "error",
+            "message": f"Error executing action '{action}': Command or script not found.",
+            "error": str(e),
+            "stdout": "",
+            "stderr": f"Command not found: {command_parts[0] if command_parts else ''}"
+        }), 500
+    except Exception as e:
+        # Catch any other exceptions during subprocess execution or in this route
+        return jsonify({
+            "status": "error", 
+            "message": f"An unexpected error occurred while processing action: {action}", 
+            "error": str(e)
+        }), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000) 
