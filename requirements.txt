@@ -15,4 +15,3 @@ python-socketio
 python-engineio
 websockets
 websocket-client
-requests

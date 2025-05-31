@@ -38,6 +38,20 @@ class ConfigManager:
             print(f"Error loading configuration: {str(e)}")
             raise
 
+    def save_config(self, config_data: Dict[str, Any]) -> None:
+        """Save configuration to the main JSON file."""
+        try:
+            with open(self.config_path, 'w') as f:
+                json.dump(config_data, f, indent=4)
+            self.config = config_data  # Update the in-memory config
+            print(f"Configuration successfully saved to {os.path.abspath(self.config_path)}")
+        except IOError as e:
+            print(f"Error writing configuration to file {os.path.abspath(self.config_path)}: {e}")
+            raise
+        except Exception as e:
+            print(f"An unexpected error occurred while saving configuration: {str(e)}")
+            raise
+
     def _deep_merge(self, target: Dict, source: Dict) -> None:
         """Deep merge source dict into target dict."""
         for key, value in source.items():
