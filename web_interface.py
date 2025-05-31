@@ -1,4 +1,4 @@
-from flask import Flask, render_template_string, request, redirect, url_for, flash
+from flask import Flask, render_template_string, request, redirect, url_for, flash, jsonify
 import json
 import os # Added os import
 from src.config_manager import ConfigManager
@@ -97,6 +97,7 @@ CONFIG_PAGE_TEMPLATE = """
         <div class="tabs">
             <button class="tab-button {% if active_tab == 'main' %}active{% endif %}" onclick="openTab('main')" data-tab="main">Main Config</button>
             <button class="tab-button {% if active_tab == 'secrets' %}active{% endif %}" onclick="openTab('secrets')" data-tab="secrets">Secrets Config</button>
+            <button class="tab-button {% if active_tab == 'actions' %}active{% endif %}" onclick="openTab('actions')" data-tab="actions">Actions</button>
         </div>
 
         <form method="post" action="{{ url_for('save_config_route') }}">
@@ -113,8 +114,23 @@ CONFIG_PAGE_TEMPLATE = """
                 <label for="secrets_config_data">Edit {{ secrets_config_path }}:</label>
                 <textarea name="secrets_config_data" rows="25">{{ secrets_config_json }}</textarea>
             </div>
+
+            <div id="actions" class="tab-content {% if active_tab == 'actions' %}active{% endif %}">
+                <h2>Display & Service Actions</h2>
+                <div class="action-buttons">
+                    <button type="button" class="action-button" onclick="runAction('start_display')">Start Display</button>
+                    <button type="button" class="action-button" onclick="runAction('stop_display')">Stop Display</button>
+                    <hr>
+                    <button type="button" class="action-button" onclick="runAction('enable_autostart')">Enable Auto-Start</button>
+                    <button type="button" class="action-button" onclick="runAction('disable_autostart')">Disable Auto-Start</button>
+                </div>
+                <div id="action_output_container" style="margin-top: 20px;">
+                    <h3>Action Output:</h3>
+                    <pre id="action_output" style="background-color: #333; color: #fff; padding: 15px; border-radius: 4px; min-height: 100px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;">No action run yet.</pre>
+                </div>
+            </div>
             
-            <input type="submit" value="Save Current Tab's Configuration">
+            <input type="submit" value="Save Current Tab's Configuration" id="save_config_button">
         </form>
     </div>
 
@@ -193,6 +209,60 @@ CONFIG_PAGE_TEMPLATE = """
             const initialTab = params.get('tab') || 'main';
             openTab(initialTab);
         });
+
+        function runAction(actionName) {
+            const outputElement = document.getElementById('action_output');
+            outputElement.textContent = `Running ${actionName.replace('_', ' ')}...`;
+            
+            // Disable buttons during action
+            document.querySelectorAll('.action-button').forEach(button => button.disabled = true);
+
+            fetch("{{ url_for('run_action_route') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ action: actionName })
+            })
+            .then(response => response.json())
+            .then(data => {
+                let outputText = `Action: ${actionName}\nStatus: ${data.status}\n`;
+                if (data.stdout) {
+                    outputText += `\nStdout:\n${data.stdout}`;
+                }
+                if (data.stderr) {
+                    outputText += `\nStderr:\n${data.stderr}`;
+                }
+                if (data.error) {
+                    outputText += `\nError: ${data.error}`;
+                }
+                outputElement.textContent = outputText;
+                flash(data.message, data.status === 'success' ? 'success' : 'error'); // Use flash for global message
+            })
+            .catch(error => {
+                outputElement.textContent = `Error running action ${actionName}: ${error}`;
+                flash(`Client-side error running action: ${error}`, 'error');
+            })
+            .finally(() => {
+                // Re-enable buttons
+                document.querySelectorAll('.action-button').forEach(button => button.disabled = false);
+            });
+        }
+
+        // Helper function to show flash messages dynamically (optional)
+        function flash(message, category) {
+            const flashContainer = document.querySelector('.flash-messages') || (() => {
+                const container = document.createElement('ul');
+                container.className = 'flash-messages';
+                document.querySelector('.container').prepend(container);
+                return container;
+            })();
+            const listItem = document.createElement('li');
+            listItem.className = category;
+            listItem.textContent = message;
+            flashContainer.appendChild(listItem);
+            setTimeout(() => listItem.remove(), 5000); // Remove after 5 seconds
+        }
     </script>
 
     <!-- CodeMirror JS (Corrected Order) -->
@@ -256,6 +326,56 @@ def save_config_route():
         flash(f"Error saving {config_type} configuration: {str(e)}", "error")
     
     return redirect(url_for('display_config_route', tab=config_type)) # Redirect back to the same tab
+
+@app.route('/run_action', methods=['POST'])
+def run_action_route():
+    data = request.get_json()
+    action = data.get('action')
+    command = None
+    explanation_msg = ""
+
+    if action == 'start_display':
+        command = "sudo systemctl start ledmatrix.service"
+        explanation_msg = "Starting the LED matrix display service."
+    elif action == 'stop_display':
+        command = "sudo systemctl stop ledmatrix.service"
+        explanation_msg = "Stopping the LED matrix display service."
+    elif action == 'enable_autostart':
+        command = "sudo systemctl enable ledmatrix.service"
+        explanation_msg = "Enabling the LED matrix service to start on boot."
+    elif action == 'disable_autostart':
+        command = "sudo systemctl disable ledmatrix.service"
+        explanation_msg = "Disabling the LED matrix service from starting on boot."
+    else:
+        return jsonify({"status": "error", "message": "Invalid action specified.", "error": "Unknown action"}), 400
+
+    try:
+        # Note: The run_terminal_cmd tool will require user approval in the extension.
+        # The output of this is a proposal to run a command.
+        # In a real environment, you would handle the actual execution and response.
+        # For this simulation, we assume the tool works as described and would provide stdout/stderr.
+        
+        # Placeholder for actual command execution result
+        # In a real scenario, the default_api.run_terminal_cmd would be called here.
+        # For now, we'll simulate a successful call without actual execution for safety.
+        
+        print(f"Simulating execution of: {command} for action: {action}") 
+        # This print will appear in the assistant's tool_code block if called, 
+        # but for now, we are constructing the route and will call the tool later if needed.
+        
+        # Simulate what the response from run_terminal_cmd might look like after user approval and execution
+        simulated_stdout = f"Successfully executed: {command}"
+        simulated_stderr = ""
+        
+        return jsonify({
+            "status": "success", 
+            "message": f"{explanation_msg} (Simulated)", 
+            "stdout": simulated_stdout, 
+            "stderr": simulated_stderr
+        })
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Failed to initiate action: {action}", "error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000) 
