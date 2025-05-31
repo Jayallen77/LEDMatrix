@@ -95,8 +95,8 @@ CONFIG_PAGE_TEMPLATE = """
         {% endwith %}
 
         <div class="tabs">
-            <button class="tab-button {% if active_tab == 'main' %}active{% endif %}" onclick="openTab('main')">Main Config</button>
-            <button class="tab-button {% if active_tab == 'secrets' %}active{% endif %}" onclick="openTab('secrets')">Secrets Config</button>
+            <button class="tab-button {% if active_tab == 'main' %}active{% endif %}" onclick="openTab('main')" data-tab="main">Main Config</button>
+            <button class="tab-button {% if active_tab == 'secrets' %}active{% endif %}" onclick="openTab('secrets')" data-tab="secrets">Secrets Config</button>
         </div>
 
         <form method="post" action="{{ url_for('save_config_route') }}">
@@ -119,87 +119,89 @@ CONFIG_PAGE_TEMPLATE = """
     </div>
 
     <script>
+        var mainEditor = null; // Declare editors in a scope accessible to openTab
+        var secretsEditor = null;
+
         function openTab(tabName) {
-            // Update URL without reloading page for better UX
             history.pushState(null, null, '{{ url_for("display_config_route") }}?tab=' + tabName);
 
             var i, tabcontent, tabbuttons;
             tabcontent = document.getElementsByClassName("tab-content");
             for (i = 0; i < tabcontent.length; i++) {
-                tabcontent[i].style.display = "none";
                 tabcontent[i].classList.remove("active");
             }
             tabbuttons = document.getElementsByClassName("tab-button");
             for (i = 0; i < tabbuttons.length; i++) {
                 tabbuttons[i].classList.remove("active");
             }
-            document.getElementById(tabName).style.display = "block";
+
             document.getElementById(tabName).classList.add("active");
-            // Set the active class for the button
-            document.querySelector(".tab-button[onclick=\"openTab('" + tabName + "')\"]").classList.add("active");
-            // Update hidden input for form submission
+            document.querySelector(".tab-button[data-tab='" + tabName + "']").classList.add("active");
             document.getElementById("config_type_hidden").value = tabName;
+
+            // Refresh the corresponding CodeMirror instance
+            if (tabName === 'main' && mainEditor) {
+                mainEditor.refresh();
+            }
+            if (tabName === 'secrets' && secretsEditor) {
+                secretsEditor.refresh();
+            }
         }
 
-        // Ensure the correct tab is active on page load based on URL parameter
         document.addEventListener('DOMContentLoaded', function() {
+            // Initialize CodeMirror for the main config textarea
+            var mainConfigTextArea = document.querySelector("textarea[name='main_config_data']");
+            if (mainConfigTextArea) {
+                mainEditor = CodeMirror.fromTextArea(mainConfigTextArea, {
+                    lineNumbers: true,
+                    mode: {name: "javascript", json: true},
+                    theme: "material-palenight",
+                    gutters: ["CodeMirror-lint-markers"],
+                    lint: true
+                });
+                new MutationObserver(() => mainEditor.refresh()).observe(document.getElementById('main'), {attributes: true, childList: false, subtree: false});
+            }
+
+            // Initialize CodeMirror for the secrets config textarea
+            var secretsConfigTextArea = document.querySelector("textarea[name='secrets_config_data']");
+            if (secretsConfigTextArea) {
+                secretsEditor = CodeMirror.fromTextArea(secretsConfigTextArea, {
+                    lineNumbers: true,
+                    mode: {name: "javascript", json: true},
+                    theme: "material-palenight",
+                    gutters: ["CodeMirror-lint-markers"],
+                    lint: true
+                });
+                new MutationObserver(() => secretsEditor.refresh()).observe(document.getElementById('secrets'), {attributes: true, childList: false, subtree: false});
+            }
+            
+            // Ensure CodeMirror instances save their content back to textareas before form submission
+            const form = document.querySelector('form');
+            if (form) {
+                form.addEventListener('submit', function() {
+                    if (mainEditor) {
+                        mainEditor.save();
+                    }
+                    if (secretsEditor) {
+                        secretsEditor.save();
+                    }
+                });
+            }
+            
+            // Initial tab setup from URL or default
             const params = new URLSearchParams(window.location.search);
-            const tab = params.get('tab') || 'main'; // Default to main tab
-            openTab(tab);
+            const initialTab = params.get('tab') || 'main';
+            openTab(initialTab);
         });
     </script>
 
-    <!-- CodeMirror JS -->
+    <!-- CodeMirror JS (Corrected Order) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsonlint/1.6.3/jsonlint.min.js"></script> <!-- Defines global jsonlint -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/lint/lint.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/lint/json-lint.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsonlint/1.6.3/jsonlint.min.js"></script> <!-- jsonlint.js dependency for json-lint addon -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/lint/json-lint.min.js"></script> <!-- Uses global jsonlint -->
 
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Initialize CodeMirror for the main config textarea
-        var mainConfigTextArea = document.querySelector("textarea[name='main_config_data']");
-        if (mainConfigTextArea) {
-            var mainEditor = CodeMirror.fromTextArea(mainConfigTextArea, {
-                lineNumbers: true,
-                mode: {name: "javascript", json: true}, // Use javascript mode with json flag
-                theme: "material-palenight",
-                gutters: ["CodeMirror-lint-markers"],
-                lint: true
-            });
-            // Refresh CodeMirror instance if it's in a tab that becomes visible later
-            new MutationObserver(() => mainEditor.refresh()).observe(document.getElementById('main'), {attributes: true});
-        }
-
-        // Initialize CodeMirror for the secrets config textarea
-        var secretsConfigTextArea = document.querySelector("textarea[name='secrets_config_data']");
-        if (secretsConfigTextArea) {
-            var secretsEditor = CodeMirror.fromTextArea(secretsConfigTextArea, {
-                lineNumbers: true,
-                mode: {name: "javascript", json: true}, // Use javascript mode with json flag
-                theme: "material-palenight",
-                gutters: ["CodeMirror-lint-markers"],
-                lint: true
-            });
-             // Refresh CodeMirror instance if it's in a tab that becomes visible later
-            new MutationObserver(() => secretsEditor.refresh()).observe(document.getElementById('secrets'), {attributes: true});
-        }
-        
-        // Ensure CodeMirror instances save their content back to textareas before form submission
-        const form = document.querySelector('form');
-        if (form) {
-            form.addEventListener('submit', function() {
-                if (typeof mainEditor !== 'undefined' && mainEditor) {
-                    mainEditor.save();
-                }
-                if (typeof secretsEditor !== 'undefined' && secretsEditor) {
-                    secretsEditor.save();
-                }
-            });
-        }
-    });
-    </script>
 </body>
 </html>
 """
