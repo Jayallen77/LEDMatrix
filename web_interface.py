@@ -335,8 +335,8 @@ def run_action_route():
     explanation_msg = ""
 
     if action == 'start_display':
-        command = "bash start_display.sh"
-        explanation_msg = "Starts the LED matrix display by executing the start_display.sh script."
+        command = "sudo python display_controller.py"
+        explanation_msg = "Starts the LED matrix display by directly running display_controller.py with sudo."
     elif action == 'stop_display':
         command = "bash stop_display.sh"
         explanation_msg = "Stops the LED matrix display by executing the stop_display.sh script."
