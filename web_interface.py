@@ -2,10 +2,12 @@ from flask import Flask, render_template_string, request, redirect, url_for, fla
 import json
 import os # Added os import
 from src.config_manager import ConfigManager
+from src.default_api import DefaultAPI
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24) # Needed for flash messages
 config_manager = ConfigManager()
+default_api = DefaultAPI()
 
 CONFIG_PAGE_TEMPLATE = """
 <!DOCTYPE html>
@@ -335,11 +337,11 @@ def run_action_route():
     explanation_msg = ""
 
     if action == 'start_display':
-        command = "sudo systemctl start ledmatrix.service"
-        explanation_msg = "Starting the LED matrix display service."
+        command = "bash start_display.sh"
+        explanation_msg = "Starting the LED matrix display via start_display.sh."
     elif action == 'stop_display':
-        command = "sudo systemctl stop ledmatrix.service"
-        explanation_msg = "Stopping the LED matrix display service."
+        command = "bash stop_display.sh"
+        explanation_msg = "Stopping the LED matrix display via stop_display.sh."
     elif action == 'enable_autostart':
         command = "sudo systemctl enable ledmatrix.service"
         explanation_msg = "Enabling the LED matrix service to start on boot."
@@ -350,32 +352,46 @@ def run_action_route():
         return jsonify({"status": "error", "message": "Invalid action specified.", "error": "Unknown action"}), 400
 
     try:
-        # Note: The run_terminal_cmd tool will require user approval in the extension.
-        # The output of this is a proposal to run a command.
-        # In a real environment, you would handle the actual execution and response.
-        # For this simulation, we assume the tool works as described and would provide stdout/stderr.
+        # This will propose the command to the user for approval via the IDE extension.
+        # The actual command execution happens after user approval.
+        tool_output = default_api.run_terminal_cmd(command=command, is_background=False, explanation=explanation_msg)
+
+        # Process the tool_output. The structure of tool_output depends on the tool's implementation.
+        # We expect it to contain stdout, stderr, and an indication of success/failure (e.g., exit_code).
+        # For this example, we'll assume tool_output might look like:
+        # {"stdout": "...", "stderr": "...", "exit_code": 0, "command_id": "..."}
+        # or it might directly be the stdout if the command was simple and successful without error.
+
+        stdout_content = tool_output.get("stdout", "")
+        stderr_content = tool_output.get("stderr", "")
+        # Infer success if stderr is empty, this is a common convention but not always true.
+        # A more robust check might involve an explicit exit_code if the tool provides it.
+        if stderr_content:
+            status = "error"
+            message = f"Action '{action}' may have encountered issues."
+        else:
+            status = "success"
+            message = f"Action '{action}' proposed and likely executed. Check output."
         
-        # Placeholder for actual command execution result
-        # In a real scenario, the default_api.run_terminal_cmd would be called here.
-        # For now, we'll simulate a successful call without actual execution for safety.
-        
-        print(f"Simulating execution of: {command} for action: {action}") 
-        # This print will appear in the assistant's tool_code block if called, 
-        # but for now, we are constructing the route and will call the tool later if needed.
-        
-        # Simulate what the response from run_terminal_cmd might look like after user approval and execution
-        simulated_stdout = f"Successfully executed: {command}"
-        simulated_stderr = ""
-        
+        # If the tool just returns a string (e.g. command_id or simple stdout), adapt as needed.
+        if isinstance(tool_output, str):
+            stdout_content = tool_output # Or interpret as a command ID or status message
+            message = f"Action '{action}' proposed. Tool response: {tool_output}"
+            if not stderr_content: # if stderr was not in a dict
+                 status = "success"
+            else:
+                 status = "error"
+
         return jsonify({
-            "status": "success", 
-            "message": f"{explanation_msg} (Simulated)", 
-            "stdout": simulated_stdout, 
-            "stderr": simulated_stderr
+            "status": status,
+            "message": message,
+            "stdout": stdout_content,
+            "stderr": stderr_content,
+            "raw_tool_response": tool_output # For debugging if needed
         })
 
     except Exception as e:
-        return jsonify({"status": "error", "message": f"Failed to initiate action: {action}", "error": str(e)}), 500
+        return jsonify({"status": "error", "message": f"Failed to execute or process action: {action}", "error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000) 
