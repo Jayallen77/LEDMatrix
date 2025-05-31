@@ -9,6 +9,12 @@ class ConfigManager:
         self.secrets_path = secrets_path or "config/config_secrets.json"
         self.config: Dict[str, Any] = {}
 
+    def get_config_path(self) -> str:
+        return self.config_path
+
+    def get_secrets_path(self) -> str:
+        return self.secrets_path
+
     def load_config(self) -> Dict[str, Any]:
         """Load configuration from JSON files."""
         try:
@@ -105,4 +111,60 @@ class ConfigManager:
 
     def get_clock_config(self) -> Dict[str, Any]:
         """Get clock configuration."""
-        return self.config.get('clock', {}) 
+        return self.config.get('clock', {})
+
+    def get_raw_file_content(self, file_type: str) -> Dict[str, Any]:
+        """Load raw content of 'main' config or 'secrets' config file."""
+        path_to_load = ""
+        if file_type == "main":
+            path_to_load = self.config_path
+        elif file_type == "secrets":
+            path_to_load = self.secrets_path
+        else:
+            raise ValueError("Invalid file_type specified. Must be 'main' or 'secrets'.")
+
+        if not os.path.exists(path_to_load):
+            # If a secrets file doesn't exist, it's not an error, just return empty
+            if file_type == "secrets":
+                return {}
+            print(f"{file_type.capitalize()} configuration file not found at {os.path.abspath(path_to_load)}")
+            raise FileNotFoundError(f"{file_type.capitalize()} configuration file not found at {os.path.abspath(path_to_load)}")
+
+        try:
+            with open(path_to_load, 'r') as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            print(f"Error parsing {file_type} configuration file: {path_to_load}")
+            raise
+        except Exception as e:
+            print(f"Error loading {file_type} configuration file {path_to_load}: {str(e)}")
+            raise
+
+    def save_raw_file_content(self, file_type: str, data: Dict[str, Any]) -> None:
+        """Save data directly to 'main' config or 'secrets' config file."""
+        path_to_save = ""
+        if file_type == "main":
+            path_to_save = self.config_path
+        elif file_type == "secrets":
+            path_to_save = self.secrets_path
+        else:
+            raise ValueError("Invalid file_type specified. Must be 'main' or 'secrets'.")
+
+        try:
+            # Create directory if it doesn't exist, especially for config/
+            os.makedirs(os.path.dirname(path_to_save), exist_ok=True)
+            with open(path_to_save, 'w') as f:
+                json.dump(data, f, indent=4)
+            print(f"{file_type.capitalize()} configuration successfully saved to {os.path.abspath(path_to_save)}")
+            
+            # If we just saved the main config or secrets, the merged self.config might be stale.
+            # Reload it to reflect the new state.
+            if file_type == "main" or file_type == "secrets":
+                self.load_config()
+
+        except IOError as e:
+            print(f"Error writing {file_type} configuration to file {os.path.abspath(path_to_save)}: {e}")
+            raise
+        except Exception as e:
+            print(f"An unexpected error occurred while saving {file_type} configuration: {str(e)}")
+            raise 
