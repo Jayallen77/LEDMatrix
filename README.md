@@ -249,13 +249,13 @@ sudo reboot
 
 ## Configuration
 
-1.Edit `config/config.json` with your preferences via `sudo nano config/config.json`
+1.Edit `config/config.json` with your preferences via `sudo nano config/config.json`
 
 ###API Keys
 
 For sensitive settings like API keys:
-Copy the template: `cp config/config_secrets.template.json config/config_secrets.json`
-Edit `config/config_secrets.json` with your API keys via `sudo nano config/config_secrets.json`
+Copy the template: `cp config/config_secrets.template.json config/config_secrets.json`
+Edit `config/config_secrets.json` with your API keys via `sudo nano config/config_secrets.json`
 Ctrl + X to exit, Y to overwrite, Enter to Confirm
 
 Everything is configured via `config/config.json` and `config/config_secrets.json`.
@@ -699,7 +699,7 @@ The LEDMatrix system includes a robust caching mechanism to optimize API calls a
 ## Final Notes
 - Most configuration is done via config/config.json
 - Refresh intervals for sports/weather/stocks are customizable
-- A caching system reduces API strain and helps ensure the display doesn’t hammer external services (and ruin it for everyone)
+- A caching system reduces API strain and helps ensure the display doesn't hammer external services (and ruin it for everyone)
 - Font files should be placed in assets/fonts/
 - You can test each module individually for debugging
 
@@ -710,4 +710,56 @@ The LEDMatrix system includes a robust caching mechanism to optimize API calls a
 - Building a user-friendly UI for easier configuration
 
 
-### If you’ve read this far — thanks!  
+### If you've read this far — thanks!  
+
+## Granting Passwordless Sudo Access for Web Interface Actions
+
+The web interface needs to run certain commands with `sudo` (e.g., `reboot`, `systemctl start/stop/enable/disable ledmatrix.service`, `python display_controller.py`). To avoid needing to enter a password for these actions through the web UI, you can configure the `sudoers` file to allow the user running the Flask application to execute these specific commands without a password.
+
+**WARNING: Be very careful when editing the `sudoers` file. Incorrect syntax can lock you out of `sudo` access.**
+
+1.  **Identify the user:** Determine which user is running the `web_interface.py` script. Often, this might be the default user like `pi` on a Raspberry Pi, or a dedicated user you've set up.
+
+2.  **Open the sudoers file for editing:**
+    Use the `visudo` command, which locks the sudoers file and checks for syntax errors before saving.
+    ```bash
+    sudo visudo
+    ```
+
+3.  **Add the permission lines:**
+    Scroll to the bottom of the file and add lines similar to the following. Replace `your_flask_user` with the actual username running the Flask application.
+    You'll need to specify the full paths to the commands. You can find these using the `which` command (e.g., `which python`, `which systemctl`, `which reboot`).
+
+    ```sudoers
+    # Allow your_flask_user to run specific commands without a password for the LED Matrix web interface
+    your_flask_user ALL=(ALL) NOPASSWD: /sbin/reboot
+    your_flask_user ALL=(ALL) NOPASSWD: /bin/systemctl start ledmatrix.service
+    your_flask_user ALL=(ALL) NOPASSWD: /bin/systemctl stop ledmatrix.service
+    your_flask_user ALL=(ALL) NOPASSWD: /bin/systemctl enable ledmatrix.service
+    your_flask_user ALL=(ALL) NOPASSWD: /bin/systemctl disable ledmatrix.service
+    your_flask_user ALL=(ALL) NOPASSWD: /usr/bin/python /path/to/your/display_controller.py 
+    your_flask_user ALL=(ALL) NOPASSWD: /bin/bash /path/to/your/stop_display.sh
+    ```
+    *   **Important:**
+        *   Replace `your_flask_user` with the correct username.
+        *   Replace `/path/to/your/display_controller.py` with the absolute path to your `display_controller.py` script.
+        *   Replace `/path/to/your/stop_display.sh` with the absolute path to your `stop_display.sh` script.
+        *   The paths to `python`, `systemctl`, `reboot`, and `bash` might vary slightly depending on your system. Use `which <command>` to find the correct paths if you are unsure. For example, `which python` might output `/usr/bin/python3` - use that full path.
+
+4.  **Save and Exit:**
+    *   If you're in `nano` (common default for `visudo`): `Ctrl+X`, then `Y` to confirm, then `Enter`.
+    *   If you're in `vim`: `Esc`, then `:wq`, then `Enter`.
+
+    `visudo` will check the syntax. If there's an error, it will prompt you to re-edit or quit. **Do not quit without fixing errors if possible.**
+
+5.  **Test:**
+    After saving, try running one of the specified commands as `your_flask_user` using `sudo` from a regular terminal session to ensure it doesn't ask for a password.
+    For example:
+    ```bash
+    sudo -u your_flask_user sudo /sbin/reboot
+    ```
+    (Don't actually reboot if you're not ready, but it should proceed without a password prompt if configured correctly. You can test with a less disruptive command like `sudo -u your_flask_user sudo systemctl status ledmatrix.service`).
+
+**Security Considerations:**
+Granting passwordless `sudo` access, even for specific commands, has security implications. Ensure that the scripts and commands allowed are secure and cannot be easily exploited. The web interface itself should also be secured if it's exposed to untrusted networks.
+For `display_controller.py` and `stop_display.sh`, ensure their file permissions restrict write access to only trusted users, preventing unauthorized modification of these scripts which run with elevated privileges.

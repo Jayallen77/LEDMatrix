@@ -124,6 +124,8 @@ CONFIG_PAGE_TEMPLATE = """
                     <hr>
                     <button type="button" class="action-button" onclick="runAction('enable_autostart')">Enable Auto-Start</button>
                     <button type="button" class="action-button" onclick="runAction('disable_autostart')">Disable Auto-Start</button>
+                    <hr>
+                    <button type="button" class="action-button" onclick="runAction('reboot_system')">Reboot System</button>
                 </div>
                 <div id="action_output_container" style="margin-top: 20px;">
                     <h3>Action Output:</h3>
@@ -347,6 +349,9 @@ def run_action_route():
     elif action == 'disable_autostart':
         command_parts = ["sudo", "systemctl", "disable", "ledmatrix.service"]
         explanation_msg = "Disables the LED matrix service from starting automatically on boot."
+    elif action == 'reboot_system':
+        command_parts = ["sudo", "reboot"]
+        explanation_msg = "Reboots the system."
     else:
         return jsonify({
             "status": "error", 
