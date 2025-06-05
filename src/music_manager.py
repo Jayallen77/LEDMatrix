@@ -686,11 +686,11 @@ class MusicManager:
             self.display_manager.draw.rectangle([0, 0, self.display_manager.matrix.width, self.display_manager.matrix.height], fill=(0, 0, 0))
 
         matrix_height = self.display_manager.matrix.height
-        album_art_size = matrix_height - 2 
+        album_art_size = matrix_height # Was matrix_height - 2
         album_art_target_size = (album_art_size, album_art_size)
-        album_art_x = 1
-        album_art_y = 1
-        text_area_x_start = album_art_x + album_art_size + 2 
+        album_art_x = 0 # Was 1
+        album_art_y = 0 # Was 1
+        text_area_x_start = album_art_x + album_art_size + 2
         text_area_width = self.display_manager.matrix.width - text_area_x_start - 1 
 
         image_to_render_this_cycle = None
