@@ -1,4 +1,5 @@
 {
+    "web_display_autostart": true,
     "timezone": "America/Chicago",
     "location": {
         "city": "Dallas",

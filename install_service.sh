@@ -13,45 +13,114 @@ fi
 # Get the home directory of the actual user
 USER_HOME=$(eval echo ~$ACTUAL_USER)
 
+# Determine the Project Root Directory (where this script is located)
+PROJECT_ROOT_DIR=$(cd "$(dirname "$0")" && pwd)
+
 echo "Installing LED Matrix Display Service for user: $ACTUAL_USER"
 echo "Using home directory: $USER_HOME"
+echo "Project root directory: $PROJECT_ROOT_DIR"
 
-# Create a temporary service file with the correct paths
-sed "s|/home/ledpi|$USER_HOME|g" ledmatrix.service > /tmp/ledmatrix.service.tmp
+# Create a temporary service file for the main display with the correct paths
+# Assuming ledmatrix.service template exists and uses /home/ledpi as a placeholder for user home
+if [ -f "ledmatrix.service" ]; then
+    sed "s|/home/ledpi|$USER_HOME|g; s|__PROJECT_ROOT_DIR__|$PROJECT_ROOT_DIR|g; s|__USER__|$ACTUAL_USER|g" ledmatrix.service > /tmp/ledmatrix.service.tmp
+    # Copy the service file to the systemd directory
+    sudo cp /tmp/ledmatrix.service.tmp /etc/systemd/system/ledmatrix.service
+    # Clean up
+    rm /tmp/ledmatrix.service.tmp
+else
+    echo "WARNING: ledmatrix.service template not found. Main display service not configured."
+fi
 
-# Copy the service file to the systemd directory
-sudo cp /tmp/ledmatrix.service.tmp /etc/systemd/system/ledmatrix.service
 
-# Clean up
-rm /tmp/ledmatrix.service.tmp
-
-# Reload systemd to recognize the new service
+# Reload systemd to recognize the new service (or modified service)
 sudo systemctl daemon-reload
 
-# Enable the service to start on boot
-sudo systemctl enable ledmatrix.service
+if [ -f "/etc/systemd/system/ledmatrix.service" ]; then
+    echo "Enabling ledmatrix.service (main display) to start on boot..."
+    sudo systemctl enable ledmatrix.service
+    echo "Starting ledmatrix.service (main display)..."
+    sudo systemctl start ledmatrix.service
+else
+    echo "Skipping enable/start for ledmatrix.service as it was not configured."
+fi
 
-# Start the service now
-sudo systemctl start ledmatrix.service
+# === LEDMatrix Web Interface service (ledmatrix-web.service) ===
+echo "Installing LEDMatrix Web Interface service (ledmatrix-web.service)..."
+
+WEB_SERVICE_FILE_CONTENT=$(cat <<EOF
+[Unit]
+Description=LED Matrix Web Interface (Conditional Start)
+After=network.target
+# Wants=ledmatrix.service
+# After=network.target ledmatrix.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 ${PROJECT_ROOT_DIR}/start_web_conditionally.py
+WorkingDirectory=${PROJECT_ROOT_DIR}
+StandardOutput=journal
+StandardError=journal
+User=${ACTUAL_USER}
+Restart=on-failure
+# Environment="PYTHONUNBUFFERED=1"
+
+[Install]
+WantedBy=multi-user.target
+EOF
+)
+
+# Write the new service file
+echo "$WEB_SERVICE_FILE_CONTENT" | sudo tee /etc/systemd/system/ledmatrix-web.service > /dev/null
+
+echo "Reloading systemd daemon for web service..."
+sudo systemctl daemon-reload
+
+echo "Enabling ledmatrix-web.service to start on boot..."
+sudo systemctl enable ledmatrix-web.service
+
+echo "Starting ledmatrix-web.service..."
+sudo systemctl start ledmatrix-web.service
+
+echo "LEDMatrix Web Interface service (ledmatrix-web.service) installation complete."
+echo "It will start based on the 'web_display_autostart' setting in config/config.json."
+# === End of LEDMatrix Web Interface service ===
+
 
 # Check the status
-echo "Service status:"
-sudo systemctl status ledmatrix.service
+echo "Service status for main display (ledmatrix.service):"
+sudo systemctl status ledmatrix.service || echo "ledmatrix.service not found or failed to get status."
+echo "Service status for web interface (ledmatrix-web.service):"
+sudo systemctl status ledmatrix-web.service || echo "ledmatrix-web.service not found or failed to get status."
 
 echo ""
-echo "LED Matrix Display Service has been installed and started."
+echo "LED Matrix Services have been processed."
 echo ""
-echo "To stop the display when you SSH in:"
+echo "To stop the main display when you SSH in:"
 echo "  sudo systemctl stop ledmatrix.service"
+echo "To stop the web interface:"
+echo "  sudo systemctl stop ledmatrix-web.service"
+
 echo ""
-echo "To check if the service is running:"
+echo "To check if the main display service is running:"
 echo "  sudo systemctl status ledmatrix.service"
+echo "To check if the web interface service is running:"
+echo "  sudo systemctl status ledmatrix-web.service"
+
 echo ""
-echo "To restart the service:"
+echo "To restart the main display service:"
 echo "  sudo systemctl restart ledmatrix.service"
+echo "To restart the web interface service:"
+echo "  sudo systemctl restart ledmatrix-web.service"
+
 echo ""
-echo "To view logs:"
+echo "To view logs for the main display:"
 echo "  journalctl -u ledmatrix.service"
+echo "To view logs for the web interface:"
+echo "  journalctl -u ledmatrix-web.service"
+
 echo ""
-echo "To disable autostart:"
-echo "  sudo systemctl disable ledmatrix.service" 
+echo "To disable autostart for the main display:"
+echo "  sudo systemctl disable ledmatrix.service"
+echo "To disable autostart for the web interface:"
+echo "  sudo systemctl disable ledmatrix-web.service" 
