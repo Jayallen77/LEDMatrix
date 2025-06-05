@@ -126,6 +126,8 @@ CONFIG_PAGE_TEMPLATE = """
                     <button type="button" class="action-button" onclick="runAction('disable_autostart')">Disable Auto-Start</button>
                     <hr>
                     <button type="button" class="action-button" onclick="runAction('reboot_system')">Reboot System</button>
+                    <hr>
+                    <button type="button" class="action-button" onclick="runAction('git_pull')">Download Latest Update</button>
                 </div>
                 <div id="action_output_container" style="margin-top: 20px;">
                     <h3>Action Output:</h3>
@@ -352,6 +354,9 @@ def run_action_route():
     elif action == 'reboot_system':
         command_parts = ["sudo", "reboot"]
         explanation_msg = "Reboots the system."
+    elif action == 'git_pull':
+        command_parts = ["git", "pull"]
+        explanation_msg = "Downloads the latest updates from the repository."
     else:
         return jsonify({
             "status": "error", 
