@@ -53,7 +53,12 @@ class WeatherManager:
             'temp_high': (255, 100, 100),
             'temp_low': (100, 100, 255),
             'dim': (180, 180, 180),
-            'extra_dim': (120, 120, 120)  # Even dimmer for smallest text
+            'extra_dim': (120, 120, 120),  # Even dimmer for smallest text
+            'uv_low': (0, 150, 0),          # Green
+            'uv_moderate': (255, 200, 0),   # Yellow
+            'uv_high': (255, 120, 0),       # Orange
+            'uv_very_high': (200, 0, 0),    # Red
+            'uv_extreme': (150, 0, 200)     # Purple
         }
         # Add caching for last drawn states
         self.last_weather_state = None
@@ -114,7 +119,8 @@ class WeatherManager:
                     'temp_max': one_call_data['daily'][0]['temp']['max'],
                     'temp_min': one_call_data['daily'][0]['temp']['min'],
                     'humidity': one_call_data['current']['humidity'],
-                    'pressure': one_call_data['current']['pressure']
+                    'pressure': one_call_data['current']['pressure'],
+                    'uvi': one_call_data['current'].get('uvi', 0)
                 },
                 'weather': one_call_data['current']['weather'],
                 'wind': {
@@ -218,7 +224,8 @@ class WeatherManager:
         return {
             'temp': round(self.weather_data['main']['temp']),
             'condition': self.weather_data['weather'][0]['main'],
-            'humidity': self.weather_data['main']['humidity']
+            'humidity': self.weather_data['main']['humidity'],
+            'uvi': self.weather_data['main'].get('uvi', 0)
         }
 
     def _get_hourly_state(self) -> List[Dict[str, Any]]:
@@ -316,15 +323,29 @@ class WeatherManager:
             y_pos = self.display_manager.matrix.height - 7 # Position near bottom for 6px font
             font = self.display_manager.extra_small_font # The 4x6 font
 
-            # --- Pressure (Section 1) ---
-            pressure = weather_data['main']['pressure'] * 0.02953
-            pressure_text = f"P:{pressure:.1f}in"
-            pressure_width = draw.textlength(pressure_text, font=font)
-            pressure_x = (section_width - pressure_width) // 2 # Center in first third
-            draw.text((pressure_x, y_pos),
-                     pressure_text,
-                     font=font,
-                     fill=self.COLORS['dim'])
+            # --- UV Index (Section 1) ---
+            uv_index = weather_data['main'].get('uvi', 0)
+            uv_prefix = "UV:"
+            uv_value_text = f"{uv_index:.0f}"
+            
+            prefix_width = draw.textlength(uv_prefix, font=font)
+            value_width = draw.textlength(uv_value_text, font=font)
+            total_width = prefix_width + value_width
+            
+            start_x = (section_width - total_width) // 2
+            
+            # Draw "UV:" prefix
+            draw.text((start_x, y_pos),
+                        uv_prefix,
+                        font=font,
+                        fill=self.COLORS['dim'])
+
+            # Draw UV value with color
+            uv_color = self._get_uv_color(uv_index)
+            draw.text((start_x + prefix_width, y_pos),
+                        uv_value_text,
+                        font=font,
+                        fill=uv_color)
             
             # --- Humidity (Section 2) ---
             humidity = weather_data['main']['humidity']
@@ -361,6 +382,19 @@ class WeatherManager:
         directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
         index = round(degrees / 45) % 8
         return directions[index]
+
+    def _get_uv_color(self, uv_index: float) -> tuple:
+        """Get color based on UV index value."""
+        if uv_index <= 2:
+            return self.COLORS['uv_low']
+        elif uv_index <= 5:
+            return self.COLORS['uv_moderate']
+        elif uv_index <= 7:
+            return self.COLORS['uv_high']
+        elif uv_index <= 10:
+            return self.COLORS['uv_very_high']
+        else:
+            return self.COLORS['uv_extreme']
 
     def display_hourly_forecast(self, force_clear: bool = False):
         """Display the next few hours of weather forecast."""
