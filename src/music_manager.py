@@ -368,6 +368,7 @@ class MusicManager:
                                 self.current_source = MusicSource.SPOTIFY
                                 significant_change_for_callback = True # Spotify poll changes always considered significant
                                 simplified_info_for_callback = simplified_info_poll.copy()
+                                self._needs_immediate_full_refresh = True # Reset display state
                                 # Handle album art for Spotify if needed (similar to _process_ytm_data_update)
                                 old_album_art_url = self.current_track_info.get('album_art_url_prev_spotify') # Need a way to store prev
                                 new_album_art_url = simplified_info_poll.get('album_art_url')
@@ -390,6 +391,7 @@ class MusicManager:
                                 self.current_track_info = simplified_info_for_callback
                                 self.current_source = MusicSource.NONE
                                 significant_change_for_callback = True
+                                self._needs_immediate_full_refresh = True # Reset display state
                                 self.album_art_image = None # Clear art
                                 self.last_album_art_url = None
                                 logger.info("Polling Spotify: Player stopped. Updating to Nothing Playing.")
@@ -665,7 +667,7 @@ class MusicManager:
 
         self.is_currently_showing_nothing_playing = False 
 
-        if perform_full_refresh_this_cycle and not self.is_currently_showing_nothing_playing : 
+        if perform_full_refresh_this_cycle: 
             title_being_displayed = current_track_info_snapshot.get('title','N/A') if current_track_info_snapshot else "N/A"
             logger.debug(f"MusicManager: Resetting scroll positions for track '{title_being_displayed}' due to full refresh signal (periodic or event-driven).")
             self.scroll_position_title = 0
