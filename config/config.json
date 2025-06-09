@@ -107,7 +107,7 @@
         "calendars": ["birthdays"]
     },
     "nhl_scoreboard": {
-        "enabled": true,
+        "enabled": false,
         "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 30,
