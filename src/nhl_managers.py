@@ -681,6 +681,8 @@ class NHLRecentManager(BaseNHLManager):
         current_time = time.time()
         if current_time - self.last_update < self.update_interval:
             return
+        
+        self.last_update = current_time
             
         try:
             # Fetch data from ESPN API
@@ -712,7 +714,6 @@ class NHLRecentManager(BaseNHLManager):
                 
             self.games_list = team_games
             self.current_game = team_games[0]
-            self.last_update = current_time
             
         except Exception as e:
             self.logger.error(f"[NHL] Error updating recent games: {e}", exc_info=True)
@@ -764,6 +765,8 @@ class NHLUpcomingManager(BaseNHLManager):
         current_time = time.time()
         if current_time - self.last_update < self.update_interval:
             return
+        
+        self.last_update = current_time
             
         try:
             # Fetch data from ESPN API
@@ -822,7 +825,6 @@ class NHLUpcomingManager(BaseNHLManager):
             self.upcoming_games = new_team_games
             if self.upcoming_games:
                 self.current_game = self.upcoming_games[0]
-            self.last_update = current_time
             
         except Exception as e:
             self.logger.error(f"[NHL] Error updating upcoming games: {e}", exc_info=True)
