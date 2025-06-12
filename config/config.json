@@ -1,5 +1,5 @@
 {
-    "web_display_autostart": true,
+    "web_display_autostart": false,
     "timezone": "America/Chicago",
     "location": {
         "city": "Dallas",
