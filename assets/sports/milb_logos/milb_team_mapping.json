@@ -1,0 +1,610 @@
+{
+  "Toledo Mud Hens": {
+    "abbreviation": "TOL",
+    "slug": "toledo"
+  },
+  "Billings Mustangs": {
+    "abbreviation": "BIL",
+    "slug": "billings"
+  },
+  "Modesto Nuts": {
+    "abbreviation": "MOD",
+    "slug": "modesto"
+  },
+  "Visalia Rawhide": {
+    "abbreviation": "VIS",
+    "slug": "visalia"
+  },
+  "Missoula PaddleHeads": {
+    "abbreviation": "MIS",
+    "slug": "missoula"
+  },
+  "Pericos de Puebla": {
+    "abbreviation": "PUE",
+    "slug": "puebla"
+  },
+  "Myrtle Beach Pelicans": {
+    "abbreviation": "MB",
+    "slug": "myrtle-beach"
+  },
+  "Reading Fightin Phils": {
+    "abbreviation": "REA",
+    "slug": "reading"
+  },
+  "Piratas de Campeche": {
+    "abbreviation": "CAM",
+    "slug": "campeche"
+  },
+  "Stockton Ports": {
+    "abbreviation": "STK",
+    "slug": "stockton"
+  },
+  "Rancho Cucamonga Quakes": {
+    "abbreviation": "RC",
+    "slug": "rancho-cucamonga"
+  },
+  "Rieleros de Aguascalientes": {
+    "abbreviation": "AGS",
+    "slug": "aguascalientes"
+  },
+  "Tacoma Rainiers": {
+    "abbreviation": "TAC",
+    "slug": "tacoma"
+  },
+  "Ogden Raptors": {
+    "abbreviation": "OGD",
+    "slug": "ogden"
+  },
+  "Scranton/Wilkes-Barre RailRiders": {
+    "abbreviation": "SWB",
+    "slug": "scranton-wb"
+  },
+  "Diablos Rojos del Mexico": {
+    "abbreviation": "MEX",
+    "slug": "mexico"
+  },
+  "Worcester Red Sox": {
+    "abbreviation": "WOR",
+    "slug": "worcester"
+  },
+  "Rochester Red Wings": {
+    "abbreviation": "ROC",
+    "slug": "rochester"
+  },
+  "Tecos de los Dos Laredos": {
+    "abbreviation": "LAR",
+    "slug": "dos-laredos"
+  },
+  "Hudson Valley Renegades": {
+    "abbreviation": "HV",
+    "slug": "hudson-valley"
+  },
+  "Hartford Yard Goats": {
+    "abbreviation": "HFD",
+    "slug": "hartford"
+  },
+  "Frisco RoughRiders": {
+    "abbreviation": "FRI",
+    "slug": "frisco"
+  },
+  "Pensacola Blue Wahoos": {
+    "abbreviation": "PNS",
+    "slug": "pensacola"
+  },
+  "Omaha Storm Chasers": {
+    "abbreviation": "OMA",
+    "slug": "omaha"
+  },
+  "Portland Sea Dogs": {
+    "abbreviation": "POR",
+    "slug": "portland"
+  },
+  "Harrisburg Senators": {
+    "abbreviation": "HBG",
+    "slug": "harrisburg"
+  },
+  "Delmarva Shorebirds": {
+    "abbreviation": "DEL",
+    "slug": "delmarva"
+  },
+  "South Bend Cubs": {
+    "abbreviation": "SB",
+    "slug": "south-bend"
+  },
+  "Rocky Mountain Vibes": {
+    "abbreviation": "RMV",
+    "slug": "rocky-mountain"
+  },
+  "Syracuse Mets": {
+    "abbreviation": "SYR",
+    "slug": "syracuse"
+  },
+  "Knoxville Smokies": {
+    "abbreviation": "KNX",
+    "slug": "knoxville"
+  },
+  "Beloit Sky Carp": {
+    "abbreviation": "BEL",
+    "slug": "beloit"
+  },
+  "Nashville Sounds": {
+    "abbreviation": "NAS",
+    "slug": "nashville"
+  },
+  "Lowell Spinners": {
+    "abbreviation": "LOW",
+    "slug": "lowell"
+  },
+  "Rocket City Trash Pandas": {
+    "abbreviation": "RCT",
+    "slug": "rocket-city"
+  },
+  "Acereros del Norte": {
+    "abbreviation": "MVA",
+    "slug": "norte"
+  },
+  "Salt Lake Bees": {
+    "abbreviation": "SL",
+    "slug": "salt-lake"
+  },
+  "Sultanes de Monterrey": {
+    "abbreviation": "MTY",
+    "slug": "monterrey"
+  },
+  "Jacksonville Jumbo Shrimp": {
+    "abbreviation": "JAX",
+    "slug": "jacksonville"
+  },
+  "Quad Cities River Bandits": {
+    "abbreviation": "QC",
+    "slug": "quad-cities"
+  },
+  "Clearwater Threshers": {
+    "abbreviation": "CLR",
+    "slug": "clearwater"
+  },
+  "Norfolk Tides": {
+    "abbreviation": "NOR",
+    "slug": "norfolk"
+  },
+  "Tigres de Quintana Roo": {
+    "abbreviation": "TIG",
+    "slug": "quintana-roo"
+  },
+  "Lakeland Flying Tigers": {
+    "abbreviation": "LAK",
+    "slug": "lakeland"
+  },
+  "Norwich Sea Unicorns": {
+    "abbreviation": "NOR",
+    "slug": "norwich"
+  },
+  "Wisconsin Timber Rattlers": {
+    "abbreviation": "WIS",
+    "slug": "wisconsin"
+  },
+  "Asheville Tourists": {
+    "abbreviation": "ASH",
+    "slug": "asheville"
+  },
+  "Arkansas Travelers": {
+    "abbreviation": "ARK",
+    "slug": "arkansas"
+  },
+  "Tri-City ValleyCats": {
+    "abbreviation": "TRI",
+    "slug": "tri-city-valleycats"
+  },
+  "Guerreros de Oaxaca": {
+    "abbreviation": "OAX",
+    "slug": "oaxaca"
+  },
+  "Winston-Salem Dash": {
+    "abbreviation": "WS",
+    "slug": "winston-salem"
+  },
+  "Great Falls Voyagers": {
+    "abbreviation": "GTF",
+    "slug": "great-falls"
+  },
+  "West Michigan Whitecaps": {
+    "abbreviation": "WM",
+    "slug": "west-michigan"
+  },
+  "Fort Wayne TinCaps": {
+    "abbreviation": "FW",
+    "slug": "fort-wayne"
+  },
+  "Tampa Tarpons": {
+    "abbreviation": "TAM",
+    "slug": "tampa"
+  },
+  "Round Rock Express": {
+    "abbreviation": "RR",
+    "slug": "round-rock"
+  },
+  "Lake Elsinore Storm": {
+    "abbreviation": "LE",
+    "slug": "lake-elsinore"
+  },
+  "Sacramento River Cats": {
+    "abbreviation": "SAC",
+    "slug": "sacramento"
+  },
+  "Erie SeaWolves": {
+    "abbreviation": "ERI",
+    "slug": "erie"
+  },
+  "Columbia Fireflies": {
+    "abbreviation": "COL",
+    "slug": "columbia"
+  },
+  "Fayetteville Woodpeckers": {
+    "abbreviation": "FAY",
+    "slug": "fayetteville"
+  },
+  "Hub City Spartanburgers": {
+    "abbreviation": "HCS",
+    "slug": "hub-city"
+  },
+  "Columbus Clingstones": {
+    "abbreviation": "COL",
+    "slug": "columbus-clingstones"
+  },
+  "Charleston RiverDogs": {
+    "abbreviation": "CHS",
+    "slug": "charleston"
+  },
+  "Durham Bulls": {
+    "abbreviation": "DUR",
+    "slug": "durham"
+  },
+  "Memphis Redbirds": {
+    "abbreviation": "MEM",
+    "slug": "memphis"
+  },
+  "Midland RockHounds": {
+    "abbreviation": "MID",
+    "slug": "midland"
+  },
+  "Oklahoma City Comets": {
+    "abbreviation": "OKC",
+    "slug": "oklahoma-city"
+  },
+  "Birmingham Barons": {
+    "abbreviation": "BIR",
+    "slug": "birmingham"
+  },
+  "Amarillo Sod Poodles": {
+    "abbreviation": "AMA",
+    "slug": "amarillo"
+  },
+  "Carolina Mudcats": {
+    "abbreviation": "CAR",
+    "slug": "carolina-mudcats"
+  },
+  "Fresno Grizzlies": {
+    "abbreviation": "FRE",
+    "slug": "fresno"
+  },
+  "Tulsa Drillers": {
+    "abbreviation": "TUL",
+    "slug": "tulsa"
+  },
+  "Reno Aces": {
+    "abbreviation": "RNO",
+    "slug": "reno"
+  },
+  "Grand Junction Rockies": {
+    "abbreviation": "GJ",
+    "slug": "grand-junction"
+  },
+  "Palm Beach Cardinals": {
+    "abbreviation": "PMB",
+    "slug": "palm-beach"
+  },
+  "El Paso Chihuahuas": {
+    "abbreviation": "ELP",
+    "slug": "el-paso"
+  },
+  "Wichita Wind Surge": {
+    "abbreviation": "WCH",
+    "slug": "wichita"
+  },
+  "Sugar Land Space Cowboys": {
+    "abbreviation": "SUG",
+    "slug": "sugar-land"
+  },
+  "Bradenton Marauders": {
+    "abbreviation": "BRD",
+    "slug": "bradenton"
+  },
+  "Northwest Arkansas Naturals": {
+    "abbreviation": "NWA",
+    "slug": "northwest-arkansas"
+  },
+  "Richmond Flying Squirrels": {
+    "abbreviation": "RIC",
+    "slug": "richmond"
+  },
+  "Albuquerque Isotopes": {
+    "abbreviation": "ABQ",
+    "slug": "albuquerque"
+  },
+  "Caliente de Durango": {
+    "abbreviation": "DUR",
+    "slug": "durango"
+  },
+  "Lehigh Valley IronPigs": {
+    "abbreviation": "LHV",
+    "slug": "lehigh-valley"
+  },
+  "Las Vegas Aviators": {
+    "abbreviation": "LV",
+    "slug": "las-vegas"
+  },
+  "Inland Empire 66ers": {
+    "abbreviation": "IE",
+    "slug": "inland-empire"
+  },
+  "Toros de Tijuana": {
+    "abbreviation": "TIJ",
+    "slug": "tijuana"
+  },
+  "Akron RubberDucks": {
+    "abbreviation": "AKR",
+    "slug": "akron"
+  },
+  "Everett AquaSox": {
+    "abbreviation": "EVE",
+    "slug": "everett"
+  },
+  "Biloxi Shuckers": {
+    "abbreviation": "BLX",
+    "slug": "biloxi"
+  },
+  "Salem Red Sox": {
+    "abbreviation": "SAL",
+    "slug": "salem"
+  },
+  "Louisville Bats": {
+    "abbreviation": "LOU",
+    "slug": "louisville"
+  },
+  "Chesapeake Baysox": {
+    "abbreviation": "CHE",
+    "slug": "chesapeake"
+  },
+  "Hillsboro Hops": {
+    "abbreviation": "HIL",
+    "slug": "hillsboro"
+  },
+  "Somerset Patriots": {
+    "abbreviation": "SOM",
+    "slug": "somerset"
+  },
+  "Montgomery Biscuits": {
+    "abbreviation": "MTG",
+    "slug": "montgomery"
+  },
+  "Buffalo Bisons": {
+    "abbreviation": "BUF",
+    "slug": "buffalo"
+  },
+  "St. Paul Saints": {
+    "abbreviation": "STP",
+    "slug": "st-paul"
+  },
+  "Dunedin Blue Jays": {
+    "abbreviation": "DUN",
+    "slug": "dunedin"
+  },
+  "Wilmington Blue Rocks": {
+    "abbreviation": "WIL",
+    "slug": "wilmington"
+  },
+  "Jersey Shore BlueClaws": {
+    "abbreviation": "JS",
+    "slug": "jersey-shore"
+  },
+  "Greenville Drive": {
+    "abbreviation": "GVL",
+    "slug": "greenville"
+  },
+  "Mississippi Braves": {
+    "abbreviation": "MIS",
+    "slug": "mississippi"
+  },
+  "Gwinnett Stripers": {
+    "abbreviation": "GWN",
+    "slug": "gwinnett"
+  },
+  "Rome Emperors": {
+    "abbreviation": "ROM",
+    "slug": "rome"
+  },
+  "Bravos de Leon": {
+    "abbreviation": "LEO",
+    "slug": "leon"
+  },
+  "Vancouver Canadians": {
+    "abbreviation": "VAN",
+    "slug": "vancouver"
+  },
+  "Fredericksburg Nationals": {
+    "abbreviation": "FBG",
+    "slug": "fredericksburg"
+  },
+  "Lake County Captains": {
+    "abbreviation": "LC",
+    "slug": "lake-county"
+  },
+  "Springfield Cardinals": {
+    "abbreviation": "SPR",
+    "slug": "springfield"
+  },
+  "Olmecas de Tabasco": {
+    "abbreviation": "TAB",
+    "slug": "tabasco"
+  },
+  "Peoria Chiefs": {
+    "abbreviation": "PEO",
+    "slug": "peoria"
+  },
+  "Idaho Falls Chukars": {
+    "abbreviation": "IDF",
+    "slug": "idaho-falls"
+  },
+  "Columbus Clippers": {
+    "abbreviation": "COL",
+    "slug": "columbus"
+  },
+  "Algodoneros Union Laguna": {
+    "abbreviation": "LAG",
+    "slug": "union-laguna"
+  },
+  "Hickory Crawdads": {
+    "abbreviation": "HIC",
+    "slug": "hickory"
+  },
+  "Daytona Tortugas": {
+    "abbreviation": "DBT",
+    "slug": "daytona"
+  },
+  "Bowling Green Hot Rods": {
+    "abbreviation": "BG",
+    "slug": "bowling-green"
+  },
+  "Iowa Cubs": {
+    "abbreviation": "IOW",
+    "slug": "iowa"
+  },
+  "Altoona Curve": {
+    "abbreviation": "ALT",
+    "slug": "altoona"
+  },
+  "Brooklyn Cyclones": {
+    "abbreviation": "BRK",
+    "slug": "brooklyn"
+  },
+  "Great Lakes Loons": {
+    "abbreviation": "GL",
+    "slug": "great-lakes"
+  },
+  "Auburn Doubledays": {
+    "abbreviation": "AUB",
+    "slug": "auburn"
+  },
+  "Dayton Dragons": {
+    "abbreviation": "DAY",
+    "slug": "dayton"
+  },
+  "Tri-City Dust Devils": {
+    "abbreviation": "TRI",
+    "slug": "tri-city-dust-devils"
+  },
+  "Eugene Emeralds": {
+    "abbreviation": "EUG",
+    "slug": "eugene"
+  },
+  "Vermont Lake Monsters": {
+    "abbreviation": "VER",
+    "slug": "vermont"
+  },
+  "New Hampshire Fisher Cats": {
+    "abbreviation": "NH",
+    "slug": "new-hampshire"
+  },
+  "San Jose Giants": {
+    "abbreviation": "SJ",
+    "slug": "san-jose"
+  },
+  "Greensboro Grasshoppers": {
+    "abbreviation": "GBO",
+    "slug": "greensboro"
+  },
+  "Augusta GreenJackets": {
+    "abbreviation": "AUG",
+    "slug": "augusta"
+  },
+  "Jupiter Hammerheads": {
+    "abbreviation": "JUP",
+    "slug": "jupiter"
+  },
+  "Boise Hawks": {
+    "abbreviation": "BOI",
+    "slug": "boise"
+  },
+  "Lynchburg Hillcats": {
+    "abbreviation": "LYN",
+    "slug": "lynchburg"
+  },
+  "Corpus Christi Hooks": {
+    "abbreviation": "CC",
+    "slug": "corpus-christi"
+  },
+  "Indianapolis Indians": {
+    "abbreviation": "IND",
+    "slug": "indianapolis"
+  },
+  "Down East Wood Ducks": {
+    "abbreviation": "DE",
+    "slug": "down-east"
+  },
+  "Spokane Indians": {
+    "abbreviation": "SPO",
+    "slug": "spokane"
+  },
+  "Kannapolis Cannon Ballers": {
+    "abbreviation": "KAN",
+    "slug": "kannapolis"
+  },
+  "Aberdeen IronBirds": {
+    "abbreviation": "ABD",
+    "slug": "aberdeen"
+  },
+  "Cedar Rapids Kernels": {
+    "abbreviation": "CR",
+    "slug": "cedar-rapids"
+  },
+  "Charlotte Knights": {
+    "abbreviation": "CLT",
+    "slug": "charlotte-knights"
+  },
+  "Leones de Yucatan": {
+    "abbreviation": "YUC",
+    "slug": "yucatan"
+  },
+  "Chattanooga Lookouts": {
+    "abbreviation": "CHA",
+    "slug": "chattanooga"
+  },
+  "Lansing Lugnuts": {
+    "abbreviation": "LAN",
+    "slug": "lansing"
+  },
+  "Saraperos de Saltillo": {
+    "abbreviation": "SLT",
+    "slug": "saltillo"
+  },
+  "Binghamton Rumble Ponies": {
+    "abbreviation": "BNG",
+    "slug": "binghamton"
+  },
+  "St. Lucie Mets": {
+    "abbreviation": "SLU",
+    "slug": "st-lucie"
+  },
+  "Fort Myers Mighty Mussels": {
+    "abbreviation": "FTM",
+    "slug": "fort-myers"
+  },
+  "San Antonio Missions": {
+    "abbreviation": "SA",
+    "slug": "san-antonio"
+  },
+  "Batavia Muckdogs": {
+    "abbreviation": "BAT",
+    "slug": "batavia"
+  }
+}
