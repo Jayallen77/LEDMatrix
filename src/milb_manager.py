@@ -159,14 +159,14 @@ class BaseMiLBManager:
             center_y = height // 2
 
             # Draw home team logo (far right, extending beyond screen)
-            home_x = width - home_logo.width + 2
+            home_x = width - home_logo.width + 18
             home_y = center_y - (home_logo.height // 2)
             
             # Paste the home logo onto the overlay
             overlay.paste(home_logo, (home_x, home_y), home_logo)
 
             # Draw away team logo (far left, extending beyond screen)
-            away_x = -2
+            away_x = -18
             away_y = center_y - (away_logo.height // 2)
 
             overlay.paste(away_logo, (away_x, away_y), away_logo)
@@ -593,14 +593,14 @@ class MiLBLiveManager(BaseMiLBManager):
             center_y = height // 2
 
             # Draw home team logo (far right, extending beyond screen)
-            home_x = width - home_logo.width + 2
+            home_x = width - home_logo.width + 18
             home_y = center_y - (home_logo.height // 2)
             
             # Paste the home logo onto the overlay
             overlay.paste(home_logo, (home_x, home_y), home_logo)
 
             # Draw away team logo (far left, extending beyond screen)
-            away_x = -2
+            away_x = -18
             away_y = center_y - (away_logo.height // 2)
 
             overlay.paste(away_logo, (away_x, away_y), away_logo)
