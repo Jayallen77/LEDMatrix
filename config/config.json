@@ -53,6 +53,9 @@
             "mlb_live": 30,
             "mlb_recent": 20,
             "mlb_upcoming": 20,
+            "milb_live": 30,
+            "milb_recent": 20,
+            "milb_upcoming": 20,
             "text_display": 10,
             "soccer_live": 30,
             "soccer_recent": 20,
@@ -216,6 +219,22 @@
             "mlb_live": true,
             "mlb_recent": true,
             "mlb_upcoming": true
+        }
+    },
+    "milb": {
+        "enabled":  true,
+        "test_mode": false,
+        "update_interval_seconds": 3600,
+        "live_update_interval": 30,
+        "recent_update_interval": 3600,
+        "upcoming_update_interval": 3600,
+        "recent_game_hours": 48,
+        "favorite_teams": ["TAM"],
+        "logo_dir": "assets/sports/milb_logos",
+        "display_modes": {
+            "milb_live": true,
+            "milb_recent": true,
+            "milb_upcoming": true
         }
     },
     "text_display": {

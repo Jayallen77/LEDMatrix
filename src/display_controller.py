@@ -20,6 +20,7 @@ from src.stock_news_manager import StockNewsManager
 from src.nhl_managers import NHLLiveManager, NHLRecentManager, NHLUpcomingManager
 from src.nba_managers import NBALiveManager, NBARecentManager, NBAUpcomingManager
 from src.mlb_manager import MLBLiveManager, MLBRecentManager, MLBUpcomingManager
+from src.milb_manager import MiLBLiveManager, MiLBRecentManager, MiLBUpcomingManager
 from src.soccer_managers import SoccerLiveManager, SoccerRecentManager, SoccerUpcomingManager
 from src.nfl_managers import NFLLiveManager, NFLRecentManager, NFLUpcomingManager
 from src.ncaa_fb_managers import NCAAFBLiveManager, NCAAFBRecentManager, NCAAFBUpcomingManager
@@ -129,6 +130,21 @@ class DisplayController:
             self.mlb_recent = None
             self.mlb_upcoming = None
         logger.info("MLB managers initialized in %.3f seconds", time.time() - mlb_time)
+
+        # Initialize MiLB managers if enabled
+        milb_time = time.time()
+        milb_enabled = self.config.get('milb', {}).get('enabled', False)
+        milb_display_modes = self.config.get('milb', {}).get('display_modes', {})
+        
+        if milb_enabled:
+            self.milb_live = MiLBLiveManager(self.config, self.display_manager) if milb_display_modes.get('milb_live', True) else None
+            self.milb_recent = MiLBRecentManager(self.config, self.display_manager) if milb_display_modes.get('milb_recent', True) else None
+            self.milb_upcoming = MiLBUpcomingManager(self.config, self.display_manager) if milb_display_modes.get('milb_upcoming', True) else None
+        else:
+            self.milb_live = None
+            self.milb_recent = None
+            self.milb_upcoming = None
+        logger.info("MiLB managers initialized in %.3f seconds", time.time() - milb_time)
             
         # Initialize Soccer managers if enabled
         soccer_time = time.time()
@@ -243,6 +259,11 @@ class DisplayController:
             if self.mlb_upcoming: self.available_modes.append('mlb_upcoming') # Use upcoming if mode enabled
             # mlb_live is handled separately when live games are available
 
+        # Add MiLB display modes if enabled
+        if milb_enabled:
+            if self.milb_recent: self.available_modes.append('milb_recent')
+            if self.milb_upcoming: self.available_modes.append('milb_upcoming')
+
         # Add Soccer display modes if enabled
         if soccer_enabled:
             if self.soccer_recent: self.available_modes.append('soccer_recent')
@@ -341,6 +362,9 @@ class DisplayController:
             'mlb_live': 30,
             'mlb_recent': 20,
             'mlb_upcoming': 20,
+            'milb_live': 30,
+            'milb_recent': 20,
+            'milb_upcoming': 20,
             'soccer_live': 30, # Soccer durations
             'soccer_recent': 20,
             'soccer_upcoming': 20,
@@ -370,6 +394,8 @@ class DisplayController:
             logger.info(f"NBA Favorite teams: {self.nba_favorite_teams}")
         if mlb_enabled:
             logger.info(f"MLB Favorite teams: {self.mlb_favorite_teams}")
+        if milb_enabled:
+            logger.info(f"MiLB Favorite teams: {self.config.get('milb', {}).get('favorite_teams', [])}")
         if soccer_enabled: # Check if soccer is enabled
             logger.info(f"Soccer Favorite teams: {self.soccer_favorite_teams}")
         if nfl_enabled: # Check if NFL is enabled
@@ -447,6 +473,11 @@ class DisplayController:
         if self.mlb_recent: self.mlb_recent.update()
         if self.mlb_upcoming: self.mlb_upcoming.update()
         
+        # Update MiLB managers
+        if self.milb_live: self.milb_live.update()
+        if self.milb_recent: self.milb_recent.update()
+        if self.milb_upcoming: self.milb_upcoming.update()
+        
         # Update Soccer managers
         if self.soccer_live: self.soccer_live.update()
         if self.soccer_recent: self.soccer_recent.update()
@@ -477,25 +508,23 @@ class DisplayController:
         Check if there are any live games available.
         Returns:
             tuple[bool, str]: (has_live_games, sport_type)
-            sport_type will be 'nhl', 'nba', 'mlb', 'soccer' or None
+            sport_type will be 'nhl', 'nba', 'mlb', 'milb', 'soccer' or None
         """
         # Prioritize sports (e.g., Soccer > NHL > NBA > MLB)
-        if self.soccer_live and self.soccer_live.live_games:
-            return True, 'soccer'
-        
-        if self.nfl_live and self.nfl_live.live_games:
-            logger.debug("NFL live games available")
-            return True, 'nfl'
-            
-        if self.nhl_live and self.nhl_live.live_games:
-            return True, 'nhl'
-            
-        if self.nba_live and self.nba_live.live_games:
-            return True, 'nba'
-            
-        if self.mlb_live and self.mlb_live.live_games:
-            return True, 'mlb'
-            
+        live_checks = {
+            'nhl': self.nhl_live and self.nhl_live.live_games,
+            'nba': self.nba_live and self.nba_live.live_games,
+            'mlb': self.mlb_live and self.mlb_live.live_games,
+            'milb': self.milb_live and self.milb_live.live_games,
+            'nfl': self.nfl_live and self.nfl_live.live_games,
+            # ... other sports
+        }
+
+        for sport, live_games in live_checks.items():
+            if live_games:
+                logger.debug(f"{sport.upper()} live games available")
+                return True, sport
+
         if 'ncaa_fb_scoreboard' in self.config and self.config['ncaa_fb_scoreboard'].get('enabled', False):
             if self.ncaa_fb_live and self.ncaa_fb_live.live_games:
                 logger.debug("NCAA FB live games available")
@@ -522,7 +551,7 @@ class DisplayController:
         Get games for a specific team and update the current game.
         Args:
             team: Team abbreviation
-            sport: 'nhl', 'nba', 'mlb', or 'soccer'
+            sport: 'nhl', 'nba', 'mlb', 'milb', or 'soccer'
             is_recent: Whether to look for recent or upcoming games
         Returns:
             bool: True if games were found and set
@@ -544,6 +573,12 @@ class DisplayController:
             manager_upcoming = self.mlb_upcoming
             games_list_attr = 'recent_games' if is_recent else 'upcoming_games'
             abbr_key_home = 'home_team' # MLB uses different keys
+            abbr_key_away = 'away_team'
+        elif sport == 'milb':
+            manager_recent = self.milb_recent
+            manager_upcoming = self.milb_upcoming
+            games_list_attr = 'recent_games' if is_recent else 'upcoming_games'
+            abbr_key_home = 'home_team' # MiLB uses different keys
             abbr_key_away = 'away_team'
         elif sport == 'soccer':
             manager_recent = self.soccer_recent
@@ -591,6 +626,10 @@ class DisplayController:
             favorite_teams = self.mlb_favorite_teams
             manager_recent = self.mlb_recent
             manager_upcoming = self.mlb_upcoming
+        elif sport == 'milb':
+            favorite_teams = self.config.get('milb', {}).get('favorite_teams', [])
+            manager_recent = self.milb_recent
+            manager_upcoming = self.milb_upcoming
         elif sport == 'soccer':
             favorite_teams = self.soccer_favorite_teams
             manager_recent = self.soccer_recent
@@ -625,6 +664,10 @@ class DisplayController:
             if not self.mlb_favorite_teams: return
             current_team = self.mlb_favorite_teams[self.mlb_current_team_index]
             # ... (rest of MLB rotation logic)
+        elif sport == 'milb':
+            if not self.config.get('milb', {}).get('favorite_teams', []): return
+            current_team = self.config['milb']['favorite_teams'][self.milb_current_team_index]
+            # ... (rest of MiLB rotation logic)
         elif sport == 'soccer':
             if not self.soccer_favorite_teams: return
             current_team = self.soccer_favorite_teams[self.soccer_current_team_index]
@@ -701,7 +744,7 @@ class DisplayController:
                             
                             active_live_sports = []
                             # Use the same priority order as _check_live_games
-                            priority_order = ['soccer', 'nfl', 'nhl', 'nba', 'mlb', 'ncaa_fb', 'ncaam_basketball', 'ncaa_baseball']
+                            priority_order = ['soccer', 'nfl', 'nhl', 'nba', 'mlb', 'milb', 'ncaa_fb', 'ncaam_basketball', 'ncaa_baseball']
                             for sport in priority_order:
                                 live_attr = f"{sport}_live"
                                 if hasattr(self, live_attr) and getattr(self, live_attr) and getattr(self, live_attr).live_games:
@@ -798,7 +841,11 @@ class DisplayController:
                              needs_switch = True
                              # current_mode_index would have been advanced if coming from regular timer expiry.
                              # If coming from live mode exit, we need to ensure it's set for the *next* regular mode.
-                             # The logic below assumes current_mode_index is for the *new* mode.
+                             # The logic below assumes current_mode_index is either current or needs +1.
+                             # If just exiting live, self.current_mode_index hasn't been incremented by timer logic yet.
+                             # So, we just use its current value to pick from available_modes.
+                             # If it was already pointing at 'music' and music is next, it's fine.
+                             # If it was stale, it will pick an available mode.
                              try:
                                  # If previous_mode_before_switch was a live mode, current_mode_index might be stale.
                                  # We need to find the next available regular mode from self.available_modes
@@ -881,6 +928,10 @@ class DisplayController:
                             manager_to_display = self.mlb_recent
                         elif self.current_display_mode == 'mlb_upcoming' and self.mlb_upcoming:
                             manager_to_display = self.mlb_upcoming
+                        elif self.current_display_mode == 'milb_recent' and self.milb_recent:
+                            manager_to_display = self.milb_recent
+                        elif self.current_display_mode == 'milb_upcoming' and self.milb_upcoming:
+                            manager_to_display = self.milb_upcoming
                         elif self.current_display_mode == 'soccer_recent' and self.soccer_recent:
                             manager_to_display = self.soccer_recent
                         elif self.current_display_mode == 'soccer_upcoming' and self.soccer_upcoming:
@@ -943,6 +994,8 @@ class DisplayController:
                             self.ncaa_baseball_live.display(force_clear=self.force_clear)
                         elif self.current_display_mode == 'mlb_live' and self.mlb_live:
                             self.mlb_live.display(force_clear=self.force_clear)
+                        elif self.current_display_mode == 'milb_live' and self.milb_live:
+                            self.milb_live.display(force_clear=self.force_clear)
                         elif self.current_display_mode == 'ncaa_fb_upcoming' and self.ncaa_fb_upcoming:
                             self.ncaa_fb_upcoming.display(force_clear=self.force_clear)
                         elif self.current_display_mode == 'ncaam_basketball_recent' and self.ncaam_basketball_recent:
