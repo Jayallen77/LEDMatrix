@@ -140,8 +140,8 @@ class BaseMiLBManager:
         image = Image.new('RGB', (width, height), color=(0, 0, 0))
         
         # Make logos 120% of display dimensions to allow them to extend off screen
-        max_width = int(width * 1.2)
-        max_height = int(height * 1.2)
+        max_width = int(width * 1.3)
+        max_height = int(height * 1.3)
         
         # Load team logos
         away_logo = self._get_team_logo(game_data['away_team'])
