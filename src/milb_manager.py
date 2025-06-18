@@ -383,6 +383,16 @@ class BaseMiLBManager:
                                         live_data = live_response.json().get('liveData', {})
                                         
                                         linescore_live = live_data.get('linescore', {})
+
+                                        # Overwrite score and inning data with more accurate live data
+                                        if linescore_live:
+                                            game_data['away_score'] = linescore_live.get('teams', {}).get('away', {}).get('runs', game_data['away_score'])
+                                            game_data['home_score'] = linescore_live.get('teams', {}).get('home', {}).get('runs', game_data['home_score'])
+                                            game_data['inning'] = linescore_live.get('currentInning', game_data['inning'])
+                                            inning_state_live = linescore_live.get('inningState', '').lower()
+                                            if inning_state_live:
+                                                game_data['inning_half'] = 'bottom' if 'bottom' in inning_state_live else 'top'
+
                                         game_data['balls'] = linescore_live.get('balls', 0)
                                         game_data['strikes'] = linescore_live.get('strikes', 0)
                                         game_data['outs'] = linescore_live.get('outs', 0)
