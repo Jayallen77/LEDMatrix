@@ -139,7 +139,7 @@ class BaseMiLBManager:
         height = self.display_manager.matrix.height
         image = Image.new('RGB', (width, height), color=(0, 0, 0))
         
-        # Make logos 120% of display dimensions to allow them to extend off screen
+        # Make logos 130% of display dimensions to allow them to extend off screen
         max_width = int(width * 1.3)
         max_height = int(height * 1.3)
         
@@ -158,16 +158,15 @@ class BaseMiLBManager:
             # Calculate vertical center line for alignment
             center_y = height // 2
 
-            # Position logos with their centers at the screen edges
-            # Home team logo (right edge)
-            home_x = width - (home_logo.width * 5 // 8)
+            # Draw home team logo (far right, extending beyond screen)
+            home_x = width - home_logo.width + 2
             home_y = center_y - (home_logo.height // 2)
             
             # Paste the home logo onto the overlay
             overlay.paste(home_logo, (home_x, home_y), home_logo)
 
-            # Away team logo (left edge)
-            away_x = -(away_logo.width * 3 // 8)
+            # Draw away team logo (far left, extending beyond screen)
+            away_x = -2
             away_y = center_y - (away_logo.height // 2)
 
             overlay.paste(away_logo, (away_x, away_y), away_logo)
@@ -574,9 +573,9 @@ class MiLBLiveManager(BaseMiLBManager):
         height = self.display_manager.matrix.height
         image = Image.new('RGB', (width, height), color=(0, 0, 0))
 
-        # Make logos 120% of display dimensions to allow them to extend off screen
-        max_width = int(width * 1.2)
-        max_height = int(height * 1.2)
+        # Make logos 130% of display dimensions to allow them to extend off screen
+        max_width = int(width * 1.3)
+        max_height = int(height * 1.3)
         
         # Load and place team logos
         away_logo = self._get_team_logo(game_data['away_team'])
@@ -593,16 +592,15 @@ class MiLBLiveManager(BaseMiLBManager):
             # Calculate vertical center line for alignment
             center_y = height // 2
 
-            # Position logos with their centers at the screen edges
-            # Home team logo (right edge)
-            home_x = width - (home_logo.width * 5 // 8)
+            # Draw home team logo (far right, extending beyond screen)
+            home_x = width - home_logo.width + 2
             home_y = center_y - (home_logo.height // 2)
             
             # Paste the home logo onto the overlay
             overlay.paste(home_logo, (home_x, home_y), home_logo)
 
-            # Away team logo (left edge)
-            away_x = -(away_logo.width * 3 // 8)
+            # Draw away team logo (far left, extending beyond screen)
+            away_x = -2
             away_y = center_y - (away_logo.height // 2)
 
             overlay.paste(away_logo, (away_x, away_y), away_logo)
