@@ -158,15 +158,16 @@ class BaseMiLBManager:
             # Calculate vertical center line for alignment
             center_y = height // 2
 
-            # Draw home team logo (far right, extending beyond screen)
-            home_x = width - home_logo.width + 2
+            # Position logos with their centers at the screen edges
+            # Home team logo (right edge)
+            home_x = width - (home_logo.width // 2)
             home_y = center_y - (home_logo.height // 2)
             
             # Paste the home logo onto the overlay
             overlay.paste(home_logo, (home_x, home_y), home_logo)
 
-            # Draw away team logo (far left, extending beyond screen)
-            away_x = -2
+            # Away team logo (left edge)
+            away_x = -(away_logo.width // 2)
             away_y = center_y - (away_logo.height // 2)
 
             overlay.paste(away_logo, (away_x, away_y), away_logo)
@@ -592,15 +593,16 @@ class MiLBLiveManager(BaseMiLBManager):
             # Calculate vertical center line for alignment
             center_y = height // 2
 
-            # Draw home team logo (far right, extending beyond screen)
-            home_x = width - home_logo.width + 2
+            # Position logos with their centers at the screen edges
+            # Home team logo (right edge)
+            home_x = width - (home_logo.width // 2)
             home_y = center_y - (home_logo.height // 2)
             
             # Paste the home logo onto the overlay
             overlay.paste(home_logo, (home_x, home_y), home_logo)
 
-            # Draw away team logo (far left, extending beyond screen)
-            away_x = -2
+            # Away team logo (left edge)
+            away_x = -(away_logo.width // 2)
             away_y = center_y - (away_logo.height // 2)
 
             overlay.paste(away_logo, (away_x, away_y), away_logo)
