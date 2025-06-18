@@ -55,7 +55,10 @@ class BaseMLBManager:
         try:
             logo_path = os.path.join(self.logo_dir, f"{team_abbr}.png")
             if os.path.exists(logo_path):
-                return Image.open(logo_path)
+                logo = Image.open(logo_path)
+                if logo.mode != 'RGBA':
+                    logo = logo.convert('RGBA')
+                return logo
             else:
                 logger.warning(f"Logo not found for team {team_abbr}")
                 return None
@@ -123,31 +126,45 @@ class BaseMLBManager:
         width = self.display_manager.matrix.width
         height = self.display_manager.matrix.height
         image = Image.new('RGB', (width, height), color=(0, 0, 0))
-        draw = ImageDraw.Draw(image)
         
-        # Set logo size to match NHL (150% of display width)
-        max_width = 35
-        max_height = 35
-        logo_size = (max_width, max_height)
-        logo_y_offset = (height - max_height) // 2
-        
+        # Make logos 150% of display dimensions to allow them to extend off screen
+        max_width = int(width * 1.5)
+        max_height = int(height * 1.5)
+
         # Load team logos
         away_logo = self._get_team_logo(game_data['away_team'])
         home_logo = self._get_team_logo(game_data['home_team'])
         
         if away_logo and home_logo:
-            away_logo = away_logo.resize(logo_size, Image.Resampling.LANCZOS)
-            home_logo = home_logo.resize(logo_size, Image.Resampling.LANCZOS)
+            # Resize maintaining aspect ratio
+            away_logo.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+            home_logo.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+
+            # Create a single overlay for both logos
+            overlay = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+
+            # Calculate vertical center line for alignment
+            center_y = height // 2
+
+            # Draw home team logo (far right, extending beyond screen)
+            home_x = width - home_logo.width + 2
+            home_y = center_y - (home_logo.height // 2)
             
-            # Position logos with NHL-style spacing (0px offset)
-            away_x = 0
-            away_y = logo_y_offset
+            # Paste the home logo onto the overlay
+            overlay.paste(home_logo, (home_x, home_y), home_logo)
+
+            # Draw away team logo (far left, extending beyond screen)
+            away_x = -2
+            away_y = center_y - (away_logo.height // 2)
+
+            overlay.paste(away_logo, (away_x, away_y), away_logo)
             
-            home_x = width - home_logo.width 
-            home_y = logo_y_offset
-            
-            image.paste(away_logo, (away_x, away_y), away_logo)
-            image.paste(home_logo, (home_x, home_y), home_logo)
+            # Composite the overlay with the main image
+            image = image.convert('RGBA')
+            image = Image.alpha_composite(image, overlay)
+            image = image.convert('RGB')
+        
+        draw = ImageDraw.Draw(image)
         
         # For upcoming games, show date and time stacked in the center
         if game_data['status'] == 'status_scheduled':
@@ -606,26 +623,45 @@ class MLBLiveManager(BaseMLBManager):
         width = self.display_manager.matrix.width
         height = self.display_manager.matrix.height
         image = Image.new('RGB', (width, height), color=(0, 0, 0))
-        draw = ImageDraw.Draw(image)
+
+        # Make logos 150% of display dimensions to allow them to extend off screen
+        max_width = int(width * 1.5)
+        max_height = int(height * 1.5)
         
-        # Set logo size
-        new_logo_height = 32
-        logo_size = (new_logo_height, new_logo_height) # Increase size
-        logo_y_offset = 0# Center vertically
-        
-        # Load and place team logos (same as base method)
+        # Load and place team logos
         away_logo = self._get_team_logo(game_data['away_team'])
         home_logo = self._get_team_logo(game_data['home_team'])
         
         if away_logo and home_logo:
-            away_logo = away_logo.resize(logo_size, Image.Resampling.LANCZOS)
-            home_logo = home_logo.resize(logo_size, Image.Resampling.LANCZOS)
-            away_x = 2
-            away_y = logo_y_offset # Apply offset
-            home_x = width - home_logo.width - 2# home_logo.width should be 24 now
-            home_y = logo_y_offset # Apply offset
-            image.paste(away_logo, (away_x, away_y), away_logo)
-            image.paste(home_logo, (home_x, home_y), home_logo)
+            # Resize maintaining aspect ratio
+            away_logo.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+            home_logo.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+
+            # Create a single overlay for both logos
+            overlay = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+
+            # Calculate vertical center line for alignment
+            center_y = height // 2
+
+            # Draw home team logo (far right, extending beyond screen)
+            home_x = width - home_logo.width + 2
+            home_y = center_y - (home_logo.height // 2)
+            
+            # Paste the home logo onto the overlay
+            overlay.paste(home_logo, (home_x, home_y), home_logo)
+
+            # Draw away team logo (far left, extending beyond screen)
+            away_x = -2
+            away_y = center_y - (away_logo.height // 2)
+
+            overlay.paste(away_logo, (away_x, away_y), away_logo)
+
+            # Composite the overlay with the main image
+            image = image.convert('RGBA')
+            image = Image.alpha_composite(image, overlay)
+            image = image.convert('RGB')
+
+        draw = ImageDraw.Draw(image)
 
         # --- Live Game Specific Elements ---
         
@@ -638,7 +674,7 @@ class MLBLiveManager(BaseMLBManager):
         inning_bbox = draw.textbbox((0, 0), inning_text, font=self.display_manager.font)
         inning_width = inning_bbox[2] - inning_bbox[0]
         inning_x = (width - inning_width) // 2
-        inning_y = 0 # Position near top center
+        inning_y = 1 # Position near top center
         # draw.text((inning_x, inning_y), inning_text, fill=(255, 255, 255), font=self.display_manager.font)
         self._draw_text_with_outline(draw, inning_text, (inning_x, inning_y), self.display_manager.font)
         
@@ -788,7 +824,7 @@ class MLBLiveManager(BaseMLBManager):
             font_height = score_font.getbbox("A")[3] - score_font.getbbox("A")[1]
         except AttributeError:
             font_height = 8 # Fallback for default font
-        score_y = height - font_height - 1 # 1 pixel padding from bottom
+        score_y = height - font_height - 2 # 2 pixels padding from bottom
         
         # Away Team:Score (Bottom Left)
         away_score_x = 2 # 2 pixels padding from left

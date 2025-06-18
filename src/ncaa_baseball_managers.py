@@ -53,7 +53,7 @@ class BaseNCAABaseballManager:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
 
-    def _get_team_logo(self, team_abbr: str, logo_size: tuple[int, int]) -> Optional[Image.Image]:
+    def _get_team_logo(self, team_abbr: str) -> Optional[Image.Image]:
         """Get team logo from the configured directory or generate a fallback."""
         try:
             logo_path = os.path.join(self.logo_dir, f"{team_abbr}.png")
@@ -65,6 +65,7 @@ class BaseNCAABaseballManager:
             else:
                 logger.warning(f"[NCAABaseball] Logo not found for team {team_abbr}. Generating fallback.")
                 # Create a fallback image with the team abbreviation, ensure it's RGBA
+                logo_size = (32,32) # default size for fallback
                 image = Image.new('RGBA', logo_size, color=(0, 0, 0, 255)) # RGBA with full opacity
                 draw = ImageDraw.Draw(image)
                 
@@ -160,26 +161,45 @@ class BaseNCAABaseballManager:
         width = self.display_manager.matrix.width
         height = self.display_manager.matrix.height
         image = Image.new('RGB', (width, height), color=(0, 0, 0))
-        draw = ImageDraw.Draw(image)
+
+        # Make logos 150% of display dimensions to allow them to extend off screen
+        max_width = int(width * 1.5)
+        max_height = int(height * 1.5)
         
-        max_width = 35
-        max_height = 35
-        logo_size = (max_width, max_height)
-        logo_y_offset = (height - max_height) // 2
-        
-        away_logo = self._get_team_logo(game_data['away_team'], logo_size)
-        home_logo = self._get_team_logo(game_data['home_team'], logo_size)
+        away_logo = self._get_team_logo(game_data['away_team'])
+        home_logo = self._get_team_logo(game_data['home_team'])
         
         if away_logo and home_logo:
-            away_logo = away_logo.resize(logo_size, Image.Resampling.LANCZOS)
-            home_logo = home_logo.resize(logo_size, Image.Resampling.LANCZOS)
-            away_x = 0
-            away_y = logo_y_offset
-            home_x = width - home_logo.width 
-            home_y = logo_y_offset
-            image.paste(away_logo, (away_x, away_y), away_logo)
-            image.paste(home_logo, (home_x, home_y), home_logo)
-        
+            # Resize maintaining aspect ratio
+            away_logo.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+            home_logo.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+
+            # Create a single overlay for both logos
+            overlay = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+
+            # Calculate vertical center line for alignment
+            center_y = height // 2
+
+            # Draw home team logo (far right, extending beyond screen)
+            home_x = width - home_logo.width + 2
+            home_y = center_y - (home_logo.height // 2)
+            
+            # Paste the home logo onto the overlay
+            overlay.paste(home_logo, (home_x, home_y), home_logo)
+
+            # Draw away team logo (far left, extending beyond screen)
+            away_x = -2
+            away_y = center_y - (away_logo.height // 2)
+
+            overlay.paste(away_logo, (away_x, away_y), away_logo)
+
+            # Composite the overlay with the main image
+            image = image.convert('RGBA')
+            image = Image.alpha_composite(image, overlay)
+            image = image.convert('RGB')
+
+        draw = ImageDraw.Draw(image)
+
         # For upcoming games, show date and time stacked in the center
         if game_data['status'] == 'status_scheduled':
             status_text = "Next Game"
@@ -536,25 +556,48 @@ class NCAABaseballLiveManager(BaseNCAABaseballManager):
         width = self.display_manager.matrix.width
         height = self.display_manager.matrix.height
         image = Image.new('RGB', (width, height), color=(0, 0, 0))
-        draw = ImageDraw.Draw(image)
+
+        # Make logos 150% of display dimensions to allow them to extend off screen
+        max_width = int(width * 1.5)
+        max_height = int(height * 1.5)
         
-        new_logo_height = 32
-        logo_size = (new_logo_height, new_logo_height)
-        logo_y_offset = 0
-        
-        away_logo = self._get_team_logo(game_data['away_team'], logo_size)
-        home_logo = self._get_team_logo(game_data['home_team'], logo_size)
+        away_logo = self._get_team_logo(game_data['away_team'])
+        home_logo = self._get_team_logo(game_data['home_team'])
         
         if away_logo and home_logo:
-            away_logo = away_logo.resize(logo_size, Image.Resampling.LANCZOS)
-            home_logo = home_logo.resize(logo_size, Image.Resampling.LANCZOS)
-            away_x = 2
-            away_y = logo_y_offset
-            home_x = width - home_logo.width - 2
-            home_y = logo_y_offset
-            image.paste(away_logo, (away_x, away_y), away_logo)
-            image.paste(home_logo, (home_x, home_y), home_logo)
+            # Resize maintaining aspect ratio
+            away_logo.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+            home_logo.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
 
+            # Create a single overlay for both logos
+            overlay = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+
+            # Calculate vertical center line for alignment
+            center_y = height // 2
+
+            # Draw home team logo (far right, extending beyond screen)
+            home_x = width - home_logo.width + 2
+            home_y = center_y - (home_logo.height // 2)
+            
+            # Paste the home logo onto the overlay
+            overlay.paste(home_logo, (home_x, home_y), home_logo)
+
+            # Draw away team logo (far left, extending beyond screen)
+            away_x = -2
+            away_y = center_y - (away_logo.height // 2)
+
+            overlay.paste(away_logo, (away_x, away_y), away_logo)
+
+            # Composite the overlay with the main image
+            image = image.convert('RGBA')
+            image = Image.alpha_composite(image, overlay)
+            image = image.convert('RGB')
+
+        draw = ImageDraw.Draw(image)
+
+        # --- Live Game Specific Elements ---
+        
+        # Define default text color
         text_color = (255, 255, 255)
         
         inning_half_indicator = "▲" if game_data['inning_half'] == 'top' else "▼"
@@ -562,9 +605,10 @@ class NCAABaseballLiveManager(BaseNCAABaseballManager):
         inning_bbox = draw.textbbox((0, 0), inning_text, font=self.display_manager.font)
         inning_width = inning_bbox[2] - inning_bbox[0]
         inning_x = (width - inning_width) // 2
-        inning_y = 0
+        inning_y = 1 # Position near top center
         self._draw_text_with_outline(draw, inning_text, (inning_x, inning_y), self.display_manager.font)
         
+        # --- REVISED BASES AND OUTS DRAWING --- 
         bases_occupied = game_data['bases_occupied']
         outs = game_data.get('outs', 0)
         inning_half = game_data['inning_half']
@@ -640,18 +684,27 @@ class NCAABaseballLiveManager(BaseNCAABaseballManager):
         def draw_bottom_outlined_text(x, y, text):
             self._draw_text_with_outline(draw, text, (x,y), score_font, fill=score_text_color, outline_color=outline_color)
         away_abbr = game_data['away_team']; home_abbr = game_data['home_team']
-        away_score_str = str(game_data['away_score']); home_score_str = str(game_data['home_score'])
-        away_text = f"{away_abbr}:{away_score_str}"; home_text = f"{home_abbr}:{home_score_str}"
+        away_score_str = str(game_data['away_score'])
+        home_score_str = str(game_data['home_score'])
+
+        away_text = f"{away_abbr}:{away_score_str}"
+        home_text = f"{home_abbr}:{home_score_str}"
+        
+        # Calculate Y position (bottom edge)
         try:
-             font_height = score_font.getbbox("A")[3] - score_font.getbbox("A")[1]
+            font_height = score_font.getbbox("A")[3] - score_font.getbbox("A")[1]
         except AttributeError:
-             font_height = 8
-        score_y = height - font_height - 1
-        away_score_x = 2
+            font_height = 8 # Fallback for default font
+        score_y = height - font_height - 2 # 2 pixels padding from bottom
+        
+        # Away Team:Score (Bottom Left)
+        away_score_x = 2 # Padding from left
         draw_bottom_outlined_text(away_score_x, score_y, away_text)
+        
+        # Home Team:Score (Bottom Right)
         home_text_bbox = draw.textbbox((0,0), home_text, font=score_font)
         home_text_width = home_text_bbox[2] - home_text_bbox[0]
-        home_score_x = width - home_text_width - 2
+        home_score_x = width - home_text_width - 2 # Padding from right
         draw_bottom_outlined_text(home_score_x, score_y, home_text)
 
         return image
