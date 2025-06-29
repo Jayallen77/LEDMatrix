@@ -384,7 +384,7 @@ class BaseMiLBManager:
                                         
                                         linescore_live = live_data.get('linescore', {})
 
-                                        # Overwrite score and inning data with more accurate live data
+                                        # Overwrite score and inning data with more accurate live data from the live feed
                                         if linescore_live:
                                             game_data['away_score'] = linescore_live.get('teams', {}).get('away', {}).get('runs', game_data['away_score'])
                                             game_data['home_score'] = linescore_live.get('teams', {}).get('home', {}).get('runs', game_data['home_score'])
