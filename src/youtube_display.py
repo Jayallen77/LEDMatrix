@@ -109,14 +109,14 @@ class YouTubeDisplay:
         draw.text((name_x, start_y), channel_name, font=self.font, fill=(255, 255, 255))
         
         # Draw subscriber count (middle)
-        subs_text = f"{channel_stats['subscribers']:,} subs"
+        subs_text = f"{channel_stats['subscribers']:,}subs"
         subs_bbox = draw.textbbox((0, 0), subs_text, font=self.font)
         subs_width = subs_bbox[2] - subs_bbox[0]
         subs_x = right_section_x + ((self.display_manager.matrix.width - right_section_x - subs_width) // 2)
         draw.text((subs_x, start_y + line_height), subs_text, font=self.font, fill=(255, 255, 255))
         
         # Draw view count (bottom)
-        views_text = f"{channel_stats['views']:,} views"
+        views_text = f"{channel_stats['views']:,}views"
         views_bbox = draw.textbbox((0, 0), views_text, font=self.font)
         views_width = views_bbox[2] - views_bbox[0]
         views_x = right_section_x + ((self.display_manager.matrix.width - right_section_x - views_width) // 2)
