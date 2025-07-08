@@ -353,12 +353,18 @@ class BaseMLBManager:
                             self.logger.debug(f"[MLB] Raw status short: {event['status'].get('shortDetail')}")
                         
                         # Determine inning half from status information
-                        inning_half = 'top'  # Default to top
-                        if 'bottom' in status_detail or 'bot' in status_detail or 'bottom' in status_short or 'bot' in status_short:
+                        inning_half = 'top'
+                        if 'mid' in status_detail or 'end' in status_detail or 'mid' in status_short or 'end' in status_short:
+                            inning_half = 'middle'
+                            # If we're in the middle of an inning, it means the next one is coming up.
+                            inning += 1
+                            if is_favorite_game:
+                                self.logger.debug("[MLB] Detected middle of inning, incrementing for display.")
+                        elif 'bottom' in status_detail or 'bot' in status_detail or 'bottom' in status_short or 'bot' in status_short:
                             inning_half = 'bottom'
                             if is_favorite_game:
                                 self.logger.debug("[MLB] Detected bottom of inning")
-                        elif 'top' in status_detail or 'mid' in status_detail or 'top' in status_short or 'mid' in status_short:
+                        elif 'top' in status_detail or 'top' in status_short:
                             inning_half = 'top'
                             if is_favorite_game:
                                 self.logger.debug("[MLB] Detected top of inning")
@@ -669,8 +675,16 @@ class MLBLiveManager(BaseMLBManager):
         text_color = (255, 255, 255)
         
         # Draw Inning (Top Center)
-        inning_half_indicator = "▲" if game_data['inning_half'] == 'top' else "▼"
-        inning_text = f"{inning_half_indicator}{game_data['inning']}"
+        inning_half = game_data['inning_half']
+        inning_num = game_data['inning']
+        inning_text = ""
+        if inning_half == 'top':
+            inning_text = f"▲{inning_num}"
+        elif inning_half == 'bottom':
+            inning_text = f"▼{inning_num}"
+        elif inning_half == 'middle':
+            inning_text = f"Top {inning_num}" # Show what's upcoming
+        
         inning_bbox = draw.textbbox((0, 0), inning_text, font=self.display_manager.font)
         inning_width = inning_bbox[2] - inning_bbox[0]
         inning_x = (width - inning_width) // 2
