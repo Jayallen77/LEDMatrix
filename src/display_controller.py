@@ -1080,8 +1080,8 @@ class DisplayController:
                     # Force clear on the next iteration after an error to be safe
                     self.force_clear = True 
 
-                # Add a short sleep to prevent high CPU usage
-                time.sleep(0.1)
+                # Add a short sleep to prevent high CPU usage but ruin scrolling text
+                # time.sleep(0.1)
 
         except KeyboardInterrupt:
             logger.info("Display controller stopped by user")
