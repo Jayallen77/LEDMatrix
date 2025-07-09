@@ -316,6 +316,7 @@ class BaseMLBManager:
                 
                 for event in data.get('events', []):
                     game_id = event['id']
+                    self.logger.info(f"Processing event: {json.dumps(event, indent=2)}")
                     status = event['status']['type']['name'].lower()
                     status_state = event['status']['type']['state'].lower()
                     
@@ -680,22 +681,9 @@ class MLBLiveManager(BaseMLBManager):
         if game_data['status'] in ['status_final', 'final', 'completed']:
             inning_text = "FINAL"
         else:
-            inning_state = game_data.get('inning_state', '')
-            inning_half = game_data.get('inning_half', '')
+            inning_half_indicator = "▲" if game_data['inning_half'].lower() == 'top' else "▼"
             inning_num = game_data['inning']
-            
-            prefix = ""
-            # Prioritize inning_state if it exists (e.g., "Middle", "End")
-            if inning_state and inning_state.lower() not in ['top', 'bottom']:
-                prefix = inning_state.capitalize()
-            # Otherwise, use inning_half (e.g., "Top", "Bottom")
-            elif inning_half:
-                prefix = inning_half.capitalize()
-
-            if prefix:
-                inning_text = f"{prefix} {inning_num}"
-            else:
-                inning_text = str(inning_num)
+            inning_text = f"{inning_half_indicator}{inning_num}"
         
         inning_bbox = draw.textbbox((0, 0), inning_text, font=self.display_manager.font)
         inning_width = inning_bbox[2] - inning_bbox[0]
