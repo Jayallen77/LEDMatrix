@@ -336,8 +336,8 @@ class BaseMLBManager:
                         self.logger.info(f"Found favorite team game: {away_abbr} @ {home_abbr} (Status: {status}, State: {status_state})")
                         self.logger.debug(f"[MLB] Full status data: {event['status']}")
                         self.logger.debug(f"[MLB] Status type: {status}, State: {status_state}")
-                        self.logger.debug(f"[MLB] Status detail: {event['status'].get('detail', '')}")
-                        self.logger.debug(f"[MLB] Status shortDetail: {event['status'].get('shortDetail', '')}")
+                        self.logger.debug(f"[MLB] Status detail: {event['status']['type'].get('detail', '')}")
+                        self.logger.debug(f"[MLB] Status shortDetail: {event['status']['type'].get('shortDetail', '')}")
                     
                     # Get game state information
                     if status_state == 'in':
@@ -345,12 +345,12 @@ class BaseMLBManager:
                         inning = event['status'].get('period', 1)  # Get inning from status period
                         
                         # Get inning information from status
-                        status_detail = event['status'].get('detail', '').lower()
-                        status_short = event['status'].get('shortDetail', '').lower()
+                        status_detail = event['status']['type'].get('detail', '').lower()
+                        status_short = event['status']['type'].get('shortDetail', '').lower()
                         
                         if is_favorite_game:
-                            self.logger.debug(f"[MLB] Raw status detail: {event['status'].get('detail')}")
-                            self.logger.debug(f"[MLB] Raw status short: {event['status'].get('shortDetail')}")
+                            self.logger.debug(f"[MLB] Raw status detail: {event['status']['type'].get('detail')}")
+                            self.logger.debug(f"[MLB] Raw status short: {event['status']['type'].get('shortDetail')}")
                         
                         # Determine inning half from status information
                         inning_half = 'top'  # Default
