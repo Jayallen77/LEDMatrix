@@ -677,13 +677,11 @@ class MLBLiveManager(BaseMLBManager):
         # Draw Inning (Top Center)
         inning_half = game_data['inning_half']
         inning_num = game_data['inning']
-        inning_text = ""
-        if inning_half == 'top':
-            inning_text = f"▲{inning_num}"
-        elif inning_half == 'bottom':
-            inning_text = f"▼{inning_num}"
-        elif inning_half == 'middle':
-            inning_text = f"Top {inning_num}" # Show what's upcoming
+        if game_data['status'] in ['status_final', 'final', 'completed']:
+            inning_text = "FINAL"
+        else:
+            inning_state = game_data.get('inning_state', '')
+            inning_text = f"{inning_state} {game_data['inning']}"
         
         inning_bbox = draw.textbbox((0, 0), inning_text, font=self.display_manager.font)
         inning_width = inning_bbox[2] - inning_bbox[0]
