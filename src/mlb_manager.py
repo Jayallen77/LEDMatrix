@@ -316,7 +316,6 @@ class BaseMLBManager:
                 
                 for event in data.get('events', []):
                     game_id = event['id']
-                    self.logger.info(f"Processing event: {json.dumps(event, indent=2)}")
                     status = event['status']['type']['name'].lower()
                     status_state = event['status']['type']['state'].lower()
                     
@@ -379,7 +378,6 @@ class BaseMLBManager:
                         situation = event['competitions'][0].get('situation', {})
                         
                         if is_favorite_game:
-                            self.logger.debug(f"[MLB] Full competition data: {event['competitions'][0]}")
                             self.logger.debug(f"[MLB] Full situation data: {situation}")
                         
                         # Get count from the correct location in the API response

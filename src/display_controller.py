@@ -752,6 +752,7 @@ class DisplayController:
         if should_be_active and not self.is_display_active:
             logger.info("Within scheduled time. Activating display.")
             self.is_display_active = True
+            self.force_clear = True # Force a redraw
         elif not should_be_active and self.is_display_active:
             logger.info("Outside of scheduled time. Deactivating display.")
             self.display_manager.clear()
