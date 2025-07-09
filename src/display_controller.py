@@ -2,6 +2,7 @@ import time
 import logging
 import sys
 from typing import Dict, Any, List
+from datetime import datetime, time as time_obj
 
 # Configure logging
 logging.basicConfig(
@@ -411,6 +412,12 @@ class DisplayController:
         logger.info(f"Initial display mode: {self.current_display_mode}")
         logger.info("DisplayController initialized with display_manager: %s", id(self.display_manager))
 
+        # --- SCHEDULING & CONFIG REFRESH ---
+        self.config_check_interval = 30
+        self.last_config_check = 0
+        self.is_display_active = True
+        self._load_config() # Initial load of schedule
+
     def _handle_music_update(self, track_info: Dict[str, Any], significant_change: bool = False):
         """Callback for when music track info changes."""
         # MusicManager now handles its own display state (album art, etc.)
@@ -712,6 +719,44 @@ class DisplayController:
                 self.ncaa_fb_current_team_index = (self.ncaa_fb_current_team_index + 1) % len(self.ncaa_fb_favorite_teams)
                 self.ncaa_fb_showing_recent = True # Reset to recent for the new team
 
+    # --- SCHEDULING METHODS ---
+    def _load_config(self):
+        """Load configuration from the config manager and parse schedule settings."""
+        self.config = self.config_manager.load_config()
+        schedule_config = self.config.get('schedule', {})
+        self.schedule_enabled = schedule_config.get('enabled', False)
+        try:
+            self.start_time = datetime.strptime(schedule_config.get('start_time', '07:00'), '%H:%M').time()
+            self.end_time = datetime.strptime(schedule_config.get('end_time', '22:00'), '%H:%M').time()
+        except (ValueError, TypeError):
+            logger.warning("Invalid time format in schedule config. Using defaults.")
+            self.start_time = time_obj(7, 0)
+            self.end_time = time_obj(22, 0)
+
+    def _check_schedule(self):
+        """Check if the display should be active based on the schedule."""
+        if not self.schedule_enabled:
+            if not self.is_display_active:
+                logger.info("Schedule is disabled. Activating display.")
+                self.is_display_active = True
+            return
+
+        now_time = datetime.now().time()
+        
+        # Handle overnight schedules
+        if self.start_time <= self.end_time:
+            should_be_active = self.start_time <= now_time < self.end_time
+        else: 
+            should_be_active = now_time >= self.start_time or now_time < self.end_time
+
+        if should_be_active and not self.is_display_active:
+            logger.info("Within scheduled time. Activating display.")
+            self.is_display_active = True
+        elif not should_be_active and self.is_display_active:
+            logger.info("Outside of scheduled time. Deactivating display.")
+            self.display_manager.clear()
+            self.is_display_active = False
+
     def run(self):
         """Run the display controller, switching between displays."""
         if not self.available_modes:
@@ -722,6 +767,17 @@ class DisplayController:
         try:
             while True:
                 current_time = time.time()
+
+                # Periodically check for config changes
+                if current_time - self.last_config_check > self.config_check_interval:
+                    self._load_config()
+                    self.last_config_check = current_time
+
+                # Enforce the schedule
+                self._check_schedule()
+                if not self.is_display_active:
+                    time.sleep(60)
+                    continue
                 
                 # Update data for all modules first
                 self._update_modules()
@@ -1024,10 +1080,8 @@ class DisplayController:
                     # Force clear on the next iteration after an error to be safe
                     self.force_clear = True 
 
-
-                # Small sleep removed - updates/drawing should manage timing
-                # time.sleep(self.update_interval) 
-                #time.sleep(self.update_interval) # Re-add the sleep
+                # Add a short sleep to prevent high CPU usage
+                time.sleep(0.1)
 
         except KeyboardInterrupt:
             logger.info("Display controller stopped by user")

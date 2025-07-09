@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>LED Matrix Config</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { max-width: 800px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 15px rgba(0,0,0,0.1); }
+        h1, h2 { text-align: center; color: #333; }
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ccc;
+            margin-bottom: 20px;
+        }
+        .tab-link {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background-color: transparent;
+            font-size: 16px;
+            border-bottom: 3px solid transparent;
+            transition: border-bottom 0.3s;
+        }
+        .tab-link.active {
+            border-bottom: 3px solid #4CAF50;
+            font-weight: bold;
+        }
+        .tab-content { display: none; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="time"], input[type="checkbox"] {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        button {
+            background-color: #4CAF50; 
+            color: white; 
+            padding: 12px 25px; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            margin-top: 10px;
+            font-size: 16px;
+        }
+        button:hover { background-color: #45a049; }
+        .flash-messages { list-style: none; padding: 0; margin-bottom: 15px; }
+        .flash-messages li { padding: 10px; margin-bottom: 10px; border-radius: 4px; }
+        .flash-messages .success { background-color: #d4edda; color: #155724; }
+        .flash-messages .error { background-color: #f8d7da; color: #721c24; }
+        textarea { 
+            width: 100%; 
+            padding: 10px; 
+            margin-top: 5px; 
+            border-radius: 4px; 
+            border: 1px solid #ccc; 
+            box-sizing: border-box; 
+            font-family: monospace;
+            min-height: 300px;
+        }
+        .filepath { font-family: monospace; background-color: #eee; padding: 2px 5px; border-radius: 3px; font-size: 0.9em;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LED Matrix Configuration</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class="flash-messages">
+            {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        <div class="tabs">
+            <button class="tab-link active" onclick="openTab(event, 'schedule')">Schedule</button>
+            <button class="tab-link" onclick="openTab(event, 'main')">Main Config</button>
+            <button class="tab-link" onclick="openTab(event, 'secrets')">Secrets Config</button>
+            <button class="tab-link" onclick="openTab(event, 'actions')">Actions</button>
+        </div>
+
+        <!-- Schedule Tab -->
+        <div id="schedule" class="tab-content" style="display: block;">
+            <h2>Display Schedule</h2>
+            <p>Set the time for the display to be active. A restart is needed for changes to take effect.</p>
+            <form action="{{ url_for('save_schedule_route') }}" method="POST">
+                <div class="form-group">
+                    <label for="schedule_enabled">Enable Schedule:</label>
+                    <input type="checkbox" id="schedule_enabled" name="schedule_enabled" {% if schedule_config.enabled %}checked{% endif %}>
+                </div>
+                <div class="form-group">
+                    <label for="start_time">Display On Time:</label>
+                    <input type="time" id="start_time" name="start_time" value="{{ schedule_config.start_time }}">
+                </div>
+                <div class="form-group">
+                    <label for="end_time">Display Off Time:</label>
+                    <input type="time" id="end_time" name="end_time" value="{{ schedule_config.end_time }}">
+                </div>
+                <button type="submit">Save Schedule</button>
+            </form>
+        </div>
+
+        <!-- Main Config Tab -->
+        <div id="main" class="tab-content">
+             <form action="{{ url_for('save_config_route') }}" method="POST">
+                <input type="hidden" name="config_type" value="main">
+                <h2>Main Configuration (<span class="filepath">{{ main_config_path }}</span>)</h2>
+                <textarea name="config_data">{{ main_config_json }}</textarea>
+                <button type="submit">Save Main Config</button>
+            </form>
+        </div>
+
+        <!-- Secrets Tab -->
+        <div id="secrets" class="tab-content">
+            <form action="{{ url_for('save_config_route') }}" method="POST">
+                <input type="hidden" name="config_type" value="secrets">
+                <h2>Secrets Configuration (<span class="filepath">{{ secrets_config_path }}</span>)</h2>
+                <textarea name="config_data">{{ secrets_config_json }}</textarea>
+                <button type="submit">Save Secrets</button>
+            </form>
+        </div>
+
+        <!-- Actions Tab -->
+        <div id="actions" class="tab-content">
+            <h2>System Actions</h2>
+            <p>Control the display service and system.</p>
+            <div class="action-buttons">
+                 <button type="button" class="action-button" onclick="runAction('start_display')">Start Display</button>
+                 <button type="button" class="action-button" onclick="runAction('stop_display')">Stop Display</button>
+                 <hr>
+                 <button type="button" class="action-button" onclick="runAction('enable_autostart')">Enable Auto-Start</button>
+                 <button type="button" class="action-button" onclick="runAction('disable_autostart')">Disable Auto-Start</button>
+                 <hr>
+                 <button type="button" class="action-button" onclick="runAction('reboot_system')">Reboot System</button>
+                 <hr>
+                 <button type="button" class="action-button" onclick="runAction('git_pull')">Download Latest Update</button>
+             </div>
+             <div id="action_output_container" style="margin-top: 20px;">
+                 <h3>Action Output:</h3>
+                 <pre id="action_output">No action run yet.</pre>
+             </div>
+        </div>
+    </div>
+
+    <script>
+    function openTab(evt, tabName) {
+        var i, tabcontent, tablinks;
+        tabcontent = document.getElementsByClassName("tab-content");
+        for (i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].style.display = "none";
+        }
+        tablinks = document.getElementsByClassName("tab-link");
+        for (i = 0; i < tablinks.length; i++) {
+            tablinks[i].className = tablinks[i].className.replace(" active", "");
+        }
+        document.getElementById(tabName).style.display = "block";
+        evt.currentTarget.className += " active";
+    }
+
+    function runAction(actionName) {
+        const outputElement = document.getElementById('action_output');
+        outputElement.textContent = `Running ${actionName.replace(/_/g, ' ')}...`;
+
+        fetch("{{ url_for('run_action_route') }}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: actionName })
+        })
+        .then(response => response.json())
+        .then(data => {
+            let outputText = `Status: ${data.status}\nMessage: ${data.message}\n`;
+            if (data.stdout) outputText += `\n--- STDOUT ---\n${data.stdout}`;
+            if (data.stderr) outputText += `\n--- STDERR ---\n${data.stderr}`;
+            outputElement.textContent = outputText;
+        })
+        .catch(error => {
+            outputElement.textContent = `Error: ${error}`;
+        });
+    }
+    // Set default active tab
+    document.addEventListener("DOMContentLoaded", function() {
+        document.querySelector('.tab-link').click();
+    });
+    </script>
+</body>
+</html> 

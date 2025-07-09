@@ -1,5 +1,10 @@
 {
     "web_display_autostart": false,
+    "schedule": {
+        "enabled": false,
+        "start_time": "07:00",
+        "end_time": "23:00"
+    },
     "timezone": "America/Chicago",
     "location": {
         "city": "Dallas",
