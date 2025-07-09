@@ -1,5 +1,5 @@
 {
-    "web_display_autostart": false,
+    "web_display_autostart": true,
     "schedule": {
         "enabled": false,
         "start_time": "07:00",
