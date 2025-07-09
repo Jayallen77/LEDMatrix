@@ -353,21 +353,29 @@ class BaseMLBManager:
                             self.logger.debug(f"[MLB] Raw status short: {event['status'].get('shortDetail')}")
                         
                         # Determine inning half from status information
-                        inning_half = 'top'
-                        if 'mid' in status_detail or 'end' in status_detail or 'mid' in status_short or 'end' in status_short:
-                            inning_half = 'middle'
-                            # If we're in the middle of an inning, it means the next one is coming up.
+                        inning_half = 'top'  # Default
+
+                        # Handle end of inning: next inning is top
+                        if 'end' in status_detail or 'end' in status_short:
+                            inning_half = 'top'
                             inning += 1
                             if is_favorite_game:
-                                self.logger.debug("[MLB] Detected middle of inning, incrementing for display.")
+                                self.logger.debug(f"[MLB] Detected end of inning. Setting to Top {inning}")
+                        # Handle middle of inning: next is bottom of current inning
+                        elif 'mid' in status_detail or 'mid' in status_short:
+                            inning_half = 'bottom'
+                            if is_favorite_game:
+                                self.logger.debug(f"[MLB] Detected middle of inning. Setting to Bottom {inning}")
+                        # Handle bottom of inning
                         elif 'bottom' in status_detail or 'bot' in status_detail or 'bottom' in status_short or 'bot' in status_short:
                             inning_half = 'bottom'
                             if is_favorite_game:
-                                self.logger.debug("[MLB] Detected bottom of inning")
+                                self.logger.debug(f"[MLB] Detected bottom of inning: {inning}")
+                        # Handle top of inning
                         elif 'top' in status_detail or 'top' in status_short:
                             inning_half = 'top'
                             if is_favorite_game:
-                                self.logger.debug("[MLB] Detected top of inning")
+                                self.logger.debug(f"[MLB] Detected top of inning: {inning}")
                         
                         if is_favorite_game:
                             self.logger.debug(f"[MLB] Status detail: {status_detail}")
