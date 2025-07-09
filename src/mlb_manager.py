@@ -681,7 +681,21 @@ class MLBLiveManager(BaseMLBManager):
             inning_text = "FINAL"
         else:
             inning_state = game_data.get('inning_state', '')
-            inning_text = f"{inning_state} {game_data['inning']}"
+            inning_half = game_data.get('inning_half', '')
+            inning_num = game_data['inning']
+            
+            prefix = ""
+            # Prioritize inning_state if it exists (e.g., "Middle", "End")
+            if inning_state and inning_state.lower() not in ['top', 'bottom']:
+                prefix = inning_state.capitalize()
+            # Otherwise, use inning_half (e.g., "Top", "Bottom")
+            elif inning_half:
+                prefix = inning_half.capitalize()
+
+            if prefix:
+                inning_text = f"{prefix} {inning_num}"
+            else:
+                inning_text = str(inning_num)
         
         inning_bbox = draw.textbbox((0, 0), inning_text, font=self.display_manager.font)
         inning_width = inning_bbox[2] - inning_bbox[0]
