@@ -9,6 +9,8 @@ from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from src.display_manager import DisplayManager
 from src.cache_manager import CacheManager
+from src.config_manager import ConfigManager
+import pytz
 
 # Constants
 ESPN_NCAAMB_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard"
@@ -34,6 +36,7 @@ class BaseNCAAMBasketballManager:
     
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         self.display_manager = display_manager
+        self.config_manager = ConfigManager()
         self.config = config
         self.ncaam_basketball_config = config.get("ncaam_basketball_scoreboard", {})
         self.is_enabled = self.ncaam_basketball_config.get("enabled", False)
@@ -63,6 +66,12 @@ class BaseNCAAMBasketballManager:
         self.logger.info(f"Initialized NCAAMBasketball manager with display dimensions: {self.display_width}x{self.display_height}")
         self.logger.info(f"Logo directory: {self.logo_dir}")
 
+    def _get_timezone(self):
+        try:
+            return pytz.timezone(self.config_manager.get_timezone())
+        except pytz.UnknownTimeZoneError:
+            return pytz.utc
+
     def _should_log(self, message_type: str, cooldown: int = 300) -> bool:
         """Check if a message should be logged based on cooldown period."""
         current_time = time.time()
@@ -78,7 +87,7 @@ class BaseNCAAMBasketballManager:
         self.logger.info("[NCAAMBasketball] Loading test data")
         
         # Create test data with current time
-        now = datetime.now(timezone.utc)
+        now = datetime.now(self._get_timezone())
         
         # Create test events for different scenarios
         events = []
@@ -308,7 +317,7 @@ class BaseNCAAMBasketballManager:
             # If no date specified, fetch data from multiple days
             if not date_str:
                 # Get today's date in YYYYMMDD format
-                today = datetime.now(timezone.utc).date()
+                today = datetime.now(pytz.utc).date()
                 dates_to_fetch = [
                     (today - timedelta(days=2)).strftime('%Y%m%d'),
                     (today - timedelta(days=1)).strftime('%Y%m%d'),
@@ -399,14 +408,14 @@ class BaseNCAAMBasketballManager:
             game_date = ""
             if start_time_utc:
                 # Convert to local time
-                local_time = start_time_utc.astimezone()
+                local_time = start_time_utc.astimezone(self._get_timezone())
                 game_time = local_time.strftime("%-I:%M %p")
                 game_date = local_time.strftime("%-m/%-d")
 
             # Calculate if game is within recent window
             is_within_window = False
             if start_time_utc:
-                cutoff_time = datetime.now(timezone.utc) - timedelta(hours=self.recent_hours)
+                cutoff_time = datetime.now(self._get_timezone()) - timedelta(hours=self.recent_hours)
                 is_within_window = start_time_utc > cutoff_time
                 self.logger.debug(f"[NCAAMBasketball] Game time: {start_time_utc}, Cutoff time: {cutoff_time}, Within window: {is_within_window}")
 

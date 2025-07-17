@@ -9,9 +9,11 @@ from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from src.display_manager import DisplayManager
 from src.cache_manager import CacheManager
+from src.config_manager import ConfigManager
+import pytz
 
 # Constants
-ESPN_NHL_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard"
+NHL_API_BASE_URL = "https://api-web.nhle.com/v1/schedule/"
 
 # Configure logging to match main configuration
 logging.basicConfig(
@@ -83,6 +85,7 @@ class BaseNHLManager:
     
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         self.display_manager = display_manager
+        self.config_manager = ConfigManager()
         self.config = config
         self.nhl_config = config.get("nhl_scoreboard", {})
         self.is_enabled = self.nhl_config.get("enabled", False)
@@ -112,6 +115,12 @@ class BaseNHLManager:
         self.logger.info(f"Initialized NHL manager with display dimensions: {self.display_width}x{self.display_height}")
         self.logger.info(f"Logo directory: {self.logo_dir}")
 
+    def _get_timezone(self):
+        try:
+            return pytz.timezone(self.config_manager.get_timezone())
+        except pytz.UnknownTimeZoneError:
+            return pytz.utc
+
     @classmethod
     def _fetch_shared_data(cls, date_str: str = None) -> Optional[Dict]:
         """Fetch and cache data for all managers to share."""
@@ -132,15 +141,18 @@ class BaseNHLManager:
                 return cached_data
                 
             # If not in cache or stale, fetch from API
-            url = ESPN_NHL_SCOREBOARD_URL
-            params = {}
-            if date_str:
-                params['dates'] = date_str
+            if not date_str:
+                # Get today's date in YYYY-MM-DD format
+                today = datetime.now(cls._get_timezone()).date()
+                date_str = today.strftime('%Y-%m-%d')
                 
-            response = requests.get(url, params=params)
+            url = f"{NHL_API_BASE_URL}{date_str}"
+            cls.logger.info(f"Fetching data from URL: {url}")
+            
+            response = requests.get(url)
             response.raise_for_status()
             data = response.json()
-            cls.logger.info(f"[NHL] Successfully fetched data from ESPN API")
+            cls.logger.info(f"[NHL] Successfully fetched data from NHL API")
             
             # Cache the response
             cls.cache_manager.set(cache_key, data)
@@ -150,17 +162,17 @@ class BaseNHLManager:
             # If no date specified, fetch data from multiple days
             if not date_str:
                 # Get today's date in YYYYMMDD format
-                today = datetime.now(timezone.utc).date()
+                today = datetime.now(cls._get_timezone()).date()
                 dates_to_fetch = [
-                    (today - timedelta(days=2)).strftime('%Y%m%d'),
-                    (today - timedelta(days=1)).strftime('%Y%m%d'),
-                    today.strftime('%Y%m%d')
+                    (today - timedelta(days=2)).strftime('%Y-%m-%d'),
+                    (today - timedelta(days=1)).strftime('%Y-%m-%d'),
+                    today.strftime('%Y-%m-%d')
                 ]
                 
                 # Fetch data for each date
                 all_events = []
                 for fetch_date in dates_to_fetch:
-                    if fetch_date != today.strftime('%Y%m%d'):  # Skip today as we already have it
+                    if fetch_date != today.strftime('%Y-%m-%d'):  # Skip today as we already have it
                         # Check cache for this date
                         cached_date_data = cls.cache_manager.get(fetch_date, max_age=300)
                         if cached_date_data:
@@ -169,8 +181,8 @@ class BaseNHLManager:
                                 all_events.extend(cached_date_data["events"])
                             continue
                             
-                        params['dates'] = fetch_date
-                        response = requests.get(url, params=params)
+                        url = f"{NHL_API_BASE_URL}{fetch_date}"
+                        response = requests.get(url)
                         response.raise_for_status()
                         date_data = response.json()
                         if date_data and "events" in date_data:
@@ -188,7 +200,7 @@ class BaseNHLManager:
             
             return data
         except requests.exceptions.RequestException as e:
-            cls.logger.error(f"[NHL] Error fetching data from ESPN: {e}")
+            cls.logger.error(f"[NHL] Error fetching data from NHL: {e}")
             return None
 
     def _fetch_data(self, date_str: str = None) -> Optional[Dict]:
@@ -196,18 +208,14 @@ class BaseNHLManager:
         # For live games, bypass the shared cache to ensure fresh data
         if isinstance(self, NHLLiveManager):
             try:
-                url = ESPN_NHL_SCOREBOARD_URL
-                params = {}
-                if date_str:
-                    params['dates'] = date_str
-                    
-                response = requests.get(url, params=params)
+                url = f"{NHL_API_BASE_URL}{date_str}" if date_str else f"{NHL_API_BASE_URL}{datetime.now(self._get_timezone()).strftime('%Y-%m-%d')}"
+                response = requests.get(url)
                 response.raise_for_status()
                 data = response.json()
-                self.logger.info(f"[NHL] Successfully fetched live game data from ESPN API")
+                self.logger.info(f"[NHL] Successfully fetched live game data from NHL API")
                 return data
             except requests.exceptions.RequestException as e:
-                self.logger.error(f"[NHL] Error fetching live game data from ESPN: {e}")
+                self.logger.error(f"[NHL] Error fetching live game data from NHL: {e}")
                 return None
         else:
             # For non-live games, use the shared cache
@@ -344,7 +352,7 @@ class BaseNHLManager:
             game_date = ""
             if start_time_utc:
                 # Convert to local time
-                local_time = start_time_utc.astimezone()
+                local_time = start_time_utc.astimezone(self._get_timezone())
                 game_time = local_time.strftime("%-I:%M %p")
                 game_date = local_time.strftime("%-m/%-d")
 
@@ -353,13 +361,13 @@ class BaseNHLManager:
             if start_time_utc:
                 # For upcoming games, check if the game is within the next 48 hours
                 if status["type"]["state"] == "pre":
-                    cutoff_time = datetime.now(timezone.utc) + timedelta(hours=self.recent_hours)
+                    cutoff_time = datetime.now(pytz.utc) + timedelta(hours=self.recent_hours)
                     is_within_window = start_time_utc <= cutoff_time
                     self.logger.info(f"[NHL] Game time: {start_time_utc}, Cutoff time: {cutoff_time}, Within window: {is_within_window}")
                     self.logger.info(f"[NHL] Game status: {status['type']['state']}, Home: {home_team['team']['abbreviation']}, Away: {away_team['team']['abbreviation']}")
                 else:
                     # For recent games, check if the game is within the last 48 hours
-                    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=self.recent_hours)
+                    cutoff_time = datetime.now(pytz.utc) - timedelta(hours=self.recent_hours)
                     is_within_window = start_time_utc > cutoff_time
                 self.logger.debug(f"[NHL] Game time: {start_time_utc}, Cutoff time: {cutoff_time}, Within window: {is_within_window}")
 

@@ -30,43 +30,18 @@ class Clock:
         }
 
     def _get_timezone(self) -> pytz.timezone:
-        """Get timezone based on location or config."""
-        # First try to use timezone from config if it exists
-        if 'timezone' in self.config:
-            try:
-                return pytz.timezone(self.config['timezone'])
-            except pytz.exceptions.UnknownTimeZoneError:
-                print(f"Warning: Invalid timezone in config: {self.config['timezone']}")
-
-        # If no timezone in config or it's invalid, try to determine from location
+        """Get timezone from the config file."""
+        config_timezone = self.config_manager.get_timezone()
         try:
-            from timezonefinder import TimezoneFinder
-            from geopy.geocoders import Nominatim
-            from geopy.exc import GeocoderTimedOut
-
-            # Get coordinates for the location
-            geolocator = Nominatim(user_agent="led_matrix_clock")
-            location_str = f"{self.location['city']}, {self.location['state']}, {self.location['country']}"
-            
-            try:
-                location = geolocator.geocode(location_str, timeout=5)  # 5 second timeout
-                if location:
-                    # Find timezone from coordinates
-                    tf = TimezoneFinder()
-                    timezone_str = tf.timezone_at(lng=location.longitude, lat=location.latitude)
-                    if timezone_str:
-                        return pytz.timezone(timezone_str)
-            except GeocoderTimedOut:
-                print("Warning: Timeout while looking up location coordinates")
-            except Exception as e:
-                print(f"Warning: Error finding timezone from location: {e}")
-        
-        except Exception as e:
-            print(f"Warning: Error importing geolocation libraries: {e}")
-        
-        # Fallback to US/Central for Dallas
-        print("Using fallback timezone: US/Central")
-        return pytz.timezone('US/Central')
+            return pytz.timezone(config_timezone)
+        except pytz.exceptions.UnknownTimeZoneError:
+            logger.warning(
+                f"Invalid timezone '{config_timezone}' in config. "
+                "Falling back to UTC. Please check your config.json file. "
+                "A list of valid timezones can be found at "
+                "https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"
+            )
+            return pytz.utc
 
     def _get_ordinal_suffix(self, day: int) -> str:
         """Get the ordinal suffix for a day number (1st, 2nd, 3rd, etc.)."""

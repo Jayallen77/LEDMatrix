@@ -10,6 +10,8 @@ from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from src.display_manager import DisplayManager
 from src.cache_manager import CacheManager
+from src.config_manager import ConfigManager
+import pytz
 
 # Constants
 # ESPN_SOCCER_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/scoreboards" # Old URL
@@ -143,6 +145,8 @@ class BaseSoccerManager:
         self.logger.info(f"Team map file: {self.team_map_file}")
         self.logger.info(f"Team map update interval: {self.team_map_update_days} days")
 
+        self.config_manager = ConfigManager(config)
+
     # --- Team League Map Management ---
     @classmethod
     def _load_team_league_map(cls) -> None:
@@ -182,7 +186,7 @@ class BaseSoccerManager:
         """Fetch data for all known leagues to build the team-to-league map."""
         cls.logger.info("[Soccer] Building team-league map...")
         new_map = {}
-        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime('%Y%m%d')
+        yesterday = (datetime.now(pytz.utc) - timedelta(days=1)).strftime('%Y%m%d')
 
         # Fetch data for all leagues defined in LEAGUE_SLUGS to get comprehensive team info
         for league_slug in LEAGUE_SLUGS.keys():
@@ -265,7 +269,7 @@ class BaseSoccerManager:
 
         cls.logger.debug(f"[Soccer] Determined leagues to fetch for shared data: {leagues_to_fetch}")
 
-        today = datetime.now(timezone.utc).date()
+        today = datetime.now(pytz.utc).date()
         # Generate dates from yesterday up to 'upcoming_fetch_days' in the future
         dates_to_fetch = [
             (today + timedelta(days=i)).strftime('%Y%m%d') 
@@ -366,7 +370,7 @@ class BaseSoccerManager:
         if isinstance(self, SoccerLiveManager) and not self.test_mode:
             # Live manager bypasses shared cache; fetches today's data per league
             live_data = {"events": []}
-            today_date_str = datetime.now(timezone.utc).strftime('%Y%m%d')
+            today_date_str = datetime.now(pytz.utc).strftime('%Y%m%d')
             
             # Determine leagues to fetch based on favorites and map
             leagues_to_fetch = self._get_live_leagues_to_fetch()
@@ -533,7 +537,7 @@ class BaseSoccerManager:
             game_time = ""
             game_date = ""
             if start_time_utc:
-                local_time = start_time_utc.astimezone()
+                local_time = start_time_utc.astimezone(self._get_timezone())
                 game_time = local_time.strftime("%-I:%M%p").lower() # e.g., 2:30pm
                 game_date = local_time.strftime("%-m/%-d")
 
@@ -546,7 +550,7 @@ class BaseSoccerManager:
             # Calculate if game is within recent/upcoming window
             is_within_window = False
             if start_time_utc:
-                now_utc = datetime.now(timezone.utc)
+                now_utc = datetime.now(pytz.utc)
                 if is_upcoming:
                     cutoff_time = now_utc + timedelta(hours=self.recent_hours)
                     is_within_window = start_time_utc <= cutoff_time
@@ -804,7 +808,7 @@ class SoccerLiveManager(BaseSoccerManager):
                          current_game_ids = {game['id'] for game in self.live_games}
 
                          if new_game_ids != current_game_ids:
-                             self.live_games = sorted(new_live_games, key=lambda x: x['start_time_utc'] or datetime.now(timezone.utc)) # Sort by time
+                             self.live_games = sorted(new_live_games, key=lambda x: x['start_time_utc'] or datetime.now(pytz.utc)) # Sort by time
                              # Reset index if current game is gone or list is new
                              if not self.current_game or self.current_game['id'] not in new_game_ids:
                                  self.current_game_index = 0
@@ -902,7 +906,7 @@ class SoccerRecentManager(BaseSoccerManager):
 
             # Process and filter games
             new_recent_games = []
-            now_utc = datetime.now(timezone.utc)
+            now_utc = datetime.now(pytz.utc)
             cutoff_time = now_utc - timedelta(hours=self.recent_hours)
 
             for event in data['events']:
@@ -1002,7 +1006,7 @@ class SoccerUpcomingManager(BaseSoccerManager):
 
             # Process and filter games
             new_upcoming_games = []
-            now_utc = datetime.now(timezone.utc)
+            now_utc = datetime.now(pytz.utc)
             cutoff_time = now_utc + timedelta(hours=self.recent_hours) # Use recent_hours as upcoming window
 
             for event in data['events']:

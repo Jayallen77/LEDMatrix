@@ -9,6 +9,8 @@ from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from src.display_manager import DisplayManager
 from src.cache_manager import CacheManager # Keep CacheManager import
+from src.config_manager import ConfigManager
+import pytz
 
 # Constants
 ESPN_NCAAFB_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard" # Changed URL for NCAA FB
@@ -85,6 +87,7 @@ class BaseNCAAFBManager: # Renamed class
 
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         self.display_manager = display_manager
+        self.config_manager = ConfigManager()
         self.config = config
         self.ncaa_fb_config = config.get("ncaa_fb_scoreboard", {}) # Changed config key
         self.is_enabled = self.ncaa_fb_config.get("enabled", False)
@@ -111,6 +114,12 @@ class BaseNCAAFBManager: # Renamed class
 
         self.logger.info(f"Initialized NCAAFB manager with display dimensions: {self.display_width}x{self.display_height}")
         self.logger.info(f"Logo directory: {self.logo_dir}")
+
+    def _get_timezone(self):
+        try:
+            return pytz.timezone(self.config_manager.get_timezone())
+        except pytz.UnknownTimeZoneError:
+            return pytz.utc
 
     @classmethod
     def _fetch_shared_data(cls, past_days: int, future_days: int, date_str: str = None) -> Optional[Dict]:
@@ -144,7 +153,7 @@ class BaseNCAAFBManager: # Renamed class
             cls._last_shared_update = current_time
 
             if not date_str:
-                today = datetime.now(timezone.utc).date()
+                today = datetime.now(cls._get_timezone()).date()
                 dates_to_fetch = []
                 # Generate dates from past_days ago to future_days ahead
                 for i in range(-past_days, future_days + 1):
@@ -303,7 +312,7 @@ class BaseNCAAFBManager: # Renamed class
 
             game_time, game_date = "", ""
             if start_time_utc:
-                local_time = start_time_utc.astimezone()
+                local_time = start_time_utc.astimezone(self._get_timezone())
                 game_time = local_time.strftime("%-I:%M %p")
                 game_date = local_time.strftime("%-m/%-d")
 

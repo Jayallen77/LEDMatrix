@@ -9,6 +9,8 @@ from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from src.display_manager import DisplayManager
 from src.cache_manager import CacheManager
+from src.config_manager import ConfigManager
+import pytz
 
 # Constants
 ESPN_NBA_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
@@ -34,6 +36,7 @@ class BaseNBAManager:
     
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         self.display_manager = display_manager
+        self.config_manager = ConfigManager()
         self.config = config
         self.nba_config = config.get("nba_scoreboard", {})
         self.is_enabled = self.nba_config.get("enabled", False)
@@ -380,14 +383,14 @@ class BaseNBAManager:
             game_date = ""
             if start_time_utc:
                 # Convert to local time
-                local_time = start_time_utc.astimezone()
+                local_time = start_time_utc.astimezone(self._get_timezone())
                 game_time = local_time.strftime("%-I:%M %p")
                 game_date = local_time.strftime("%-m/%-d")
 
             # Calculate if game is within recent window
             is_within_window = False
             if start_time_utc:
-                cutoff_time = datetime.now(timezone.utc) - timedelta(hours=self.recent_hours)
+                cutoff_time = datetime.now(self._get_timezone()) - timedelta(hours=self.recent_hours)
                 is_within_window = start_time_utc > cutoff_time
                 self.logger.debug(f"[NBA] Game time: {start_time_utc}, Cutoff time: {cutoff_time}, Within window: {is_within_window}")
 

@@ -8,10 +8,12 @@ from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from src.display_manager import DisplayManager
-from src.cache_manager import CacheManager # Keep CacheManager import
+from src.cache_manager import CacheManager
+from src.config_manager import ConfigManager
+import pytz
 
 # Constants
-ESPN_NFL_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard" # Changed URL
+ESPN_NFL_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
 
 # Configure logging to match main configuration
 logging.basicConfig(
@@ -85,6 +87,7 @@ class BaseNFLManager: # Renamed class
 
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         self.display_manager = display_manager
+        self.config_manager = ConfigManager()
         self.config = config
         self.nfl_config = config.get("nfl_scoreboard", {}) # Changed config key
         self.is_enabled = self.nfl_config.get("enabled", False)
@@ -111,6 +114,12 @@ class BaseNFLManager: # Renamed class
 
         self.logger.info(f"Initialized NFL manager with display dimensions: {self.display_width}x{self.display_height}")
         self.logger.info(f"Logo directory: {self.logo_dir}")
+
+    def _get_timezone(self):
+        try:
+            return pytz.timezone(self.config_manager.get_timezone())
+        except pytz.UnknownTimeZoneError:
+            return pytz.utc
 
     @classmethod
     def _fetch_shared_data(cls, past_days: int, future_days: int, date_str: str = None) -> Optional[Dict]:
@@ -144,7 +153,7 @@ class BaseNFLManager: # Renamed class
             cls._last_shared_update = current_time
 
             if not date_str:
-                today = datetime.now(timezone.utc).date()
+                today = datetime.now(cls._get_timezone()).date()
                 dates_to_fetch = []
                 # Generate dates from past_days ago to future_days ahead
                 for i in range(-past_days, future_days + 1):
@@ -303,7 +312,7 @@ class BaseNFLManager: # Renamed class
 
             game_time, game_date = "", ""
             if start_time_utc:
-                local_time = start_time_utc.astimezone()
+                local_time = start_time_utc.astimezone(self._get_timezone())
                 game_time = local_time.strftime("%-I:%M %p")
                 game_date = local_time.strftime("%-m/%-d")
 
@@ -557,7 +566,7 @@ class NFLLiveManager(BaseNFLManager): # Renamed class
                         current_game_ids = {g['id'] for g in self.live_games}
 
                         if new_game_ids != current_game_ids:
-                            self.live_games = sorted(new_live_games, key=lambda g: g.get('start_time_utc') or datetime.now(timezone.utc)) # Sort by start time
+                            self.live_games = sorted(new_live_games, key=lambda g: g.get('start_time_utc') or datetime.now(self._get_timezone())) # Sort by start time
                             # Reset index if current game is gone or list is new
                             if not self.current_game or self.current_game['id'] not in new_game_ids:
                                 self.current_game_index = 0
@@ -781,7 +790,7 @@ class NFLRecentManager(BaseNFLManager): # Renamed class
                  team_games = processed_games # Show all recent games if no favorites defined
 
             # Sort by game time, most recent first
-            team_games.sort(key=lambda g: g.get('start_time_utc') or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+            team_games.sort(key=lambda g: g.get('start_time_utc') or datetime.min.replace(tzinfo=self._get_timezone()), reverse=True)
 
             # Check if the list of games to display has changed
             new_game_ids = {g['id'] for g in team_games}
@@ -953,7 +962,7 @@ class NFLUpcomingManager(BaseNFLManager): # Renamed class
                 team_games = processed_games # Show all upcoming if no favorites
 
             # Sort by game time, earliest first
-            team_games.sort(key=lambda g: g.get('start_time_utc') or datetime.max.replace(tzinfo=timezone.utc))
+            team_games.sort(key=lambda g: g.get('start_time_utc') or datetime.max.replace(tzinfo=self._get_timezone()))
 
             # Log changes or periodically
             should_log = (
