@@ -73,7 +73,7 @@
     },
     "clock": {
         "enabled": true,
-        "format": "%H:%M:%S",
+        "format": "%I:%M %p",
         "update_interval": 1
     },
     "weather": {
