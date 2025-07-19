@@ -108,7 +108,6 @@ class BaseMLBManager:
 
     def _draw_odds_info(self, draw: ImageDraw.Draw, odds_data: Dict[str, Any], width: int, height: int) -> None:
         """Draw odds information on the display."""
-        self.logger.info(f"Attempting to draw odds with data: {json.dumps(odds_data, indent=2)}")
         if not odds_data:
             return
 
@@ -266,7 +265,6 @@ class BaseMLBManager:
 
             # Draw odds if available
             if 'odds' in game_data:
-                self.logger.info(f"Found odds data for game {game_data.get('id')}, attempting to draw.")
                 self._draw_odds_info(draw, game_data['odds'], width, height)
         
         # For recent/final games, show scores and status
@@ -297,7 +295,6 @@ class BaseMLBManager:
 
             # Draw odds if available
             if 'odds' in game_data:
-                self.logger.info(f"Found odds data for game {game_data.get('id')}, attempting to draw.")
                 self._draw_odds_info(draw, game_data['odds'], width, height)
 
         # For live games, show detailed game state
@@ -328,7 +325,6 @@ class BaseMLBManager:
 
             # Draw odds if available
             if 'odds' in game_data:
-                self.logger.info(f"Found odds data for game {game_data.get('id')}, attempting to draw.")
                 self._draw_odds_info(draw, game_data['odds'], width, height)
 
         return image
@@ -936,18 +932,28 @@ class MLBLiveManager(BaseMLBManager):
         home_spread_text = ""
         away_spread_text = ""
         if 'odds' in game_data and game_data['odds']:
-            self.logger.info(f"Found odds data for live game {game_data.get('id')}, preparing to draw.")
             home_team_odds = game_data['odds'].get('home_team_odds', {})
             away_team_odds = game_data['odds'].get('away_team_odds', {})
+            spread = game_data['odds'].get('spread')
 
-            if home_team_odds and home_team_odds.get('spread_odds'):
-                home_spread = home_team_odds['spread_odds']
+            home_spread = home_team_odds.get('spread_odds')
+            if home_spread is None and spread is not None:
+                home_spread = spread
+
+            away_spread = away_team_odds.get('spread_odds')
+            if away_spread is None and spread is not None:
+                # Away spread is usually the inverse of the home spread
+                try:
+                    away_spread = -spread
+                except TypeError:
+                    away_spread = None
+
+            if home_spread is not None:
                 if isinstance(home_spread, (int, float)) and home_spread > 0:
                     home_spread = f"+{home_spread}"
                 home_spread_text = f" ({home_spread})"
 
-            if away_team_odds and away_team_odds.get('spread_odds'):
-                away_spread = away_team_odds['spread_odds']
+            if away_spread is not None:
                 if isinstance(away_spread, (int, float)) and away_spread > 0:
                     away_spread = f"+{away_spread}"
                 away_spread_text = f" ({away_spread})"
