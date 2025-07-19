@@ -312,7 +312,6 @@ class BaseMiLBManager:
             for date in dates:
                 for sport_id in sport_ids:
                     url = f"http://statsapi.mlb.com/api/v1/schedule?sportId={sport_id}&date={date}"
-                    
                     try:
                         self.logger.debug(f"Fetching MiLB games from MLB Stats API: {url}")
                         response = self.session.get(url, headers=self.headers, timeout=10)
@@ -347,19 +346,18 @@ class BaseMiLBManager:
                             status_obj = event['status']
                             status_state = status_obj.get('abstractGameState', 'Final')
 
-                            mapped_status = 'unknown'
-                            mapped_status_state = 'unknown'
-                            if status_state == 'Live':
-                                mapped_status = 'status_in_progress'
-                                mapped_status_state = 'in'
-                            elif status_state == 'Final':
-                                mapped_status = 'status_final'
-                                mapped_status_state = 'post'
-                            elif status_state in ['Preview', 'Scheduled']:
-                                mapped_status = 'status_scheduled'
-                                mapped_status_state = 'pre'
+                            # Map status to a consistent format
+                            status_map = {
+                                'in progress': 'status_in_progress',
+                                'final': 'status_final',
+                                'scheduled': 'status_scheduled',
+                                'preview': 'status_scheduled'
+                            }
+                            mapped_status = status_map.get(status_obj.get('detailedState', '').lower(), 'status_other')
+                            mapped_status_state = 'in' if mapped_status == 'status_in_progress' else 'post' if mapped_status == 'status_final' else 'pre'
 
                             game_data = {
+                                'id': game_pk,
                                 'away_team': away_abbr,
                                 'home_team': home_abbr,
                                 'away_score': event['teams']['away'].get('score', 0),
@@ -373,42 +371,17 @@ class BaseMiLBManager:
                                 linescore = event.get('linescore', {})
                                 game_data['inning'] = linescore.get('currentInning', 1)
                                 inning_state = linescore.get('inningState', 'Top').lower()
-                                game_data['inning_half'] = 'bottom' if 'bottom' in inning_state else 'top'
-                                
-                                if is_favorite_game:
-                                    try:
-                                        live_url = f"http://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
-                                        live_response = self.session.get(live_url, headers=self.headers, timeout=5)
-                                        live_response.raise_for_status()
-                                        live_data = live_response.json().get('liveData', {})
-                                        
-                                        linescore_live = live_data.get('linescore', {})
-
-                                        # Overwrite score and inning data with more accurate live data from the live feed
-                                        if linescore_live:
-                                            game_data['away_score'] = linescore_live.get('teams', {}).get('away', {}).get('runs', game_data['away_score'])
-                                            game_data['home_score'] = linescore_live.get('teams', {}).get('home', {}).get('runs', game_data['home_score'])
-                                            game_data['inning'] = linescore_live.get('currentInning', game_data['inning'])
-                                            inning_state_live = linescore_live.get('inningState', '').lower()
-                                            if inning_state_live:
-                                                game_data['inning_half'] = 'bottom' if 'bottom' in inning_state_live else 'top'
-
-                                        game_data['balls'] = linescore_live.get('balls', 0)
-                                        game_data['strikes'] = linescore_live.get('strikes', 0)
-                                        game_data['outs'] = linescore_live.get('outs', 0)
-                                        
-                                        offense = linescore_live.get('offense', {})
-                                        game_data['bases_occupied'] = [
-                                            'first' in offense,
-                                            'second' in offense,
-                                            'third' in offense
-                                        ]
-                                    except Exception as e:
-                                        self.logger.warning(f"Could not fetch live details for game {game_pk}: {e}")
-                                        game_data.update({'balls': 0, 'strikes': 0, 'outs': 0, 'bases_occupied': [False]*3})
-                                else:
-                                    game_data.update({'balls': 0, 'strikes': 0, 'outs': 0, 'bases_occupied': [False]*3})
+                                game_data['inning_half'] = inning_state
+                                game_data['balls'] = linescore.get('balls', 0)
+                                game_data['strikes'] = linescore.get('strikes', 0)
+                                game_data['outs'] = linescore.get('outs', 0)
+                                game_data['bases_occupied'] = [
+                                    'first' in linescore.get('offense', {}),
+                                    'second' in linescore.get('offense', {}),
+                                    'third' in linescore.get('offense', {})
+                                ]
                             else:
+                                # For non-live games, set defaults
                                 game_data.update({'inning': 1, 'inning_half': 'top', 'balls': 0, 'strikes': 0, 'outs': 0, 'bases_occupied': [False]*3})
                             
                             all_games[game_pk] = game_data
@@ -418,6 +391,94 @@ class BaseMiLBManager:
         except Exception as e:
             self.logger.error(f"Error fetching MiLB data from MLB Stats API: {e}", exc_info=True)
             return {}
+
+    def _extract_game_details(self, game) -> Dict:
+        game_pk = game.get('id')
+        home_team_name = game['home']['team']['name']
+        away_team_name = game['away']['team']['name']
+        
+        home_abbr = self.team_name_to_abbr.get(home_team_name)
+        away_abbr = self.team_name_to_abbr.get(away_team_name)
+
+        if not home_abbr:
+            home_abbr = game['home']['team'].get('abbreviation', home_team_name[:3].upper())
+            self.logger.debug(f"Could not find team abbreviation for '{home_team_name}'. Using '{home_abbr}'.")
+        if not away_abbr:
+            away_abbr = game['away']['team'].get('abbreviation', away_team_name[:3].upper())
+            self.logger.debug(f"Could not find team abbreviation for '{away_team_name}'. Using '{away_abbr}'.")
+
+        is_favorite_game = (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams)
+        
+        if not self.favorite_teams or is_favorite_game:
+            status_obj = game['status']
+            status_state = status_obj.get('abstractGameState', 'Final')
+
+            mapped_status = 'unknown'
+            mapped_status_state = 'unknown'
+            if status_state == 'Live':
+                mapped_status = 'status_in_progress'
+                mapped_status_state = 'in'
+            elif status_state == 'Final':
+                mapped_status = 'status_final'
+                mapped_status_state = 'post'
+            elif status_state in ['Preview', 'Scheduled']:
+                mapped_status = 'status_scheduled'
+                mapped_status_state = 'pre'
+
+            game_data = {
+                'away_team': away_abbr,
+                'home_team': home_abbr,
+                'away_score': game['away']['score'],
+                'home_score': game['home']['score'],
+                'status': mapped_status,
+                'status_state': mapped_status_state,
+                'start_time': game['date']
+            }
+
+            if status_state == 'Live':
+                linescore = game.get('linescore', {})
+                game_data['inning'] = linescore.get('currentInning', 1)
+                inning_state = linescore.get('inningState', 'Top').lower()
+                game_data['inning_half'] = 'bottom' if 'bottom' in inning_state else 'top'
+                
+                if is_favorite_game:
+                    try:
+                        live_url = f"http://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
+                        live_response = self.session.get(live_url, headers=self.headers, timeout=5)
+                        live_response.raise_for_status()
+                        live_data = live_response.json().get('liveData', {})
+                        
+                        linescore_live = live_data.get('linescore', {})
+
+                        # Overwrite score and inning data with more accurate live data from the live feed
+                        if linescore_live:
+                            game_data['away_score'] = linescore_live.get('teams', {}).get('away', {}).get('runs', game_data['away_score'])
+                            game_data['home_score'] = linescore_live.get('teams', {}).get('home', {}).get('runs', game_data['home_score'])
+                            game_data['inning'] = linescore_live.get('currentInning', game_data['inning'])
+                            inning_state_live = linescore_live.get('inningState', '').lower()
+                            if inning_state_live:
+                                game_data['inning_half'] = 'bottom' if 'bottom' in inning_state_live else 'top'
+
+                        game_data['balls'] = linescore_live.get('balls', 0)
+                        game_data['strikes'] = linescore_live.get('strikes', 0)
+                        game_data['outs'] = linescore_live.get('outs', 0)
+                        
+                        offense = linescore_live.get('offense', {})
+                        game_data['bases_occupied'] = [
+                            'first' in offense,
+                            'second' in offense,
+                            'third' in offense
+                        ]
+                    except Exception as e:
+                        self.logger.warning(f"Could not fetch live details for game {game_pk}: {e}")
+                        game_data.update({'balls': 0, 'strikes': 0, 'outs': 0, 'bases_occupied': [False]*3})
+                else:
+                    game_data.update({'balls': 0, 'strikes': 0, 'outs': 0, 'bases_occupied': [False]*3})
+            else:
+                game_data.update({'inning': 1, 'inning_half': 'top', 'balls': 0, 'strikes': 0, 'outs': 0, 'bases_occupied': [False]*3})
+            
+            return game_data
+        return {}
 
 class MiLBLiveManager(BaseMiLBManager):
     """Manager for displaying live MiLB games."""
@@ -567,15 +628,15 @@ class MiLBLiveManager(BaseMiLBManager):
                         # No live games found
                         self.live_games = []
                         self.current_game = None
-            
-            # Check if it's time to switch games
-            if len(self.live_games) > 1 and (current_time - self.last_game_switch) >= self.game_display_duration:
-                self.current_game_index = (self.current_game_index + 1) % len(self.live_games)
-                self.current_game = self.live_games[self.current_game_index]
-                self.last_game_switch = current_time
-                # Force display update when switching games
-                # self.display(force_clear=True) # REMOVED: DisplayController handles this
-                self.last_display_update = current_time
+                
+                # Check if it's time to switch games
+                if len(self.live_games) > 1 and (current_time - self.last_game_switch) >= self.game_display_duration:
+                    self.current_game_index = (self.current_game_index + 1) % len(self.live_games)
+                    self.current_game = self.live_games[self.current_game_index]
+                    self.last_game_switch = current_time
+                    # Force display update when switching games
+                    # self.display(force_clear=True) # REMOVED: DisplayController handles this
+                    self.last_display_update = current_time
 
     def _create_live_game_display(self, game_data: Dict[str, Any]) -> Image.Image:
         """Create a display image for a live MiLB game."""
@@ -826,7 +887,7 @@ class MiLBRecentManager(BaseMiLBManager):
         self.current_game = None
         self.current_game_index = 0
         self.last_update = 0
-        self.update_interval = self.milb_config.get('recent_update_interval', 3600)
+        self.update_interval = self.milb_config.get('recent_update_interval', 3600)  # 1 hour
         self.recent_hours = self.milb_config.get('recent_game_hours', 72)  # Increased from 48 to 72 hours
         self.last_game_switch = 0  # Track when we last switched games
         self.game_display_duration = 10  # Display each game for 10 seconds
@@ -837,7 +898,9 @@ class MiLBRecentManager(BaseMiLBManager):
     def update(self):
         """Update recent games data."""
         current_time = time.time()
-        if current_time - self.last_update < self.update_interval:
+        if current_time - self.last_update >= self.update_interval:
+            self.last_update = current_time
+        else:
             return
             
         try:
@@ -929,7 +992,7 @@ class MiLBRecentManager(BaseMiLBManager):
             logger.error(f"[MiLB] Error displaying recent game: {e}", exc_info=True)
 
 class MiLBUpcomingManager(BaseMiLBManager):
-    """Manager for displaying upcoming MiLB games."""
+    """Manager for upcoming MiLB games."""
     def __init__(self, config: Dict[str, Any], display_manager):
         super().__init__(config, display_manager)
         self.logger.info("Initialized MiLB Upcoming Manager")
@@ -937,7 +1000,7 @@ class MiLBUpcomingManager(BaseMiLBManager):
         self.current_game = None
         self.current_game_index = 0
         self.last_update = 0
-        self.update_interval = self.milb_config.get('upcoming_update_interval', 3600)
+        self.update_interval = self.milb_config.get('upcoming_update_interval', 3600) # 1 hour
         self.last_warning_time = 0
         self.warning_cooldown = 300  # Only show warning every 5 minutes
         self.last_game_switch = 0  # Track when we last switched games
@@ -947,7 +1010,9 @@ class MiLBUpcomingManager(BaseMiLBManager):
     def update(self):
         """Update upcoming games data."""
         current_time = time.time()
-        if current_time - self.last_update < self.update_interval:
+        if current_time - self.last_update >= self.update_interval:
+            self.last_update = current_time
+        else:
             return
             
         try:
@@ -961,42 +1026,10 @@ class MiLBUpcomingManager(BaseMiLBManager):
                 
                 logger.info(f"Looking for games between {now} and {upcoming_cutoff}")
                 
-                for game in games.values():
-                    # Check if this is a favorite team game first
-                    is_favorite_game = (game['home_team'] in self.favorite_teams or 
-                                      game['away_team'] in self.favorite_teams)
-                    
-                    if not is_favorite_game:
-                        continue  # Skip non-favorite team games
-                        
-                    game_time = datetime.fromisoformat(game['start_time'].replace('Z', '+00:00'))
-                    # Ensure game_time is timezone-aware (UTC)
-                    if game_time.tzinfo is None:
-                        game_time = game_time.replace(tzinfo=timezone.utc)
-                    logger.info(f"Checking favorite team game: {game['away_team']} @ {game['home_team']} at {game_time}")
-                    logger.info(f"Game status: {game['status']}, State: {game['status_state']}")
-                    
-                    # Check if game is within our time window
-                    is_within_time = now <= game_time <= upcoming_cutoff
-                    
-                    # For upcoming games, we'll consider any game that:
-                    # 1. Is within our time window
-                    # 2. Is not final (not 'post' or 'final' state)
-                    # 3. Has a future start time
-                    is_upcoming = (
-                        is_within_time and 
-                        game['status_state'] not in ['post', 'final', 'completed'] and
-                        game_time > now
-                    )
-                    
-                    logger.info(f"Within time window: {is_within_time}")
-                    logger.info(f"Is upcoming: {is_upcoming}")
-                    logger.info(f"Game time > now: {game_time > now}")
-                    logger.info(f"Status state not final: {game['status_state'] not in ['post', 'final', 'completed']}")
-                    
-                    if is_upcoming:
-                        new_upcoming_games.append(game)
-                        logger.info(f"Added favorite team game to upcoming list: {game['away_team']} @ {game['home_team']}")
+                for game in games.get('events', []):
+                    game_data = self._extract_game_details(game)
+                    if game_data:
+                        new_upcoming_games.append(game_data)
                 
                 # Filter for favorite teams (though we already filtered above, this is a safety check)
                 new_team_games = [game for game in new_upcoming_games 
