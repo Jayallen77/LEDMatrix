@@ -65,6 +65,7 @@ class BaseMLBManager:
             )
             if odds_data:
                 game['odds'] = odds_data
+                self.logger.info(f"Successfully attached odds to game {game.get('id', 'N/A')}")
         except Exception as e:
             self.logger.error(f"Error fetching odds for game {game.get('id', 'N/A')}: {e}")
 
