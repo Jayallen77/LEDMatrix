@@ -932,31 +932,41 @@ class MLBLiveManager(BaseMLBManager):
         home_spread_text = ""
         away_spread_text = ""
         if 'odds' in game_data and game_data['odds']:
-            home_team_odds = game_data['odds'].get('home_team_odds', {})
-            away_team_odds = game_data['odds'].get('away_team_odds', {})
-            spread = game_data['odds'].get('spread')
+            self.logger.info(f"Odds data available for live game: {json.dumps(game_data['odds'], indent=2)}")
+            odds = game_data['odds']
+            home_team_odds = odds.get('home_team_odds', {})
+            away_team_odds = odds.get('away_team_odds', {})
 
+            # --- Robust Spread Extraction ---
             home_spread = home_team_odds.get('spread_odds')
-            if home_spread is None and spread is not None:
-                home_spread = spread
-
             away_spread = away_team_odds.get('spread_odds')
-            if away_spread is None and spread is not None:
-                # Away spread is usually the inverse of the home spread
-                try:
-                    away_spread = -spread
-                except TypeError:
-                    away_spread = None
 
+            # Fallback to top-level spread if specific odds aren't present
+            if home_spread is None and away_spread is None:
+                spread_val = odds.get('spread')
+                if spread_val is not None:
+                    try:
+                        # The 'spread' value typically applies to the home team
+                        home_spread = float(spread_val)
+                        # Away spread is the inverse
+                        away_spread = -home_spread
+                    except (ValueError, TypeError):
+                        self.logger.warning(f"Could not parse top-level spread value: {spread_val}")
+
+            # Format for display
             if home_spread is not None:
-                if isinstance(home_spread, (int, float)) and home_spread > 0:
-                    home_spread = f"+{home_spread}"
-                home_spread_text = f" ({home_spread})"
+                try:
+                    home_spread_num = float(home_spread)
+                    home_spread_text = f" ({home_spread_num:+.1f})"
+                except (ValueError, TypeError):
+                     home_spread_text = "" # Don't display if not a number
 
             if away_spread is not None:
-                if isinstance(away_spread, (int, float)) and away_spread > 0:
-                    away_spread = f"+{away_spread}"
-                away_spread_text = f" ({away_spread})"
+                try:
+                    away_spread_num = float(away_spread)
+                    away_spread_text = f" ({away_spread_num:+.1f})"
+                except (ValueError, TypeError):
+                    away_spread_text = ""
         
         # Calculate Y position (bottom edge)
         # Get font height (approximate or precise)
