@@ -25,11 +25,14 @@ class OddsManager:
         
         try:
             url = f"{self.base_url}/{sport}/leagues/{league}/events/{event_id}/competitions/{event_id}/odds"
+            self.logger.info(f"Requesting odds from URL: {url}")
             response = requests.get(url)
             response.raise_for_status()
             raw_data = response.json()
+            self.logger.debug(f"Received raw odds data from ESPN: {json.dumps(raw_data, indent=2)}")
             
             odds_data = self._extract_espn_data(raw_data)
+            self.logger.info(f"Extracted odds data: {odds_data}")
             
             if odds_data:
                 self.cache_manager.save_cache(cache_key, odds_data)
@@ -48,8 +51,9 @@ class OddsManager:
             item = data["items"][0]
             # Find the desired bookmaker, e.g., 'fanduel'
             provider = next((p for p in item.get('providers', []) if p.get('name', '').lower() == 'fanduel'), item['providers'][0] if item.get('providers') else {})
+            self.logger.debug(f"Found provider for odds: {provider.get('name', 'N/A')}")
             
-            return {
+            extracted_data = {
                 "details": provider.get("details"),
                 "over_under": provider.get("overUnder"),
                 "spread": provider.get("spread"),
@@ -62,4 +66,8 @@ class OddsManager:
                     "spread_odds": provider.get("awayTeamOdds", {}).get("spreadOdds")
                 }
             }
+            self.logger.debug(f"Returning extracted odds data: {json.dumps(extracted_data, indent=2)}")
+            return extracted_data
+        
+        self.logger.warning("No 'items' found in ESPN odds data.")
         return None 
