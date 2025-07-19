@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from src.display_manager import DisplayManager
 from src.cache_manager import CacheManager
 from src.config_manager import ConfigManager
+from src.odds_manager import OddsManager
 import pytz
 
 # Constants
@@ -32,6 +33,7 @@ class BaseNCAAMBasketballManager:
     _shared_data = None
     _last_shared_update = 0
     cache_manager = CacheManager()  # Make cache_manager a class attribute
+    odds_manager = OddsManager(cache_manager, ConfigManager())
     logger = logging.getLogger('NCAAMBasketball')  # Make logger a class attribute
     
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
@@ -40,6 +42,7 @@ class BaseNCAAMBasketballManager:
         self.config = config
         self.ncaam_basketball_config = config.get("ncaam_basketball_scoreboard", {})
         self.is_enabled = self.ncaam_basketball_config.get("enabled", False)
+        self.show_odds = self.ncaam_basketball_config.get("show_odds", False)
         self.test_mode = self.ncaam_basketball_config.get("test_mode", False)
         self.logo_dir = self.ncaam_basketball_config.get("logo_dir", "assets/sports/ncaam_logos")
         self.update_interval = self.ncaam_basketball_config.get("update_interval_seconds", 300)
@@ -65,6 +68,22 @@ class BaseNCAAMBasketballManager:
         
         self.logger.info(f"Initialized NCAAMBasketball manager with display dimensions: {self.display_width}x{self.display_height}")
         self.logger.info(f"Logo directory: {self.logo_dir}")
+
+    def _fetch_odds(self, game: Dict) -> None:
+        """Fetch odds for a game and attach it to the game dictionary."""
+        if not self.show_odds:
+            return
+        
+        try:
+            odds_data = self.odds_manager.get_odds(
+                sport="basketball",
+                league="mens-college-basketball",
+                event_id=game["id"]
+            )
+            if odds_data:
+                game['odds'] = odds_data
+        except Exception as e:
+            self.logger.error(f"Error fetching odds for game {game.get('id', 'N/A')}: {e}")
 
     def _get_timezone(self):
         try:
@@ -436,7 +455,8 @@ class BaseNCAAMBasketballManager:
                 "away_score": away_team.get("score", "0"),
                 "away_logo_path": os.path.join(self.logo_dir, f"{away_team['team']['abbreviation']}.png"),
                 "game_time": game_time,
-                "game_date": game_date
+                "game_date": game_date,
+                "id": game_event.get("id")
             }
 
             # Log game details for debugging
@@ -568,6 +588,25 @@ class BaseNCAAMBasketballManager:
                     clock_y = period_y + 10  # Position below period
                     self._draw_text_with_outline(draw, clock, (clock_x, clock_y), self.fonts['time'])
 
+            # Display odds if available
+            if 'odds' in game:
+                odds = game['odds']
+                spread = odds.get('spread', {}).get('point', None)
+                if spread is not None:
+                    # Format spread text
+                    spread_text = f"{spread:+.1f}" if spread > 0 else f"{spread:.1f}"
+                    
+                    # Choose color and position based on which team has the spread
+                    if odds.get('spread', {}).get('team') == game['home_abbr']:
+                        text_color = (255, 100, 100) # Reddish
+                        spread_x = self.display_width - draw.textlength(spread_text, font=self.fonts['status']) - 2
+                    else:
+                        text_color = (100, 255, 100) # Greenish
+                        spread_x = 2
+                    
+                    spread_y = self.display_height - 8
+                    self._draw_text_with_outline(draw, spread_text, (spread_x, spread_y), self.fonts['status'], fill=text_color)
+
             # Display the image
             self.display_manager.image.paste(main_img, (0, 0))
             self.display_manager.update_display()
@@ -677,6 +716,7 @@ class NCAAMBasketballLiveManager(BaseNCAAMBasketballManager):
                                 details["home_abbr"] in self.favorite_teams or
                                 details["away_abbr"] in self.favorite_teams
                             ):
+                                self._fetch_odds(details)
                                 new_live_games.append(details)
                                 if self.favorite_teams and (
                                     details["home_abbr"] in self.favorite_teams or
@@ -810,6 +850,7 @@ class NCAAMBasketballRecentManager(BaseNCAAMBasketballManager):
                 game = self._extract_game_details(event)
                 # Filter for recent games: must be final and within the time window
                 if game and game['is_final'] and game['is_within_window']:
+                    self._fetch_odds(game)
                     new_recent_games.append(game)
 
             # Filter for favorite teams
@@ -940,6 +981,7 @@ class NCAAMBasketballUpcomingManager(BaseNCAAMBasketballManager):
             for event in events:
                 game = self._extract_game_details(event)
                 if game and game['is_upcoming']:
+                    self._fetch_odds(game)
                     new_upcoming_games.append(game)
                     self.logger.debug(f"Processing upcoming game: {game['away_abbr']} vs {game['home_abbr']}")
 

@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 class ConfigManager:
     def __init__(self, config_path: str = None, secrets_path: str = None):
@@ -92,6 +92,18 @@ class ConfigManager:
         except Exception as e:
             print(f"An unexpected error occurred while saving configuration: {str(e)}")
             raise
+
+    def get_secret(self, key: str) -> Optional[Any]:
+        """Get a secret value by key."""
+        try:
+            if not os.path.exists(self.secrets_path):
+                return None
+            with open(self.secrets_path, 'r') as f:
+                secrets = json.load(f)
+                return secrets.get(key)
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"Error reading secrets file: {e}")
+            return None
 
     def _deep_merge(self, target: Dict, source: Dict) -> None:
         """Deep merge source dict into target dict."""

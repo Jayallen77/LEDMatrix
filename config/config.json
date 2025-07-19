@@ -116,6 +116,7 @@
     },
     "nhl_scoreboard": {
         "enabled": false,
+        "show_odds": false,
         "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 30,
@@ -132,6 +133,7 @@
     },
     "nba_scoreboard": {
         "enabled": false,
+        "show_odds": false,
         "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 30,
@@ -148,6 +150,7 @@
     },
     "nfl_scoreboard": {
         "enabled": false,
+        "show_odds": false,
         "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 30,
@@ -163,6 +166,7 @@
     },
     "ncaa_fb_scoreboard": {
         "enabled": false,
+        "show_odds": false,
         "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 30,
@@ -178,6 +182,7 @@
     },
     "ncaam_basketball_scoreboard": {
         "enabled": false,
+        "show_odds": false,
         "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 30,
@@ -192,6 +197,7 @@
     },
     "ncaa_baseball_scoreboard": {
         "enabled": false,
+        "show_odds": false,
         "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 30,
@@ -212,6 +218,7 @@
     },
     "mlb": {
         "enabled":  true,
+        "show_odds": false,
         "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 30,
@@ -228,6 +235,7 @@
     },
     "milb": {
         "enabled":  true,
+        "show_odds": false,
         "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 30,

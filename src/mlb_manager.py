@@ -11,6 +11,7 @@ from .cache_manager import CacheManager
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import pytz
+from src.odds_manager import OddsManager
 
 # Get logger
 logger = logging.getLogger(__name__)
@@ -21,8 +22,10 @@ class BaseMLBManager:
         self.config = config
         self.display_manager = display_manager
         self.mlb_config = config.get('mlb', {})
+        self.show_odds = self.mlb_config.get("show_odds", False)
         self.favorite_teams = self.mlb_config.get('favorite_teams', [])
         self.cache_manager = CacheManager()
+        self.odds_manager = OddsManager(self.cache_manager, self.config)
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)  # Set logger level to INFO
         
@@ -49,6 +52,22 @@ class BaseMLBManager:
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
+
+    def _fetch_odds(self, game: Dict) -> None:
+        """Fetch odds for a game and attach it to the game dictionary."""
+        if not self.show_odds:
+            return
+        
+        try:
+            odds_data = self.odds_manager.get_odds(
+                sport="baseball",
+                league="mlb",
+                event_id=game["id"]
+            )
+            if odds_data:
+                game['odds'] = odds_data
+        except Exception as e:
+            self.logger.error(f"Error fetching odds for game {game.get('id', 'N/A')}: {e}")
 
     def _get_team_logo(self, team_abbr: str) -> Optional[Image.Image]:
         """Get team logo from the configured directory."""
@@ -241,6 +260,40 @@ class BaseMLBManager:
             # draw.text((score_x, score_y), score_text, font=score_font, fill=(255, 255, 255))
             self._draw_text_with_outline(draw, score_text, (score_x, score_y), score_font)
         
+        # Draw betting odds if available and enabled
+        if self.show_odds and 'odds' in game_data:
+            odds_details = game_data['odds'].get('details', 'N/A')
+            home_team_odds = game_data['odds'].get('home_team_odds', {})
+            away_team_odds = game_data['odds'].get('away_team_odds', {})
+
+            # Extract spread and format it
+            home_spread = home_team_odds.get('point_spread', 'N/A')
+            away_spread = away_team_odds.get('point_spread', 'N/A')
+
+            # Add a plus sign to positive spreads
+            if isinstance(home_spread, (int, float)) and home_spread > 0:
+                home_spread = f"+{home_spread}"
+            
+            if isinstance(away_spread, (int, float)) and away_spread > 0:
+                away_spread = f"+{away_spread}"
+
+            # Define colors for odds text
+            odds_font = self.display_manager.status_font
+            odds_color = (255, 0, 0)  # Red text
+            outline_color = (0, 0, 0)   # Black outline
+
+            # Draw away team odds
+            if away_spread != 'N/A':
+                away_odds_x = 5  # Adjust as needed
+                away_odds_y = height - 10  # Adjust as needed
+                self._draw_text_with_outline(draw, str(away_spread), (away_odds_x, away_odds_y), odds_font, odds_color, outline_color)
+
+            # Draw home team odds
+            if home_spread != 'N/A':
+                home_odds_x = width - 30  # Adjust as needed
+                home_odds_y = height - 10  # Adjust as needed
+                self._draw_text_with_outline(draw, str(home_spread), (home_odds_x, home_odds_y), odds_font, odds_color, outline_color)
+
         return image
 
     def _format_game_time(self, game_time: str) -> str:
@@ -568,6 +621,7 @@ class MLBLiveManager(BaseMLBManager):
                                 game['home_team'] in self.favorite_teams or 
                                 game['away_team'] in self.favorite_teams
                             ):
+                                self._fetch_odds(game)
                                 # Ensure scores are valid numbers
                                 try:
                                     game['home_score'] = int(game['home_score'])
@@ -942,6 +996,7 @@ class MLBRecentManager(BaseMLBManager):
                 
                 # Only add favorite team games that are final and within time window
                 if is_favorite_game and is_final and is_within_time:
+                    self._fetch_odds(game)
                     new_recent_games.append(game)
                     logger.info(f"[MLB] Added favorite team game to recent list: {game['away_team']} @ {game['home_team']}")
             
@@ -1056,6 +1111,7 @@ class MLBUpcomingManager(BaseMLBManager):
                     logger.info(f"Status state not final: {game['status_state'] not in ['post', 'final', 'completed']}")
                     
                     if is_upcoming:
+                        self._fetch_odds(game)
                         new_upcoming_games.append(game)
                         logger.info(f"Added favorite team game to upcoming list: {game['away_team']} @ {game['home_team']}")
                 

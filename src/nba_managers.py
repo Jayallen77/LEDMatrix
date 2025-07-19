@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from src.display_manager import DisplayManager
 from src.cache_manager import CacheManager
 from src.config_manager import ConfigManager
+from src.odds_manager import OddsManager
 import pytz
 
 # Constants
@@ -32,6 +33,7 @@ class BaseNBAManager:
     _shared_data = None
     _last_shared_update = 0
     cache_manager = CacheManager()  # Make cache_manager a class attribute
+    odds_manager = OddsManager(cache_manager)
     logger = logging.getLogger('NBA')  # Make logger a class attribute
     
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
@@ -40,6 +42,7 @@ class BaseNBAManager:
         self.config = config
         self.nba_config = config.get("nba_scoreboard", {})
         self.is_enabled = self.nba_config.get("enabled", False)
+        self.show_odds = self.nba_config.get("show_odds", False)
         self.test_mode = self.nba_config.get("test_mode", False)
         self.logo_dir = self.nba_config.get("logo_dir", "assets/sports/nba_logos")
         self.update_interval = self.nba_config.get("update_interval_seconds", 300)

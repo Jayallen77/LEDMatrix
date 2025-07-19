@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from src.display_manager import DisplayManager
 from src.cache_manager import CacheManager
 from src.config_manager import ConfigManager
+from src.odds_manager import OddsManager
 import pytz
 
 # Constants
@@ -95,6 +96,7 @@ class BaseSoccerManager:
     _shared_data = {}  # Dictionary to hold shared data per league/date
     _last_shared_update = {} # Dictionary for update times per league/date
     cache_manager = CacheManager()
+    odds_manager = OddsManager(cache_manager, ConfigManager())
     logger = logging.getLogger('Soccer') # Use 'Soccer' logger
     
     # Class attribute to store soccer_config for shared access
@@ -109,6 +111,7 @@ class BaseSoccerManager:
         BaseSoccerManager._soccer_config_shared = self.soccer_config # Store for class methods
         
         self.is_enabled = self.soccer_config.get("enabled", False)
+        self.show_odds = self.soccer_config.get("show_odds", False)
         self.test_mode = self.soccer_config.get("test_mode", False)
         self.logo_dir = self.soccer_config.get("logo_dir", "assets/sports/soccer_logos") # Soccer logos
         self.update_interval = self.soccer_config.get("update_interval_seconds", 60) # General fallback
@@ -146,6 +149,22 @@ class BaseSoccerManager:
         self.logger.info(f"Team map update interval: {self.team_map_update_days} days")
 
         self.config_manager = ConfigManager(config)
+
+    def _fetch_odds(self, game: Dict) -> None:
+        """Fetch odds for a game and attach it to the game dictionary."""
+        if not self.show_odds:
+            return
+        
+        try:
+            odds_data = self.odds_manager.get_odds(
+                sport="soccer",
+                league=game["league_slug"],
+                event_id=game["id"]
+            )
+            if odds_data:
+                game['odds'] = odds_data
+        except Exception as e:
+            self.logger.error(f"Error fetching odds for game {game.get('id', 'N/A')}: {e}")
 
     # --- Team League Map Management ---
     @classmethod
@@ -576,7 +595,8 @@ class BaseSoccerManager:
                 "away_logo": self._load_and_resize_logo(away_team["team"]["abbreviation"]),
                 "game_time": game_time, # Formatted local time (e.g., 2:30pm)
                 "game_date": game_date, # Formatted local date (e.g., 7/21)
-                "league": league_name
+                "league": league_name,
+                "league_slug": league_slug
             }
 
             self.logger.debug(f"[Soccer] Extracted game: {details['away_abbr']} {details['away_score']} @ {details['home_abbr']} {details['home_score']} ({details['game_clock_display']}) - League: {details['league']} - Final: {details['is_final']}, Upcoming: {details['is_upcoming']}, Live: {details['is_live']}, Within Window: {details['is_within_window']}")
@@ -693,6 +713,25 @@ class BaseSoccerManager:
                 status_y_top = 1 # Original Y position for live/final status
                 self._draw_text_with_outline(draw, status_text, (status_x, status_y_top), status_font_top)
 
+            # Display odds if available
+            if 'odds' in game:
+                odds = game['odds']
+                spread = odds.get('spread', {}).get('point', None)
+                if spread is not None:
+                    # Format spread text
+                    spread_text = f"{spread:+.1f}" if spread > 0 else f"{spread:.1f}"
+                    
+                    # Choose color and position based on which team has the spread
+                    if odds.get('spread', {}).get('team') == game['home_abbr']:
+                        text_color = (255, 100, 100) # Reddish
+                        spread_x = self.display_width - draw.textlength(spread_text, font=self.fonts['status']) - 2
+                    else:
+                        text_color = (100, 255, 100) # Greenish
+                        spread_x = 2
+                    
+                    spread_y = self.display_height - 8
+                    self._draw_text_with_outline(draw, spread_text, (spread_x, spread_y), self.fonts['status'], fill=text_color)
+
             # --- Display Image ---
             self.display_manager.image.paste(main_img, (0, 0))
             self.display_manager.update_display()
@@ -786,6 +825,7 @@ class SoccerLiveManager(BaseSoccerManager):
                                 details["home_abbr"] in self.favorite_teams or
                                 details["away_abbr"] in self.favorite_teams
                             ):
+                                self._fetch_odds(details)
                                 new_live_games.append(details)
 
                     # Logging
@@ -914,6 +954,7 @@ class SoccerRecentManager(BaseSoccerManager):
                 if game and game['is_final'] and game['start_time_utc'] and game['start_time_utc'] >= cutoff_time:
                      # Check favorite teams if list is provided
                      if not self.favorite_teams or (game['home_abbr'] in self.favorite_teams or game['away_abbr'] in self.favorite_teams):
+                        self._fetch_odds(game)
                         new_recent_games.append(game)
 
             # Sort games by start time, most recent first
@@ -1016,6 +1057,7 @@ class SoccerUpcomingManager(BaseSoccerManager):
                    game['start_time_utc'] >= now_utc and game['start_time_utc'] <= cutoff_time:
                     # Check favorite teams if list is provided
                      if not self.favorite_teams or (game['home_abbr'] in self.favorite_teams or game['away_abbr'] in self.favorite_teams):
+                        self._fetch_odds(game)
                         new_upcoming_games.append(game)
 
             # Sort games by start time, soonest first

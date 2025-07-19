@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from src.display_manager import DisplayManager
 from src.cache_manager import CacheManager
 from src.config_manager import ConfigManager
+from src.odds_manager import OddsManager
 import pytz
 
 # Constants
@@ -83,6 +84,7 @@ class BaseNFLManager: # Renamed class
     _shared_data = None
     _last_shared_update = 0
     cache_manager = CacheManager()
+    odds_manager = OddsManager(cache_manager)
     logger = logging.getLogger('NFL') # Changed logger name
 
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
@@ -91,6 +93,7 @@ class BaseNFLManager: # Renamed class
         self.config = config
         self.nfl_config = config.get("nfl_scoreboard", {}) # Changed config key
         self.is_enabled = self.nfl_config.get("enabled", False)
+        self.show_odds = self.nfl_config.get("show_odds", False)
         self.test_mode = self.nfl_config.get("test_mode", False)
         self.logo_dir = self.nfl_config.get("logo_dir", "assets/sports/nfl_logos") # Changed logo dir
         self.update_interval = self.nfl_config.get("update_interval_seconds", 60)
@@ -121,6 +124,44 @@ class BaseNFLManager: # Renamed class
         except pytz.UnknownTimeZoneError:
             return pytz.utc
 
+    def _fetch_odds(self, game: Dict) -> None:
+        """Fetch odds for a specific game if conditions are met."""
+        self.logger.debug(f"Checking odds for game: {game.get('id', 'N/A')}")
+        
+        # Ensure the API key is set in the secrets config
+        if not self.config_manager.get_secret("the_odds_api_key"):
+            if self._should_log('no_api_key', cooldown=3600):  # Log once per hour
+                self.logger.warning("Odds API key not found. Skipping odds fetch.")
+            return
+            
+        # Check if odds should be shown for this sport
+        if not self.show_odds:
+            self.logger.debug("Odds display is disabled for NFL.")
+            return
+
+        # Fetch odds using OddsManager
+        try:
+            # Determine update interval based on game state
+            is_live = game.get('status', '').lower() == 'in'
+            update_interval = self.nfl_config.get("live_odds_update_interval", 60) if is_live \
+                else self.nfl_config.get("odds_update_interval", 3600)
+
+            odds_data = self.odds_manager.get_odds(
+                sport="football",
+                league="nfl",
+                event_id=game['id'],
+                update_interval_seconds=update_interval
+            )
+            
+            if odds_data:
+                game['odds'] = odds_data
+                self.logger.debug(f"Successfully fetched and attached odds for game {game['id']}")
+            else:
+                self.logger.debug(f"No odds data returned for game {game['id']}")
+
+        except Exception as e:
+            self.logger.error(f"Error fetching odds for game {game.get('id', 'N/A')}: {e}")
+            
     @classmethod
     def _fetch_shared_data(cls, past_days: int, future_days: int, date_str: str = None) -> Optional[Dict]:
         """Fetch and cache data for all managers to share."""

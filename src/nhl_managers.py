@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from src.display_manager import DisplayManager
 from src.cache_manager import CacheManager
 from src.config_manager import ConfigManager
+from src.odds_manager import OddsManager
 import pytz
 
 # Constants
@@ -81,6 +82,7 @@ class BaseNHLManager:
     _shared_data = None
     _last_shared_update = 0
     cache_manager = CacheManager()  # Make cache_manager a class attribute
+    odds_manager = OddsManager(cache_manager, ConfigManager())
     logger = logging.getLogger('NHL')  # Make logger a class attribute
     
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
@@ -89,6 +91,7 @@ class BaseNHLManager:
         self.config = config
         self.nhl_config = config.get("nhl_scoreboard", {})
         self.is_enabled = self.nhl_config.get("enabled", False)
+        self.show_odds = self.nhl_config.get("show_odds", False)
         self.test_mode = self.nhl_config.get("test_mode", False)  # Use test_mode from config
         self.logo_dir = self.nhl_config.get("logo_dir", "assets/sports/nhl_logos")
         self.update_interval = self.nhl_config.get("update_interval_seconds", 60)
@@ -114,6 +117,22 @@ class BaseNHLManager:
         
         self.logger.info(f"Initialized NHL manager with display dimensions: {self.display_width}x{self.display_height}")
         self.logger.info(f"Logo directory: {self.logo_dir}")
+
+    def _fetch_odds(self, game: Dict) -> None:
+        """Fetch odds for a game and attach it to the game dictionary."""
+        if not self.show_odds:
+            return
+        
+        try:
+            odds_data = self.odds_manager.get_odds(
+                sport="hockey",
+                league="nhl",
+                event_id=game["id"]
+            )
+            if odds_data:
+                game['odds'] = odds_data
+        except Exception as e:
+            self.logger.error(f"Error fetching odds for game {game.get('id', 'N/A')}: {e}")
 
     def _get_timezone(self):
         try:
@@ -387,7 +406,8 @@ class BaseNHLManager:
                 "away_score": away_team.get("score", "0"),
                 "away_logo_path": os.path.join(self.logo_dir, f"{away_team['team']['abbreviation']}.png"),
                 "game_time": game_time,
-                "game_date": game_date
+                "game_date": game_date,
+                "id": game_event.get("id")
             }
 
             # Log game details for debugging
@@ -513,6 +533,25 @@ class BaseNHLManager:
                 status_y = 5
                 self._draw_text_with_outline(draw, status_text, (status_x, status_y), self.fonts['time'])
 
+            # Display odds if available
+            if 'odds' in game:
+                odds = game['odds']
+                spread = odds.get('spread', {}).get('point', None)
+                if spread is not None:
+                    # Format spread text
+                    spread_text = f"{spread:+.1f}" if spread > 0 else f"{spread:.1f}"
+                    
+                    # Choose color and position based on which team has the spread
+                    if odds.get('spread', {}).get('team') == game['home_abbr']:
+                        text_color = (255, 100, 100) # Reddish
+                        spread_x = self.display_width - draw.textlength(spread_text, font=self.fonts['status']) - 2
+                    else:
+                        text_color = (100, 255, 100) # Greenish
+                        spread_x = 2
+                    
+                    spread_y = self.display_height - 8
+                    self._draw_text_with_outline(draw, spread_text, (spread_x, spread_y), self.fonts['status'], fill=text_color)
+
             # Display the image
             self.display_manager.image.paste(main_img, (0, 0))
             self.display_manager.update_display()
@@ -608,6 +647,7 @@ class NHLLiveManager(BaseNHLManager):
                                 details["home_abbr"] in self.favorite_teams or 
                                 details["away_abbr"] in self.favorite_teams
                             ):
+                                self._fetch_odds(details)
                                 new_live_games.append(details)
                     
                     # Only log if there's a change in games or enough time has passed
@@ -707,6 +747,9 @@ class NHLRecentManager(BaseNHLManager):
             for event in events:
                 game = self._extract_game_details(event)
                 if game:
+                    # Fetch odds if enabled
+                    if self.show_odds:
+                        self._fetch_odds(game)
                     self.recent_games.append(game)
                     self.logger.debug(f"Processing game: {game['away_abbr']} vs {game['home_abbr']} - Final: {game['is_final']}, Within window: {game['is_within_window']}")
             
@@ -796,6 +839,9 @@ class NHLUpcomingManager(BaseNHLManager):
                     self.logger.debug(f"[NHL] Game time: {game['start_time_utc']}")
                     
                     if not game['is_final'] and game['is_within_window']:
+                        # Fetch odds if enabled
+                        if self.show_odds:
+                            self._fetch_odds(game)
                         new_upcoming_games.append(game)
                         self.logger.debug(f"[NHL] Added to upcoming games: {game['away_abbr']} vs {game['home_abbr']}")
             

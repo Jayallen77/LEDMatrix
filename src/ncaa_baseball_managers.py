@@ -10,6 +10,7 @@ import numpy as np
 from .cache_manager import CacheManager
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+from src.odds_manager import OddsManager
 import pytz
 
 # Get logger
@@ -24,8 +25,10 @@ class BaseNCAABaseballManager:
         self.config = config
         self.display_manager = display_manager
         self.ncaa_baseball_config = config.get('ncaa_baseball_scoreboard', {})
+        self.show_odds = self.ncaa_baseball_config.get('show_odds', False)
         self.favorite_teams = self.ncaa_baseball_config.get('favorite_teams', [])
         self.cache_manager = CacheManager()
+        self.odds_manager = OddsManager(self.cache_manager, self.config)
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)  # Set logger level to DEBUG
         
@@ -52,6 +55,22 @@ class BaseNCAABaseballManager:
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
+
+    def _fetch_odds(self, game: Dict) -> None:
+        """Fetch odds for a game and attach it to the game dictionary."""
+        if not self.show_odds:
+            return
+        
+        try:
+            odds_data = self.odds_manager.get_odds(
+                sport="baseball",
+                league="college-baseball",
+                event_id=game["id"]
+            )
+            if odds_data:
+                game['odds'] = odds_data
+        except Exception as e:
+            self.logger.error(f"Error fetching odds for game {game.get('id', 'N/A')}: {e}")
 
     def _get_team_logo(self, team_abbr: str) -> Optional[Image.Image]:
         """Get team logo from the configured directory or generate a fallback."""
@@ -256,6 +275,40 @@ class BaseNCAABaseballManager:
             score_x = (width - score_width) // 2
             score_y = height - score_font.getmetrics()[0] - 2 # Adjusted for font metrics
             self._draw_text_with_outline(draw, score_text, (score_x, score_y), score_font)
+
+        # Draw betting odds if available and enabled
+        if self.show_odds and 'odds' in game_data:
+            odds_details = game_data['odds'].get('details', 'N/A')
+            home_team_odds = game_data['odds'].get('home_team_odds', {})
+            away_team_odds = game_data['odds'].get('away_team_odds', {})
+
+            # Extract spread and format it
+            home_spread = home_team_odds.get('point_spread', 'N/A')
+            away_spread = away_team_odds.get('point_spread', 'N/A')
+
+            # Add a plus sign to positive spreads
+            if isinstance(home_spread, (int, float)) and home_spread > 0:
+                home_spread = f"+{home_spread}"
+            
+            if isinstance(away_spread, (int, float)) and away_spread > 0:
+                away_spread = f"+{away_spread}"
+
+            # Define colors for odds text
+            odds_font = self.display_manager.status_font
+            odds_color = (255, 0, 0)  # Red text
+            outline_color = (0, 0, 0)   # Black outline
+
+            # Draw away team odds
+            if away_spread != 'N/A':
+                away_odds_x = 5
+                away_odds_y = height - 10
+                self._draw_text_with_outline(draw, str(away_spread), (away_odds_x, away_odds_y), odds_font, odds_color, outline_color)
+
+            # Draw home team odds
+            if home_spread != 'N/A':
+                home_odds_x = width - 30
+                home_odds_y = height - 10
+                self._draw_text_with_outline(draw, str(home_spread), (home_odds_x, home_odds_y), odds_font, odds_color, outline_color)
         
         return image
 
@@ -498,6 +551,7 @@ class NCAABaseballLiveManager(BaseNCAABaseballManager):
                                 try:
                                     game['home_score'] = int(game['home_score'])
                                     game['away_score'] = int(game['away_score'])
+                                    self._fetch_odds(game)
                                     new_live_games.append(game)
                                 except (ValueError, TypeError):
                                     self.logger.warning(f"[NCAABaseball] Invalid score format for game {game['away_team']} @ {game['home_team']}")
@@ -777,6 +831,7 @@ class NCAABaseballRecentManager(BaseNCAABaseballManager):
                 logger.info(f"[NCAABaseball] Is within time window: {is_within_time}")
                 
                 if is_final and is_within_time:
+                    self._fetch_odds(game)
                     new_recent_games.append(game)
                     logger.info(f"[NCAABaseball] Added favorite team game to recent list: {game['away_team']} @ {game['home_team']}")
             
@@ -869,6 +924,7 @@ class NCAABaseballUpcomingManager(BaseNCAABaseballManager):
                     logger.info(f"[NCAABaseball] Is upcoming state: {is_upcoming_state}")
                     
                     if is_within_time and is_upcoming_state:
+                        self._fetch_odds(game)
                         new_upcoming_games.append(game)
                         logger.info(f"[NCAABaseball] Added favorite team game to upcoming list: {game['away_team']} @ {game['home_team']}")
                 

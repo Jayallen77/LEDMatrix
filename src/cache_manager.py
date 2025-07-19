@@ -122,8 +122,10 @@ class CacheManager:
             self._memory_cache[key] = data
             self._memory_cache_timestamps[key] = time.time()
             
-        except Exception:
-            pass  # Silently fail if cache save fails
+        except (IOError, OSError) as e:
+            self.logger.error(f"Failed to save cache for key '{key}': {e}")
+        except Exception as e:
+            self.logger.error(f"An unexpected error occurred while saving cache for key '{key}': {e}")
 
     def load_cache(self, key: str) -> Optional[Dict[str, Any]]:
         """Load data from cache with memory caching."""
