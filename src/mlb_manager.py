@@ -349,6 +349,7 @@ class BaseMLBManager:
                 self.logger.info("Using test mode data for MLB")
                 return {
                     'test_game_1': {
+                        'id': 'test_game_1',
                         'away_team': 'TB',
                         'home_team': 'TEX',
                         'away_score': 3,
@@ -519,6 +520,7 @@ class BaseMLBManager:
                         bases_occupied = [False, False, False]
                     
                     all_games[game_id] = {
+                        'id': game_id,
                         'away_team': away_abbr,
                         'home_team': home_abbr,
                         'away_score': away_team['score'],
@@ -975,7 +977,9 @@ class MLBRecentManager(BaseMLBManager):
     def update(self):
         """Update recent games data."""
         current_time = time.time()
+        self.logger.info("Checking for recent MLB games...")
         if current_time - self.last_update < self.update_interval:
+            self.logger.info("Skipping recent games update, interval not reached.")
             return
             
         try:
@@ -1086,7 +1090,9 @@ class MLBUpcomingManager(BaseMLBManager):
     def update(self):
         """Update upcoming games data."""
         current_time = time.time()
+        self.logger.info("Checking for upcoming MLB games...")
         if current_time - self.last_update < self.update_interval:
+            self.logger.info("Skipping upcoming games update, interval not reached.")
             return
             
         try:
