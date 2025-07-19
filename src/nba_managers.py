@@ -33,7 +33,7 @@ class BaseNBAManager:
     _shared_data = None
     _last_shared_update = 0
     cache_manager = CacheManager()  # Make cache_manager a class attribute
-    odds_manager = OddsManager(cache_manager)
+    odds_manager = OddsManager(cache_manager, ConfigManager())
     logger = logging.getLogger('NBA')  # Make logger a class attribute
     
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):

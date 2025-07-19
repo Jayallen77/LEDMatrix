@@ -84,7 +84,7 @@ class BaseNFLManager: # Renamed class
     _shared_data = None
     _last_shared_update = 0
     cache_manager = CacheManager()
-    odds_manager = OddsManager(cache_manager)
+    odds_manager = OddsManager(cache_manager, ConfigManager())
     logger = logging.getLogger('NFL') # Changed logger name
 
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
