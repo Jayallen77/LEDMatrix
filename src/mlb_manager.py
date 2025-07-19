@@ -27,7 +27,6 @@ class BaseMLBManager:
         self.cache_manager = CacheManager()
         self.odds_manager = OddsManager(self.cache_manager, self.config)
         self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.INFO)  # Set logger level to INFO
         
         # Logo handling
         self.logo_dir = self.mlb_config.get('logo_dir', os.path.join('assets', 'sports', 'mlb_logos'))
