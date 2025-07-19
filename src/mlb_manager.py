@@ -106,6 +106,30 @@ class BaseMLBManager:
         # Draw the text in the specified color
         draw.text((x, y), text, font=font, fill=fill)
 
+    def _draw_odds_info(self, draw: ImageDraw.Draw, odds_data: Dict[str, Any], width: int, height: int) -> None:
+        """Draw odds information on the display."""
+        if not odds_data:
+            return
+
+        try:
+            # Use a smaller font for odds
+            font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
+            line_height = font.getbbox("A")[3] + 2
+            
+            # Start position for odds display (bottom left)
+            y_pos = height - (2 * line_height) - 2
+
+            # Display Over/Under
+            over_under_text = f"O/U: {odds_data.get('over_under', 'N/A')}"
+            self._draw_text_with_outline(draw, over_under_text, (2, y_pos), font)
+            
+            # Display Spread
+            spread_text = f"Spread: {odds_data.get('spread', 'N/A')}"
+            self._draw_text_with_outline(draw, spread_text, (2, y_pos + line_height), font)
+
+        except Exception as e:
+            self.logger.error(f"Error drawing odds info: {e}")
+
     def _draw_base_indicators(self, draw: ImageDraw.Draw, bases_occupied: List[bool], center_x: int, y: int) -> None:
         """Draw base indicators on the display."""
         base_size = 8  # Increased from 6 to 8 for better visibility
@@ -197,8 +221,6 @@ class BaseMLBManager:
             # Draw on the current image
             self.display_manager.draw = draw
             self.display_manager._draw_bdf_text(status_text, status_x, status_y, color=(255, 255, 255), font=self.display_manager.calendar_font)
-            # Update the display
-            self.display_manager.update_display()
             
             # Format game date and time
             game_time = datetime.fromisoformat(game_data['start_time'].replace('Z', '+00:00'))
@@ -231,6 +253,10 @@ class BaseMLBManager:
             time_y = date_y + 10
             # draw.text((time_x, time_y), game_time_str, font=time_font, fill=(255, 255, 255))
             self._draw_text_with_outline(draw, game_time_str, (time_x, time_y), time_font)
+
+            # Draw odds if available
+            if 'odds' in game_data:
+                self._draw_odds_info(draw, game_data['odds'], width, height)
         
         # For recent/final games, show scores and status
         elif game_data['status'] in ['status_final', 'final', 'completed']:
@@ -244,8 +270,6 @@ class BaseMLBManager:
             # Draw on the current image
             self.display_manager.draw = draw
             self.display_manager._draw_bdf_text(status_text, status_x, status_y, color=(255, 255, 255), font=self.display_manager.calendar_font)
-            # Update the display
-            self.display_manager.update_display()
             
             # Draw scores at the bottom using NHL-style font
             away_score = str(game_data['away_score'])
@@ -259,40 +283,40 @@ class BaseMLBManager:
             score_y = height - score_font.size - 2
             # draw.text((score_x, score_y), score_text, font=score_font, fill=(255, 255, 255))
             self._draw_text_with_outline(draw, score_text, (score_x, score_y), score_font)
-        
-        # Draw betting odds if available and enabled
-        if self.show_odds and 'odds' in game_data:
-            odds_details = game_data['odds'].get('details', 'N/A')
-            home_team_odds = game_data['odds'].get('home_team_odds', {})
-            away_team_odds = game_data['odds'].get('away_team_odds', {})
 
-            # Extract spread and format it
-            home_spread = home_team_odds.get('point_spread', 'N/A')
-            away_spread = away_team_odds.get('point_spread', 'N/A')
+            # Draw odds if available
+            if 'odds' in game_data:
+                self._draw_odds_info(draw, game_data['odds'], width, height)
 
-            # Add a plus sign to positive spreads
-            if isinstance(home_spread, (int, float)) and home_spread > 0:
-                home_spread = f"+{home_spread}"
+        # For live games, show detailed game state
+        elif game_data['status'] == 'status_in_progress' or game_data.get('live', False):
+            # Show "Live" at the top using NHL-style font
+            status_text = "Live"
+            # Set font size for BDF font
+            self.display_manager.calendar_font.set_char_size(height=7*64)  # 7 pixels high, 64 units per pixel
+            status_width = self.display_manager.get_text_width(status_text, self.display_manager.calendar_font)
+            status_x = (width - status_width) // 2
+            status_y = 2
+            # Draw on the current image
+            self.display_manager.draw = draw
+            self.display_manager._draw_bdf_text(status_text, status_x, status_y, color=(255, 255, 255), font=self.display_manager.calendar_font)
             
-            if isinstance(away_spread, (int, float)) and away_spread > 0:
-                away_spread = f"+{away_spread}"
+            # Draw scores at the bottom using NHL-style font
+            away_score = str(game_data['away_score'])
+            home_score = str(game_data['home_score'])
+            score_text = f"{away_score}-{home_score}"
+            score_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 12)
+            
+            # Calculate position for the score text
+            score_width = draw.textlength(score_text, font=score_font)
+            score_x = (width - score_width) // 2
+            score_y = height - score_font.size - 2
+            # draw.text((score_x, score_y), score_text, font=score_font, fill=(255, 255, 255))
+            self._draw_text_with_outline(draw, score_text, (score_x, score_y), score_font)
 
-            # Define colors for odds text
-            odds_font = self.display_manager.status_font
-            odds_color = (255, 0, 0)  # Red text
-            outline_color = (0, 0, 0)   # Black outline
-
-            # Draw away team odds
-            if away_spread != 'N/A':
-                away_odds_x = 5  # Adjust as needed
-                away_odds_y = height - 10  # Adjust as needed
-                self._draw_text_with_outline(draw, str(away_spread), (away_odds_x, away_odds_y), odds_font, odds_color, outline_color)
-
-            # Draw home team odds
-            if home_spread != 'N/A':
-                home_odds_x = width - 30  # Adjust as needed
-                home_odds_y = height - 10  # Adjust as needed
-                self._draw_text_with_outline(draw, str(home_spread), (home_odds_x, home_odds_y), odds_font, odds_color, outline_color)
+            # Draw odds if available
+            if 'odds' in game_data:
+                self._draw_odds_info(draw, game_data['odds'], width, height)
 
         return image
 
