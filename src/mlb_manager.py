@@ -973,13 +973,19 @@ class MLBRecentManager(BaseMLBManager):
         self.last_warning_time = 0
         self.warning_cooldown = 300  # Only show warning every 5 minutes
         logger.info(f"Initialized MLBRecentManager with {len(self.favorite_teams)} favorite teams")
+        self.last_log_time = 0
+        self.log_interval = 300 # 5 minutes
 
     def update(self):
         """Update recent games data."""
         current_time = time.time()
-        self.logger.info(f"Checking for recent MLB games. Last update was at {self.last_update}")
+        if current_time - self.last_log_time > self.log_interval:
+            self.logger.info(f"Checking for recent MLB games. Last update was at {self.last_update}")
+            self.last_log_time = current_time
+
         if self.last_update != 0 and (current_time - self.last_update < self.update_interval):
-            self.logger.info(f"Skipping recent games update, interval not reached. Next update in {self.update_interval - (current_time - self.last_update):.0f} seconds.")
+            if current_time - self.last_log_time > self.log_interval:
+                self.logger.info(f"Skipping recent games update, interval not reached. Next update in {self.update_interval - (current_time - self.last_update):.0f} seconds.")
             return
             
         try:
@@ -1086,13 +1092,19 @@ class MLBUpcomingManager(BaseMLBManager):
         self.last_game_switch = 0  # Track when we last switched games
         self.game_display_duration = 10  # Display each game for 10 seconds
         logger.info(f"Initialized MLBUpcomingManager with {len(self.favorite_teams)} favorite teams")
+        self.last_log_time = 0
+        self.log_interval = 300 # 5 minutes
 
     def update(self):
         """Update upcoming games data."""
         current_time = time.time()
-        self.logger.info(f"Checking for upcoming MLB games. Last update was at {self.last_update}")
+        if current_time - self.last_log_time > self.log_interval:
+            self.logger.info(f"Checking for upcoming MLB games. Last update was at {self.last_update}")
+            self.last_log_time = current_time
+
         if self.last_update != 0 and (current_time - self.last_update < self.update_interval):
-            self.logger.info(f"Skipping upcoming games update, interval not reached. Next update in {self.update_interval - (current_time - self.last_update):.0f} seconds.")
+            if current_time - self.last_log_time > self.log_interval:
+                self.logger.info(f"Skipping upcoming games update, interval not reached. Next update in {self.update_interval - (current_time - self.last_update):.0f} seconds.")
             return
             
         try:
