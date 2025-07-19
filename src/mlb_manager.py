@@ -977,9 +977,9 @@ class MLBRecentManager(BaseMLBManager):
     def update(self):
         """Update recent games data."""
         current_time = time.time()
-        self.logger.info("Checking for recent MLB games...")
-        if current_time - self.last_update < self.update_interval:
-            self.logger.info("Skipping recent games update, interval not reached.")
+        self.logger.info(f"Checking for recent MLB games. Last update was at {self.last_update}")
+        if self.last_update != 0 and (current_time - self.last_update < self.update_interval):
+            self.logger.info(f"Skipping recent games update, interval not reached. Next update in {self.update_interval - (current_time - self.last_update):.0f} seconds.")
             return
             
         try:
@@ -1090,9 +1090,9 @@ class MLBUpcomingManager(BaseMLBManager):
     def update(self):
         """Update upcoming games data."""
         current_time = time.time()
-        self.logger.info("Checking for upcoming MLB games...")
-        if current_time - self.last_update < self.update_interval:
-            self.logger.info("Skipping upcoming games update, interval not reached.")
+        self.logger.info(f"Checking for upcoming MLB games. Last update was at {self.last_update}")
+        if self.last_update != 0 and (current_time - self.last_update < self.update_interval):
+            self.logger.info(f"Skipping upcoming games update, interval not reached. Next update in {self.update_interval - (current_time - self.last_update):.0f} seconds.")
             return
             
         try:
