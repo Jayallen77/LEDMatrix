@@ -23,60 +23,61 @@ class CacheManager:
         # Initialize logger first
         self.logger = logging.getLogger(__name__)
         
-        # Get the actual user's home directory, even when running with sudo
-        try:
-            # Try to get the real user's home directory
-            real_user = os.environ.get('SUDO_USER') or os.environ.get('USER')
-            if real_user:
-                home_dir = f"/home/{real_user}"
-            else:
-                home_dir = os.path.expanduser('~')
-        except Exception:
-            home_dir = os.path.expanduser('~')
-            
-        # Determine the appropriate cache directory
-        if os.geteuid() == 0:  # Running as root/sudo
-            self.cache_dir = "/var/cache/ledmatrix"
+        # Determine the most reliable writable directory
+        self.cache_dir = self._get_writable_cache_dir()
+        if self.cache_dir:
+            self.logger.info(f"Using cache directory: {self.cache_dir}")
         else:
-            self.cache_dir = os.path.join(home_dir, '.ledmatrix_cache')
-            
+            # This is a critical failure, as caching is essential.
+            self.logger.error("Could not find or create a writable cache directory. Caching will be disabled.")
+            self.cache_dir = None
+
         self._memory_cache = {}  # In-memory cache for faster access
         self._memory_cache_timestamps = {}
         self._cache_lock = threading.Lock()
         
-        # Ensure cache directory exists after logger is initialized
-        self._ensure_cache_dir()
-        
-    def _ensure_cache_dir(self):
-        """Ensure the cache directory exists with proper permissions."""
+    def _get_writable_cache_dir(self) -> Optional[str]:
+        """Tries to find or create a writable cache directory in a few common locations."""
+        # Attempt 1: User's home directory (handling sudo)
         try:
-            os.makedirs(self.cache_dir, exist_ok=True)
-            # Set permissions to allow both root and the user to access
-            if os.geteuid() == 0:  # Running as root/sudo
-                os.chmod(self.cache_dir, 0o777)  # Full permissions for all users
-                # Also set ownership to the real user if we're running as root
-                real_user = os.environ.get('SUDO_USER')
-                if real_user:
-                    try:
-                        import pwd
-                        uid = pwd.getpwnam(real_user).pw_uid
-                        gid = pwd.getpwnam(real_user).pw_gid
-                        os.chown(self.cache_dir, uid, gid)
-                    except Exception as e:
-                        self.logger.warning(f"Could not set cache directory ownership: {e}")
-        except Exception as e:
-            self.logger.error(f"Failed to create cache directory: {e}")
-            # Fallback to temp directory if we can't create the cache directory
-            self.cache_dir = os.path.join(tempfile.gettempdir(), 'ledmatrix_cache')
-            try:
-                os.makedirs(self.cache_dir, exist_ok=True)
-                self.logger.info(f"Using fallback cache directory: {self.cache_dir}")
-            except Exception as e:
-                self.logger.error(f"Failed to create fallback cache directory: {e}")
-                raise  # Re-raise if we can't create any cache directory
+            real_user = os.environ.get('SUDO_USER') or os.environ.get('USER', 'default')
+            if real_user and real_user != 'root':
+                 home_dir = os.path.expanduser(f"~{real_user}")
+            else:
+                home_dir = os.path.expanduser('~')
             
-    def _get_cache_path(self, key: str) -> str:
+            user_cache_dir = os.path.join(home_dir, '.ledmatrix_cache')
+            os.makedirs(user_cache_dir, exist_ok=True)
+            
+            # Test writability
+            test_file = os.path.join(user_cache_dir, '.writetest')
+            with open(test_file, 'w') as f:
+                f.write('test')
+            os.remove(test_file)
+            return user_cache_dir
+        except Exception as e:
+            self.logger.warning(f"Could not use user-specific cache directory: {e}")
+
+        # Attempt 2: System-wide temporary directory
+        try:
+            system_cache_dir = os.path.join(tempfile.gettempdir(), 'ledmatrix_cache')
+            os.makedirs(system_cache_dir, exist_ok=True)
+            if os.access(system_cache_dir, os.W_OK):
+                return system_cache_dir
+        except Exception as e:
+            self.logger.warning(f"Could not use system-wide temporary cache directory: {e}")
+
+        # Return None if no directory is writable
+        return None
+
+    def _ensure_cache_dir(self):
+        """This method is deprecated and no longer needed."""
+        pass
+            
+    def _get_cache_path(self, key: str) -> Optional[str]:
         """Get the path for a cache file."""
+        if not self.cache_dir:
+            return None
         return os.path.join(self.cache_dir, f"{key}.json")
         
     def get_cached_data(self, key: str, max_age: int = 300) -> Optional[Dict]:
@@ -112,15 +113,16 @@ class CacheManager:
             data: Data to cache
         """
         try:
-            # Save to file
-            cache_path = self._get_cache_path(key)
-            with self._cache_lock:
-                with open(cache_path, 'w') as f:
-                    json.dump(data, f, indent=4, cls=DateTimeEncoder)
-                
-            # Update memory cache
+            # Update memory cache first
             self._memory_cache[key] = data
             self._memory_cache_timestamps[key] = time.time()
+
+            # Save to file if a cache directory is available
+            cache_path = self._get_cache_path(key)
+            if cache_path:
+                with self._cache_lock:
+                    with open(cache_path, 'w') as f:
+                        json.dump(data, f, indent=4, cls=DateTimeEncoder)
             
         except (IOError, OSError) as e:
             self.logger.error(f"Failed to save cache for key '{key}': {e}")
@@ -143,7 +145,7 @@ class CacheManager:
                     del self._memory_cache_timestamps[key]
 
         cache_path = self._get_cache_path(key)
-        if not os.path.exists(cache_path):
+        if not cache_path or not os.path.exists(cache_path):
             return None
 
         try:
@@ -173,15 +175,16 @@ class CacheManager:
                     del self._memory_cache[key]
                     del self._memory_cache_timestamps[key]
                 cache_path = self._get_cache_path(key)
-                if os.path.exists(cache_path):
+                if cache_path and os.path.exists(cache_path):
                     os.remove(cache_path)
             else:
                 # Clear all keys
                 self._memory_cache.clear()
                 self._memory_cache_timestamps.clear()
-                for file in os.listdir(self.cache_dir):
-                    if file.endswith('.json'):
-                        os.remove(os.path.join(self.cache_dir, file))
+                if self.cache_dir:
+                    for file in os.listdir(self.cache_dir):
+                        if file.endswith('.json'):
+                            os.remove(os.path.join(self.cache_dir, file))
 
     def has_data_changed(self, data_type: str, new_data: Dict[str, Any]) -> bool:
         """Check if data has changed from cached version."""
