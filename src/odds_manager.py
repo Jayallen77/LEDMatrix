@@ -52,6 +52,7 @@ class OddsManager:
             # Find the desired bookmaker, e.g., 'fanduel'
             provider = next((p for p in item.get('providers', []) if p.get('name', '').lower() == 'fanduel'), item['providers'][0] if item.get('providers') else {})
             self.logger.debug(f"Found provider for odds: {provider.get('name', 'N/A')}")
+            self.logger.debug(f"Provider details: {json.dumps(provider, indent=2)}")
             
             extracted_data = {
                 "details": provider.get("details"),

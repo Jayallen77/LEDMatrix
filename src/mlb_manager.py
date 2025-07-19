@@ -113,18 +113,27 @@ class BaseMLBManager:
         try:
             # Use a smaller font for odds
             font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
-            line_height = font.getbbox("A")[3] + 2
-            
-            # Start position for odds display (bottom left)
-            y_pos = height - (2 * line_height) - 2
+            odds_color = (255, 0, 0)  # Red text
+            outline_color = (0, 0, 0)   # Black outline
 
-            # Display Over/Under
-            over_under_text = f"O/U: {odds_data.get('over_under', 'N/A')}"
-            self._draw_text_with_outline(draw, over_under_text, (2, y_pos), font)
-            
-            # Display Spread
-            spread_text = f"Spread: {odds_data.get('spread', 'N/A')}"
-            self._draw_text_with_outline(draw, spread_text, (2, y_pos + line_height), font)
+            home_team_odds = odds_data.get('home_team_odds', {})
+            away_team_odds = odds_data.get('away_team_odds', {})
+
+            if home_team_odds and home_team_odds.get('spread_odds'):
+                home_spread = home_team_odds['spread_odds']
+                if isinstance(home_spread, (int, float)) and home_spread > 0:
+                    home_spread = f"+{home_spread}"
+                home_odds_x = width - 30  # Adjust as needed
+                home_odds_y = height - 10  # Adjust as needed
+                self._draw_text_with_outline(draw, str(home_spread), (home_odds_x, home_odds_y), font, odds_color, outline_color)
+
+            if away_team_odds and away_team_odds.get('spread_odds'):
+                away_spread = away_team_odds['spread_odds']
+                if isinstance(away_spread, (int, float)) and away_spread > 0:
+                    away_spread = f"+{away_spread}"
+                away_odds_x = 5  # Adjust as needed
+                away_odds_y = height - 10  # Adjust as needed
+                self._draw_text_with_outline(draw, str(away_spread), (away_odds_x, away_odds_y), font, odds_color, outline_color)
 
         except Exception as e:
             self.logger.error(f"Error drawing odds info: {e}")
