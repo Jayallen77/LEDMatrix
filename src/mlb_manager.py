@@ -108,6 +108,7 @@ class BaseMLBManager:
 
     def _draw_odds_info(self, draw: ImageDraw.Draw, odds_data: Dict[str, Any], width: int, height: int) -> None:
         """Draw odds information on the display."""
+        self.logger.info(f"Attempting to draw odds with data: {json.dumps(odds_data, indent=2)}")
         if not odds_data:
             return
 
@@ -265,6 +266,7 @@ class BaseMLBManager:
 
             # Draw odds if available
             if 'odds' in game_data:
+                self.logger.info(f"Found odds data for game {game_data.get('id')}, attempting to draw.")
                 self._draw_odds_info(draw, game_data['odds'], width, height)
         
         # For recent/final games, show scores and status
@@ -295,6 +297,7 @@ class BaseMLBManager:
 
             # Draw odds if available
             if 'odds' in game_data:
+                self.logger.info(f"Found odds data for game {game_data.get('id')}, attempting to draw.")
                 self._draw_odds_info(draw, game_data['odds'], width, height)
 
         # For live games, show detailed game state
@@ -325,6 +328,7 @@ class BaseMLBManager:
 
             # Draw odds if available
             if 'odds' in game_data:
+                self.logger.info(f"Found odds data for game {game_data.get('id')}, attempting to draw.")
                 self._draw_odds_info(draw, game_data['odds'], width, height)
 
         return image
