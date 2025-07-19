@@ -911,6 +911,7 @@ class MLBLiveManager(BaseMLBManager):
         score_font = self.display_manager.font # Use PressStart2P
         outline_color = (0, 0, 0)
         score_text_color = (255, 255, 255) # Use a specific name for score text color
+        odds_color = (255, 0, 0) # Red for odds
 
         # Helper function for outlined text
         def draw_bottom_outlined_text(x, y, text):
@@ -931,6 +932,26 @@ class MLBLiveManager(BaseMLBManager):
         away_text = f"{away_abbr}:{away_score_str}"
         home_text = f"{home_abbr}:{home_score_str}"
         
+        # Get odds if available
+        home_spread_text = ""
+        away_spread_text = ""
+        if 'odds' in game_data and game_data['odds']:
+            self.logger.info(f"Found odds data for live game {game_data.get('id')}, preparing to draw.")
+            home_team_odds = game_data['odds'].get('home_team_odds', {})
+            away_team_odds = game_data['odds'].get('away_team_odds', {})
+
+            if home_team_odds and home_team_odds.get('spread_odds'):
+                home_spread = home_team_odds['spread_odds']
+                if isinstance(home_spread, (int, float)) and home_spread > 0:
+                    home_spread = f"+{home_spread}"
+                home_spread_text = f" ({home_spread})"
+
+            if away_team_odds and away_team_odds.get('spread_odds'):
+                away_spread = away_team_odds['spread_odds']
+                if isinstance(away_spread, (int, float)) and away_spread > 0:
+                    away_spread = f"+{away_spread}"
+                away_spread_text = f" ({away_spread})"
+        
         # Calculate Y position (bottom edge)
         # Get font height (approximate or precise)
         try:
@@ -941,17 +962,26 @@ class MLBLiveManager(BaseMLBManager):
         
         # Away Team:Score (Bottom Left)
         away_score_x = 2 # 2 pixels padding from left
-        # draw.text((away_score_x, score_y), away_text, font=score_font, fill=text_color)
         draw_bottom_outlined_text(away_score_x, score_y, away_text)
+        if away_spread_text:
+            score_width = draw.textbbox((0,0), away_text, font=score_font)[2]
+            spread_x = away_score_x + score_width
+            # Draw spread part in red
+            self._draw_text_with_outline(draw, away_spread_text, (spread_x, score_y), score_font, fill=odds_color, outline_color=outline_color)
         
         # Home Team:Score (Bottom Right)
         home_text_bbox = draw.textbbox((0,0), home_text, font=score_font)
         home_text_width = home_text_bbox[2] - home_text_bbox[0]
-        home_score_x = width - home_text_width - 2 # 2 pixels padding from right
-        # draw.text((home_score_x, score_y), home_text, font=score_font, fill=text_color)
-        draw_bottom_outlined_text(home_score_x, score_y, home_text)
+        home_spread_bbox = draw.textbbox((0,0), home_spread_text, font=score_font)
+        home_spread_width = home_spread_bbox[2] - home_spread_bbox[0]
+        
+        total_home_width = home_text_width + home_spread_width
+        home_score_x = width - total_home_width - 2 # 2 pixels padding from right
 
-        # TODO: Add Outs display if needed
+        draw_bottom_outlined_text(home_score_x, score_y, home_text)
+        if home_spread_text:
+            spread_x = home_score_x + home_text_width
+            self._draw_text_with_outline(draw, home_spread_text, (spread_x, score_y), score_font, fill=odds_color, outline_color=outline_color)
 
         return image
 
