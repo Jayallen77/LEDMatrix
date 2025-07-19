@@ -116,7 +116,7 @@ class CacheManager:
             cache_path = self._get_cache_path(key)
             with self._cache_lock:
                 with open(cache_path, 'w') as f:
-                    json.dump(data, f)
+                    json.dump(data, f, indent=4, cls=DateTimeEncoder)
                 
             # Update memory cache
             self._memory_cache[key] = data
