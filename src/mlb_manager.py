@@ -326,12 +326,18 @@ class BaseMLBManager:
                 home_spread = home_team_odds.get('spread_odds')
                 away_spread = away_team_odds.get('spread_odds')
 
-                if home_spread is None:
-                    # Fallback for different API structures
-                    home_spread = odds.get('spread')
+                # Get top-level spread as fallback
+                top_level_spread = odds.get('spread')
+                
+                # If we have a top-level spread and the individual spreads are None or 0, use the top-level
+                if top_level_spread is not None:
+                    if home_spread is None or home_spread == 0.0:
+                        home_spread = top_level_spread
+                    if away_spread is None:
+                        away_spread = -top_level_spread
 
                 # Show away team spread on left side
-                if away_spread is not None:
+                if away_spread is not None and away_spread != 0.0:
                     away_spread_text = str(away_spread)
                     font = self.display_manager.extra_small_font
                     away_spread_width = draw.textlength(away_spread_text, font=font)
@@ -340,7 +346,7 @@ class BaseMLBManager:
                     self._draw_text_with_outline(draw, away_spread_text, (away_spread_x, away_spread_y), font, fill=(0, 255, 0))
                 
                 # Show home team spread on right side
-                if home_spread is not None:
+                if home_spread is not None and home_spread != 0.0:
                     home_spread_text = str(home_spread)
                     font = self.display_manager.extra_small_font
                     home_spread_width = draw.textlength(home_spread_text, font=font)
@@ -974,17 +980,40 @@ class MLBLiveManager(BaseMLBManager):
         # Draw main text
         self.display_manager._draw_bdf_text(count_text, count_x, count_y, color=text_color, font=bdf_font)
 
-        # Draw scores at the bottom using original format (away_score-home_score)
-        away_score = str(game_data['away_score'])
-        home_score = str(game_data['home_score'])
-        score_text = f"{away_score}-{home_score}"
-        score_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 12)
+        # Draw Team:Score at the bottom (matching main branch format)
+        score_font = self.display_manager.font  # Use PressStart2P
+        outline_color = (0, 0, 0)
+        score_text_color = (255, 255, 255)  # Use a specific name for score text color
+
+        # Helper function for outlined text
+        def draw_bottom_outlined_text(x, y, text):
+            self._draw_text_with_outline(draw, text, (x, y), score_font, fill=score_text_color, outline_color=outline_color)
+
+        away_abbr = game_data['away_team']
+        home_abbr = game_data['home_team']
+        away_score_str = str(game_data['away_score'])
+        home_score_str = str(game_data['home_score'])
+
+        away_text = f"{away_abbr}:{away_score_str}"
+        home_text = f"{home_abbr}:{home_score_str}"
         
-        # Calculate position for the score text (centered)
-        score_width = draw.textlength(score_text, font=score_font)
-        score_x = (width - score_width) // 2
-        score_y = height - score_font.size - 2
-        self._draw_text_with_outline(draw, score_text, (score_x, score_y), score_font, fill=(255, 255, 255))
+        # Calculate Y position (bottom edge)
+        # Get font height (approximate or precise)
+        try:
+            font_height = score_font.getbbox("A")[3] - score_font.getbbox("A")[1]
+        except AttributeError:
+            font_height = 8  # Fallback for default font
+        score_y = height - font_height - 2  # 2 pixels padding from bottom
+        
+        # Away Team:Score (Bottom Left)
+        away_score_x = 2  # 2 pixels padding from left
+        draw_bottom_outlined_text(away_score_x, score_y, away_text)
+        
+        # Home Team:Score (Bottom Right)
+        home_text_bbox = draw.textbbox((0, 0), home_text, font=score_font)
+        home_text_width = home_text_bbox[2] - home_text_bbox[0]
+        home_score_x = width - home_text_width - 2  # 2 pixels padding from right
+        draw_bottom_outlined_text(home_score_x, score_y, home_text)
 
         # Draw gambling odds if available
         if 'odds' in game_data and game_data['odds']:
@@ -994,12 +1023,18 @@ class MLBLiveManager(BaseMLBManager):
             home_spread = home_team_odds.get('spread_odds')
             away_spread = away_team_odds.get('spread_odds')
 
-            if home_spread is None:
-                # Fallback for different API structures
-                home_spread = odds.get('spread')
+            # Get top-level spread as fallback
+            top_level_spread = odds.get('spread')
+            
+            # If we have a top-level spread and the individual spreads are None or 0, use the top-level
+            if top_level_spread is not None:
+                if home_spread is None or home_spread == 0.0:
+                    home_spread = top_level_spread
+                if away_spread is None:
+                    away_spread = -top_level_spread
 
             # Show away team spread on left side (top)
-            if away_spread is not None:
+            if away_spread is not None and away_spread != 0.0:
                 away_spread_text = str(away_spread)
                 font = self.display_manager.extra_small_font
                 away_spread_width = draw.textlength(away_spread_text, font=font)
@@ -1008,7 +1043,7 @@ class MLBLiveManager(BaseMLBManager):
                 self._draw_text_with_outline(draw, away_spread_text, (away_spread_x, away_spread_y), font, fill=(0, 255, 0))
             
             # Show home team spread on right side (top)
-            if home_spread is not None:
+            if home_spread is not None and home_spread != 0.0:
                 home_spread_text = str(home_spread)
                 font = self.display_manager.extra_small_font
                 home_spread_width = draw.textlength(home_spread_text, font=font)
