@@ -32,7 +32,7 @@ class OddsManager:
             response = requests.get(url)
             response.raise_for_status()
             raw_data = response.json()
-            self.logger.debug(f"Received raw odds data from ESPN: {json.dumps(raw_data, indent=2)}")
+            self.logger.info(f"Received raw odds data from ESPN: {json.dumps(raw_data, indent=2)}")
             
             odds_data = self._extract_espn_data(raw_data)
             self.logger.info(f"Extracted odds data: {odds_data}")
@@ -50,12 +50,20 @@ class OddsManager:
         return self.cache_manager.load_cache(cache_key)
 
     def _extract_espn_data(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        self.logger.info(f"Extracting ESPN odds data. Data keys: {list(data.keys())}")
+        
         if "items" in data and data["items"]:
+            self.logger.info(f"Found {len(data['items'])} items in odds data")
             item = data["items"][0]
+            self.logger.info(f"First item keys: {list(item.keys())}")
+            
+            providers = item.get('providers', [])
+            self.logger.info(f"Found {len(providers)} providers: {[p.get('name', 'N/A') for p in providers]}")
+            
             # Find the desired bookmaker, e.g., 'fanduel'
             provider = next((p for p in item.get('providers', []) if p.get('name', '').lower() == 'fanduel'), item['providers'][0] if item.get('providers') else {})
-            self.logger.debug(f"Found provider for odds: {provider.get('name', 'N/A')}")
-            self.logger.debug(f"Provider details: {json.dumps(provider, indent=2)}")
+            self.logger.info(f"Selected provider: {provider.get('name', 'N/A')}")
+            self.logger.info(f"Provider details: {json.dumps(provider, indent=2)}")
             
             extracted_data = {
                 "details": provider.get("details"),
@@ -70,7 +78,7 @@ class OddsManager:
                     "spread_odds": provider.get("awayTeamOdds", {}).get("spreadOdds")
                 }
             }
-            self.logger.debug(f"Returning extracted odds data: {json.dumps(extracted_data, indent=2)}")
+            self.logger.info(f"Returning extracted odds data: {json.dumps(extracted_data, indent=2)}")
             return extracted_data
         
         self.logger.warning("No 'items' found in ESPN odds data.")

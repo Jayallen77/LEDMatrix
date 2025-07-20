@@ -58,14 +58,33 @@ class BaseMLBManager:
             return
         
         try:
+            game_id = game.get('id', 'N/A')
+            self.logger.info(f"Requesting odds for game ID: {game_id}")
+            
             odds_data = self.odds_manager.get_odds(
                 sport="baseball",
                 league="mlb",
-                event_id=game["id"]
+                event_id=game_id
             )
             if odds_data:
                 game['odds'] = odds_data
-                self.logger.info(f"Successfully attached odds to game {game.get('id', 'N/A')}")
+                self.logger.info(f"Successfully attached odds to game {game_id}")
+                
+                # Check if the odds data has any non-null values
+                has_odds = False
+                if odds_data.get('spread') is not None:
+                    has_odds = True
+                if odds_data.get('home_team_odds', {}).get('spread_odds') is not None:
+                    has_odds = True
+                if odds_data.get('away_team_odds', {}).get('spread_odds') is not None:
+                    has_odds = True
+                
+                if not has_odds:
+                    self.logger.warning(f"Odds data returned for game {game_id} but all values are null")
+                else:
+                    self.logger.info(f"Found actual odds data for game {game_id}")
+            else:
+                self.logger.warning(f"No odds data returned for game {game_id}")
         except Exception as e:
             self.logger.error(f"Error fetching odds for game {game.get('id', 'N/A')}: {e}")
 
@@ -105,39 +124,6 @@ class BaseMLBManager:
         
         # Draw the text in the specified color
         draw.text((x, y), text, font=font, fill=fill)
-
-    def _draw_odds_info(self, draw: ImageDraw.Draw, odds_data: Dict[str, Any], width: int, height: int) -> None:
-        """Draw odds information on the display."""
-        if not odds_data:
-            return
-
-        try:
-            # Use a smaller font for odds
-            font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
-            odds_color = (255, 0, 0)  # Red text
-            outline_color = (0, 0, 0)   # Black outline
-
-            home_team_odds = odds_data.get('home_team_odds', {})
-            away_team_odds = odds_data.get('away_team_odds', {})
-
-            if home_team_odds and home_team_odds.get('spread_odds'):
-                home_spread = home_team_odds['spread_odds']
-                if isinstance(home_spread, (int, float)) and home_spread > 0:
-                    home_spread = f"+{home_spread}"
-                home_odds_x = width - 30  # Adjust as needed
-                home_odds_y = height - 10  # Adjust as needed
-                self._draw_text_with_outline(draw, str(home_spread), (home_odds_x, home_odds_y), font, odds_color, outline_color)
-
-            if away_team_odds and away_team_odds.get('spread_odds'):
-                away_spread = away_team_odds['spread_odds']
-                if isinstance(away_spread, (int, float)) and away_spread > 0:
-                    away_spread = f"+{away_spread}"
-                away_odds_x = 5  # Adjust as needed
-                away_odds_y = height - 10  # Adjust as needed
-                self._draw_text_with_outline(draw, str(away_spread), (away_odds_x, away_odds_y), font, odds_color, outline_color)
-
-        except Exception as e:
-            self.logger.error(f"Error drawing odds info: {e}")
 
     def _draw_base_indicators(self, draw: ImageDraw.Draw, bases_occupied: List[bool], center_x: int, y: int) -> None:
         """Draw base indicators on the display."""
@@ -265,72 +251,7 @@ class BaseMLBManager:
 
             # Draw odds if available
             if 'odds' in game_data:
-                odds_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
-                outline_color = (0, 0, 0)
-                odds_color = (255, 0, 0)
-                text_color = (255, 255, 255)
-
-                away_abbr = game_data['away_team']
-                home_abbr = game_data['home_team']
-                
-                odds = game_data['odds']
-                home_team_odds = odds.get('home_team_odds', {})
-                away_team_odds = odds.get('away_team_odds', {})
-
-                home_spread_text = ""
-                away_spread_text = ""
-                
-                home_spread = home_team_odds.get('spread_odds')
-                away_spread = away_team_odds.get('spread_odds')
-
-                if home_spread is None and away_spread is None:
-                    spread_val = odds.get('spread')
-                    if spread_val is not None:
-                        try:
-                            home_spread = float(spread_val)
-                            away_spread = -home_spread
-                        except (ValueError, TypeError):
-                            pass
-
-                if home_spread is not None:
-                    try:
-                        home_spread_num = float(home_spread)
-                        home_spread_text = f" ({home_spread_num:+.1f})"
-                    except (ValueError, TypeError):
-                        home_spread_text = ""
-
-                if away_spread is not None:
-                    try:
-                        away_spread_num = float(away_spread)
-                        away_spread_text = f" ({away_spread_num:+.1f})"
-                    except (ValueError, TypeError):
-                        away_spread_text = ""
-
-                try:
-                    font_height = odds_font.getbbox("A")[3] - odds_font.getbbox("A")[1]
-                except AttributeError:
-                    font_height = 8 # Fallback
-                odds_y = height - font_height - 2
-
-                # Away team odds
-                away_x = 2
-                self._draw_text_with_outline(draw, away_abbr, (away_x, odds_y), odds_font, fill=text_color, outline_color=outline_color)
-                if away_spread_text:
-                    abbr_width = draw.textbbox((0,0), away_abbr, font=odds_font)[2]
-                    spread_x = away_x + abbr_width
-                    self._draw_text_with_outline(draw, away_spread_text, (spread_x, odds_y), odds_font, fill=odds_color, outline_color=outline_color)
-
-                # Home team odds
-                home_text = f"{home_abbr}{home_spread_text}"
-                home_text_bbox = draw.textbbox((0,0), home_text, font=odds_font)
-                home_text_width = home_text_bbox[2] - home_text_bbox[0]
-                home_x = width - home_text_width - 2
-                
-                self._draw_text_with_outline(draw, home_abbr, (home_x, odds_y), odds_font, fill=text_color, outline_color=outline_color)
-                if home_spread_text:
-                    abbr_width = draw.textbbox((0,0), home_abbr, font=odds_font)[2]
-                    spread_x = home_x + abbr_width
-                    self._draw_text_with_outline(draw, home_spread_text, (spread_x, odds_y), odds_font, fill=odds_color, outline_color=outline_color)
+                self._draw_odds_info(draw, game_data['odds'], width, height)
         
         # For recent/final games, show scores and status
         elif game_data['status'] in ['status_final', 'final', 'completed']:
@@ -345,81 +266,35 @@ class BaseMLBManager:
             self.display_manager.draw = draw
             self.display_manager._draw_bdf_text(status_text, status_x, status_y, color=(255, 255, 255), font=self.display_manager.calendar_font)
             
-            # Draw scores at the bottom using NHL-style font
-            score_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
-            outline_color = (0, 0, 0)
-            score_text_color = (255, 255, 255)
-            odds_color = (255, 0, 0) # Red for odds
+            # DEBUG: Draw spread in the center. If not available, show score.
+            display_text = None
+            font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 12)
+            text_color = (255, 255, 255)
 
-            away_abbr = game_data['away_team']
-            home_abbr = game_data['home_team']
-            away_score_str = str(game_data['away_score'])
-            home_score_str = str(game_data['home_score'])
-
-            away_text = f"{away_abbr}:{away_score_str}"
-            home_text = f"{home_abbr}:{home_score_str}"
-
-            # Get odds if available
-            home_spread_text = ""
-            away_spread_text = ""
             if 'odds' in game_data and game_data['odds']:
                 odds = game_data['odds']
                 home_team_odds = odds.get('home_team_odds', {})
-                away_team_odds = odds.get('away_team_odds', {})
-
                 home_spread = home_team_odds.get('spread_odds')
-                away_spread = away_team_odds.get('spread_odds')
-                
-                if home_spread is None and away_spread is None:
-                    spread_val = odds.get('spread')
-                    if spread_val is not None:
-                        try:
-                            home_spread = float(spread_val)
-                            away_spread = -home_spread
-                        except (ValueError, TypeError):
-                            pass
+
+                if home_spread is None:
+                    # Fallback for different API structures
+                    home_spread = odds.get('spread')
                 
                 if home_spread is not None:
-                    try:
-                        home_spread_num = float(home_spread)
-                        home_spread_text = f" ({home_spread_num:+.1f})"
-                    except (ValueError, TypeError):
-                         home_spread_text = ""
+                    display_text = str(home_spread)
+                    text_color = (0, 255, 0) # Green for debug
 
-                if away_spread is not None:
-                    try:
-                        away_spread_num = float(away_spread)
-                        away_spread_text = f" ({away_spread_num:+.1f})"
-                    except (ValueError, TypeError):
-                        away_spread_text = ""
-            
-            try:
-                font_height = score_font.getbbox("A")[3] - score_font.getbbox("A")[1]
-            except AttributeError:
-                font_height = 8 # Fallback for default font
-            score_y = height - font_height - 2 # 2 pixels padding from bottom
+            # If spread was not found, fallback to score
+            if display_text is None:
+                away_score = str(game_data['away_score'])
+                home_score = str(game_data['home_score'])
+                display_text = f"{away_score}-{home_score}"
 
-            # Away Team:Score (Bottom Left)
-            away_score_x = 2
-            self._draw_text_with_outline(draw, away_text, (away_score_x, score_y), score_font, fill=score_text_color, outline_color=outline_color)
-            if away_spread_text:
-                score_width = draw.textbbox((0,0), away_text, font=score_font)[2]
-                spread_x = away_score_x + score_width
-                self._draw_text_with_outline(draw, away_spread_text, (spread_x, score_y), score_font, fill=odds_color, outline_color=outline_color)
-
-            # Home Team:Score (Bottom Right)
-            home_text_bbox = draw.textbbox((0,0), home_text, font=score_font)
-            home_text_width = home_text_bbox[2] - home_text_bbox[0]
-            home_spread_bbox = draw.textbbox((0,0), home_spread_text, font=score_font)
-            home_spread_width = home_spread_bbox[2] - home_spread_bbox[0]
-            
-            total_home_width = home_text_width + home_spread_width
-            home_score_x = width - total_home_width - 2
-
-            self._draw_text_with_outline(draw, home_text, (home_score_x, score_y), score_font, fill=score_text_color, outline_color=outline_color)
-            if home_spread_text:
-                spread_x = home_score_x + home_text_width
-                self._draw_text_with_outline(draw, home_spread_text, (spread_x, score_y), score_font, fill=odds_color, outline_color=outline_color)
+            # Draw the determined text
+            display_width = draw.textlength(display_text, font=font)
+            display_x = (width - display_width) // 2
+            display_y = (height - font.size) // 2
+            self._draw_text_with_outline(draw, display_text, (display_x, display_y), font, fill=text_color)
 
         # For live games, show detailed game state
         elif game_data['status'] == 'status_in_progress' or game_data.get('live', False):
@@ -447,9 +322,9 @@ class BaseMLBManager:
             # draw.text((score_x, score_y), score_text, font=score_font, fill=(255, 255, 255))
             self._draw_text_with_outline(draw, score_text, (score_x, score_y), score_font)
 
-            # Draw odds if available
-            if 'odds' in game_data:
-                self._draw_odds_info(draw, game_data['odds'], width, height)
+            # For live games, we are not adding the debug spread display yet
+            # It can be added later if needed by copying the logic from recent/upcoming
+            pass
 
         return image
 
