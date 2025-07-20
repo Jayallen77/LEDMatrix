@@ -281,7 +281,7 @@ class BaseMLBManager:
                 # Show away team spread on left side
                 if away_spread is not None:
                     away_spread_text = str(away_spread)
-                    font = self.display_manager.small_font
+                    font = self.display_manager.extra_small_font
                     away_spread_width = draw.textlength(away_spread_text, font=font)
                     away_spread_x = 2  # Top left for away team
                     away_spread_y = 2
@@ -290,7 +290,7 @@ class BaseMLBManager:
                 # Show home team spread on right side
                 if home_spread is not None:
                     home_spread_text = str(home_spread)
-                    font = self.display_manager.small_font
+                    font = self.display_manager.extra_small_font
                     home_spread_width = draw.textlength(home_spread_text, font=font)
                     home_spread_x = width - home_spread_width - 2  # Top right for home team
                     home_spread_y = 2
@@ -300,10 +300,10 @@ class BaseMLBManager:
                 over_under = odds.get('over_under')
                 if over_under is not None:
                     ou_text = f"O/U: {over_under}"
-                    ou_width = draw.textlength(ou_text, font=self.display_manager.small_font)
+                    ou_width = draw.textlength(ou_text, font=self.display_manager.extra_small_font)
                     ou_x = (width - ou_width) // 2
-                    ou_y = height - self.display_manager.small_font.size - 2
-                    self._draw_text_with_outline(draw, ou_text, (ou_x, ou_y), self.display_manager.small_font, fill=(0, 255, 0))
+                    ou_y = height - self.display_manager.extra_small_font.size - 2
+                    self._draw_text_with_outline(draw, ou_text, (ou_x, ou_y), self.display_manager.extra_small_font, fill=(0, 255, 0))
         
         # For recent/final games, show scores and status
         elif game_data['status'] in ['status_final', 'final', 'completed']:
@@ -333,7 +333,7 @@ class BaseMLBManager:
                 # Show away team spread on left side
                 if away_spread is not None:
                     away_spread_text = str(away_spread)
-                    font = self.display_manager.small_font
+                    font = self.display_manager.extra_small_font
                     away_spread_width = draw.textlength(away_spread_text, font=font)
                     away_spread_x = 2  # Top left for away team
                     away_spread_y = 2
@@ -342,7 +342,7 @@ class BaseMLBManager:
                 # Show home team spread on right side
                 if home_spread is not None:
                     home_spread_text = str(home_spread)
-                    font = self.display_manager.small_font
+                    font = self.display_manager.extra_small_font
                     home_spread_width = draw.textlength(home_spread_text, font=font)
                     home_spread_x = width - home_spread_width - 2  # Top right for home team
                     home_spread_y = 2
@@ -352,10 +352,10 @@ class BaseMLBManager:
                 over_under = odds.get('over_under')
                 if over_under is not None:
                     ou_text = f"O/U: {over_under}"
-                    ou_width = draw.textlength(ou_text, font=self.display_manager.small_font)
+                    ou_width = draw.textlength(ou_text, font=self.display_manager.extra_small_font)
                     ou_x = (width - ou_width) // 2
-                    ou_y = height - self.display_manager.small_font.size - 2
-                    self._draw_text_with_outline(draw, ou_text, (ou_x, ou_y), self.display_manager.small_font, fill=(0, 255, 0))
+                    ou_y = height - self.display_manager.extra_small_font.size - 2
+                    self._draw_text_with_outline(draw, ou_text, (ou_x, ou_y), self.display_manager.extra_small_font, fill=(0, 255, 0))
             
             # Show score in center if no odds available
             if 'odds' not in game_data or not game_data['odds']:
@@ -1001,7 +1001,7 @@ class MLBLiveManager(BaseMLBManager):
             # Show away team spread on left side (top)
             if away_spread is not None:
                 away_spread_text = str(away_spread)
-                font = self.display_manager.small_font
+                font = self.display_manager.extra_small_font
                 away_spread_width = draw.textlength(away_spread_text, font=font)
                 away_spread_x = 2  # Top left for away team
                 away_spread_y = 2
@@ -1010,7 +1010,7 @@ class MLBLiveManager(BaseMLBManager):
             # Show home team spread on right side (top)
             if home_spread is not None:
                 home_spread_text = str(home_spread)
-                font = self.display_manager.small_font
+                font = self.display_manager.extra_small_font
                 home_spread_width = draw.textlength(home_spread_text, font=font)
                 home_spread_x = width - home_spread_width - 2  # Top right for home team
                 home_spread_y = 2
@@ -1020,10 +1020,10 @@ class MLBLiveManager(BaseMLBManager):
             over_under = odds.get('over_under')
             if over_under is not None:
                 ou_text = f"O/U: {over_under}"
-                ou_width = draw.textlength(ou_text, font=self.display_manager.small_font)
+                ou_width = draw.textlength(ou_text, font=self.display_manager.extra_small_font)
                 ou_x = (width - ou_width) // 2
-                ou_y = height - self.display_manager.small_font.size - 2
-                self._draw_text_with_outline(draw, ou_text, (ou_x, ou_y), self.display_manager.small_font, fill=(0, 255, 0))
+                ou_y = height - self.display_manager.extra_small_font.size - 2
+                self._draw_text_with_outline(draw, ou_text, (ou_x, ou_y), self.display_manager.extra_small_font, fill=(0, 255, 0))
 
         return image
 
