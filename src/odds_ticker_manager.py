@@ -185,9 +185,10 @@ class OddsTickerManager:
                 for event in data.get('events', []):
                     game_id = event['id']
                     status = event['status']['type']['name'].lower()
+                    logger.debug(f"Event {game_id}: status={status}")
                     
-                    # Only include upcoming games
-                    if status in ['scheduled', 'pre-game']:
+                    # Only include upcoming games (handle both 'scheduled' and 'status_scheduled')
+                    if status in ['scheduled', 'pre-game', 'status_scheduled']:
                         game_time = datetime.fromisoformat(event['date'].replace('Z', '+00:00'))
                         
                         # Only include games in the next 7 days
@@ -199,6 +200,8 @@ class OddsTickerManager:
                             
                             home_abbr = home_team['team']['abbreviation']
                             away_abbr = away_team['team']['abbreviation']
+                            
+                            logger.info(f"Found upcoming game: {away_abbr} @ {home_abbr} on {game_time}")
                             
                             # Fetch odds for this game
                             odds_data = self.odds_manager.get_odds(
@@ -219,7 +222,11 @@ class OddsTickerManager:
                             }
                             
                             games.append(game_data)
-                            
+                        else:
+                            logger.debug(f"Game {game_id} is outside 7-day window: {game_time}")
+                    else:
+                        logger.debug(f"Game {game_id} has status '{status}', skipping")
+                
             except Exception as e:
                 logger.error(f"Error fetching {league_config['league']} games for date {date}: {e}")
         
