@@ -57,6 +57,10 @@ class BaseMLBManager:
         if not self.show_odds:
             return
         
+        # Skip if odds are already attached to this game
+        if 'odds' in game and game['odds']:
+            return
+        
         try:
             game_id = game.get('id', 'N/A')
             self.logger.info(f"Requesting odds for game ID: {game_id}")

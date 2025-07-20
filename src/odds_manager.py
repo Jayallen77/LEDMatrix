@@ -16,15 +16,14 @@ class OddsManager:
     def get_odds(self, sport: str, league: str, event_id: str, update_interval_seconds=3600):
         cache_key = f"odds_espn_{sport}_{league}_{event_id}"
 
-        # Temporarily disable cache to force a fresh API call for debugging
-        cached_data = None
-        # cached_data = self.cache_manager.get_cached_data(cache_key, max_age=update_interval_seconds)
+        # Check cache first with 1-hour update interval
+        cached_data = self.cache_manager.get_cached_data(cache_key, max_age=update_interval_seconds)
 
         if cached_data:
             self.logger.info(f"Using cached odds from ESPN for {cache_key}")
             return cached_data
 
-        self.logger.info(f"Fetching fresh odds from ESPN for {cache_key}")
+        self.logger.info(f"Cache miss - fetching fresh odds from ESPN for {cache_key}")
         
         try:
             url = f"{self.base_url}/{sport}/leagues/{league}/events/{event_id}/competitions/{event_id}/odds"
@@ -39,6 +38,9 @@ class OddsManager:
             
             if odds_data:
                 self.cache_manager.save_cache(cache_key, odds_data)
+                self.logger.info(f"Saved odds data to cache for {cache_key}")
+            else:
+                self.logger.warning(f"No odds data extracted for {cache_key}")
             
             return odds_data
 
