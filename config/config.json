@@ -109,7 +109,7 @@
     },
     "odds_ticker": {
         "enabled": true,
-        "show_favorite_teams_only": false,
+        "show_favorite_teams_only": true,
         "enabled_leagues": ["mlb"],
         "update_interval": 3600,
         "scroll_speed": 2,

@@ -28,7 +28,7 @@ class OddsManager:
         try:
             url = f"{self.base_url}/{sport}/leagues/{league}/events/{event_id}/competitions/{event_id}/odds"
             self.logger.info(f"Requesting odds from URL: {url}")
-            response = requests.get(url)
+            response = requests.get(url, timeout=10)
             response.raise_for_status()
             raw_data = response.json()
             self.logger.debug(f"Received raw odds data from ESPN: {json.dumps(raw_data, indent=2)}")
@@ -41,6 +41,8 @@ class OddsManager:
                 self.logger.info(f"Saved odds data to cache for {cache_key}")
             else:
                 self.logger.warning(f"No odds data extracted for {cache_key}")
+                # Cache the fact that no odds are available to avoid repeated API calls
+                self.cache_manager.save_cache(cache_key, {"no_odds": True})
             
             return odds_data
 

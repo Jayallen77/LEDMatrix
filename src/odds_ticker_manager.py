@@ -207,8 +207,14 @@ class OddsTickerManager:
                             odds_data = self.odds_manager.get_odds(
                                 sport=sport,
                                 league=league,
-                                event_id=game_id
+                                event_id=game_id,
+                                update_interval_seconds=7200  # Cache for 2 hours instead of 1 hour
                             )
+                            
+                            # Include games even without odds data (but log it)
+                            if odds_data and odds_data.get('no_odds'):
+                                logger.debug(f"Game {game_id} has no odds data, but including in display")
+                                odds_data = None  # Set to None so display shows just game info
                             
                             game_data = {
                                 'id': game_id,
@@ -321,12 +327,12 @@ class OddsTickerManager:
         
         if away_logo:
             away_logo.thumbnail((logo_size, logo_size), Image.Resampling.LANCZOS)
-            away_x = text_x - logo_size - 5
+            away_x = int(text_x - logo_size - 5)
             image.paste(away_logo, (away_x, logo_y), away_logo)
         
         if home_logo:
             home_logo.thumbnail((logo_size, logo_size), Image.Resampling.LANCZOS)
-            home_x = text_x + text_width + 5
+            home_x = int(text_x + text_width + 5)
             image.paste(home_logo, (home_x, logo_y), home_logo)
         
         return image
