@@ -115,12 +115,16 @@ class OddsTickerManager:
         games_data = []
         now = datetime.now(timezone.utc)
         
+        logger.info(f"Fetching upcoming games for {len(self.enabled_leagues)} enabled leagues")
+        
         for league_key in self.enabled_leagues:
             if league_key not in self.league_configs:
                 logger.warning(f"Unknown league: {league_key}")
                 continue
                 
             league_config = self.league_configs[league_key]
+            logger.info(f"Processing league {league_key}: enabled={league_config['enabled']}")
+            
             if not league_config['enabled']:
                 logger.debug(f"League {league_key} is disabled, skipping")
                 continue
@@ -128,6 +132,7 @@ class OddsTickerManager:
             try:
                 # Fetch upcoming games for this league
                 games = self._fetch_league_games(league_config, now)
+                logger.info(f"Found {len(games)} games for {league_key}")
                 games_data.extend(games)
                 
             except Exception as e:
@@ -142,13 +147,16 @@ class OddsTickerManager:
             for league_config in self.league_configs.values():
                 all_favorite_teams.extend(league_config.get('favorite_teams', []))
             
+            logger.info(f"Filtering for favorite teams: {all_favorite_teams}")
+            original_count = len(games_data)
             games_data = [
                 game for game in games_data 
                 if (game.get('home_team') in all_favorite_teams or 
                     game.get('away_team') in all_favorite_teams)
             ]
+            logger.info(f"Filtered from {original_count} to {len(games_data)} games")
         
-        logger.info(f"Fetched {len(games_data)} upcoming games for odds ticker")
+        logger.info(f"Total games found: {len(games_data)}")
         return games_data
 
     def _fetch_league_games(self, league_config: Dict[str, Any], now: datetime) -> List[Dict[str, Any]]:
@@ -329,14 +337,19 @@ class OddsTickerManager:
     def update(self):
         """Update odds ticker data."""
         if not self.is_enabled:
+            logger.debug("Odds ticker is disabled, skipping update")
             return
             
         current_time = time.time()
         if current_time - self.last_update < self.update_interval:
+            logger.debug(f"Odds ticker update interval not reached. Next update in {self.update_interval - (current_time - self.last_update)} seconds")
             return
         
         try:
             logger.info("Updating odds ticker data")
+            logger.info(f"Enabled leagues: {self.enabled_leagues}")
+            logger.info(f"Show favorite teams only: {self.show_favorite_teams_only}")
+            
             self.games_data = self._fetch_upcoming_games()
             self.last_update = current_time
             self.current_position = 0
@@ -344,16 +357,32 @@ class OddsTickerManager:
             
             if self.games_data:
                 logger.info(f"Updated odds ticker with {len(self.games_data)} games")
+                for i, game in enumerate(self.games_data[:3]):  # Log first 3 games
+                    logger.info(f"Game {i+1}: {game['away_team']} @ {game['home_team']} - {game['start_time']}")
             else:
                 logger.warning("No games found for odds ticker")
+                logger.info("This could be due to:")
+                logger.info("- No upcoming games in the next 7 days")
+                logger.info("- No favorite teams have upcoming games (if show_favorite_teams_only is True)")
+                logger.info("- API is not returning data")
+                logger.info("- Leagues are disabled in config")
                 
         except Exception as e:
             logger.error(f"Error updating odds ticker: {e}", exc_info=True)
 
     def display(self, force_clear: bool = False):
         """Display the odds ticker."""
-        if not self.is_enabled or not self.games_data:
+        if not self.is_enabled:
+            logger.debug("Odds ticker is disabled")
             return
+        
+        if not self.games_data:
+            logger.warning("Odds ticker has no games data. Attempting to update...")
+            self.update()
+            if not self.games_data:
+                logger.warning("Still no games data after update. Displaying fallback message.")
+                self._display_fallback_message()
+                return
         
         try:
             current_time = time.time()
@@ -403,4 +432,31 @@ class OddsTickerManager:
             self.display_manager.update_display()
             
         except Exception as e:
-            logger.error(f"Error displaying odds ticker: {e}", exc_info=True) 
+            logger.error(f"Error displaying odds ticker: {e}", exc_info=True)
+            self._display_fallback_message()
+
+    def _display_fallback_message(self):
+        """Display a fallback message when no games data is available."""
+        try:
+            width = self.display_manager.matrix.width
+            height = self.display_manager.matrix.height
+            
+            # Create a simple fallback image
+            image = Image.new('RGB', (width, height), color=(0, 0, 0))
+            draw = ImageDraw.Draw(image)
+            
+            # Draw a simple message
+            message = "No odds data available"
+            text_width = draw.textlength(message, font=self.fonts['medium'])
+            text_x = (width - text_width) // 2
+            text_y = (height - self.fonts['medium'].size) // 2
+            
+            self._draw_text_with_outline(draw, message, (text_x, text_y), self.fonts['medium'])
+            
+            # Display the fallback image
+            self.display_manager.image = image
+            self.display_manager.draw = ImageDraw.Draw(self.display_manager.image)
+            self.display_manager.update_display()
+            
+        except Exception as e:
+            logger.error(f"Error displaying fallback message: {e}", exc_info=True) 
