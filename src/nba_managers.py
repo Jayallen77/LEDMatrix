@@ -359,6 +359,44 @@ class BaseNBAManager:
             # For non-live games, use the shared cache
             return self._fetch_shared_data(date_str)
 
+    def _fetch_odds(self, game: Dict) -> None:
+        """Fetch odds for a specific game if conditions are met."""
+        self.logger.debug(f"Checking odds for game: {game.get('id', 'N/A')}")
+        
+        # Ensure the API key is set in the secrets config
+        if not self.config_manager.get_secret("the_odds_api_key"):
+            if self._should_log('no_api_key', cooldown=3600):  # Log once per hour
+                self.logger.warning("Odds API key not found. Skipping odds fetch.")
+            return
+            
+        # Check if odds should be shown for this sport
+        if not self.show_odds:
+            self.logger.debug("Odds display is disabled for NBA.")
+            return
+
+        # Fetch odds using OddsManager
+        try:
+            # Determine update interval based on game state
+            is_live = game.get('is_live', False)
+            update_interval = self.nba_config.get("live_odds_update_interval", 3600) if is_live \
+                else self.nba_config.get("odds_update_interval", 3600)
+
+            odds_data = self.odds_manager.get_odds(
+                sport="basketball",
+                league="nba",
+                event_id=game['id'],
+                update_interval_seconds=update_interval
+            )
+            
+            if odds_data:
+                game['odds'] = odds_data
+                self.logger.debug(f"Successfully fetched and attached odds for game {game['id']}")
+            else:
+                self.logger.debug(f"No odds data returned for game {game['id']}")
+
+        except Exception as e:
+            self.logger.error(f"Error fetching odds for game {game.get('id', 'N/A')}: {e}")
+
     def _extract_game_details(self, game_event: Dict) -> Optional[Dict]:
         """Extract relevant game details from ESPN API response."""
         if not game_event:
@@ -533,6 +571,10 @@ class BaseNBAManager:
                     clock_y = period_y + 10  # Position below period
                     draw.text((clock_x, clock_y), clock, font=self.fonts['time'], fill=(255, 255, 255))
 
+            # Draw odds if available
+            if 'odds' in game and game['odds']:
+                self._draw_dynamic_odds(draw, game['odds'], self.display_width, self.display_height)
+
             # Display the image
             self.display_manager.image.paste(main_img, (0, 0))
             self.display_manager.update_display()
@@ -553,152 +595,153 @@ class BaseNBAManager:
             
         self._draw_scorebug_layout(self.current_game, force_clear)
 
+    def _draw_dynamic_odds(self, draw: ImageDraw.Draw, odds: Dict[str, Any], width: int, height: int) -> None:
+        """Draw odds with dynamic positioning - only show negative spread and position O/U based on favored team."""
+        home_team_odds = odds.get('home_team_odds', {})
+        away_team_odds = odds.get('away_team_odds', {})
+        home_spread = home_team_odds.get('spread_odds')
+        away_spread = away_team_odds.get('spread_odds')
+
+        # Get top-level spread as fallback
+        top_level_spread = odds.get('spread')
+        
+        # If we have a top-level spread and the individual spreads are None or 0, use the top-level
+        if top_level_spread is not None:
+            if home_spread is None or home_spread == 0.0:
+                home_spread = top_level_spread
+            if away_spread is None:
+                away_spread = -top_level_spread
+
+        # Determine which team is favored (has negative spread)
+        home_favored = home_spread is not None and home_spread < 0
+        away_favored = away_spread is not None and away_spread < 0
+        
+        # Only show the negative spread (favored team)
+        favored_spread = None
+        favored_side = None
+        
+        if home_favored:
+            favored_spread = home_spread
+            favored_side = 'home'
+            self.logger.debug(f"Home team favored with spread: {favored_spread}")
+        elif away_favored:
+            favored_spread = away_spread
+            favored_side = 'away'
+            self.logger.debug(f"Away team favored with spread: {favored_spread}")
+        else:
+            self.logger.debug("No clear favorite - spreads: home={home_spread}, away={away_spread}")
+        
+        # Show the negative spread on the appropriate side
+        if favored_spread is not None:
+            spread_text = str(favored_spread)
+            font = self.fonts['detail']  # Use detail font for odds
+            
+            if favored_side == 'home':
+                # Home team is favored, show spread on right side
+                spread_width = draw.textlength(spread_text, font=font)
+                spread_x = width - spread_width - 2  # Top right
+                spread_y = 2
+                self._draw_text_with_outline(draw, spread_text, (spread_x, spread_y), font, fill=(0, 255, 0))
+                self.logger.debug(f"Showing home spread '{spread_text}' on right side")
+            else:
+                # Away team is favored, show spread on left side
+                spread_x = 2  # Top left
+                spread_y = 2
+                self._draw_text_with_outline(draw, spread_text, (spread_x, spread_y), font, fill=(0, 255, 0))
+                self.logger.debug(f"Showing away spread '{spread_text}' on left side")
+        
+        # Show over/under on the opposite side of the favored team
+        over_under = odds.get('over_under')
+        if over_under is not None:
+            ou_text = f"O/U: {over_under}"
+            font = self.fonts['detail']  # Use detail font for odds
+            ou_width = draw.textlength(ou_text, font=font)
+            
+            if favored_side == 'home':
+                # Home team is favored, show O/U on left side (opposite of spread)
+                ou_x = 2  # Top left
+                ou_y = 2
+                self.logger.debug(f"Showing O/U '{ou_text}' on left side (home favored)")
+            elif favored_side == 'away':
+                # Away team is favored, show O/U on right side (opposite of spread)
+                ou_x = width - ou_width - 2  # Top right
+                ou_y = 2
+                self.logger.debug(f"Showing O/U '{ou_text}' on right side (away favored)")
+            else:
+                # No clear favorite, show O/U in center
+                ou_x = (width - ou_width) // 2
+                ou_y = 2
+                self.logger.debug(f"Showing O/U '{ou_text}' in center (no clear favorite)")
+            
+            self._draw_text_with_outline(draw, ou_text, (ou_x, ou_y), font, fill=(0, 255, 0))
+
+    def _draw_text_with_outline(self, draw, text, position, font, fill=(255, 255, 255), outline_color=(0, 0, 0)):
+        """Helper to draw text with an outline."""
+        draw.text(position, text, font=font, fill=outline_color)
+        draw.text(position, text, font=font, fill=fill)
+
+
 class NBALiveManager(BaseNBAManager):
     """Manager for live NBA games."""
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         super().__init__(config, display_manager)
-        self.update_interval = self.nba_config.get("live_update_interval", 15)  # 15 seconds for live games
-        self.no_data_interval = 300  # 5 minutes when no live games
+        self.update_interval = self.nba_config.get("live_update_interval", 30)
+        self.no_data_interval = 300
         self.last_update = 0
         self.logger.info("Initialized NBA Live Manager")
-        self.live_games = []  # List to store all live games
-        self.current_game_index = 0  # Index to track which game to show
-        self.last_game_switch = 0  # Track when we last switched games
-        self.game_display_duration = self.nba_config.get("live_game_duration", 20)  # Display each live game for 20 seconds
-        self.last_display_update = 0  # Track when we last updated the display
+        self.live_games = []
+        self.current_game_index = 0
+        self.last_game_switch = 0
+        self.game_display_duration = self.nba_config.get("live_game_duration", 20)
+        self.last_display_update = 0
         self.last_log_time = 0
-        self.log_interval = 300  # Only log status every 5 minutes
-        self.has_favorite_team_game = False  # Track if we have any favorite team games
-        
-        # Initialize with test game only if test mode is enabled
-        if self.test_mode:
-            self.current_game = {
-                "home_abbr": "LAL",
-                "away_abbr": "BOS",
-                "home_score": "85",
-                "away_score": "82",
-                "period": 3,
-                "clock": "12:34",
-                "home_logo_path": os.path.join(self.logo_dir, "LAL.png"),
-                "away_logo_path": os.path.join(self.logo_dir, "BOS.png"),
-                "game_time": "7:30 PM",
-                "game_date": "Apr 17"
-            }
-            self.live_games = [self.current_game]
-            self.logger.info("[NBA] Initialized NBALiveManager with test game: LAL vs BOS")
-        else:
-            self.logger.info("[NBA] Initialized NBALiveManager in live mode")
+        self.log_interval = 300
 
     def update(self):
         """Update live game data."""
+        if not self.is_enabled: return
         current_time = time.time()
-        
-        # Determine update interval based on whether we have favorite team games
-        if self.has_favorite_team_game:
-            interval = self.update_interval  # 15 seconds for live favorite team games
-        else:
-            interval = self.no_data_interval  # 5 minutes when no favorite team games
-        
+        interval = self.no_data_interval if not self.live_games else self.update_interval
+
         if current_time - self.last_update >= interval:
             self.last_update = current_time
-            
-            if self.test_mode:
-                # For testing, we'll just update the clock to show it's working
-                if self.current_game:
-                    minutes = int(self.current_game["clock"].split(":")[0])
-                    seconds = int(self.current_game["clock"].split(":")[1])
-                    seconds -= 1
-                    if seconds < 0:
-                        seconds = 59
-                        minutes -= 1
-                        if minutes < 0:
-                            minutes = 11
-                            if self.current_game["period"] < 4:
-                                self.current_game["period"] += 1
-                            else:
-                                self.current_game["period"] = 1
-                    self.current_game["clock"] = f"{minutes:02d}:{seconds:02d}"
-                    # Always update display in test mode
-                    self.display(force_clear=True)
-            else:
-                # Fetch live game data from ESPN API
-                data = self._fetch_data()
-                if data and "events" in data:
-                    # Find all live games involving favorite teams
-                    new_live_games = []
-                    has_favorite_team = False
-                    for event in data["events"]:
-                        details = self._extract_game_details(event)
-                        if details and details["is_live"]:
-                            if not self.favorite_teams or (
-                                details["home_abbr"] in self.favorite_teams or 
-                                details["away_abbr"] in self.favorite_teams
-                            ):
-                                new_live_games.append(details)
-                                if self.favorite_teams and (
-                                    details["home_abbr"] in self.favorite_teams or 
-                                    details["away_abbr"] in self.favorite_teams
-                                ):
-                                    has_favorite_team = True
-                    
-                    # Update favorite team game status
-                    self.has_favorite_team_game = has_favorite_team
-                    
-                    # Only log if there's a change in games or enough time has passed
-                    should_log = (
-                        current_time - self.last_log_time >= self.log_interval or
-                        len(new_live_games) != len(self.live_games) or
-                        not self.live_games or  # Log if we had no games before
-                        has_favorite_team != self.has_favorite_team_game  # Log if favorite team status changed
-                    )
-                    
-                    if should_log:
-                        if new_live_games:
-                            self.logger.info(f"[NBA] Found {len(new_live_games)} live games")
-                            for game in new_live_games:
-                                self.logger.info(f"[NBA] Live game: {game['away_abbr']} vs {game['home_abbr']} - Q{game['period']}, {game['clock']}")
-                            if has_favorite_team:
-                                self.logger.info("[NBA] Found live game(s) for favorite team(s)")
-                        else:
-                            self.logger.info("[NBA] No live games found")
-                        self.last_log_time = current_time
-                    
-                    if new_live_games:
-                        # Update the current game with the latest data
-                        for new_game in new_live_games:
-                            if self.current_game and (
-                                (new_game["home_abbr"] == self.current_game["home_abbr"] and 
-                                 new_game["away_abbr"] == self.current_game["away_abbr"]) or
-                                (new_game["home_abbr"] == self.current_game["away_abbr"] and 
-                                 new_game["away_abbr"] == self.current_game["home_abbr"])
-                            ):
-                                self.current_game = new_game
-                                break
-                        
-                        # Only update the games list if we have new games
-                        if not self.live_games or set(game["away_abbr"] + game["home_abbr"] for game in new_live_games) != set(game["away_abbr"] + game["home_abbr"] for game in self.live_games):
-                            self.live_games = new_live_games
-                            # If we don't have a current game or it's not in the new list, start from the beginning
-                            if not self.current_game or self.current_game not in self.live_games:
-                                self.current_game_index = 0
-                                self.current_game = self.live_games[0]
-                                self.last_game_switch = current_time
-                        
-                        # Only update display if we have new data and enough time has passed
-                        if current_time - self.last_display_update >= 1.0:
-                            # self.display(force_clear=True) # REMOVED: DisplayController handles this
-                            self.last_display_update = current_time
-                    else:
-                        # No live games found
-                        self.live_games = []
-                        self.current_game = None
-                        self.has_favorite_team_game = False
 
-    def display(self, force_clear: bool = False):
+            # Fetch live game data
+            data = self._fetch_data()
+            new_live_games = []
+            if data and "events" in data:
+                for event in data["events"]:
+                    details = self._extract_game_details(event)
+                    if details and details["is_live"]:
+                        if not self.favorite_teams or (
+                            details["home_abbr"] in self.favorite_teams or
+                            details["away_abbr"] in self.favorite_teams
+                        ):
+                            # Fetch odds if enabled
+                            if self.show_odds:
+                                self._fetch_odds(details)
+                            new_live_games.append(details)
+
+                # Update game list and current game
+                if new_live_games:
+                    self.live_games = new_live_games
+                    if not self.current_game or self.current_game not in self.live_games:
+                        self.current_game_index = 0
+                        self.current_game = self.live_games[0] if self.live_games else None
+                        self.last_game_switch = current_time
+                    else:
+                        # Update current game with fresh data
+                        self.current_game = new_live_games[self.current_game_index]
+                else:
+                    self.live_games = []
+                    self.current_game = None
+
+    def display(self, force_clear: bool = False) -> None:
         """Display live game information."""
         if not self.current_game:
             return
-        super().display(force_clear)  # Call parent class's display method
+        super().display(force_clear)
+
 
 class NBARecentManager(BaseNBAManager):
     """Manager for recently completed NBA games."""
@@ -708,93 +751,67 @@ class NBARecentManager(BaseNBAManager):
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = 3600  # 1 hour for recent games
-        self.recent_hours = self.nba_config.get("recent_game_hours", 48)
         self.last_game_switch = 0
         self.game_display_duration = 15  # Display each game for 15 seconds
-        self.last_log_time = 0
-        self.log_interval = 300  # Only log status every 5 minutes
-        self.last_warning_time = 0
-        self.warning_cooldown = 300  # Only show warning every 5 minutes
-        self.logger.info(f"Initialized NBARecentManager with {len(self.favorite_teams)} favorite teams")
-        
+
     def update(self):
         """Update recent games data."""
         current_time = time.time()
         if current_time - self.last_update < self.update_interval:
             return
-            
+
         try:
-            # Fetch data from ESPN API
             data = self._fetch_data()
             if not data or 'events' not in data:
-                self.logger.warning("[NBA] No events found in ESPN API response")
                 return
-                
+
             events = data['events']
-            
-            # Process games
             new_recent_games = []
             for event in events:
                 game = self._extract_game_details(event)
-                # Filter for recent games: must be final and within the time window
                 if game and game['is_final'] and game['is_within_window']:
+                    # Fetch odds if enabled
+                    if self.show_odds:
+                        self._fetch_odds(game)
                     new_recent_games.append(game)
-            
+
             # Filter for favorite teams
-            new_team_games = [game for game in new_recent_games 
-                         if game['home_abbr'] in self.favorite_teams or 
-                            game['away_abbr'] in self.favorite_teams]
-            
-            # Only log if there's a change in games or enough time has passed
-            should_log = (
-                current_time - self.last_log_time >= self.log_interval or
-                len(new_team_games) != len(self.recent_games) or
-                not self.recent_games  # Log if we had no games before
-            )
-            
-            if should_log:
-                if new_team_games:
-                    self.logger.info(f"[NBA] Found {len(new_team_games)} recent games for favorite teams")
-                else:
-                    self.logger.info("[NBA] No recent games found for favorite teams")
-                self.last_log_time = current_time
-            
-            self.recent_games = new_team_games
+            if self.favorite_teams:
+                team_games = [game for game in new_recent_games 
+                             if game['home_abbr'] in self.favorite_teams or 
+                                game['away_abbr'] in self.favorite_teams]
+            else:
+                team_games = new_recent_games
+
+            self.recent_games = team_games
             if self.recent_games:
                 self.current_game = self.recent_games[0]
             self.last_update = current_time
-            
+
         except Exception as e:
             self.logger.error(f"[NBA] Error updating recent games: {e}", exc_info=True)
 
     def display(self, force_clear=False):
         """Display recent games."""
         if not self.recent_games:
-            current_time = time.time()
-            if current_time - self.last_warning_time > self.warning_cooldown:
-                self.logger.info("[NBA] No recent games to display")
-                self.last_warning_time = current_time
-            return  # Skip display update entirely
-            
+            return
+
         try:
             current_time = time.time()
-            
+
             # Check if it's time to switch games
             if current_time - self.last_game_switch >= self.game_display_duration:
-                # Move to next game
                 self.current_game_index = (self.current_game_index + 1) % len(self.recent_games)
                 self.current_game = self.recent_games[self.current_game_index]
                 self.last_game_switch = current_time
-                force_clear = True  # Force clear when switching games
-            
+                force_clear = True
+
             # Draw the scorebug layout
             self._draw_scorebug_layout(self.current_game, force_clear)
-            
-            # Update display
-            self.display_manager.update_display()
-            
+
         except Exception as e:
             self.logger.error(f"[NBA] Error displaying recent game: {e}", exc_info=True)
+
 
 class NBAUpcomingManager(BaseNBAManager):
     """Manager for upcoming NBA games."""
@@ -804,86 +821,55 @@ class NBAUpcomingManager(BaseNBAManager):
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = 3600  # 1 hour for upcoming games
-        self.last_warning_time = 0
-        self.warning_cooldown = 300  # Only show warning every 5 minutes
-        self.logger.info(f"Initialized NBAUpcomingManager with {len(self.favorite_teams)} favorite teams")
-        
+
     def update(self):
         """Update upcoming games data."""
         current_time = time.time()
         if current_time - self.last_update < self.update_interval:
             return
-            
+
         try:
-            # Fetch data from ESPN API
             data = self._fetch_data()
             if not data or 'events' not in data:
-                if current_time - self.last_warning_time > self.warning_cooldown:
-                    self.logger.warning("[NBA] No events found in ESPN API response")
-                    self.last_warning_time = current_time
-                self.games_list = []
-                self.current_game = None
-                self.last_update = current_time
                 return
-                
+
             events = data['events']
-            if self._should_log("fetch_success", 300):
-                self.logger.info(f"[NBA] Successfully fetched {len(events)} events from ESPN API")
-            
-            # Process games
             self.upcoming_games = []
             for event in events:
                 game = self._extract_game_details(event)
-                if game and game['is_upcoming']:  # Only check is_upcoming, not is_within_window
+                if game and game['is_upcoming']:
+                    # Fetch odds if enabled
+                    if self.show_odds:
+                        self._fetch_odds(game)
                     self.upcoming_games.append(game)
-                    self.logger.debug(f"Processing upcoming game: {game['away_abbr']} vs {game['home_abbr']}")
-            
+
             # Filter for favorite teams
-            team_games = [game for game in self.upcoming_games 
-                         if game['home_abbr'] in self.favorite_teams or 
-                            game['away_abbr'] in self.favorite_teams]
-            
-            if self._should_log("team_games", 300):
-                self.logger.info(f"[NBA] Found {len(team_games)} upcoming games for favorite teams")
-            
-            if not team_games:
-                if current_time - self.last_warning_time > self.warning_cooldown:
-                    self.logger.info("[NBA] No upcoming games found for favorite teams")
-                    self.last_warning_time = current_time
-                self.games_list = []
-                self.current_game = None
-                self.last_update = current_time
-                return
-            
-            self.games_list = team_games
-            self.current_game = team_games[0]
+            if self.favorite_teams:
+                team_games = [game for game in self.upcoming_games 
+                             if game['home_abbr'] in self.favorite_teams or 
+                                game['away_abbr'] in self.favorite_teams]
+            else:
+                team_games = self.upcoming_games
+
+            if team_games:
+                self.current_game = team_games[0]
             self.last_update = current_time
-            
+
         except Exception as e:
             self.logger.error(f"[NBA] Error updating upcoming games: {e}", exc_info=True)
-            self.games_list = []
-            self.current_game = None
-            self.last_update = current_time
 
     def display(self, force_clear=False):
         """Display upcoming games."""
-        if not self.games_list:
-            current_time = time.time()
-            if current_time - self.last_warning_time > self.warning_cooldown:
-                self.logger.info("[NBA] No upcoming games to display")
-                self.last_warning_time = current_time
-            return  # Skip display update entirely
-            
+        if not self.upcoming_games:
+            return
+
         try:
             # Draw the scorebug layout
             self._draw_scorebug_layout(self.current_game, force_clear)
-            
-            # Update display
-            self.display_manager.update_display()
-            
+
             # Move to next game
-            self.current_game_index = (self.current_game_index + 1) % len(self.games_list)
-            self.current_game = self.games_list[self.current_game_index]
-            
+            self.current_game_index = (self.current_game_index + 1) % len(self.upcoming_games)
+            self.current_game = self.upcoming_games[self.current_game_index]
+
         except Exception as e:
             self.logger.error(f"[NBA] Error displaying upcoming game: {e}", exc_info=True) 

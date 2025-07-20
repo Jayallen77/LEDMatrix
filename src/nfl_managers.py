@@ -279,6 +279,86 @@ class BaseNFLManager: # Renamed class
             fonts['detail'] = ImageFont.load_default()
         return fonts
 
+    def _draw_dynamic_odds(self, draw: ImageDraw.Draw, odds: Dict[str, Any], width: int, height: int) -> None:
+        """Draw odds with dynamic positioning - only show negative spread and position O/U based on favored team."""
+        home_team_odds = odds.get('home_team_odds', {})
+        away_team_odds = odds.get('away_team_odds', {})
+        home_spread = home_team_odds.get('spread_odds')
+        away_spread = away_team_odds.get('spread_odds')
+
+        # Get top-level spread as fallback
+        top_level_spread = odds.get('spread')
+        
+        # If we have a top-level spread and the individual spreads are None or 0, use the top-level
+        if top_level_spread is not None:
+            if home_spread is None or home_spread == 0.0:
+                home_spread = top_level_spread
+            if away_spread is None:
+                away_spread = -top_level_spread
+
+        # Determine which team is favored (has negative spread)
+        home_favored = home_spread is not None and home_spread < 0
+        away_favored = away_spread is not None and away_spread < 0
+        
+        # Only show the negative spread (favored team)
+        favored_spread = None
+        favored_side = None
+        
+        if home_favored:
+            favored_spread = home_spread
+            favored_side = 'home'
+            self.logger.debug(f"Home team favored with spread: {favored_spread}")
+        elif away_favored:
+            favored_spread = away_spread
+            favored_side = 'away'
+            self.logger.debug(f"Away team favored with spread: {favored_spread}")
+        else:
+            self.logger.debug("No clear favorite - spreads: home={home_spread}, away={away_spread}")
+        
+        # Show the negative spread on the appropriate side
+        if favored_spread is not None:
+            spread_text = str(favored_spread)
+            font = self.fonts['detail']  # Use detail font for odds
+            
+            if favored_side == 'home':
+                # Home team is favored, show spread on right side
+                spread_width = draw.textlength(spread_text, font=font)
+                spread_x = width - spread_width - 2  # Top right
+                spread_y = 2
+                self._draw_text_with_outline(draw, spread_text, (spread_x, spread_y), font, fill=(0, 255, 0))
+                self.logger.debug(f"Showing home spread '{spread_text}' on right side")
+            else:
+                # Away team is favored, show spread on left side
+                spread_x = 2  # Top left
+                spread_y = 2
+                self._draw_text_with_outline(draw, spread_text, (spread_x, spread_y), font, fill=(0, 255, 0))
+                self.logger.debug(f"Showing away spread '{spread_text}' on left side")
+        
+        # Show over/under on the opposite side of the favored team
+        over_under = odds.get('over_under')
+        if over_under is not None:
+            ou_text = f"O/U: {over_under}"
+            font = self.fonts['detail']  # Use detail font for odds
+            ou_width = draw.textlength(ou_text, font=font)
+            
+            if favored_side == 'home':
+                # Home team is favored, show O/U on left side (opposite of spread)
+                ou_x = 2  # Top left
+                ou_y = 2
+                self.logger.debug(f"Showing O/U '{ou_text}' on left side (home favored)")
+            elif favored_side == 'away':
+                # Away team is favored, show O/U on right side (opposite of spread)
+                ou_x = width - ou_width - 2  # Top right
+                ou_y = 2
+                self.logger.debug(f"Showing O/U '{ou_text}' on right side (away favored)")
+            else:
+                # No clear favorite, show O/U in center
+                ou_x = (width - ou_width) // 2
+                ou_y = 2
+                self.logger.debug(f"Showing O/U '{ou_text}' in center (no clear favorite)")
+            
+            self._draw_text_with_outline(draw, ou_text, (ou_x, ou_y), font, fill=(0, 255, 0))
+
     def _draw_text_with_outline(self, draw, text, position, font, fill=(255, 255, 255), outline_color=(0, 0, 0)):
         """Draw text with a black outline for better readability."""
         x, y = position
@@ -580,6 +660,9 @@ class NFLLiveManager(BaseNFLManager): # Renamed class
                                 details["home_abbr"] in self.favorite_teams or
                                 details["away_abbr"] in self.favorite_teams
                             ):
+                                # Fetch odds if enabled
+                                if self.show_odds:
+                                    self._fetch_odds(details)
                                 new_live_games.append(details)
 
                     # Log changes or periodically
@@ -769,6 +852,10 @@ class NFLLiveManager(BaseNFLManager): # Renamed class
                 color = (255, 255, 255) if i < home_timeouts_remaining else (80, 80, 80) # White if available, gray if used
                 draw_overlay.rectangle([to_x, timeout_y, to_x + timeout_bar_width, timeout_y + timeout_bar_height], fill=color, outline=(0,0,0))
 
+            # Draw odds if available
+            if 'odds' in game and game['odds']:
+                self._draw_dynamic_odds(draw_overlay, game['odds'], self.display_width, self.display_height)
+
             # Composite the text overlay onto the main image
             main_img = Image.alpha_composite(main_img, overlay)
             main_img = main_img.convert('RGB') # Convert for display
@@ -820,6 +907,9 @@ class NFLRecentManager(BaseNFLManager): # Renamed class
                 game = self._extract_game_details(event)
                 # Filter criteria: must be final, within time window
                 if game and game['is_final'] and game.get('is_within_window', True): # Assume within window if key missing
+                    # Fetch odds if enabled
+                    if self.show_odds:
+                        self._fetch_odds(game)
                     processed_games.append(game)
 
             # Filter for favorite teams
@@ -915,6 +1005,10 @@ class NFLRecentManager(BaseNFLManager): # Renamed class
             status_y = 1
             self._draw_text_with_outline(draw_overlay, status_text, (status_x, status_y), self.fonts['time'])
 
+            # Draw odds if available
+            if 'odds' in game and game['odds']:
+                self._draw_dynamic_odds(draw_overlay, game['odds'], self.display_width, self.display_height)
+
             # Composite and display
             main_img = Image.alpha_composite(main_img, overlay)
             main_img = main_img.convert('RGB')
@@ -992,6 +1086,9 @@ class NFLUpcomingManager(BaseNFLManager): # Renamed class
                 game = self._extract_game_details(event)
                 # Filter criteria: must be upcoming ('pre' state) and within time window
                 if game and game['is_upcoming'] and game.get('is_within_window', True): # Assume within window if key missing
+                     # Fetch odds if enabled
+                     if self.show_odds:
+                         self._fetch_odds(game)
                      processed_games.append(game)
 
             # Filter for favorite teams
@@ -1104,6 +1201,10 @@ class NFLUpcomingManager(BaseNFLManager): # Renamed class
             time_x = (self.display_width - time_width) // 2
             time_y = date_y + 9 # Place time below date
             self._draw_text_with_outline(draw_overlay, game_time, (time_x, time_y), self.fonts['time'])
+
+            # Draw odds if available
+            if 'odds' in game and game['odds']:
+                self._draw_dynamic_odds(draw_overlay, game['odds'], self.display_width, self.display_height)
 
             # Composite and display
             main_img = Image.alpha_composite(main_img, overlay)

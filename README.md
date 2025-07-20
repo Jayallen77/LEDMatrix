@@ -62,6 +62,45 @@ The system supports live, recent, and upcoming game information for multiple spo
 - Soccer
 - (Note, some of these sports seasons were not active during development and might need fine tuning when games are active)
 
+### Odds Ticker Feature
+The system includes a comprehensive odds ticker that displays betting odds for upcoming sports games across multiple leagues. The ticker shows game times, team logos, spreads, money lines, and over/under totals in a scrolling format.
+
+**Features:**
+- **Multi-League Support**: NFL, NBA, MLB, NCAA Football
+- **Configurable Leagues**: Choose which leagues to display
+- **Favorite Teams Filter**: Option to show only favorite teams or all games
+- **Team Logos**: Displays team logos alongside odds information
+- **Comprehensive Odds**: Shows spreads, money lines, and over/under totals
+- **Scrolling Display**: Smooth scrolling text with team logos
+- **Time Display**: Shows game times in local timezone
+
+**Display Format:**
+```
+[12:00 PM] DAL -6.5 ML -200 O/U 47.5 vs NYG ML +175
+```
+
+**Configuration:**
+Add the following section to your `config/config.json`:
+```json
+{
+    "odds_ticker": {
+        "enabled": true,
+        "show_favorite_teams_only": false,
+        "enabled_leagues": ["nfl", "nba", "mlb", "ncaa_fb"],
+        "update_interval": 3600,
+        "scroll_speed": 2,
+        "scroll_delay": 0.05,
+        "display_duration": 30
+    }
+}
+```
+
+**Testing:**
+You can test the odds ticker functionality using:
+```bash
+python test_odds_ticker.py
+```
+
 ### Financial Information
 - Near real-time stock & crypto price updates
 - Stock news headlines
@@ -298,6 +337,99 @@ The calendar display will show:
 - Event date and time
 - Event title (wrapped to fit the display)
 - Up to 3 upcoming events (configurable)
+
+## Odds Ticker Configuration
+
+The odds ticker displays betting odds for upcoming sports games. To configure it:
+
+1. In `config/config.json`, add the following section:
+```json
+{
+    "odds_ticker": {
+        "enabled": true,
+        "show_favorite_teams_only": false,
+        "enabled_leagues": ["nfl", "nba", "mlb", "ncaa_fb"],
+        "update_interval": 3600,
+        "scroll_speed": 2,
+        "scroll_delay": 0.05,
+        "display_duration": 30
+    }
+}
+```
+
+### Configuration Options
+
+- **`enabled`**: Enable/disable the odds ticker (default: false)
+- **`show_favorite_teams_only`**: Show only games involving favorite teams (default: false)
+- **`enabled_leagues`**: Array of leagues to display (options: "nfl", "nba", "mlb", "ncaa_fb")
+- **`update_interval`**: How often to fetch new odds data in seconds (default: 3600)
+- **`scroll_speed`**: Pixels to scroll per update (default: 2)
+- **`scroll_delay`**: Delay between scroll updates in seconds (default: 0.05)
+- **`display_duration`**: How long to show each game in seconds (default: 30)
+
+### Display Format
+
+The odds ticker shows information in this format:
+```
+[12:00 PM] DAL -6.5 ML -200 O/U 47.5 vs NYG ML +175
+```
+
+Where:
+- `[12:00 PM]` - Game time in local timezone
+- `DAL` - Away team abbreviation
+- `-6.5` - Spread for away team (negative = favored)
+- `ML -200` - Money line for away team
+- `O/U 47.5` - Over/under total
+- `vs` - Separator
+- `NYG` - Home team abbreviation
+- `ML +175` - Money line for home team
+
+### Team Logos
+
+The ticker displays team logos alongside the text:
+- Away team logo appears to the left of the text
+- Home team logo appears to the right of the text
+- Logos are automatically resized to fit the display
+
+### Requirements
+
+- ESPN API access for odds data
+- Team logo files in the appropriate directories:
+  - `assets/sports/nfl_logos/`
+  - `assets/sports/nba_logos/`
+  - `assets/sports/mlb_logos/`
+  - `assets/sports/ncaa_fbs_logos/`
+
+### Troubleshooting
+
+**No Games Displayed:**
+1. **League Configuration**: Ensure the leagues you want are enabled in their respective config sections
+2. **Favorite Teams**: If `show_favorite_teams_only` is true, ensure you have favorite teams configured
+3. **API Access**: Verify ESPN API is accessible and returning data
+4. **Time Window**: The ticker only shows games in the next 7 days
+
+**No Odds Data:**
+1. **API Timing**: Odds may not be available immediately when games are scheduled
+2. **League Support**: Not all leagues may have odds data available
+3. **API Limits**: ESPN API may have rate limits or temporary issues
+
+**Performance Issues:**
+1. **Reduce scroll_speed**: Try setting it to 1 instead of 2
+2. **Increase scroll_delay**: Try 0.1 instead of 0.05
+3. **Check system resources**: Ensure the Raspberry Pi has adequate resources
+
+### Testing
+
+You can test the odds ticker functionality using:
+```bash
+python test_odds_ticker.py
+```
+
+This will:
+1. Initialize the odds ticker
+2. Fetch upcoming games and odds
+3. Display sample games
+4. Test the scrolling functionality
 
 ## Music Display Configuration
 

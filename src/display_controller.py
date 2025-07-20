@@ -18,6 +18,7 @@ from src.display_manager import DisplayManager
 from src.config_manager import ConfigManager
 from src.stock_manager import StockManager
 from src.stock_news_manager import StockNewsManager
+from src.odds_ticker_manager import OddsTickerManager
 from src.nhl_managers import NHLLiveManager, NHLRecentManager, NHLUpcomingManager
 from src.nba_managers import NBALiveManager, NBARecentManager, NBAUpcomingManager
 from src.mlb_manager import MLBLiveManager, MLBRecentManager, MLBUpcomingManager
@@ -54,6 +55,7 @@ class DisplayController:
         self.weather = WeatherManager(self.config, self.display_manager) if self.config.get('weather', {}).get('enabled', False) else None
         self.stocks = StockManager(self.config, self.display_manager) if self.config.get('stocks', {}).get('enabled', False) else None
         self.news = StockNewsManager(self.config, self.display_manager) if self.config.get('stock_news', {}).get('enabled', False) else None
+        self.odds_ticker = OddsTickerManager(self.config, self.display_manager) if self.config.get('odds_ticker', {}).get('enabled', False) else None
         self.calendar = CalendarManager(self.display_manager, self.config) if self.config.get('calendar', {}).get('enabled', False) else None
         self.youtube = YouTubeDisplay(self.display_manager, self.config) if self.config.get('youtube', {}).get('enabled', False) else None
         self.text_display = TextDisplay(self.display_manager, self.config) if self.config.get('text_display', {}).get('enabled', False) else None
@@ -234,6 +236,7 @@ class DisplayController:
         if self.weather: self.available_modes.extend(['weather_current', 'weather_hourly', 'weather_daily'])
         if self.stocks: self.available_modes.append('stocks')
         if self.news: self.available_modes.append('stock_news')
+        if self.odds_ticker: self.available_modes.append('odds_ticker')
         if self.calendar: self.available_modes.append('calendar')
         if self.youtube: self.available_modes.append('youtube')
         if self.text_display: self.available_modes.append('text_display')
@@ -461,6 +464,7 @@ class DisplayController:
         if self.weather: self.weather.get_weather()
         if self.stocks: self.stocks.update_stock_data()
         if self.news: self.news.update_news_data()
+        if self.odds_ticker: self.odds_ticker.update()
         if self.calendar: self.calendar.update(time.time())
         if self.youtube: self.youtube.update()
         if self.text_display: self.text_display.update()
@@ -965,13 +969,15 @@ class DisplayController:
                         elif self.current_display_mode == 'stocks' and self.stocks:
                              manager_to_display = self.stocks
                         elif self.current_display_mode == 'stock_news' and self.news:
-                              manager_to_display = self.news
+                             manager_to_display = self.news
+                        elif self.current_display_mode == 'odds_ticker' and self.odds_ticker:
+                             manager_to_display = self.odds_ticker
                         elif self.current_display_mode == 'calendar' and self.calendar:
-                              manager_to_display = self.calendar
+                             manager_to_display = self.calendar
                         elif self.current_display_mode == 'youtube' and self.youtube:
-                              manager_to_display = self.youtube
+                             manager_to_display = self.youtube
                         elif self.current_display_mode == 'text_display' and self.text_display:
-                              manager_to_display = self.text_display
+                             manager_to_display = self.text_display
                         # Add other regular managers (NHL recent/upcoming, NBA, MLB, Soccer, NFL, NCAA FB)
                         elif self.current_display_mode == 'nhl_recent' and self.nhl_recent:
                             manager_to_display = self.nhl_recent
@@ -1035,6 +1041,8 @@ class DisplayController:
                             manager_to_display.display_stocks(force_clear=self.force_clear)
                         elif self.current_display_mode == 'stock_news':
                              manager_to_display.display_news() # Assumes internal clearing
+                        elif self.current_display_mode == 'odds_ticker':
+                             manager_to_display.display(force_clear=self.force_clear)
                         elif self.current_display_mode == 'calendar':
                              manager_to_display.display(force_clear=self.force_clear)
                         elif self.current_display_mode == 'youtube':

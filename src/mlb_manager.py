@@ -285,20 +285,19 @@ class BaseMLBManager:
             self.display_manager.draw = draw
             self.display_manager._draw_bdf_text(status_text, status_x, status_y, color=(255, 255, 255), font=self.display_manager.calendar_font)
             
-            # Show spreads and over/under if available
+            # Always show scores for recent/final games
+            away_score = str(game_data['away_score'])
+            home_score = str(game_data['home_score'])
+            display_text = f"{away_score}-{home_score}"
+            font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 12)
+            display_width = draw.textlength(display_text, font=font)
+            display_x = (width - display_width) // 2
+            display_y = (height - font.size) // 2
+            self._draw_text_with_outline(draw, display_text, (display_x, display_y), font, fill=(255, 255, 255))
+            
+            # Show spreads and over/under if available (on top of scores)
             if 'odds' in game_data and game_data['odds']:
                 self._draw_dynamic_odds(draw, game_data['odds'], width, height)
-            
-            # Show score in center if no odds available
-            if 'odds' not in game_data or not game_data['odds']:
-                away_score = str(game_data['away_score'])
-                home_score = str(game_data['home_score'])
-                display_text = f"{away_score}-{home_score}"
-                font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 12)
-                display_width = draw.textlength(display_text, font=font)
-                display_x = (width - display_width) // 2
-                display_y = (height - font.size) // 2
-                self._draw_text_with_outline(draw, display_text, (display_x, display_y), font, fill=(255, 255, 255))
 
         # For live games, show detailed game state
         elif game_data['status'] == 'status_in_progress' or game_data.get('live', False):
