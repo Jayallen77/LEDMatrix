@@ -110,7 +110,7 @@
     "odds_ticker": {
         "enabled": true,
         "show_favorite_teams_only": false,
-        "enabled_leagues": ["nfl", "nba", "mlb", "ncaa_fb"],
+        "enabled_leagues": ["mlb"],
         "update_interval": 3600,
         "scroll_speed": 2,
         "scroll_delay": 0.05,
@@ -142,7 +142,7 @@
         }
     },
     "nba_scoreboard": {
-        "enabled": false,
+        "enabled": true,
         "show_odds": false,
         "test_mode": false,
         "update_interval_seconds": 3600,
@@ -161,7 +161,7 @@
         }
     },
     "nfl_scoreboard": {
-        "enabled": false,
+        "enabled": true,
         "show_odds": false,
         "test_mode": false,
         "update_interval_seconds": 3600,
@@ -179,7 +179,7 @@
         }
     },
     "ncaa_fb_scoreboard": {
-        "enabled": false,
+        "enabled": true,
         "show_odds": false,
         "test_mode": false,
         "update_interval_seconds": 3600,
