@@ -266,35 +266,107 @@ class BaseMLBManager:
             self.display_manager.draw = draw
             self.display_manager._draw_bdf_text(status_text, status_x, status_y, color=(255, 255, 255), font=self.display_manager.calendar_font)
             
-            # DEBUG: Draw spread in the center. If not available, show score.
-            display_text = None
-            font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 12)
-            text_color = (255, 255, 255)
-
+            # DEBUG: Draw spread in the center to check if data is loading
             if 'odds' in game_data and game_data['odds']:
                 odds = game_data['odds']
                 home_team_odds = odds.get('home_team_odds', {})
+                away_team_odds = odds.get('away_team_odds', {})
                 home_spread = home_team_odds.get('spread_odds')
+                away_spread = away_team_odds.get('spread_odds')
 
                 if home_spread is None:
                     # Fallback for different API structures
                     home_spread = odds.get('spread')
-                
-                if home_spread is not None:
-                    display_text = str(home_spread)
-                    text_color = (0, 255, 0) # Green for debug
 
-            # If spread was not found, fallback to score
-            if display_text is None:
+                # Show away team spread on left side
+                if away_spread is not None:
+                    away_spread_text = str(away_spread)
+                    font = self.display_manager.small_font
+                    away_spread_width = draw.textlength(away_spread_text, font=font)
+                    away_spread_x = 2  # Top left for away team
+                    away_spread_y = 2
+                    self._draw_text_with_outline(draw, away_spread_text, (away_spread_x, away_spread_y), font, fill=(0, 255, 0))
+                
+                # Show home team spread on right side
+                if home_spread is not None:
+                    home_spread_text = str(home_spread)
+                    font = self.display_manager.small_font
+                    home_spread_width = draw.textlength(home_spread_text, font=font)
+                    home_spread_x = width - home_spread_width - 2  # Top right for home team
+                    home_spread_y = 2
+                    self._draw_text_with_outline(draw, home_spread_text, (home_spread_x, home_spread_y), font, fill=(0, 255, 0))
+                
+                # Also show over/under at bottom center
+                over_under = odds.get('over_under')
+                if over_under is not None:
+                    ou_text = f"O/U: {over_under}"
+                    ou_width = draw.textlength(ou_text, font=font)
+                    ou_x = (width - ou_width) // 2
+                    ou_y = height - font.size - 2
+                    self._draw_text_with_outline(draw, ou_text, (ou_x, ou_y), font, fill=(0, 255, 0))
+        
+        # For recent/final games, show scores and status
+        elif game_data['status'] in ['status_final', 'final', 'completed']:
+            # Show "Final" at the top using NHL-style font
+            status_text = "Final"
+            # Set font size for BDF font
+            self.display_manager.calendar_font.set_char_size(height=7*64)  # 7 pixels high, 64 units per pixel
+            status_width = self.display_manager.get_text_width(status_text, self.display_manager.calendar_font)
+            status_x = (width - status_width) // 2
+            status_y = 2
+            # Draw on the current image
+            self.display_manager.draw = draw
+            self.display_manager._draw_bdf_text(status_text, status_x, status_y, color=(255, 255, 255), font=self.display_manager.calendar_font)
+            
+            # Show spreads and over/under if available
+            if 'odds' in game_data and game_data['odds']:
+                odds = game_data['odds']
+                home_team_odds = odds.get('home_team_odds', {})
+                away_team_odds = odds.get('away_team_odds', {})
+                home_spread = home_team_odds.get('spread_odds')
+                away_spread = away_team_odds.get('spread_odds')
+
+                if home_spread is None:
+                    # Fallback for different API structures
+                    home_spread = odds.get('spread')
+
+                # Show away team spread on left side
+                if away_spread is not None:
+                    away_spread_text = str(away_spread)
+                    font = self.display_manager.small_font
+                    away_spread_width = draw.textlength(away_spread_text, font=font)
+                    away_spread_x = 2  # Top left for away team
+                    away_spread_y = 2
+                    self._draw_text_with_outline(draw, away_spread_text, (away_spread_x, away_spread_y), font, fill=(0, 255, 0))
+                
+                # Show home team spread on right side
+                if home_spread is not None:
+                    home_spread_text = str(home_spread)
+                    font = self.display_manager.small_font
+                    home_spread_width = draw.textlength(home_spread_text, font=font)
+                    home_spread_x = width - home_spread_width - 2  # Top right for home team
+                    home_spread_y = 2
+                    self._draw_text_with_outline(draw, home_spread_text, (home_spread_x, home_spread_y), font, fill=(0, 255, 0))
+                
+                # Also show over/under at bottom center
+                over_under = odds.get('over_under')
+                if over_under is not None:
+                    ou_text = f"O/U: {over_under}"
+                    ou_width = draw.textlength(ou_text, font=font)
+                    ou_x = (width - ou_width) // 2
+                    ou_y = height - font.size - 2
+                    self._draw_text_with_outline(draw, ou_text, (ou_x, ou_y), font, fill=(0, 255, 0))
+            
+            # Show score in center if no odds available
+            if 'odds' not in game_data or not game_data['odds']:
                 away_score = str(game_data['away_score'])
                 home_score = str(game_data['home_score'])
                 display_text = f"{away_score}-{home_score}"
-
-            # Draw the determined text
-            display_width = draw.textlength(display_text, font=font)
-            display_x = (width - display_width) // 2
-            display_y = (height - font.size) // 2
-            self._draw_text_with_outline(draw, display_text, (display_x, display_y), font, fill=text_color)
+                font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 12)
+                display_width = draw.textlength(display_text, font=font)
+                display_x = (width - display_width) // 2
+                display_y = (height - font.size) // 2
+                self._draw_text_with_outline(draw, display_text, (display_x, display_y), font, fill=(255, 255, 255))
 
         # For live games, show detailed game state
         elif game_data['status'] == 'status_in_progress' or game_data.get('live', False):
