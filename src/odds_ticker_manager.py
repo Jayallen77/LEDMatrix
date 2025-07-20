@@ -141,20 +141,10 @@ class OddsTickerManager:
         # Sort games by start time
         games_data.sort(key=lambda x: x.get('start_time', datetime.max))
         
-        # Filter for favorite teams if enabled
+        # Filter for favorite teams if enabled (now handled in _fetch_league_games)
+        # This filtering is now redundant since we filter before fetching odds
         if self.show_favorite_teams_only:
-            all_favorite_teams = []
-            for league_config in self.league_configs.values():
-                all_favorite_teams.extend(league_config.get('favorite_teams', []))
-            
-            logger.info(f"Filtering for favorite teams: {all_favorite_teams}")
-            original_count = len(games_data)
-            games_data = [
-                game for game in games_data 
-                if (game.get('home_team') in all_favorite_teams or 
-                    game.get('away_team') in all_favorite_teams)
-            ]
-            logger.info(f"Filtered from {original_count} to {len(games_data)} games")
+            logger.debug("Favorite team filtering already applied during game fetching")
         
         logger.info(f"Total games found: {len(games_data)}")
         return games_data
@@ -201,9 +191,16 @@ class OddsTickerManager:
                             home_abbr = home_team['team']['abbreviation']
                             away_abbr = away_team['team']['abbreviation']
                             
+                            # Check if this game involves favorite teams BEFORE fetching odds
+                            if self.show_favorite_teams_only:
+                                favorite_teams = league_config.get('favorite_teams', [])
+                                if home_abbr not in favorite_teams and away_abbr not in favorite_teams:
+                                    logger.debug(f"Skipping game {home_abbr} vs {away_abbr} - no favorite teams involved")
+                                    continue
+                            
                             logger.info(f"Found upcoming game: {away_abbr} @ {home_abbr} on {game_time}")
                             
-                            # Fetch odds for this game
+                            # Fetch odds for this game (only if it involves favorite teams)
                             odds_data = self.odds_manager.get_odds(
                                 sport=sport,
                                 league=league,

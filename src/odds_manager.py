@@ -79,5 +79,7 @@ class OddsManager:
             self.logger.debug(f"Returning extracted odds data: {json.dumps(extracted_data, indent=2)}")
             return extracted_data
         
+        # Log the actual response structure when no items are found
         self.logger.warning("No 'items' found in ESPN odds data.")
+        self.logger.warning(f"Actual response structure: {json.dumps(data, indent=2)}")
         return None 
