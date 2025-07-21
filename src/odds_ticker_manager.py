@@ -213,72 +213,59 @@ class OddsTickerManager:
     def _fetch_league_games(self, league_config: Dict[str, Any], now: datetime) -> List[Dict[str, Any]]:
         """Fetch upcoming games for a specific league."""
         games = []
-        
-        # Get dates for API request (yesterday, today, tomorrow - same as MLB manager)
         yesterday = now - timedelta(days=1)
-        # Use user-configurable future_fetch_days
         future_window = now + timedelta(days=self.future_fetch_days)
-        # Build a list of dates from yesterday to future_window
         num_days = (future_window - yesterday).days + 1
         dates = [(yesterday + timedelta(days=i)).strftime("%Y%m%d") for i in range(num_days)]
-        
+
+        # Optimization: If showing favorite teams only, track games found per team
+        favorite_teams = league_config.get('favorite_teams', []) if self.show_favorite_teams_only else []
+        team_games_found = {team: 0 for team in favorite_teams}
+        max_games = self.games_per_favorite_team if self.show_favorite_teams_only else None
+        all_games = []
+
         for date in dates:
+            if self.show_favorite_teams_only and all(team_games_found[t] >= max_games for t in favorite_teams):
+                break  # All favorite teams have enough games, stop searching
             try:
-                # ESPN API endpoint for games with date parameter
                 sport = league_config['sport']
                 league = league_config['league']
                 url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/scoreboard?dates={date}"
-                
                 logger.debug(f"Fetching {league} games from ESPN API for date: {date}")
                 response = requests.get(url, timeout=10)
                 response.raise_for_status()
-                
                 data = response.json()
-                
                 for event in data.get('events', []):
                     game_id = event['id']
                     status = event['status']['type']['name'].lower()
-                    logger.debug(f"Event {game_id}: status={status}")
-                    
-                    # Only include upcoming games (handle both 'scheduled' and 'status_scheduled')
                     if status in ['scheduled', 'pre-game', 'status_scheduled']:
                         game_time = datetime.fromisoformat(event['date'].replace('Z', '+00:00'))
-                        
-                        # Only include games in the next 3 days (same as MLB manager)
                         if now <= game_time <= future_window:
-                            # Get team information
                             competitors = event['competitions'][0]['competitors']
                             home_team = next(c for c in competitors if c['homeAway'] == 'home')
                             away_team = next(c for c in competitors if c['homeAway'] == 'away')
-                            
                             home_abbr = home_team['team']['abbreviation']
                             away_abbr = away_team['team']['abbreviation']
-                            
-                            # Get records directly from the scoreboard feed
+                            # Only process favorite teams if enabled
+                            if self.show_favorite_teams_only:
+                                # Skip if both teams have already met their quota
+                                for team in [home_abbr, away_abbr]:
+                                    if team in team_games_found and team_games_found[team] >= max_games:
+                                        continue
+                                # Only add if at least one team still needs games
+                                if not ((home_abbr in team_games_found and team_games_found[home_abbr] < max_games) or (away_abbr in team_games_found and team_games_found[away_abbr] < max_games)):
+                                    continue
+                            # Build game dict (existing logic)
                             home_record = home_team.get('records', [{}])[0].get('summary', '') if home_team.get('records') else ''
                             away_record = away_team.get('records', [{}])[0].get('summary', '') if away_team.get('records') else ''
-
-                            # Check if this game involves favorite teams BEFORE fetching odds
-                            if self.show_favorite_teams_only:
-                                favorite_teams = league_config.get('favorite_teams', [])
-                                if home_abbr not in favorite_teams and away_abbr not in favorite_teams:
-                                    logger.debug(f"Skipping game {home_abbr} vs {away_abbr} - no favorite teams involved")
-                                    continue
-                            
-                            logger.debug(f"Found upcoming game: {away_abbr} @ {home_abbr} on {game_time}")
-                            
-                            # Fetch odds for this game (only if it involves favorite teams)
                             odds_data = self.odds_manager.get_odds(
                                 sport=sport,
                                 league=league,
                                 event_id=game_id,
-                                update_interval_seconds=7200  # Cache for 2 hours instead of 1 hour
+                                update_interval_seconds=7200
                             )
-                            
-                            # Check if odds data has actual values (similar to MLB manager)
                             has_odds = False
                             if odds_data and not odds_data.get('no_odds'):
-                                # Check if the odds data has any non-null values
                                 if odds_data.get('spread') is not None:
                                     has_odds = True
                                 if odds_data.get('home_team_odds', {}).get('spread_odds') is not None:
@@ -287,34 +274,24 @@ class OddsTickerManager:
                                     has_odds = True
                                 if odds_data.get('over_under') is not None:
                                     has_odds = True
-                            
-                            if not has_odds:
-                                logger.debug(f"Game {game_id} has no valid odds data, setting odds to None")
-                                odds_data = None
-                            
-                            game_data = {
+                            game = {
                                 'id': game_id,
-                                'league': league_config['league'],
-                                'league_key': league_config['sport'],
                                 'home_team': home_abbr,
                                 'away_team': away_abbr,
                                 'start_time': game_time,
-                                'odds': odds_data,
-                                'logo_dir': league_config['logo_dir'],
                                 'home_record': home_record,
-                                'away_record': away_record
+                                'away_record': away_record,
+                                'odds': odds_data if has_odds else None
                             }
-                            
-                            games.append(game_data)
-                        else:
-                            logger.debug(f"Game {game_id} is outside 3-day window: {game_time}")
-                    else:
-                        logger.debug(f"Game {game_id} has status '{status}', skipping")
-                
+                            all_games.append(game)
+                            # If favorite teams only, increment counters
+                            if self.show_favorite_teams_only:
+                                for team in [home_abbr, away_abbr]:
+                                    if team in team_games_found and team_games_found[team] < max_games:
+                                        team_games_found[team] += 1
             except Exception as e:
-                logger.error(f"Error fetching {league_config['league']} games for date {date}: {e}")
-        
-        return games
+                logger.error(f"Error fetching games for {league_config.get('league', 'unknown')} on {date}: {e}", exc_info=True)
+        return all_games
 
     def _format_odds_text(self, game: Dict[str, Any]) -> str:
         """Format the odds text for display."""
@@ -393,9 +370,9 @@ class OddsTickerManager:
         height = self.display_manager.matrix.height
         
         # Make logos use most of the display height, with a small margin
-        logo_margin = 2
-        logo_size = height - 2 * logo_margin
-        logo_padding = 5
+        logo_margin = 0
+        logo_size = int(height * 1.2)
+        logo_padding = 2
         vs_padding = 8
         section_padding = 12
 

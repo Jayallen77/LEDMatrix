@@ -168,8 +168,8 @@
         }
     },
     "nfl_scoreboard": {
-        "enabled": false,
-        "show_odds": false,
+        "enabled": true,
+        "show_odds": true,
         "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 30,
@@ -187,7 +187,7 @@
         }
     },
     "ncaa_fb_scoreboard": {
-        "enabled": false,
+        "enabled": true,
         "show_odds": true,
         "test_mode": false,
         "update_interval_seconds": 3600,
