@@ -147,17 +147,29 @@ class OddsTickerManager:
             logger.debug("Favorite team filtering already applied during game fetching")
         
         logger.info(f"Total games found: {len(games_data)}")
+        
+        # Log details about found games
+        if games_data:
+            logger.info("Games found:")
+            for i, game in enumerate(games_data):
+                odds_status = "Has odds" if game.get('odds') else "No odds"
+                logger.info(f"  {i+1}. {game['away_team']} @ {game['home_team']} - {odds_status}")
+        
         return games_data
 
     def _fetch_league_games(self, league_config: Dict[str, Any], now: datetime) -> List[Dict[str, Any]]:
         """Fetch upcoming games for a specific league."""
         games = []
         
-        # Get dates for API request (today and next 7 days)
-        dates = []
-        for i in range(8):  # Today + 7 days
-            date = now + timedelta(days=i)
-            dates.append(date.strftime("%Y%m%d"))
+        # Get dates for API request (yesterday, today, tomorrow - same as MLB manager)
+        yesterday = now - timedelta(days=1)
+        tomorrow = now + timedelta(days=1)
+        
+        dates = [
+            yesterday.strftime("%Y%m%d"),
+            now.strftime("%Y%m%d"),
+            tomorrow.strftime("%Y%m%d")
+        ]
         
         for date in dates:
             try:
@@ -181,8 +193,8 @@ class OddsTickerManager:
                     if status in ['scheduled', 'pre-game', 'status_scheduled']:
                         game_time = datetime.fromisoformat(event['date'].replace('Z', '+00:00'))
                         
-                        # Only include games in the next 7 days
-                        if now <= game_time <= now + timedelta(days=7):
+                        # Only include games in the next 3 days (same as MLB manager)
+                        if now <= game_time <= now + timedelta(days=3):
                             # Get team information
                             competitors = event['competitions'][0]['competitors']
                             home_team = next(c for c in competitors if c['homeAway'] == 'home')
@@ -208,10 +220,22 @@ class OddsTickerManager:
                                 update_interval_seconds=7200  # Cache for 2 hours instead of 1 hour
                             )
                             
-                            # Include games even without odds data (but log it)
-                            if odds_data and odds_data.get('no_odds'):
-                                logger.debug(f"Game {game_id} has no odds data, but including in display")
-                                odds_data = None  # Set to None so display shows just game info
+                            # Check if odds data has actual values (similar to MLB manager)
+                            has_odds = False
+                            if odds_data and not odds_data.get('no_odds'):
+                                # Check if the odds data has any non-null values
+                                if odds_data.get('spread') is not None:
+                                    has_odds = True
+                                if odds_data.get('home_team_odds', {}).get('spread_odds') is not None:
+                                    has_odds = True
+                                if odds_data.get('away_team_odds', {}).get('spread_odds') is not None:
+                                    has_odds = True
+                                if odds_data.get('over_under') is not None:
+                                    has_odds = True
+                            
+                            if not has_odds:
+                                logger.debug(f"Game {game_id} has no valid odds data, setting odds to None")
+                                odds_data = None
                             
                             game_data = {
                                 'id': game_id,
@@ -226,7 +250,7 @@ class OddsTickerManager:
                             
                             games.append(game_data)
                         else:
-                            logger.debug(f"Game {game_id} is outside 7-day window: {game_time}")
+                            logger.debug(f"Game {game_id} is outside 3-day window: {game_time}")
                     else:
                         logger.debug(f"Game {game_id} has status '{status}', skipping")
                 
@@ -239,7 +263,20 @@ class OddsTickerManager:
         """Format the odds text for display."""
         odds = game.get('odds', {})
         if not odds:
-            return f"{game['away_team']} vs {game['home_team']}"
+            # Show just the game info without odds
+            game_time = game['start_time']
+            timezone_str = self.config.get('timezone', 'UTC')
+            try:
+                tz = pytz.timezone(timezone_str)
+            except pytz.exceptions.UnknownTimeZoneError:
+                tz = pytz.UTC
+            
+            if game_time.tzinfo is None:
+                game_time = game_time.replace(tzinfo=pytz.UTC)
+            local_time = game_time.astimezone(tz)
+            time_str = local_time.strftime("%I:%M %p")
+            
+            return f"[{time_str}] {game['away_team']} vs {game['home_team']} (No odds)"
         
         # Extract odds data
         home_team_odds = odds.get('home_team_odds', {})
@@ -406,9 +443,11 @@ class OddsTickerManager:
             
             # Get current game
             current_game = self.games_data[self.current_game_index]
+            logger.debug(f"Displaying game: {current_game['away_team']} @ {current_game['home_team']}")
             
             # Create ticker image if needed
             if force_clear or self.current_image is None:
+                logger.debug("Creating new ticker image")
                 self.current_image = self._create_ticker_image(current_game)
             
             # Scroll the image
@@ -434,6 +473,7 @@ class OddsTickerManager:
             if crop_x + crop_width > self.current_image.width:
                 crop_x = self.current_image.width - crop_width
             
+            logger.debug(f"Cropping image at position ({crop_x}, {crop_y}) with size ({crop_width}, {crop_height})")
             cropped_image = self.current_image.crop((crop_x, crop_y, crop_x + crop_width, crop_y + crop_height))
             
             # Display the cropped image
@@ -451,22 +491,30 @@ class OddsTickerManager:
             width = self.display_manager.matrix.width
             height = self.display_manager.matrix.height
             
-            # Create a simple fallback image
-            image = Image.new('RGB', (width, height), color=(0, 0, 0))
+            logger.info(f"Displaying fallback message on {width}x{height} display")
+            
+            # Create a simple fallback image with a brighter background
+            image = Image.new('RGB', (width, height), color=(50, 50, 50))  # Dark gray instead of black
             draw = ImageDraw.Draw(image)
             
-            # Draw a simple message
-            message = "No odds data available"
-            text_width = draw.textlength(message, font=self.fonts['medium'])
+            # Draw a simple message with larger font
+            message = "No odds data"
+            font = self.fonts['large']  # Use large font for better visibility
+            text_width = draw.textlength(message, font=font)
             text_x = (width - text_width) // 2
-            text_y = (height - self.fonts['medium'].size) // 2
+            text_y = (height - font.size) // 2
             
-            self._draw_text_with_outline(draw, message, (text_x, text_y), self.fonts['medium'])
+            logger.info(f"Drawing fallback message: '{message}' at position ({text_x}, {text_y})")
+            
+            # Draw with bright white text and black outline
+            self._draw_text_with_outline(draw, message, (text_x, text_y), font, fill=(255, 255, 255), outline_color=(0, 0, 0))
             
             # Display the fallback image
             self.display_manager.image = image
             self.display_manager.draw = ImageDraw.Draw(self.display_manager.image)
             self.display_manager.update_display()
+            
+            logger.info("Fallback message display completed")
             
         except Exception as e:
             logger.error(f"Error displaying fallback message: {e}", exc_info=True) 

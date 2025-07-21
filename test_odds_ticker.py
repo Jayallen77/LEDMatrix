@@ -45,6 +45,11 @@ def test_odds_ticker():
             print("Odds ticker is disabled in config. Enabling for test...")
             odds_ticker.is_enabled = True
         
+        # Temporarily disable favorite teams filter for testing
+        print("Temporarily disabling favorite teams filter to test display...")
+        original_show_favorite = odds_ticker.show_favorite_teams_only
+        odds_ticker.show_favorite_teams_only = False
+        
         # Update odds ticker data
         print("Updating odds ticker data...")
         odds_ticker.update()
@@ -71,10 +76,18 @@ def test_odds_ticker():
                 print(f"Display iteration {i+1} complete")
         
         else:
-            print("No games found. This might be normal if:")
-            print("- No upcoming games in the next 7 days")
-            print("- No favorite teams have upcoming games (if show_favorite_teams_only is True)")
+            print("No games found even with favorite teams filter disabled. This suggests:")
+            print("- No upcoming MLB games in the next 7 days")
             print("- API is not returning data")
+            print("- MLB league is disabled")
+            
+            # Test fallback message display
+            print("Testing fallback message display...")
+            odds_ticker._display_fallback_message()
+            time.sleep(3)
+        
+        # Restore original setting
+        odds_ticker.show_favorite_teams_only = original_show_favorite
         
         # Cleanup
         display_manager.cleanup()
