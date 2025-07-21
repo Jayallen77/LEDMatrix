@@ -183,7 +183,7 @@
         "show_records": true,
         "display_modes": {
             "nfl_live": true,
-            "nfl_recent": true,
+            "nfl_recent": false,
             "nfl_upcoming": true
         }
     },
@@ -202,7 +202,7 @@
         "show_records": true,
         "display_modes": {
             "ncaa_fb_live": true,
-            "ncaa_fb_recent": true,
+            "ncaa_fb_recent": false,
             "ncaa_fb_upcoming": true
         }
     },
