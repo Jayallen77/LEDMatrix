@@ -395,7 +395,7 @@ class OddsTickerManager:
         team_info_width = max(away_team_width, home_team_width)
 
         # Odds text
-        odds = game.get('odds', {})
+        odds = game.get('odds') or {}
         home_team_odds = odds.get('home_team_odds', {})
         away_team_odds = odds.get('away_team_odds', {})
         home_spread = home_team_odds.get('spread_odds')
