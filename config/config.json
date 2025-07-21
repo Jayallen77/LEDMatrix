@@ -267,6 +267,7 @@
         "recent_game_hours": 48,
         "favorite_teams": ["TAM"],
         "logo_dir": "assets/sports/milb_logos",
+        "show_records": true,
         "display_modes": {
             "milb_live": true,
             "milb_recent": true,

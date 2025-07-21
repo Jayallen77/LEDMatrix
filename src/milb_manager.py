@@ -22,6 +22,7 @@ class BaseMiLBManager:
         self.display_manager = display_manager
         self.milb_config = config.get('milb', {})
         self.favorite_teams = self.milb_config.get('favorite_teams', [])
+        self.show_records = self.milb_config.get('show_records', False)
         self.cache_manager = CacheManager()
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)  # Set logger level to INFO
@@ -252,6 +253,31 @@ class BaseMiLBManager:
             score_y = height - score_font.size - 2
             # draw.text((score_x, score_y), score_text, font=score_font, fill=(255, 255, 255))
             self._draw_text_with_outline(draw, score_text, (score_x, score_y), score_font)
+
+        # Draw records for upcoming and recent games
+        if self.show_records and game_data['status'] in ['status_scheduled', 'status_final', 'final', 'completed']:
+            try:
+                record_font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6)
+            except IOError:
+                record_font = ImageFont.load_default()
+            
+            away_record = game_data.get('away_record', '')
+            home_record = game_data.get('home_record', '')
+            
+            # Using textbbox is more accurate for height than .size
+            record_bbox = draw.textbbox((0,0), "0-0", font=record_font)
+            record_height = record_bbox[3] - record_bbox[1]
+            record_y = height - record_height - 1
+
+            if away_record:
+                away_record_x = 2
+                self._draw_text_with_outline(draw, away_record, (away_record_x, record_y), record_font)
+
+            if home_record:
+                home_record_bbox = draw.textbbox((0,0), home_record, font=record_font)
+                home_record_width = home_record_bbox[2] - home_record_bbox[0]
+                home_record_x = width - home_record_width - 2
+                self._draw_text_with_outline(draw, home_record, (home_record_x, record_y), record_font)
         
         return image
 
@@ -340,6 +366,14 @@ class BaseMiLBManager:
                             away_abbr = event['teams']['away']['team'].get('abbreviation', away_team_name[:3].upper())
                             self.logger.debug(f"Could not find team abbreviation for '{away_team_name}'. Using '{away_abbr}'.")
 
+                        # Get team records
+                        away_record = event['teams']['away'].get('record', {}).get('wins', 0)
+                        away_losses = event['teams']['away'].get('record', {}).get('losses', 0)
+                        home_record = event['teams']['home'].get('record', {}).get('wins', 0)
+                        home_losses = event['teams']['home'].get('record', {}).get('losses', 0)
+                        away_record_str = f"{away_record}-{away_losses}"
+                        home_record_str = f"{home_record}-{home_losses}"
+
                         is_favorite_game = (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams)
                         
                         if not self.favorite_teams or is_favorite_game:
@@ -364,7 +398,9 @@ class BaseMiLBManager:
                                 'home_score': event['teams']['home'].get('score', 0),
                                 'status': mapped_status,
                                 'status_state': mapped_status_state,
-                                'start_time': event['gameDate']
+                                'start_time': event['gameDate'],
+                                'away_record': f"{event['teams']['away'].get('record', {}).get('wins', 0)}-{event['teams']['away'].get('record', {}).get('losses', 0)}",
+                                'home_record': f"{event['teams']['home'].get('record', {}).get('wins', 0)}-{event['teams']['home'].get('record', {}).get('losses', 0)}"
                             }
 
                             if status_state == 'Live':
@@ -407,6 +443,14 @@ class BaseMiLBManager:
             away_abbr = game['away']['team'].get('abbreviation', away_team_name[:3].upper())
             self.logger.debug(f"Could not find team abbreviation for '{away_team_name}'. Using '{away_abbr}'.")
 
+        # Get team records
+        away_record = game['away'].get('record', {}).get('wins', 0)
+        away_losses = game['away'].get('record', {}).get('losses', 0)
+        home_record = game['home'].get('record', {}).get('wins', 0)
+        home_losses = game['home'].get('record', {}).get('losses', 0)
+        away_record_str = f"{away_record}-{away_losses}"
+        home_record_str = f"{home_record}-{home_losses}"
+
         is_favorite_game = (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams)
         
         if not self.favorite_teams or is_favorite_game:
@@ -432,7 +476,9 @@ class BaseMiLBManager:
                 'home_score': game['home']['score'],
                 'status': mapped_status,
                 'status_state': mapped_status_state,
-                'start_time': game['date']
+                'start_time': game['date'],
+                'away_record': f"{game['away'].get('record', {}).get('wins', 0)}-{game['away'].get('record', {}).get('losses', 0)}",
+                'home_record': f"{game['home'].get('record', {}).get('wins', 0)}-{game['home'].get('record', {}).get('losses', 0)}"
             }
 
             if status_state == 'Live':
