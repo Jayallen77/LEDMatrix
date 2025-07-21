@@ -384,7 +384,7 @@ class OddsTickerManager:
 
         # Fonts
         team_font = self.fonts['medium']
-        odds_font = self.fonts['small']
+        odds_font = self.fonts['medium']
         vs_font = self.fonts['medium']
 
         # Get team logos
@@ -416,8 +416,8 @@ class OddsTickerManager:
         away_team_odds = odds.get('away_team_odds', {})
         
         # Determine the favorite and get the spread
-        home_spread = home_team_odds.get('point_spread')
-        away_spread = away_team_odds.get('point_spread')
+        home_spread = home_team_odds.get('spread_odds')
+        away_spread = away_team_odds.get('spread_odds')
         
         # Check for valid spread values before comparing
         home_favored = isinstance(home_spread, (int, float)) and home_spread < 0
@@ -481,7 +481,7 @@ class OddsTickerManager:
         current_x += team_info_width + section_padding
 
         # Odds (stacked)
-        odds_font_height = odds_font.size if hasattr(odds_font, 'size') else 6
+        odds_font_height = odds_font.size if hasattr(odds_font, 'size') else 8
         odds_y_away = 2
         odds_y_home = height - odds_font_height - 2
         

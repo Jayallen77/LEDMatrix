@@ -113,7 +113,7 @@
         "enabled_leagues": ["mlb"],
         "update_interval": 3600,
         "scroll_speed": 1,
-        "scroll_delay": 0.001
+        "scroll_delay": 0.01
     },
     "calendar": {
         "enabled": true,
