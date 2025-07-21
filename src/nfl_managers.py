@@ -105,6 +105,12 @@ class BaseNFLManager: # Renamed class
         self.fetch_past_games = self.nfl_config.get("fetch_past_games", 1)
         self.fetch_future_games = self.nfl_config.get("fetch_future_games", 1)
 
+        # Check display modes to determine what data to fetch
+        display_modes = self.nfl_config.get("display_modes", {})
+        self.recent_enabled = display_modes.get("nfl_recent", False)
+        self.upcoming_enabled = display_modes.get("nfl_upcoming", False)
+        self.live_enabled = display_modes.get("nfl_live", False)
+
         self.logger.setLevel(logging.DEBUG)
 
         display_config = config.get("display", {})
@@ -118,6 +124,7 @@ class BaseNFLManager: # Renamed class
 
         self.logger.info(f"Initialized NFL manager with display dimensions: {self.display_width}x{self.display_height}")
         self.logger.info(f"Logo directory: {self.logo_dir}")
+        self.logger.info(f"Display modes - Recent: {self.recent_enabled}, Upcoming: {self.upcoming_enabled}, Live: {self.live_enabled}")
 
     def _get_timezone(self):
         try:
@@ -179,6 +186,20 @@ class BaseNFLManager: # Renamed class
                 BaseNFLManager._last_shared_update = current_time
                 return cached_data
 
+            # Check if we need to fetch past or future games based on display modes
+            need_past_games = self.recent_enabled and fetch_past_games > 0
+            need_future_games = self.upcoming_enabled and fetch_future_games > 0
+            
+            if not need_past_games and not need_future_games:
+                BaseNFLManager.logger.info("[NFL] Skipping data fetch - no enabled display modes require past or future games")
+                return None
+
+            # Adjust fetch parameters based on enabled modes
+            actual_past_games = fetch_past_games if need_past_games else 0
+            actual_future_games = fetch_future_games if need_future_games else 0
+            
+            BaseNFLManager.logger.info(f"[NFL] Fetching data - Past games: {actual_past_games}, Future games: {actual_future_games}")
+
             # Smart game-based fetching with range caching
             today = datetime.now(self._get_timezone()).date()
             all_events = []
@@ -186,7 +207,7 @@ class BaseNFLManager: # Renamed class
             future_events = []
             
             # Check for cached search ranges
-            range_cache_key = f"search_ranges_nfl_{fetch_past_games}_{fetch_future_games}"
+            range_cache_key = f"search_ranges_nfl_{actual_past_games}_{actual_future_games}"
             cached_ranges = BaseNFLManager.cache_manager.get(range_cache_key, max_age=86400)  # Cache for 24 hours
             
             if cached_ranges:
@@ -201,19 +222,19 @@ class BaseNFLManager: # Renamed class
             days_to_check = max(past_days_needed, future_days_needed)
             max_days_to_check = 365  # Limit to 1 year to prevent infinite loops
             
-            while (len(past_events) < fetch_past_games or len(future_events) < fetch_future_games) and days_to_check <= max_days_to_check:
+            while (len(past_events) < actual_past_games or len(future_events) < actual_future_games) and days_to_check <= max_days_to_check:
                 # Check dates in both directions
                 dates_to_check = []
                 
                 # Check past dates (start from cached range if available)
-                if len(past_events) < fetch_past_games:
+                if len(past_events) < actual_past_games:
                     start_day = past_days_needed if cached_ranges else 1
                     for i in range(start_day, days_to_check + 1):
                         past_date = today - timedelta(days=i)
                         dates_to_check.append(past_date.strftime('%Y%m%d'))
                 
                 # Check future dates (start from cached range if available)
-                if len(future_events) < fetch_future_games:
+                if len(future_events) < actual_future_games:
                     start_day = future_days_needed if cached_ranges else 1
                     for i in range(start_day, days_to_check + 1):
                         future_date = today + timedelta(days=i)
@@ -224,7 +245,7 @@ class BaseNFLManager: # Renamed class
                     dates_to_check.append(today.strftime('%Y%m%d'))
                 
                 if dates_to_check:
-                    BaseNFLManager.logger.info(f"[NFL] Checking {len(dates_to_check)} dates (day {days_to_check}) to find {fetch_past_games} past and {fetch_future_games} future games")
+                    BaseNFLManager.logger.info(f"[NFL] Checking {len(dates_to_check)} dates (day {days_to_check}) to find {actual_past_games} past and {actual_future_games} future games")
                     
                     # Fetch data for each date
                     for fetch_date in dates_to_check:
@@ -276,7 +297,7 @@ class BaseNFLManager: # Renamed class
                 days_to_check += 1
             
             # Cache the search ranges for next time
-            if len(past_events) >= fetch_past_games and len(future_events) >= fetch_future_games:
+            if len(past_events) >= actual_past_games and len(future_events) >= actual_future_games:
                 # Calculate how many days we actually needed
                 actual_past_days = max(1, days_to_check - 1) if past_events else 0
                 actual_future_days = max(1, days_to_check - 1) if future_events else 0
@@ -291,8 +312,8 @@ class BaseNFLManager: # Renamed class
                 BaseNFLManager.logger.info(f"[NFL] Cached search ranges: {actual_past_days} days past, {actual_future_days} days future")
             
             # Take the specified number of games
-            selected_past_events = past_events[-fetch_past_games:] if past_events else []
-            selected_future_events = future_events[:fetch_future_games] if future_events else []
+            selected_past_events = past_events[-actual_past_games:] if past_events else []
+            selected_future_events = future_events[:actual_future_games] if future_events else []
             
             # Combine selected events
             selected_events = selected_past_events + selected_future_events
