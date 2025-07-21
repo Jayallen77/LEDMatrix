@@ -564,7 +564,7 @@ class OddsTickerManager:
         if self.ticker_image and self.scroll_speed > 0 and self.scroll_delay > 0:
             # Duration for the ticker to scroll its full width
             self.dynamic_display_duration = (self.ticker_image.width / self.scroll_speed) * self.scroll_delay
-            logger.info(f"Calculated dynamic display duration: {self.dynamic_display_duration:.2f} seconds for a width of {self.ticker_image.width}px")
+            logger.info(f"[OddsTickerManager] Calculated dynamic display duration: {self.dynamic_display_duration:.2f} seconds for a width of {self.ticker_image.width}px, scroll_speed={self.scroll_speed}, scroll_delay={self.scroll_delay}")
         else:
             # Fallback to the configured duration if something is wrong
             self.dynamic_display_duration = self.display_duration

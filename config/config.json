@@ -110,7 +110,7 @@
     "odds_ticker": {
         "enabled": true,
         "show_favorite_teams_only": true,
-        "enabled_leagues": ["mlb"],
+        "enabled_leagues": ["mlb", "nfl", "ncaa_fb"],
         "update_interval": 3600,
         "scroll_speed": 1,
         "scroll_delay": 0.01
