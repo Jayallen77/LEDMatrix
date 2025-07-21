@@ -361,11 +361,21 @@ The odds ticker displays betting odds for upcoming sports games. To configure it
 
 - **`enabled`**: Enable/disable the odds ticker (default: false)
 - **`show_favorite_teams_only`**: Show only games involving favorite teams (default: false)
+- **`games_per_favorite_team`**: Number of upcoming games to show per favorite team, per league (default: 1)
+- **`max_games_per_league`**: Maximum number of games to show per league (default: 5)
+- **`show_odds_only`**: If true, only show games that have odds available (default: false)
+- **`sort_order`**: How to sort games in the ticker. Options: `soonest` (default; by start time). (More options can be added in the future.)
 - **`enabled_leagues`**: Array of leagues to display (options: "nfl", "nba", "mlb", "ncaa_fb")
 - **`update_interval`**: How often to fetch new odds data in seconds (default: 3600)
-- **`scroll_speed`**: Pixels to scroll per update (default: 2)
+- **`scroll_speed`**: Pixels to scroll per update (default: 1)
 - **`scroll_delay`**: Delay between scroll updates in seconds (default: 0.05)
 - **`display_duration`**: How long to show each game in seconds (default: 30)
+
+**How it works:**
+- If `show_favorite_teams_only` is true, the ticker will show the next `games_per_favorite_team` games for each favorite team in each enabled league, deduplicated and capped at `max_games_per_league` per league.
+- If `show_favorite_teams_only` is false, the ticker will show all games for all teams (up to `max_games_per_league` per league).
+- If `show_odds_only` is true, only games with odds will be shown.
+- Games are sorted by `sort_order` (default: soonest).
 
 ### Display Format
 

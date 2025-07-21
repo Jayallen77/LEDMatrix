@@ -110,10 +110,15 @@
     "odds_ticker": {
         "enabled": true,
         "show_favorite_teams_only": true,
-        "enabled_leagues": ["mlb", "nfl", "ncaa_fb"],
+        "games_per_favorite_team": 1,
+        "max_games_per_league": 5,
+        "show_odds_only": false,
+        "sort_order": "soonest",
+        "enabled_leagues": ["nfl","mlb", "ncaa_fb"],
         "update_interval": 3600,
         "scroll_speed": 1,
-        "scroll_delay": 0.01
+        "scroll_delay": 0.05,
+        "display_duration": 30
     },
     "calendar": {
         "enabled": true,

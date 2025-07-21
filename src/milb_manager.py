@@ -367,12 +367,20 @@ class BaseMiLBManager:
                             self.logger.debug(f"Could not find team abbreviation for '{away_team_name}'. Using '{away_abbr}'.")
 
                         # Get team records
-                        away_record = event['teams']['away'].get('record', {}).get('wins', 0)
-                        away_losses = event['teams']['away'].get('record', {}).get('losses', 0)
-                        home_record = event['teams']['home'].get('record', {}).get('wins', 0)
-                        home_losses = event['teams']['home'].get('record', {}).get('losses', 0)
-                        away_record_str = f"{away_record}-{away_losses}"
-                        home_record_str = f"{home_record}-{home_losses}"
+                        away_record_data = event['teams']['away'].get('record', {})
+                        home_record_data = event['teams']['home'].get('record', {})
+                        away_record = away_record_data.get('wins')
+                        away_losses = away_record_data.get('losses')
+                        home_record = home_record_data.get('wins')
+                        home_losses = home_record_data.get('losses')
+                        if away_record is not None and away_losses is not None and (away_record != 0 or away_losses != 0):
+                            away_record_str = f"{away_record}-{away_losses}"
+                        else:
+                            away_record_str = ''
+                        if home_record is not None and home_losses is not None and (home_record != 0 or home_losses != 0):
+                            home_record_str = f"{home_record}-{home_losses}"
+                        else:
+                            home_record_str = ''
 
                         is_favorite_game = (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams)
                         
@@ -399,8 +407,8 @@ class BaseMiLBManager:
                                 'status': mapped_status,
                                 'status_state': mapped_status_state,
                                 'start_time': event['gameDate'],
-                                'away_record': f"{event['teams']['away'].get('record', {}).get('wins', 0)}-{event['teams']['away'].get('record', {}).get('losses', 0)}",
-                                'home_record': f"{event['teams']['home'].get('record', {}).get('wins', 0)}-{event['teams']['home'].get('record', {}).get('losses', 0)}"
+                                'away_record': away_record_str,
+                                'home_record': home_record_str
                             }
 
                             if status_state == 'Live':

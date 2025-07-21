@@ -24,6 +24,10 @@ class OddsTickerManager:
         self.odds_ticker_config = config.get('odds_ticker', {})
         self.is_enabled = self.odds_ticker_config.get('enabled', False)
         self.show_favorite_teams_only = self.odds_ticker_config.get('show_favorite_teams_only', False)
+        self.games_per_favorite_team = self.odds_ticker_config.get('games_per_favorite_team', 1)
+        self.max_games_per_league = self.odds_ticker_config.get('max_games_per_league', 5)
+        self.show_odds_only = self.odds_ticker_config.get('show_odds_only', False)
+        self.sort_order = self.odds_ticker_config.get('sort_order', 'soonest')
         self.enabled_leagues = self.odds_ticker_config.get('enabled_leagues', ['nfl', 'nba', 'mlb'])
         self.update_interval = self.odds_ticker_config.get('update_interval', 3600)
         self.scroll_speed = self.odds_ticker_config.get('scroll_speed', 2)
@@ -144,7 +148,7 @@ class OddsTickerManager:
             return None
 
     def _fetch_upcoming_games(self) -> List[Dict[str, Any]]:
-        """Fetch upcoming games with odds for all enabled leagues."""
+        """Fetch upcoming games with odds for all enabled leagues, with user-defined granularity."""
         games_data = []
         now = datetime.now(timezone.utc)
         
@@ -163,31 +167,50 @@ class OddsTickerManager:
                 continue
             
             try:
-                # Fetch upcoming games for this league
-                games = self._fetch_league_games(league_config, now)
-                logger.debug(f"Found {len(games)} games for {league_key}")
-                games_data.extend(games)
+                # Fetch all upcoming games for this league
+                all_games = self._fetch_league_games(league_config, now)
+                logger.debug(f"Found {len(all_games)} games for {league_key}")
+                league_games = []
+                
+                if self.show_favorite_teams_only:
+                    # For each favorite team, find their next N games
+                    favorite_teams = league_config.get('favorite_teams', [])
+                    seen_game_ids = set()
+                    for team in favorite_teams:
+                        # Find games where this team is home or away
+                        team_games = [g for g in all_games if (g['home_team'] == team or g['away_team'] == team)]
+                        # Sort by start_time
+                        team_games.sort(key=lambda x: x.get('start_time', datetime.max))
+                        # Only keep games with odds if show_odds_only is set
+                        if self.show_odds_only:
+                            team_games = [g for g in team_games if g.get('odds')]
+                        # Take the next N games for this team
+                        for g in team_games[:self.games_per_favorite_team]:
+                            if g['id'] not in seen_game_ids:
+                                league_games.append(g)
+                                seen_game_ids.add(g['id'])
+                    # Cap at max_games_per_league
+                    league_games = league_games[:self.max_games_per_league]
+                else:
+                    # Show all games, optionally only those with odds
+                    league_games = all_games
+                    if self.show_odds_only:
+                        league_games = [g for g in league_games if g.get('odds')]
+                    # Sort by start_time
+                    league_games.sort(key=lambda x: x.get('start_time', datetime.max))
+                    league_games = league_games[:self.max_games_per_league]
+                
+                # Sorting (default is soonest)
+                if self.sort_order == 'soonest':
+                    league_games.sort(key=lambda x: x.get('start_time', datetime.max))
+                # (Other sort options can be added here)
+                
+                games_data.extend(league_games)
                 
             except Exception as e:
                 logger.error(f"Error fetching games for {league_key}: {e}")
         
-        # Sort games by start time
-        games_data.sort(key=lambda x: x.get('start_time', datetime.max))
-        
-        # Filter for favorite teams if enabled (now handled in _fetch_league_games)
-        # This filtering is now redundant since we filter before fetching odds
-        if self.show_favorite_teams_only:
-            logger.debug("Favorite team filtering already applied during game fetching")
-        
         logger.debug(f"Total games found: {len(games_data)}")
-        
-        # Log details about found games
-        if games_data:
-            logger.debug("Games found:")
-            for i, game in enumerate(games_data):
-                odds_status = "Has odds" if game.get('odds') else "No odds"
-                logger.debug(f"  {i+1}. {game['away_team']} @ {game['home_team']} - {odds_status}")
-        
         return games_data
 
     def _fetch_league_games(self, league_config: Dict[str, Any], now: datetime) -> List[Dict[str, Any]]:
@@ -518,7 +541,7 @@ class OddsTickerManager:
         odds_y_home = height - odds_font_height - 2
         
         # Use a consistent color for all odds text
-        odds_color = (255, 255, 0) # Yellow
+        odds_color = (0, 255, 0) # Green
 
         draw.text((current_x, odds_y_away), away_odds_text, font=odds_font, fill=odds_color)
         draw.text((current_x, odds_y_home), home_odds_text, font=odds_font, fill=odds_color)
@@ -557,9 +580,15 @@ class OddsTickerManager:
         self.ticker_image = Image.new('RGB', (total_width, height), color=(0, 0, 0))
         
         current_x = 0
-        for img in game_images:
+        for idx, img in enumerate(game_images):
             self.ticker_image.paste(img, (current_x, 0))
-            current_x += img.width + gap_width
+            current_x += img.width
+            # Draw a 1px white vertical bar between games, except after the last one
+            if idx < len(game_images) - 1:
+                bar_x = current_x + gap_width // 2
+                for y in range(height):
+                    self.ticker_image.putpixel((bar_x, y), (255, 255, 255))
+            current_x += gap_width
 
         if self.ticker_image and self.scroll_speed > 0 and self.scroll_delay > 0:
             # Duration for the ticker to scroll its full width
