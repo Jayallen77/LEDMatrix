@@ -84,6 +84,140 @@ class OddsTickerManager:
             }
         }
         
+        # Team name mappings for better display
+        self.team_names = {
+            'nfl': {
+                'TB': 'Bucs',
+                'DAL': 'Cowboys',
+                'NE': 'Patriots',
+                'NYG': 'Giants',
+                'NYJ': 'Jets',
+                'BUF': 'Bills',
+                'MIA': 'Dolphins',
+                'BAL': 'Ravens',
+                'CIN': 'Bengals',
+                'CLE': 'Browns',
+                'PIT': 'Steelers',
+                'HOU': 'Texans',
+                'IND': 'Colts',
+                'JAX': 'Jaguars',
+                'TEN': 'Titans',
+                'DEN': 'Broncos',
+                'KC': 'Chiefs',
+                'LV': 'Raiders',
+                'LAC': 'Chargers',
+                'ARI': 'Cardinals',
+                'ATL': 'Falcons',
+                'CAR': 'Panthers',
+                'CHI': 'Bears',
+                'DET': 'Lions',
+                'GB': 'Packers',
+                'MIN': 'Vikings',
+                'NO': 'Saints',
+                'PHI': 'Eagles',
+                'SEA': 'Seahawks',
+                'SF': '49ers',
+                'LAR': 'Rams',
+                'WAS': 'Commanders'
+            },
+            'ncaa_fb': {
+                'UGA': 'Georgia',
+                'AUB': 'Auburn',
+                'ALA': 'Alabama',
+                'LSU': 'LSU',
+                'FLA': 'Florida',
+                'TEN': 'Tennessee',
+                'TEX': 'Texas',
+                'OKL': 'Oklahoma',
+                'ORE': 'Oregon',
+                'WAS': 'Washington',
+                'USC': 'USC',
+                'UCLA': 'UCLA',
+                'MICH': 'Michigan',
+                'OSU': 'Ohio State',
+                'PSU': 'Penn State',
+                'ND': 'Notre Dame',
+                'CLEM': 'Clemson',
+                'FSU': 'Florida State',
+                'MIAMI': 'Miami',
+                'VT': 'Virginia Tech',
+                'UNC': 'North Carolina',
+                'DUKE': 'Duke',
+                'NCST': 'NC State',
+                'WAKE': 'Wake Forest',
+                'BC': 'Boston College',
+                'GT': 'Georgia Tech',
+                'LOU': 'Louisville',
+                'PITT': 'Pittsburgh',
+                'SYR': 'Syracuse',
+                'CUSE': 'Syracuse'
+            },
+            'mlb': {
+                'TB': 'Rays',
+                'TEX': 'Rangers',
+                'NYY': 'Yankees',
+                'BOS': 'Red Sox',
+                'BAL': 'Orioles',
+                'TOR': 'Blue Jays',
+                'CWS': 'White Sox',
+                'CLE': 'Guardians',
+                'DET': 'Tigers',
+                'KC': 'Royals',
+                'MIN': 'Twins',
+                'HOU': 'Astros',
+                'LAA': 'Angels',
+                'OAK': 'Athletics',
+                'SEA': 'Mariners',
+                'ATL': 'Braves',
+                'MIA': 'Marlins',
+                'NYM': 'Mets',
+                'PHI': 'Phillies',
+                'WSH': 'Nationals',
+                'CHC': 'Cubs',
+                'CIN': 'Reds',
+                'MIL': 'Brewers',
+                'PIT': 'Pirates',
+                'STL': 'Cardinals',
+                'ARI': 'Diamondbacks',
+                'COL': 'Rockies',
+                'LAD': 'Dodgers',
+                'SD': 'Padres',
+                'SF': 'Giants'
+            },
+            'nba': {
+                'DAL': 'Mavericks',
+                'BOS': 'Celtics',
+                'LAL': 'Lakers',
+                'LAC': 'Clippers',
+                'GSW': 'Warriors',
+                'PHX': 'Suns',
+                'SAC': 'Kings',
+                'POR': 'Trail Blazers',
+                'UTA': 'Jazz',
+                'DEN': 'Nuggets',
+                'OKC': 'Thunder',
+                'HOU': 'Rockets',
+                'SAS': 'Spurs',
+                'MEM': 'Grizzlies',
+                'NOP': 'Pelicans',
+                'MIN': 'Timberwolves',
+                'MIA': 'Heat',
+                'ORL': 'Magic',
+                'ATL': 'Hawks',
+                'CHA': 'Hornets',
+                'WAS': 'Wizards',
+                'DET': 'Pistons',
+                'CLE': 'Cavaliers',
+                'IND': 'Pacers',
+                'CHI': 'Bulls',
+                'MIL': 'Bucks',
+                'TOR': 'Raptors',
+                'PHI': '76ers',
+                'BKN': 'Nets',
+                'NYK': 'Knicks'
+            }
+        }
+        
         logger.info(f"OddsTickerManager initialized with enabled leagues: {self.enabled_leagues}")
         logger.info(f"Show favorite teams only: {self.show_favorite_teams_only}")
 
@@ -102,6 +236,13 @@ class OddsTickerManager:
                 'medium': ImageFont.load_default(),
                 'large': ImageFont.load_default()
             }
+
+    def _get_team_name(self, team_abbr: str, league: str) -> str:
+        """Convert team abbreviation to full team name for display."""
+        league_key = league.lower()
+        if league_key in self.team_names and team_abbr in self.team_names[league_key]:
+            return self.team_names[league_key][team_abbr]
+        return team_abbr  # Return original if no mapping found
 
     def _fetch_team_record(self, team_abbr: str, league: str) -> str:
         """Fetch team record from ESPN API."""
@@ -285,10 +426,17 @@ class OddsTickerManager:
                                     has_odds = True
                                 if odds_data.get('over_under') is not None:
                                     has_odds = True
+                            
+                            # Convert abbreviations to full team names
+                            home_team_name = self._get_team_name(home_abbr, league)
+                            away_team_name = self._get_team_name(away_abbr, league)
+                            
                             game = {
                                 'id': game_id,
-                                'home_team': home_abbr,
-                                'away_team': away_abbr,
+                                'home_team': home_team_name,
+                                'away_team': away_team_name,
+                                'home_abbr': home_abbr,  # Keep original for logo loading
+                                'away_abbr': away_abbr,  # Keep original for logo loading
                                 'start_time': game_time,
                                 'home_record': home_record,
                                 'away_record': away_record,
@@ -399,8 +547,8 @@ class OddsTickerManager:
         datetime_font = self.fonts['medium'] # Use large font for date/time
 
         # Get team logos
-        home_logo = self._get_team_logo(game['home_team'], game['logo_dir'])
-        away_logo = self._get_team_logo(game['away_team'], game['logo_dir'])
+        home_logo = self._get_team_logo(game['home_abbr'], game['logo_dir'])
+        away_logo = self._get_team_logo(game['away_abbr'], game['logo_dir'])
 
         if home_logo:
             home_logo = home_logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)

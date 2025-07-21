@@ -101,6 +101,38 @@ You can test the odds ticker functionality using:
 python test_odds_ticker.py
 ```
 
+### Persistent Caching Setup
+
+The LEDMatrix system uses persistent caching to improve performance and reduce API calls. When running with `sudo`, the system needs a persistent cache directory that survives restarts.
+
+**Automatic Setup:**
+Run the setup script to create a persistent cache directory:
+```bash
+chmod +x setup_cache.sh
+./setup_cache.sh
+```
+
+This will:
+- Create `/var/cache/ledmatrix/` directory
+- Set proper ownership to your user account
+- Set appropriate permissions (755)
+
+**Manual Setup:**
+If you prefer to set up manually:
+```bash
+sudo mkdir -p /var/cache/ledmatrix
+sudo chown $USER:$USER /var/cache/ledmatrix
+sudo chmod 755 /var/cache/ledmatrix
+```
+
+**Cache Locations (in order of preference):**
+1. `~/.ledmatrix_cache/` (user's home directory) - **Most persistent**
+2. `/var/cache/ledmatrix/` (system cache directory) - **Persistent across restarts**
+3. `/opt/ledmatrix/cache/` (alternative persistent location)
+4. `/tmp/ledmatrix_cache/` (temporary directory) - **NOT persistent**
+
+**Note:** If the system falls back to `/tmp/ledmatrix_cache/`, you'll see a warning message and the cache will not persist across restarts.
+
 ### Financial Information
 - Near real-time stock & crypto price updates
 - Stock news headlines

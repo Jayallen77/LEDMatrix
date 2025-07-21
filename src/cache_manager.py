@@ -58,12 +58,32 @@ class CacheManager:
         except Exception as e:
             self.logger.warning(f"Could not use user-specific cache directory: {e}")
 
-        # Attempt 2: System-wide temporary directory
+        # Attempt 2: System-wide persistent cache directory (for sudo scenarios)
         try:
-            system_cache_dir = os.path.join(tempfile.gettempdir(), 'ledmatrix_cache')
+            # Try /var/cache/ledmatrix first (most standard)
+            system_cache_dir = '/var/cache/ledmatrix'
             os.makedirs(system_cache_dir, exist_ok=True)
             if os.access(system_cache_dir, os.W_OK):
                 return system_cache_dir
+        except Exception as e:
+            self.logger.warning(f"Could not use /var/cache/ledmatrix: {e}")
+
+        # Attempt 3: /opt/ledmatrix/cache (alternative persistent location)
+        try:
+            opt_cache_dir = '/opt/ledmatrix/cache'
+            os.makedirs(opt_cache_dir, exist_ok=True)
+            if os.access(opt_cache_dir, os.W_OK):
+                return opt_cache_dir
+        except Exception as e:
+            self.logger.warning(f"Could not use /opt/ledmatrix/cache: {e}")
+
+        # Attempt 4: System-wide temporary directory (fallback, not persistent)
+        try:
+            temp_cache_dir = os.path.join(tempfile.gettempdir(), 'ledmatrix_cache')
+            os.makedirs(temp_cache_dir, exist_ok=True)
+            if os.access(temp_cache_dir, os.W_OK):
+                self.logger.warning("Using temporary cache directory - cache will NOT persist across restarts")
+                return temp_cache_dir
         except Exception as e:
             self.logger.warning(f"Could not use system-wide temporary cache directory: {e}")
 
@@ -294,4 +314,44 @@ class CacheManager:
             'data': data,
             'timestamp': time.time()
         }
-        return self.save_cache(data_type, cache_data) 
+        return self.save_cache(data_type, cache_data)
+
+    def get(self, key: str, max_age: int = 300) -> Optional[Dict]:
+        """Get data from cache if it exists and is not stale."""
+        return self.get_cached_data(key, max_age)
+
+    def set(self, key: str, data: Dict) -> None:
+        """Store data in cache with current timestamp."""
+        self.save_cache(key, data)
+
+    def setup_persistent_cache(self) -> bool:
+        """
+        Set up a persistent cache directory with proper permissions.
+        This should be run once with sudo to create the directory.
+        """
+        try:
+            # Try to create /var/cache/ledmatrix with proper permissions
+            cache_dir = '/var/cache/ledmatrix'
+            os.makedirs(cache_dir, exist_ok=True)
+            
+            # Set ownership to the real user (not root)
+            real_user = os.environ.get('SUDO_USER')
+            if real_user:
+                import pwd
+                try:
+                    uid = pwd.getpwnam(real_user).pw_uid
+                    gid = pwd.getpwnam(real_user).pw_gid
+                    os.chown(cache_dir, uid, gid)
+                    self.logger.info(f"Set ownership of {cache_dir} to {real_user}")
+                except Exception as e:
+                    self.logger.warning(f"Could not set ownership: {e}")
+            
+            # Set permissions to 755 (rwxr-xr-x)
+            os.chmod(cache_dir, 0o755)
+            
+            self.logger.info(f"Successfully set up persistent cache directory: {cache_dir}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to set up persistent cache directory: {e}")
+            return False 

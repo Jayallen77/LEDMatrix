@@ -220,9 +220,13 @@ class BaseNFLManager: # Renamed class
             # Track games found for each favorite team
             favorite_team_games = {team: [] for team in self.favorite_teams} if self.favorite_teams else {}
             
-            # Check for cached search ranges
+            # Check for cached search ranges and last successful date
             range_cache_key = f"search_ranges_nfl_{actual_past_games}_{actual_future_games}"
             cached_ranges = BaseNFLManager.cache_manager.get(range_cache_key, max_age=86400)  # Cache for 24 hours
+            
+            # Check for last successful date cache
+            last_successful_cache_key = f"last_successful_date_nfl_{actual_past_games}_{actual_future_games}"
+            last_successful_date = BaseNFLManager.cache_manager.get(last_successful_cache_key, max_age=86400)
             
             if cached_ranges:
                 past_days_needed = cached_ranges.get('past_days', 0)
@@ -235,6 +239,20 @@ class BaseNFLManager: # Renamed class
             # Start with cached ranges or expand incrementally
             days_to_check = max(past_days_needed, future_days_needed)
             max_days_to_check = 365  # Limit to 1 year to prevent infinite loops
+            
+            # If we have a last successful date, start from there
+            if last_successful_date and need_future_games:
+                last_successful_str = last_successful_date.get('date')
+                if last_successful_str:
+                    try:
+                        last_successful = datetime.strptime(last_successful_str, '%Y%m%d').date()
+                        days_since_last = (today - last_successful).days
+                        if days_since_last > 0:
+                            BaseNFLManager.logger.info(f"[NFL] Starting search from last successful date: {last_successful_str} ({days_since_last} days ago)")
+                            # Start from the day after the last successful date
+                            days_to_check = max(days_to_check, days_since_last + 1)
+                    except ValueError:
+                        BaseNFLManager.logger.warning(f"[NFL] Invalid last successful date format: {last_successful_str}")
             
             while (len(past_events) < actual_past_games or 
                    (need_future_games and self.favorite_teams and 
@@ -344,6 +362,29 @@ class BaseNFLManager: # Renamed class
                 }
                 BaseNFLManager.cache_manager.set(range_cache_key, range_data)
                 BaseNFLManager.logger.info(f"[NFL] Cached search ranges: {actual_past_days} days past, {actual_future_days} days future")
+                
+                # Store the last successful date for future searches
+                if future_events:
+                    # Find the furthest future date where we found games
+                    furthest_future_date = None
+                    for event in future_events:
+                        try:
+                            event_time = datetime.fromisoformat(event['date'].replace('Z', '+00:00'))
+                            if event_time.tzinfo is None:
+                                event_time = event_time.replace(tzinfo=pytz.UTC)
+                            event_date = event_time.date()
+                            if furthest_future_date is None or event_date > furthest_future_date:
+                                furthest_future_date = event_date
+                        except Exception:
+                            continue
+                    
+                    if furthest_future_date:
+                        last_successful_data = {
+                            'date': furthest_future_date.strftime('%Y%m%d'),
+                            'last_updated': current_time
+                        }
+                        BaseNFLManager.cache_manager.set(last_successful_cache_key, last_successful_data)
+                        BaseNFLManager.logger.info(f"[NFL] Cached last successful date: {furthest_future_date.strftime('%Y%m%d')}")
             
             # Take the specified number of games
             selected_past_events = past_events[-actual_past_games:] if past_events else []
