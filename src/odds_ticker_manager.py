@@ -42,6 +42,7 @@ class OddsTickerManager:
         self.current_game_index = 0
         self.ticker_image = None # This will hold the single, wide image
         self.last_display_time = 0
+        self.dynamic_display_duration = 0
         
         # Font setup
         self.fonts = self._load_fonts()
@@ -404,7 +405,7 @@ class OddsTickerManager:
         vs_text = "vs."
         vs_width = int(temp_draw.textlength(vs_text, font=vs_font))
 
-        # Format date and time
+        # Format date and time into 3 parts
         game_time = game['start_time']
         timezone_str = self.config.get('timezone', 'UTC')
         try:
@@ -416,7 +417,9 @@ class OddsTickerManager:
             game_time = game_time.replace(tzinfo=pytz.UTC)
         local_time = game_time.astimezone(tz)
         
-        datetime_text = local_time.strftime("%a %-m/%d %-I:%M%p").lower()
+        day_text = local_time.strftime("%a").lower()
+        date_text = local_time.strftime("%-m/%d")
+        time_text = local_time.strftime("%-I:%M%p").lower()
 
         # Team and record text
         away_team_text = f"{game.get('away_team', 'N/A')} ({game.get('away_record', '') or 'N/A'})"
@@ -424,8 +427,13 @@ class OddsTickerManager:
         
         away_team_width = int(temp_draw.textlength(away_team_text, font=team_font))
         home_team_width = int(temp_draw.textlength(home_team_text, font=team_font))
-        datetime_width = int(temp_draw.textlength(datetime_text, font=datetime_font))
-        team_info_width = max(away_team_width, home_team_width, datetime_width)
+        team_info_width = max(away_team_width, home_team_width)
+        
+        # Datetime column width
+        day_width = int(temp_draw.textlength(day_text, font=datetime_font))
+        date_width = int(temp_draw.textlength(date_text, font=datetime_font))
+        time_width = int(temp_draw.textlength(time_text, font=datetime_font))
+        datetime_col_width = max(day_width, date_width, time_width)
 
         # Odds text
         odds = game.get('odds') or {}
@@ -471,7 +479,7 @@ class OddsTickerManager:
 
         # --- Calculate total width ---
         total_width = (logo_size + logo_padding + vs_width + vs_padding + logo_size + section_padding +
-                       team_info_width + section_padding + odds_width + section_padding)
+                       team_info_width + section_padding + odds_width + section_padding + datetime_col_width + section_padding)
 
         # --- Create final image ---
         image = Image.new('RGB', (int(total_width), height), color=(0, 0, 0))
@@ -499,17 +507,9 @@ class OddsTickerManager:
 
         # Team Info (stacked)
         team_font_height = team_font.size if hasattr(team_font, 'size') else 8
-        datetime_font_height = datetime_font.size if hasattr(datetime_font, 'size') else 6
-        
-        total_text_height = team_font_height + datetime_font_height + team_font_height
-        padding_y = (height - total_text_height) // 2 # Center the whole block vertically
-        
-        away_y = padding_y
-        datetime_y = away_y + team_font_height
-        home_y = datetime_y + datetime_font_height
-
+        away_y = 2
+        home_y = height - team_font_height - 2
         draw.text((current_x, away_y), away_team_text, font=team_font, fill=(255, 255, 255))
-        draw.text((current_x, datetime_y), datetime_text, font=datetime_font, fill=(255, 255, 255))
         draw.text((current_x, home_y), home_team_text, font=team_font, fill=(255, 255, 255))
         current_x += team_info_width + section_padding
 
@@ -523,6 +523,20 @@ class OddsTickerManager:
 
         draw.text((current_x, odds_y_away), away_odds_text, font=odds_font, fill=odds_color)
         draw.text((current_x, odds_y_home), home_odds_text, font=odds_font, fill=odds_color)
+        current_x += odds_width + section_padding
+        
+        # Datetime (stacked, 3 rows)
+        datetime_font_height = datetime_font.size if hasattr(datetime_font, 'size') else 6
+        total_dt_height = 3 * datetime_font_height + 4 # Padding between lines
+        dt_padding_y = (height - total_dt_height) // 2
+
+        day_y = dt_padding_y
+        date_y = day_y + datetime_font_height + 2
+        time_y = date_y + datetime_font_height + 2
+
+        draw.text((current_x, day_y), day_text, font=datetime_font, fill=(255, 255, 255))
+        draw.text((current_x, date_y), date_text, font=datetime_font, fill=(255, 255, 255))
+        draw.text((current_x, time_y), time_text, font=datetime_font, fill=(255, 255, 255))
 
         return image
 
@@ -547,6 +561,18 @@ class OddsTickerManager:
         for img in game_images:
             self.ticker_image.paste(img, (current_x, 0))
             current_x += img.width + gap_width
+
+        if self.ticker_image and self.scroll_speed > 0 and self.scroll_delay > 0:
+            # Duration for the ticker to scroll its full width
+            self.dynamic_display_duration = (self.ticker_image.width / self.scroll_speed) * self.scroll_delay
+            logger.info(f"Calculated dynamic display duration: {self.dynamic_display_duration:.2f} seconds for a width of {self.ticker_image.width}px")
+        else:
+            # Fallback to the configured duration if something is wrong
+            self.dynamic_display_duration = self.display_duration
+
+    def get_dynamic_duration(self) -> float:
+        """Return the calculated dynamic duration for the ticker to complete one full scroll."""
+        return self.dynamic_display_duration
 
     def _draw_text_with_outline(self, draw: ImageDraw.Draw, text: str, position: tuple, font: ImageFont.FreeTypeFont, 
                                fill: tuple = (255, 255, 255), outline_color: tuple = (0, 0, 0)) -> None:

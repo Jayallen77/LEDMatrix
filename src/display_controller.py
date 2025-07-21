@@ -447,6 +447,12 @@ class DisplayController:
     def get_current_duration(self) -> int:
         """Get the duration for the current display mode."""
         mode_key = self.current_display_mode
+
+        if mode_key == 'odds_ticker' and self.odds_ticker:
+            dynamic_duration = self.odds_ticker.get_dynamic_duration()
+            if dynamic_duration > 0:
+                return dynamic_duration
+        
         # Simplify weather key handling
         if mode_key.startswith('weather_'):
             return self.display_durations.get(mode_key, 15)
