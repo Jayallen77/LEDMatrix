@@ -223,10 +223,18 @@ class OddsTickerManager:
         team_games_found = {team: 0 for team in favorite_teams}
         max_games = self.games_per_favorite_team if self.show_favorite_teams_only else None
         all_games = []
+        
+        # Optimization: Track total games found when not showing favorite teams only
+        games_found = 0
+        max_games_per_league = self.max_games_per_league if not self.show_favorite_teams_only else None
 
         for date in dates:
+            # Stop if we have enough games for favorite teams
             if self.show_favorite_teams_only and all(team_games_found[t] >= max_games for t in favorite_teams):
                 break  # All favorite teams have enough games, stop searching
+            # Stop if we have enough games for the league (when not showing favorite teams only)
+            if not self.show_favorite_teams_only and max_games_per_league and games_found >= max_games_per_league:
+                break  # We have enough games for this league, stop searching
             try:
                 sport = league_config['sport']
                 league = league_config['league']
@@ -236,6 +244,9 @@ class OddsTickerManager:
                 response.raise_for_status()
                 data = response.json()
                 for event in data.get('events', []):
+                    # Stop if we have enough games for the league (when not showing favorite teams only)
+                    if not self.show_favorite_teams_only and max_games_per_league and games_found >= max_games_per_league:
+                        break
                     game_id = event['id']
                     status = event['status']['type']['name'].lower()
                     if status in ['scheduled', 'pre-game', 'status_scheduled']:
@@ -281,14 +292,19 @@ class OddsTickerManager:
                                 'start_time': game_time,
                                 'home_record': home_record,
                                 'away_record': away_record,
-                                'odds': odds_data if has_odds else None
+                                'odds': odds_data if has_odds else None,
+                                'logo_dir': league_config.get('logo_dir', f'assets/sports/{league.lower()}_logos')
                             }
                             all_games.append(game)
+                            games_found += 1
                             # If favorite teams only, increment counters
                             if self.show_favorite_teams_only:
                                 for team in [home_abbr, away_abbr]:
                                     if team in team_games_found and team_games_found[team] < max_games:
                                         team_games_found[team] += 1
+                # Stop if we have enough games for the league (when not showing favorite teams only)
+                if not self.show_favorite_teams_only and max_games_per_league and games_found >= max_games_per_league:
+                    break
             except Exception as e:
                 logger.error(f"Error fetching games for {league_config.get('league', 'unknown')} on {date}: {e}", exc_info=True)
         return all_games
