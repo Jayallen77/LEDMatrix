@@ -36,7 +36,7 @@ class OddsTickerManager:
         
         # State variables
         self.last_update = 0
-        self.current_position = 0
+        self.scroll_position = 0
         self.last_scroll_time = 0
         self.games_data = []
         self.current_game_index = 0
@@ -534,7 +534,7 @@ class OddsTickerManager:
             # Check if it's time to switch games
             if current_time - self.last_display_time >= self.display_duration:
                 self.current_game_index = (self.current_game_index + 1) % len(self.games_data)
-                self.current_position = 0
+                self.scroll_position = 0
                 self.last_display_time = current_time
                 self.current_image = None  # Force recreate image
             
