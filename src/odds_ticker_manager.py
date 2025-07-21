@@ -162,10 +162,6 @@ class OddsTickerManager:
             league_config = self.league_configs[league_key]
             logger.debug(f"Processing league {league_key}: enabled={league_config['enabled']}")
             
-            if not league_config['enabled']:
-                logger.debug(f"League {league_key} is disabled, skipping")
-                continue
-            
             try:
                 # Fetch all upcoming games for this league
                 all_games = self._fetch_league_games(league_config, now)
@@ -336,7 +332,7 @@ class OddsTickerManager:
             if game_time.tzinfo is None:
                 game_time = game_time.replace(tzinfo=pytz.UTC)
             local_time = game_time.astimezone(tz)
-            time_str = local_time.strftime("%I:%M %p")
+            time_str = local_time.strftime("%I:%M %p").lstrip('0')
             
             return f"[{time_str}] {game['away_team']} vs {game['home_team']} (No odds)"
         
@@ -361,7 +357,7 @@ class OddsTickerManager:
         if game_time.tzinfo is None:
             game_time = game_time.replace(tzinfo=pytz.UTC)
         local_time = game_time.astimezone(tz)
-        time_str = local_time.strftime("%I:%M %p")
+        time_str = local_time.strftime("%I:%M %p").lstrip('0')
         
         # Build odds string
         odds_parts = [f"[{time_str}]"]
@@ -441,7 +437,7 @@ class OddsTickerManager:
         # Capitalize full day name, e.g., 'Tuesday'
         day_text = local_time.strftime("%A")
         date_text = local_time.strftime("%-m/%d")
-        time_text = local_time.strftime("%-I:%M %p")
+        time_text = local_time.strftime("%I:%M %p").lstrip('0')
 
         # Team and record text
         away_team_text = f"{game.get('away_team', 'N/A')} ({game.get('away_record', '') or 'N/A'})"

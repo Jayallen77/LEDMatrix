@@ -560,7 +560,7 @@ class BaseSoccerManager:
             game_date = ""
             if start_time_utc:
                 local_time = start_time_utc.astimezone(self._get_timezone())
-                game_time = local_time.strftime("%-I:%M%p").lower() # e.g., 2:30pm
+                game_time = local_time.strftime("%I:%M%p").lower().lstrip('0') # e.g., 2:30pm
                 game_date = local_time.strftime("%-m/%-d")
 
             status_type = status["type"]["name"]

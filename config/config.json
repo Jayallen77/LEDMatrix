@@ -117,7 +117,7 @@
         "enabled_leagues": ["nfl","mlb", "ncaa_fb"],
         "update_interval": 3600,
         "scroll_speed": 1,
-        "scroll_delay": 0.05,
+        "scroll_delay": 0.01,
         "display_duration": 30
     },
     "calendar": {

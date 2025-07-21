@@ -345,13 +345,11 @@ class BaseNCAABaseballManager:
             except pytz.exceptions.UnknownTimeZoneError:
                 logger.warning(f"[NCAABaseball] Unknown timezone: {timezone_str}, falling back to UTC")
                 tz = pytz.UTC
-            
             dt = datetime.fromisoformat(game_time.replace('Z', '+00:00'))
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=pytz.UTC)
             local_dt = dt.astimezone(tz)
-            
-            return local_dt.strftime("%I:%M %p")
+            return local_dt.strftime("%I:%M %p").lstrip('0')
         except Exception as e:
             logger.error(f"[NCAABaseball] Error formatting game time: {e}")
             return "TBD"
