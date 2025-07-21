@@ -33,6 +33,7 @@ class OddsTickerManager:
         self.scroll_speed = self.odds_ticker_config.get('scroll_speed', 2)
         self.scroll_delay = self.odds_ticker_config.get('scroll_delay', 0.05)
         self.display_duration = self.odds_ticker_config.get('display_duration', 30)
+        self.future_fetch_days = self.odds_ticker_config.get('future_fetch_days', 7)
         
         # Initialize managers
         self.cache_manager = CacheManager()
@@ -215,13 +216,11 @@ class OddsTickerManager:
         
         # Get dates for API request (yesterday, today, tomorrow - same as MLB manager)
         yesterday = now - timedelta(days=1)
-        tomorrow = now + timedelta(days=1)
-        
-        dates = [
-            yesterday.strftime("%Y%m%d"),
-            now.strftime("%Y%m%d"),
-            tomorrow.strftime("%Y%m%d")
-        ]
+        # Use user-configurable future_fetch_days
+        future_window = now + timedelta(days=self.future_fetch_days)
+        # Build a list of dates from yesterday to future_window
+        num_days = (future_window - yesterday).days + 1
+        dates = [(yesterday + timedelta(days=i)).strftime("%Y%m%d") for i in range(num_days)]
         
         for date in dates:
             try:
@@ -246,7 +245,7 @@ class OddsTickerManager:
                         game_time = datetime.fromisoformat(event['date'].replace('Z', '+00:00'))
                         
                         # Only include games in the next 3 days (same as MLB manager)
-                        if now <= game_time <= now + timedelta(days=3):
+                        if now <= game_time <= future_window:
                             # Get team information
                             competitors = event['competitions'][0]['competitors']
                             home_team = next(c for c in competitors if c['homeAway'] == 'home')

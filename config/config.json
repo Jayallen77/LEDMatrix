@@ -118,7 +118,8 @@
         "update_interval": 3600,
         "scroll_speed": 1,
         "scroll_delay": 0.01,
-        "display_duration": 30
+        "display_duration": 60,
+        "future_fetch_days": 45
     },
     "calendar": {
         "enabled": true,
