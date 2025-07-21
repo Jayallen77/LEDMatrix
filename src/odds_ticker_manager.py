@@ -385,7 +385,7 @@ class OddsTickerManager:
         draw.text((x_pos, 5), away_team_text, font=team_font, fill=(255, 255, 255))
         
         # Home team logo and info
-        x_pos += draw.textlength(away_team_text, font=team_font) + 10
+        x_pos += int(draw.textlength(away_team_text, font=team_font)) + 10
         if home_logo:
             home_logo = home_logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
             image.paste(home_logo, (x_pos, (height - logo_size) // 2), home_logo)
@@ -405,7 +405,7 @@ class OddsTickerManager:
             home_favored = home_spread is not None and home_spread < 0
             
             # Draw odds
-            x_pos += draw.textlength(home_team_text, font=team_font) + 10
+            x_pos += int(draw.textlength(home_team_text, font=team_font)) + 10
             if home_favored:
                 draw.text((x_pos, 18), f"{home_spread}", font=odds_font, fill=(0, 255, 0))
                 if over_under:

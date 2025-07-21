@@ -270,21 +270,6 @@ class BaseMLBManager:
             self.display_manager.draw = draw
             self.display_manager._draw_bdf_text(status_text, status_x, status_y, color=(255, 255, 255), font=self.display_manager.calendar_font)
             
-
-        
-        # For recent/final games, show scores and status
-        elif game_data['status'] in ['status_final', 'final', 'completed']:
-            # Show "Final" at the top using NHL-style font
-            status_text = "Final"
-            # Set font size for BDF font
-            self.display_manager.calendar_font.set_char_size(height=7*64)  # 7 pixels high, 64 units per pixel
-            status_width = self.display_manager.get_text_width(status_text, self.display_manager.calendar_font)
-            status_x = (width - status_width) // 2
-            status_y = 2
-            # Draw on the current image
-            self.display_manager.draw = draw
-            self.display_manager._draw_bdf_text(status_text, status_x, status_y, color=(255, 255, 255), font=self.display_manager.calendar_font)
-            
             # Always show scores for recent/final games
             away_score = str(game_data['away_score'])
             home_score = str(game_data['home_score'])
@@ -328,6 +313,31 @@ class BaseMLBManager:
             # For live games, we are not adding the debug spread display yet
             # It can be added later if needed by copying the logic from recent/upcoming
             pass
+
+        # Draw records for upcoming and recent games
+        if game_data['status'] in ['status_scheduled', 'status_final', 'final', 'completed']:
+            try:
+                record_font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6)
+            except IOError:
+                record_font = ImageFont.load_default()
+            
+            away_record = game_data.get('away_record', '')
+            home_record = game_data.get('home_record', '')
+            
+            # Using textbbox is more accurate for height than .size
+            record_bbox = draw.textbbox((0,0), "0-0", font=record_font)
+            record_height = record_bbox[3] - record_bbox[1]
+            record_y = height - record_height - 1
+
+            if away_record:
+                away_record_x = 2
+                self._draw_text_with_outline(draw, away_record, (away_record_x, record_y), record_font)
+
+            if home_record:
+                home_record_bbox = draw.textbbox((0,0), home_record, font=record_font)
+                home_record_width = home_record_bbox[2] - home_record_bbox[0]
+                home_record_x = width - home_record_width - 2
+                self._draw_text_with_outline(draw, home_record, (home_record_x, record_y), record_font)
 
         return image
 
@@ -417,6 +427,15 @@ class BaseMLBManager:
                     home_abbr = home_team['team']['abbreviation']
                     away_abbr = away_team['team']['abbreviation']
                     
+                    # Get team records
+                    home_record = "0-0"
+                    if 'record' in home_team and len(home_team['record']) > 0:
+                        home_record = home_team['record'][0].get('summary', '0-0')
+                    
+                    away_record = "0-0"
+                    if 'record' in away_team and len(away_team['record']) > 0:
+                        away_record = away_team['record'][0].get('summary', '0-0')
+
                     # Check if this is a favorite team game
                     is_favorite_game = (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams)
                     
@@ -537,6 +556,8 @@ class BaseMLBManager:
                         'home_team': home_abbr,
                         'away_score': away_team['score'],
                         'home_score': home_team['score'],
+                        'away_record': away_record,
+                        'home_record': home_record,
                         'status': status,
                         'status_state': status_state,
                         'inning': inning,
