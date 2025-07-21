@@ -267,16 +267,16 @@ class BaseMiLBManager:
             # Using textbbox is more accurate for height than .size
             record_bbox = draw.textbbox((0,0), "0-0", font=record_font)
             record_height = record_bbox[3] - record_bbox[1]
-            record_y = height - record_height - 1
+            record_y = height - record_height
 
             if away_record:
-                away_record_x = 2
+                away_record_x = 0
                 self._draw_text_with_outline(draw, away_record, (away_record_x, record_y), record_font)
 
             if home_record:
                 home_record_bbox = draw.textbbox((0,0), home_record, font=record_font)
                 home_record_width = home_record_bbox[2] - home_record_bbox[0]
-                home_record_x = width - home_record_width - 2
+                home_record_x = width - home_record_width
                 self._draw_text_with_outline(draw, home_record, (home_record_x, record_y), record_font)
         
         return image

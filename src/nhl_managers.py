@@ -553,7 +553,7 @@ class BaseNHLManager:
                         text_color = (100, 255, 100) # Greenish
                         spread_x = 2
                     
-                    spread_y = self.display_height - 8
+                    spread_y = 0
                     self._draw_text_with_outline(draw, spread_text, (spread_x, spread_y), self.fonts['status'], fill=text_color)
 
             # Draw records if enabled
@@ -568,7 +568,7 @@ class BaseNHLManager:
                 
                 record_bbox = draw.textbbox((0,0), "0-0", font=record_font)
                 record_height = record_bbox[3] - record_bbox[1]
-                record_y = self.display_height - record_height - 1
+                record_y = self.display_height - record_height
 
                 if away_record:
                     away_record_x = 2

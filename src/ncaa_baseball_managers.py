@@ -288,16 +288,16 @@ class BaseNCAABaseballManager:
 
             record_bbox = draw.textbbox((0, 0), "0-0", font=record_font)
             record_height = record_bbox[3] - record_bbox[1]
-            record_y = height - record_height - 1
+            record_y = height - record_height
 
             if away_record:
-                away_record_x = 2
+                away_record_x = 0
                 self._draw_text_with_outline(draw, away_record, (away_record_x, record_y), record_font)
 
             if home_record:
                 home_record_bbox = draw.textbbox((0, 0), home_record, font=record_font)
                 home_record_width = home_record_bbox[2] - home_record_bbox[0]
-                home_record_x = width - home_record_width - 2
+                home_record_x = width - home_record_width
                 self._draw_text_with_outline(draw, home_record, (home_record_x, record_y), record_font)
 
         # Draw betting odds if available and enabled
@@ -324,14 +324,14 @@ class BaseNCAABaseballManager:
 
             # Draw away team odds
             if away_spread != 'N/A':
-                away_odds_x = 5
-                away_odds_y = height - 10
+                away_odds_x = 0
+                away_odds_y = 0
                 self._draw_text_with_outline(draw, str(away_spread), (away_odds_x, away_odds_y), odds_font, odds_color, outline_color)
 
             # Draw home team odds
             if home_spread != 'N/A':
-                home_odds_x = width - 30
-                home_odds_y = height - 10
+                home_odds_x = width - draw.textlength(str(home_spread), font=odds_font)
+                home_odds_y = 0
                 self._draw_text_with_outline(draw, str(home_spread), (home_odds_x, home_odds_y), odds_font, odds_color, outline_color)
         
         return image

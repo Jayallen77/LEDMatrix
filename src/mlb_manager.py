@@ -279,6 +279,7 @@ class BaseMLBManager:
             display_width = draw.textlength(display_text, font=font)
             display_x = (width - display_width) // 2
             display_y = (height - font.size) // 2
+            display_y += 4
             self._draw_text_with_outline(draw, display_text, (display_x, display_y), font, fill=(255, 255, 255))
             
             # Show spreads and over/under if available (on top of scores)
@@ -328,16 +329,16 @@ class BaseMLBManager:
             # Using textbbox is more accurate for height than .size
             record_bbox = draw.textbbox((0,0), "0-0", font=record_font)
             record_height = record_bbox[3] - record_bbox[1]
-            record_y = height - record_height - 1
+            record_y = height - record_height
 
             if away_record:
-                away_record_x = 2
+                away_record_x = 0
                 self._draw_text_with_outline(draw, away_record, (away_record_x, record_y), record_font)
 
             if home_record:
                 home_record_bbox = draw.textbbox((0,0), home_record, font=record_font)
                 home_record_width = home_record_bbox[2] - home_record_bbox[0]
-                home_record_x = width - home_record_width - 2
+                home_record_x = width - home_record_width
                 self._draw_text_with_outline(draw, home_record, (home_record_x, record_y), record_font)
 
         return image
@@ -624,14 +625,14 @@ class BaseMLBManager:
             if favored_side == 'home':
                 # Home team is favored, show spread on right side
                 spread_width = draw.textlength(spread_text, font=font)
-                spread_x = width - spread_width - 2  # Top right
-                spread_y = 2
+                spread_x = width - spread_width  # Top right
+                spread_y = 0
                 self._draw_text_with_outline(draw, spread_text, (spread_x, spread_y), font, fill=(0, 255, 0))
                 self.logger.debug(f"Showing home spread '{spread_text}' on right side")
             else:
                 # Away team is favored, show spread on left side
-                spread_x = 2  # Top left
-                spread_y = 2
+                spread_x = 0  # Top left
+                spread_y = 0
                 self._draw_text_with_outline(draw, spread_text, (spread_x, spread_y), font, fill=(0, 255, 0))
                 self.logger.debug(f"Showing away spread '{spread_text}' on left side")
         
@@ -644,18 +645,18 @@ class BaseMLBManager:
             
             if favored_side == 'home':
                 # Home team is favored, show O/U on left side (opposite of spread)
-                ou_x = 2  # Top left
-                ou_y = 2
+                ou_x = 0  # Top left
+                ou_y = 0
                 self.logger.debug(f"Showing O/U '{ou_text}' on left side (home favored)")
             elif favored_side == 'away':
                 # Away team is favored, show O/U on right side (opposite of spread)
-                ou_x = width - ou_width - 2  # Top right
-                ou_y = 2
+                ou_x = width - ou_width  # Top right
+                ou_y = 0
                 self.logger.debug(f"Showing O/U '{ou_text}' on right side (away favored)")
             else:
                 # No clear favorite, show O/U in center
                 ou_x = (width - ou_width) // 2
-                ou_y = 2
+                ou_y = 0
                 self.logger.debug(f"Showing O/U '{ou_text}' in center (no clear favorite)")
             
             self._draw_text_with_outline(draw, ou_text, (ou_x, ou_y), font, fill=(0, 255, 0))
