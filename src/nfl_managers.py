@@ -132,22 +132,24 @@ class BaseNFLManager: # Renamed class
         except pytz.UnknownTimeZoneError:
             return pytz.utc
 
+    def _should_log(self, warning_type: str, cooldown: int = 60) -> bool:
+        """Check if we should log a warning based on cooldown period."""
+        current_time = time.time()
+        if current_time - self._last_warning_time > cooldown:
+            self._last_warning_time = current_time
+            return True
+        return False
+
     def _fetch_odds(self, game: Dict) -> None:
         """Fetch odds for a specific game if conditions are met."""
         self.logger.debug(f"Checking odds for game: {game.get('id', 'N/A')}")
         
-        # Ensure the API key is set in the secrets config
-        if not self.config_manager.get_secret("the_odds_api_key"):
-            if self._should_log('no_api_key', cooldown=3600):  # Log once per hour
-                self.logger.warning("Odds API key not found. Skipping odds fetch.")
-            return
-            
         # Check if odds should be shown for this sport
         if not self.show_odds:
             self.logger.debug("Odds display is disabled for NFL.")
             return
 
-        # Fetch odds using OddsManager
+        # Fetch odds using OddsManager (ESPN API)
         try:
             # Determine update interval based on game state
             is_live = game.get('status', '').lower() == 'in'
@@ -198,6 +200,15 @@ class BaseNFLManager: # Renamed class
             actual_past_games = fetch_past_games if need_past_games else 0
             actual_future_games = fetch_future_games if need_future_games else 0
             
+            # For upcoming games, we need to find games for each favorite team
+            if need_future_games and self.favorite_teams:
+                # Calculate how many games we need to find for favorite teams
+                games_needed_per_team = actual_future_games
+                total_favorite_games_needed = len(self.favorite_teams) * games_needed_per_team
+                BaseNFLManager.logger.info(f"[NFL] Need to find {games_needed_per_team} games for each of {len(self.favorite_teams)} favorite teams ({total_favorite_games_needed} total)")
+            else:
+                total_favorite_games_needed = actual_future_games
+            
             BaseNFLManager.logger.info(f"[NFL] Fetching data - Past games: {actual_past_games}, Future games: {actual_future_games}")
 
             # Smart game-based fetching with range caching
@@ -205,6 +216,9 @@ class BaseNFLManager: # Renamed class
             all_events = []
             past_events = []
             future_events = []
+            
+            # Track games found for each favorite team
+            favorite_team_games = {team: [] for team in self.favorite_teams} if self.favorite_teams else {}
             
             # Check for cached search ranges
             range_cache_key = f"search_ranges_nfl_{actual_past_games}_{actual_future_games}"
@@ -222,7 +236,9 @@ class BaseNFLManager: # Renamed class
             days_to_check = max(past_days_needed, future_days_needed)
             max_days_to_check = 365  # Limit to 1 year to prevent infinite loops
             
-            while (len(past_events) < actual_past_games or len(future_events) < actual_future_games) and days_to_check <= max_days_to_check:
+            while (len(past_events) < actual_past_games or 
+                   (need_future_games and self.favorite_teams and 
+                    not all(len(games) >= actual_future_games for games in favorite_team_games.values()))) and days_to_check <= max_days_to_check:
                 # Check dates in both directions
                 dates_to_check = []
                 
@@ -290,6 +306,24 @@ class BaseNFLManager: # Renamed class
                                     past_events.append(event)
                                 else:
                                     future_events.append(event)
+                                    
+                                    # Track games for favorite teams
+                                    if self.favorite_teams and need_future_games:
+                                        competition = event.get('competitions', [{}])[0]
+                                        competitors = competition.get('competitors', [])
+                                        home_team = next((c for c in competitors if c.get('homeAway') == 'home'), None)
+                                        away_team = next((c for c in competitors if c.get('homeAway') == 'away'), None)
+                                        
+                                        if home_team and away_team:
+                                            home_abbr = home_team['team']['abbreviation']
+                                            away_abbr = away_team['team']['abbreviation']
+                                            
+                                            # Check if this game involves a favorite team
+                                            for team in self.favorite_teams:
+                                                if team in [home_abbr, away_abbr]:
+                                                    if len(favorite_team_games[team]) < actual_future_games:
+                                                        favorite_team_games[team].append(event)
+                                                        BaseNFLManager.logger.debug(f"[NFL] Found game for {team}: {away_abbr}@{home_abbr}")
                             except Exception as e:
                                 BaseNFLManager.logger.warning(f"[NFL] Could not parse event date: {e}")
                                 continue
@@ -313,7 +347,17 @@ class BaseNFLManager: # Renamed class
             
             # Take the specified number of games
             selected_past_events = past_events[-actual_past_games:] if past_events else []
-            selected_future_events = future_events[:actual_future_games] if future_events else []
+            
+            # For future games, use favorite team games if available
+            if self.favorite_teams and need_future_games:
+                selected_future_events = []
+                for team in self.favorite_teams:
+                    team_games = favorite_team_games.get(team, [])
+                    selected_future_events.extend(team_games[:actual_future_games])
+                BaseNFLManager.logger.info(f"[NFL] Selected {len(selected_past_events)} past games and {len(selected_future_events)} favorite team future games")
+            else:
+                selected_future_events = future_events[:actual_future_games] if future_events else []
+                BaseNFLManager.logger.info(f"[NFL] Selected {len(selected_past_events)} past games and {len(selected_future_events)} future games after checking {days_to_check} days")
             
             # Combine selected events
             selected_events = selected_past_events + selected_future_events

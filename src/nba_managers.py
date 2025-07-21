@@ -370,22 +370,16 @@ class BaseNBAManager:
         """Fetch odds for a specific game if conditions are met."""
         self.logger.debug(f"Checking odds for game: {game.get('id', 'N/A')}")
         
-        # Ensure the API key is set in the secrets config
-        if not self.config_manager.get_secret("the_odds_api_key"):
-            if self._should_log('no_api_key', cooldown=3600):  # Log once per hour
-                self.logger.warning("Odds API key not found. Skipping odds fetch.")
-            return
-            
         # Check if odds should be shown for this sport
         if not self.show_odds:
             self.logger.debug("Odds display is disabled for NBA.")
             return
 
-        # Fetch odds using OddsManager
+        # Fetch odds using OddsManager (ESPN API)
         try:
             # Determine update interval based on game state
-            is_live = game.get('is_live', False)
-            update_interval = self.nba_config.get("live_odds_update_interval", 3600) if is_live \
+            is_live = game.get('status', '').lower() == 'in'
+            update_interval = self.nba_config.get("live_odds_update_interval", 60) if is_live \
                 else self.nba_config.get("odds_update_interval", 3600)
 
             odds_data = self.odds_manager.get_odds(
