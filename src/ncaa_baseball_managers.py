@@ -26,6 +26,7 @@ class BaseNCAABaseballManager:
         self.display_manager = display_manager
         self.ncaa_baseball_config = config.get('ncaa_baseball_scoreboard', {})
         self.show_odds = self.ncaa_baseball_config.get('show_odds', False)
+        self.show_records = self.ncaa_baseball_config.get('show_records', False)
         self.favorite_teams = self.ncaa_baseball_config.get('favorite_teams', [])
         self.cache_manager = CacheManager()
         self.odds_manager = OddsManager(self.cache_manager, self.config)
@@ -276,6 +277,29 @@ class BaseNCAABaseballManager:
             score_y = height - score_font.getmetrics()[0] - 2 # Adjusted for font metrics
             self._draw_text_with_outline(draw, score_text, (score_x, score_y), score_font)
 
+        if self.show_records and game_data['status'] in ['status_scheduled', 'status_final', 'final', 'completed']:
+            try:
+                record_font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6)
+            except IOError:
+                record_font = ImageFont.load_default()
+
+            away_record = game_data.get('away_record', '')
+            home_record = game_data.get('home_record', '')
+
+            record_bbox = draw.textbbox((0, 0), "0-0", font=record_font)
+            record_height = record_bbox[3] - record_bbox[1]
+            record_y = height - record_height - 1
+
+            if away_record:
+                away_record_x = 2
+                self._draw_text_with_outline(draw, away_record, (away_record_x, record_y), record_font)
+
+            if home_record:
+                home_record_bbox = draw.textbbox((0, 0), home_record, font=record_font)
+                home_record_width = home_record_bbox[2] - home_record_bbox[0]
+                home_record_x = width - home_record_width - 2
+                self._draw_text_with_outline(draw, home_record, (home_record_x, record_y), record_font)
+
         # Draw betting odds if available and enabled
         if self.show_odds and 'odds' in game_data:
             odds_details = game_data['odds'].get('details', 'N/A')
@@ -393,6 +417,8 @@ class BaseNCAABaseballManager:
 
                     home_abbr = home_team['team'].get('abbreviation', 'N/A')
                     away_abbr = away_team['team'].get('abbreviation', 'N/A')
+                    home_record = home_team.get('records', [{}])[0].get('summary', '') if home_team.get('records') else ''
+                    away_record = away_team.get('records', [{}])[0].get('summary', '') if away_team.get('records') else ''
                     
                     is_favorite_game = (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams)
                     
@@ -455,6 +481,8 @@ class BaseNCAABaseballManager:
                         'home_team': home_abbr,
                         'away_score': away_team.get('score', '0'),
                         'home_score': home_team.get('score', '0'),
+                        'away_record': away_record,
+                        'home_record': home_record,
                         'status': status,
                         'status_state': status_state,
                         'inning': inning,

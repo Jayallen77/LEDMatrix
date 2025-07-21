@@ -115,6 +115,7 @@ class BaseSoccerManager:
         self.test_mode = self.soccer_config.get("test_mode", False)
         self.logo_dir = self.soccer_config.get("logo_dir", "assets/sports/soccer_logos") # Soccer logos
         self.update_interval = self.soccer_config.get("update_interval_seconds", 60) # General fallback
+        self.show_records = self.soccer_config.get('show_records', False)
         self.last_update = 0
         self.current_game = None
         self.fonts = self._load_fonts()
@@ -552,6 +553,8 @@ class BaseSoccerManager:
 
             home_team = next(c for c in competitors if c.get("homeAway") == "home")
             away_team = next(c for c in competitors if c.get("homeAway") == "away")
+            home_record = home_team.get('records', [{}])[0].get('summary', '') if home_team.get('records') else ''
+            away_record = away_team.get('records', [{}])[0].get('summary', '') if away_team.get('records') else ''
 
             game_time = ""
             game_date = ""
@@ -589,9 +592,11 @@ class BaseSoccerManager:
                 "is_within_window": is_within_window,
                 "home_abbr": home_team["team"]["abbreviation"],
                 "home_score": home_team.get("score", "0"),
+                "home_record": home_record,
                 "home_logo": self._load_and_resize_logo(home_team["team"]["abbreviation"]),
                 "away_abbr": away_team["team"]["abbreviation"],
                 "away_score": away_team.get("score", "0"),
+                "away_record": away_record,
                 "away_logo": self._load_and_resize_logo(away_team["team"]["abbreviation"]),
                 "game_time": game_time, # Formatted local time (e.g., 2:30pm)
                 "game_date": game_date, # Formatted local date (e.g., 7/21)
@@ -731,6 +736,30 @@ class BaseSoccerManager:
                     
                     spread_y = self.display_height - 8
                     self._draw_text_with_outline(draw, spread_text, (spread_x, spread_y), self.fonts['status'], fill=text_color)
+
+            # Draw records if enabled
+            if self.show_records:
+                try:
+                    record_font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6)
+                except IOError:
+                    record_font = ImageFont.load_default()
+                
+                away_record = game.get('away_record', '')
+                home_record = game.get('home_record', '')
+                
+                record_bbox = draw.textbbox((0,0), "0-0", font=record_font)
+                record_height = record_bbox[3] - record_bbox[1]
+                record_y = self.display_height - record_height - 1
+
+                if away_record:
+                    away_record_x = 2
+                    self._draw_text_with_outline(draw, away_record, (away_record_x, record_y), record_font)
+
+                if home_record:
+                    home_record_bbox = draw.textbbox((0,0), home_record, font=record_font)
+                    home_record_width = home_record_bbox[2] - home_record_bbox[0]
+                    home_record_x = self.display_width - home_record_width - 2
+                    self._draw_text_with_outline(draw, home_record, (home_record_x, record_y), record_font)
 
             # --- Display Image ---
             self.display_manager.image.paste(main_img, (0, 0))

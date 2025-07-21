@@ -102,14 +102,30 @@ class OddsTickerManager:
         # This is a simplified implementation; a more robust solution would cache team data
         try:
             sport = 'baseball' if league == 'mlb' else 'football' if league in ['nfl', 'college-football'] else 'basketball'
-            url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/teams/{team_abbr}"
+            
+            # Use a more specific endpoint for college sports
+            if league == 'college-football':
+                url = f"https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/{team_abbr}"
+            else:
+                url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/teams/{team_abbr}"
+
             response = requests.get(url, timeout=10)
             response.raise_for_status()
             data = response.json()
-            record = data.get('team', {}).get('record', {}).get('summary', 'N/A')
-            return record
+            
+            # Different path for college sports records
+            if league == 'college-football':
+                 record_items = data.get('team', {}).get('record', {}).get('items', [])
+                 if record_items:
+                     return record_items[0].get('summary', 'N/A')
+                 else:
+                    return 'N/A'
+            else:
+                record = data.get('team', {}).get('record', {}).get('summary', 'N/A')
+                return record
+
         except Exception as e:
-            logger.error(f"Error fetching record for {team_abbr}: {e}")
+            logger.error(f"Error fetching record for {team_abbr} in league {league}: {e}")
             return "N/A"
 
     def _get_team_logo(self, team_abbr: str, logo_dir: str) -> Optional[Image.Image]:
@@ -219,6 +235,10 @@ class OddsTickerManager:
                             home_abbr = home_team['team']['abbreviation']
                             away_abbr = away_team['team']['abbreviation']
                             
+                            # Get records directly from the scoreboard feed
+                            home_record = home_team.get('records', [{}])[0].get('summary', '') if home_team.get('records') else ''
+                            away_record = away_team.get('records', [{}])[0].get('summary', '') if away_team.get('records') else ''
+
                             # Check if this game involves favorite teams BEFORE fetching odds
                             if self.show_favorite_teams_only:
                                 favorite_teams = league_config.get('favorite_teams', [])
@@ -253,10 +273,6 @@ class OddsTickerManager:
                                 logger.debug(f"Game {game_id} has no valid odds data, setting odds to None")
                                 odds_data = None
                             
-                            # Fetch team records
-                            home_record = self._fetch_team_record(home_abbr, league)
-                            away_record = self._fetch_team_record(away_abbr, league)
-
                             game_data = {
                                 'id': game_id,
                                 'league': league_config['league'],
@@ -385,29 +401,34 @@ class OddsTickerManager:
 
         # "vs." text
         vs_text = "vs."
-        vs_width = temp_draw.textlength(vs_text, font=vs_font)
+        vs_width = int(temp_draw.textlength(vs_text, font=vs_font))
 
         # Team and record text
-        away_team_text = f"{game.get('away_team', 'N/A')} ({game.get('away_record', '')})"
-        home_team_text = f"{game.get('home_team', 'N/A')} ({game.get('home_record', '')})"
-        away_team_width = temp_draw.textlength(away_team_text, font=team_font)
-        home_team_width = temp_draw.textlength(home_team_text, font=team_font)
+        away_team_text = f"{game.get('away_team', 'N/A')} ({game.get('away_record', '') or 'N/A'})"
+        home_team_text = f"{game.get('home_team', 'N/A')} ({game.get('home_record', '') or 'N/A'})"
+        away_team_width = int(temp_draw.textlength(away_team_text, font=team_font))
+        home_team_width = int(temp_draw.textlength(home_team_text, font=team_font))
         team_info_width = max(away_team_width, home_team_width)
 
         # Odds text
         odds = game.get('odds') or {}
         home_team_odds = odds.get('home_team_odds', {})
         away_team_odds = odds.get('away_team_odds', {})
-        home_spread = home_team_odds.get('spread_odds')
-        away_spread = away_team_odds.get('spread_odds')
+        
+        # Determine the favorite and get the spread
+        home_spread = home_team_odds.get('point_spread')
+        away_spread = away_team_odds.get('point_spread')
+        
+        # Check for valid spread values before comparing
+        home_favored = isinstance(home_spread, (int, float)) and home_spread < 0
+        away_favored = isinstance(away_spread, (int, float)) and away_spread < 0
+
         over_under = odds.get('over_under')
         
-        home_favored = home_spread is not None and home_spread < 0
-        away_favored = away_spread is not None and away_spread < 0
-
         away_odds_text = ""
         home_odds_text = ""
         
+        # Simplified odds placement logic
         if home_favored:
             home_odds_text = f"{home_spread}"
             if over_under:
@@ -416,11 +437,11 @@ class OddsTickerManager:
             away_odds_text = f"{away_spread}"
             if over_under:
                 home_odds_text = f"O/U {over_under}"
-        elif over_under: # No clear favorite, put O/U on home line
+        elif over_under:
             home_odds_text = f"O/U {over_under}"
-
-        away_odds_width = temp_draw.textlength(away_odds_text, font=odds_font)
-        home_odds_width = temp_draw.textlength(home_odds_text, font=odds_font)
+        
+        away_odds_width = int(temp_draw.textlength(away_odds_text, font=odds_font))
+        home_odds_width = int(temp_draw.textlength(home_odds_text, font=odds_font))
         odds_width = max(away_odds_width, home_odds_width)
 
         # --- Calculate total width ---
@@ -463,8 +484,12 @@ class OddsTickerManager:
         odds_font_height = odds_font.size if hasattr(odds_font, 'size') else 6
         odds_y_away = 2
         odds_y_home = height - odds_font_height - 2
-        draw.text((current_x, odds_y_away), away_odds_text, font=odds_font, fill=(255, 255, 0)) # Yellow for odds
-        draw.text((current_x, odds_y_home), home_odds_text, font=odds_font, fill=(0, 255, 0)) # Green for favorite
+        
+        # Use a consistent color for all odds text
+        odds_color = (255, 255, 0) # Yellow
+
+        draw.text((current_x, odds_y_away), away_odds_text, font=odds_font, fill=odds_color)
+        draw.text((current_x, odds_y_home), home_odds_text, font=odds_font, fill=odds_color)
 
         return image
 

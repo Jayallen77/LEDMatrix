@@ -24,6 +24,7 @@ class BaseMLBManager:
         self.mlb_config = config.get('mlb', {})
         self.show_odds = self.mlb_config.get("show_odds", False)
         self.favorite_teams = self.mlb_config.get('favorite_teams', [])
+        self.show_records = self.mlb_config.get('show_records', False)
         self.cache_manager = CacheManager()
         self.odds_manager = OddsManager(self.cache_manager, self.config)
         self.logger = logging.getLogger(__name__)
@@ -315,7 +316,7 @@ class BaseMLBManager:
             pass
 
         # Draw records for upcoming and recent games
-        if game_data['status'] in ['status_scheduled', 'status_final', 'final', 'completed']:
+        if self.show_records and game_data['status'] in ['status_scheduled', 'status_final', 'final', 'completed']:
             try:
                 record_font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6)
             except IOError:

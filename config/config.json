@@ -38,7 +38,7 @@
             "hourly_forecast": 15,
             "daily_forecast": 15,
             "stock_news": 20,
-            "odds_ticker": 25,
+            "odds_ticker": 45,
             "nhl_live": 30,
             "nhl_recent": 20,
             "nhl_upcoming": 20,
@@ -112,9 +112,8 @@
         "show_favorite_teams_only": true,
         "enabled_leagues": ["mlb"],
         "update_interval": 3600,
-        "scroll_speed": 2,
-        "scroll_delay": 0.05,
-        "display_duration": 30
+        "scroll_speed": 1,
+        "scroll_delay": 0.001
     },
     "calendar": {
         "enabled": true,
@@ -126,15 +125,16 @@
     },
     "nhl_scoreboard": {
         "enabled": false,
-        "show_odds": false,
+        "show_odds": true,
         "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 30,
         "recent_update_interval": 3600,
         "upcoming_update_interval": 3600,
         "recent_game_hours": 48,
-        "favorite_teams": ["TB", "DAL"],
+        "favorite_teams": ["TB"],
         "logo_dir": "assets/sports/nhl_logos",
+        "show_records": true,
         "display_modes": {
             "nhl_live": true,
             "nhl_recent": true,
@@ -142,8 +142,8 @@
         }
     },
     "nba_scoreboard": {
-        "enabled": true,
-        "show_odds": false,
+        "enabled": false,
+        "show_odds": true,
         "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 30,
@@ -152,8 +152,9 @@
         "recent_update_interval": 3600,
         "upcoming_update_interval": 3600,
         "recent_game_hours": 72,
-        "favorite_teams": ["DAL", "ATL"],
+        "favorite_teams": ["DAL"],
         "logo_dir": "assets/sports/nba_logos",
+        "show_records": true,
         "display_modes": {
             "nba_live": true,
             "nba_recent": true,
@@ -172,6 +173,7 @@
         "future_fetch_days": 7,
         "favorite_teams": ["TB", "DAL"],
         "logo_dir": "assets/sports/nfl_logos",
+        "show_records": true,
         "display_modes": {
             "nfl_live": true,
             "nfl_recent": true,
@@ -180,7 +182,7 @@
     },
     "ncaa_fb_scoreboard": {
         "enabled": false,
-        "show_odds": false,
+        "show_odds": true,
         "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 30,
@@ -190,30 +192,16 @@
         "future_fetch_days": 7,
         "favorite_teams": ["UGA", "AUB"],
         "logo_dir": "assets/sports/ncaa_fbs_logos",
+        "show_records": true,
         "display_modes": {
             "ncaa_fb_live": true,
             "ncaa_fb_recent": true,
             "ncaa_fb_upcoming": true
         }
     },
-    "ncaam_basketball_scoreboard": {
-        "enabled": false,
-        "show_odds": false,
-        "test_mode": false,
-        "update_interval_seconds": 3600,
-        "live_update_interval": 30,
-        "recent_game_hours": 72,
-        "favorite_teams": ["UGA", "AUB"],
-        "logo_dir": "assets/sports/ncaa_fbs_logos",
-        "display_modes": {
-            "ncaam_basketball_live": true,
-            "ncaam_basketball_recent": true,
-            "ncaam_basketball_upcoming": true
-        }
-    },
     "ncaa_baseball_scoreboard": {
         "enabled": false,
-        "show_odds": false,
+        "show_odds": true,
         "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 30,
@@ -222,10 +210,27 @@
         "recent_game_hours": 72,
         "favorite_teams": ["UGA", "AUB"],
         "logo_dir": "assets/sports/ncaa_fbs_logos",
+        "show_records": true,
         "display_modes": {
             "ncaa_baseball_live": true,
             "ncaa_baseball_recent": true,
             "ncaa_baseball_upcoming": true
+        }
+    },
+    "ncaam_basketball_scoreboard": {
+        "enabled": false,
+        "show_odds": true,
+        "test_mode": false,
+        "update_interval_seconds": 3600,
+        "live_update_interval": 30,
+        "recent_game_hours": 72,
+        "favorite_teams": ["UGA", "AUB"],
+        "logo_dir": "assets/sports/ncaa_fbs_logos",
+        "show_records": true,
+        "display_modes": {
+            "ncaam_basketball_live": true,
+            "ncaam_basketball_recent": true,
+            "ncaam_basketball_upcoming": true
         }
     },
     "youtube": {
@@ -245,6 +250,7 @@
         "recent_game_hours": 48,
         "favorite_teams": ["TB", "TEX"],
         "logo_dir": "assets/sports/mlb_logos",
+        "show_records": true,
         "display_modes": {
             "mlb_live": false,
             "mlb_recent": true,
@@ -280,6 +286,7 @@
     },
     "soccer_scoreboard": {
         "enabled": false,
+        "show_odds": true,
         "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 30,
@@ -287,9 +294,10 @@
         "upcoming_update_interval": 3600,
         "recent_game_hours": 168,
         "upcoming_fetch_days": 7,
-        "favorite_teams": ["BAR"],
+        "favorite_teams": ["LIV"],
         "leagues": ["eng.1", "esp.1", "ger.1", "ita.1", "fra.1", "uefa.champions", "usa.1"],
         "logo_dir": "assets/sports/soccer_logos",
+        "show_records": true,
         "display_modes": {
             "soccer_live": true,
             "soccer_recent": true,

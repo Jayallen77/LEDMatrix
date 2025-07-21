@@ -44,8 +44,9 @@ class BaseNCAAMBasketballManager:
         self.is_enabled = self.ncaam_basketball_config.get("enabled", False)
         self.show_odds = self.ncaam_basketball_config.get("show_odds", False)
         self.test_mode = self.ncaam_basketball_config.get("test_mode", False)
-        self.logo_dir = self.ncaam_basketball_config.get("logo_dir", "assets/sports/ncaam_logos")
-        self.update_interval = self.ncaam_basketball_config.get("update_interval_seconds", 300)
+        self.logo_dir = self.ncaam_basketball_config.get("logo_dir", "assets/sports/ncaa_fbs_logos")
+        self.update_interval = self.ncaam_basketball_config.get("update_interval_seconds", 60)
+        self.show_records = self.ncaam_basketball_config.get('show_records', False)
         self.last_update = 0
         self.current_game = None
         self.fonts = self._load_fonts()
@@ -421,6 +422,8 @@ class BaseNCAAMBasketballManager:
 
             home_team = next(c for c in competitors if c.get("homeAway") == "home")
             away_team = next(c for c in competitors if c.get("homeAway") == "away")
+            home_record = home_team.get('records', [{}])[0].get('summary', '') if home_team.get('records') else ''
+            away_record = away_team.get('records', [{}])[0].get('summary', '') if away_team.get('records') else ''
 
             # Format game time and date for display
             game_time = ""
@@ -450,9 +453,11 @@ class BaseNCAAMBasketballManager:
                 "is_within_window": is_within_window,
                 "home_abbr": home_team["team"]["abbreviation"],
                 "home_score": home_team.get("score", "0"),
+                "home_record": home_record,
                 "home_logo_path": os.path.join(self.logo_dir, f"{home_team['team']['abbreviation']}.png"),
                 "away_abbr": away_team["team"]["abbreviation"],
                 "away_score": away_team.get("score", "0"),
+                "away_record": away_record,
                 "away_logo_path": os.path.join(self.logo_dir, f"{away_team['team']['abbreviation']}.png"),
                 "game_time": game_time,
                 "game_date": game_date,
@@ -589,23 +594,32 @@ class BaseNCAAMBasketballManager:
                     self._draw_text_with_outline(draw, clock, (clock_x, clock_y), self.fonts['time'])
 
             # Display odds if available
-            if 'odds' in game:
-                odds = game['odds']
-                spread = odds.get('spread', {}).get('point', None)
-                if spread is not None:
-                    # Format spread text
-                    spread_text = f"{spread:+.1f}" if spread > 0 else f"{spread:.1f}"
-                    
-                    # Choose color and position based on which team has the spread
-                    if odds.get('spread', {}).get('team') == game['home_abbr']:
-                        text_color = (255, 100, 100) # Reddish
-                        spread_x = self.display_width - draw.textlength(spread_text, font=self.fonts['status']) - 2
-                    else:
-                        text_color = (100, 255, 100) # Greenish
-                        spread_x = 2
-                    
-                    spread_y = self.display_height - 8
-                    self._draw_text_with_outline(draw, spread_text, (spread_x, spread_y), self.fonts['status'], fill=text_color)
+            if 'odds' in game and game['odds']:
+                self._draw_dynamic_odds(draw, game['odds'], self.display_width, self.display_height)
+
+            # Draw records if enabled
+            if self.show_records:
+                try:
+                    record_font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6)
+                except IOError:
+                    record_font = ImageFont.load_default()
+                
+                away_record = game.get('away_record', '')
+                home_record = game.get('home_record', '')
+                
+                record_bbox = draw.textbbox((0,0), "0-0", font=record_font)
+                record_height = record_bbox[3] - record_bbox[1]
+                record_y = self.display_height - record_height - 1
+
+                if away_record:
+                    away_record_x = 2
+                    self._draw_text_with_outline(draw, away_record, (away_record_x, record_y), record_font)
+
+                if home_record:
+                    home_record_bbox = draw.textbbox((0,0), home_record, font=record_font)
+                    home_record_width = home_record_bbox[2] - home_record_bbox[0]
+                    home_record_x = self.display_width - home_record_width - 2
+                    self._draw_text_with_outline(draw, home_record, (home_record_x, record_y), record_font)
 
             # Display the image
             self.display_manager.image.paste(main_img, (0, 0))

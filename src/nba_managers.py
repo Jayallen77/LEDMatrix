@@ -45,6 +45,7 @@ class BaseNBAManager:
         self.show_odds = self.nba_config.get("show_odds", False)
         self.test_mode = self.nba_config.get("test_mode", False)
         self.logo_dir = self.nba_config.get("logo_dir", "assets/sports/nba_logos")
+        self.show_records = self.nba_config.get('show_records', False)
         self.update_interval = self.nba_config.get("update_interval_seconds", 300)
         self.last_update = 0
         self.current_game = None
@@ -424,6 +425,8 @@ class BaseNBAManager:
 
             home_team = next(c for c in competitors if c.get("homeAway") == "home")
             away_team = next(c for c in competitors if c.get("homeAway") == "away")
+            home_record = home_team.get('records', [{}])[0].get('summary', '') if home_team.get('records') else ''
+            away_record = away_team.get('records', [{}])[0].get('summary', '') if away_team.get('records') else ''
 
             # Format game time and date for display
             game_time = ""
@@ -452,9 +455,11 @@ class BaseNBAManager:
                 "is_within_window": is_within_window,
                 "home_abbr": home_team["team"]["abbreviation"],
                 "home_score": home_team.get("score", "0"),
+                "home_record": home_record,
                 "home_logo_path": os.path.join(self.logo_dir, f"{home_team['team']['abbreviation']}.png"),
                 "away_abbr": away_team["team"]["abbreviation"],
                 "away_score": away_team.get("score", "0"),
+                "away_record": away_record,
                 "away_logo_path": os.path.join(self.logo_dir, f"{away_team['team']['abbreviation']}.png"),
                 "game_time": game_time,
                 "game_date": game_date
@@ -580,6 +585,30 @@ class BaseNBAManager:
             # Draw odds if available
             if 'odds' in game and game['odds']:
                 self._draw_dynamic_odds(draw, game['odds'], self.display_width, self.display_height)
+
+            # Draw records if enabled
+            if self.show_records:
+                try:
+                    record_font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6)
+                except IOError:
+                    record_font = ImageFont.load_default()
+                
+                away_record = game.get('away_record', '')
+                home_record = game.get('home_record', '')
+                
+                record_bbox = draw.textbbox((0,0), "0-0", font=record_font)
+                record_height = record_bbox[3] - record_bbox[1]
+                record_y = self.display_height - record_height - 1
+
+                if away_record:
+                    away_record_x = 2
+                    self._draw_text_with_outline(draw, away_record, (away_record_x, record_y), record_font)
+
+                if home_record:
+                    home_record_bbox = draw.textbbox((0,0), home_record, font=record_font)
+                    home_record_width = home_record_bbox[2] - home_record_bbox[0]
+                    home_record_x = self.display_width - home_record_width - 2
+                    self._draw_text_with_outline(draw, home_record, (home_record_x, record_y), record_font)
 
             # Display the image
             self.display_manager.image.paste(main_img, (0, 0))

@@ -97,6 +97,7 @@ class BaseNFLManager: # Renamed class
         self.test_mode = self.nfl_config.get("test_mode", False)
         self.logo_dir = self.nfl_config.get("logo_dir", "assets/sports/nfl_logos") # Changed logo dir
         self.update_interval = self.nfl_config.get("update_interval_seconds", 60)
+        self.show_records = self.nfl_config.get('show_records', False)
         self.last_update = 0
         self.current_game = None
         self.fonts = self._load_fonts()
@@ -424,6 +425,8 @@ class BaseNFLManager: # Renamed class
 
             home_abbr = home_team["team"]["abbreviation"]
             away_abbr = away_team["team"]["abbreviation"]
+            home_record = home_team.get('records', [{}])[0].get('summary', '') if home_team.get('records') else ''
+            away_record = away_team.get('records', [{}])[0].get('summary', '') if away_team.get('records') else ''
 
             # Filter by favorite teams if the list is not empty
             if self.favorite_teams and not (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams):
@@ -498,10 +501,12 @@ class BaseNFLManager: # Renamed class
                 "is_halftime": status["type"]["state"] == "halftime", # Added halftime check
                 "home_abbr": home_abbr,
                 "home_score": home_team.get("score", "0"),
+                "home_record": home_record,
                 "home_logo_path": os.path.join(self.logo_dir, f"{home_abbr}.png"),
                 "home_timeouts": home_timeouts,
                 "away_abbr": away_abbr,
                 "away_score": away_team.get("score", "0"),
+                "away_record": away_record,
                 "away_logo_path": os.path.join(self.logo_dir, f"{away_abbr}.png"),
                 "away_timeouts": away_timeouts,
                 "game_time": game_time,
@@ -1008,6 +1013,30 @@ class NFLRecentManager(BaseNFLManager): # Renamed class
             if 'odds' in game and game['odds']:
                 self._draw_dynamic_odds(draw_overlay, game['odds'], self.display_width, self.display_height)
 
+            # Draw records if enabled
+            if self.show_records:
+                try:
+                    record_font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6)
+                except IOError:
+                    record_font = ImageFont.load_default()
+                
+                away_record = game.get('away_record', '')
+                home_record = game.get('home_record', '')
+                
+                record_bbox = draw_overlay.textbbox((0,0), "0-0", font=record_font)
+                record_height = record_bbox[3] - record_bbox[1]
+                record_y = self.display_height - record_height - 1
+
+                if away_record:
+                    away_record_x = 2
+                    self._draw_text_with_outline(draw_overlay, away_record, (away_record_x, record_y), record_font)
+
+                if home_record:
+                    home_record_bbox = draw_overlay.textbbox((0,0), home_record, font=record_font)
+                    home_record_width = home_record_bbox[2] - home_record_bbox[0]
+                    home_record_x = self.display_width - home_record_width - 2
+                    self._draw_text_with_outline(draw_overlay, home_record, (home_record_x, record_y), record_font)
+
             # Composite and display
             main_img = Image.alpha_composite(main_img, overlay)
             main_img = main_img.convert('RGB')
@@ -1204,6 +1233,30 @@ class NFLUpcomingManager(BaseNFLManager): # Renamed class
             # Draw odds if available
             if 'odds' in game and game['odds']:
                 self._draw_dynamic_odds(draw_overlay, game['odds'], self.display_width, self.display_height)
+
+            # Draw records if enabled
+            if self.show_records:
+                try:
+                    record_font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6)
+                except IOError:
+                    record_font = ImageFont.load_default()
+                
+                away_record = game.get('away_record', '')
+                home_record = game.get('home_record', '')
+                
+                record_bbox = draw_overlay.textbbox((0,0), "0-0", font=record_font)
+                record_height = record_bbox[3] - record_bbox[1]
+                record_y = self.display_height - record_height - 1
+
+                if away_record:
+                    away_record_x = 2
+                    self._draw_text_with_outline(draw_overlay, away_record, (away_record_x, record_y), record_font)
+
+                if home_record:
+                    home_record_bbox = draw_overlay.textbbox((0,0), home_record, font=record_font)
+                    home_record_width = home_record_bbox[2] - home_record_bbox[0]
+                    home_record_x = self.display_width - home_record_width - 2
+                    self._draw_text_with_outline(draw_overlay, home_record, (home_record_x, record_y), record_font)
 
             # Composite and display
             main_img = Image.alpha_composite(main_img, overlay)
