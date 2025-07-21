@@ -40,7 +40,7 @@ class OddsTickerManager:
         self.last_scroll_time = 0
         self.games_data = []
         self.current_game_index = 0
-        self.current_image = None
+        self.ticker_image = None # This will hold the single, wide image
         self.last_display_time = 0
         
         # Font setup
@@ -356,117 +356,139 @@ class OddsTickerManager:
         """Create a display image for a game in the new format."""
         width = self.display_manager.matrix.width
         height = self.display_manager.matrix.height
-        image = Image.new('RGB', (width * 2, height), color=(0, 0, 0))  # Wider image for scrolling
-        draw = ImageDraw.Draw(image)
         
-        # Load logos
-        home_logo = self._get_team_logo(game['home_team'], game['logo_dir'])
-        away_logo = self._get_team_logo(game['away_team'], game['logo_dir'])
+        # Create a wider image for scrolling. The width will be determined by the content.
+        # Let's start with a placeholder and calculate the actual width.
         
+        # --- Pre-calculate widths ---
+        logo_size = 24  # Assuming square logos
+        logo_padding = 5
+        vs_padding = 8
+        section_padding = 12
+
         # Fonts
         team_font = self.fonts['medium']
-        record_font = self.fonts['small']
         odds_font = self.fonts['small']
-        
-        # Team names and records
-        away_team_text = f"{game['away_team']} ({game['away_record']})"
-        home_team_text = f"{game['home_team']} ({game['home_record']})"
-        
-        # Calculate positions
-        logo_size = 24
-        x_pos = 10
-        
-        # Away team logo and info
-        if away_logo:
-            away_logo = away_logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
-            image.paste(away_logo, (x_pos, (height - logo_size) // 2), away_logo)
-            x_pos += logo_size + 5
-            
-        draw.text((x_pos, 5), away_team_text, font=team_font, fill=(255, 255, 255))
-        
-        # Home team logo and info
-        x_pos += int(draw.textlength(away_team_text, font=team_font)) + 10
-        if home_logo:
-            home_logo = home_logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
-            image.paste(home_logo, (x_pos, (height - logo_size) // 2), home_logo)
-            x_pos += logo_size + 5
-            
-        draw.text((x_pos, 18), home_team_text, font=team_font, fill=(255, 255, 255))
-        
-        # Odds
-        odds = game.get('odds', {})
-        if odds:
-            home_team_odds = odds.get('home_team_odds', {})
-            away_team_odds = odds.get('away_team_odds', {})
-            home_spread = home_team_odds.get('spread_odds')
-            over_under = odds.get('over_under')
-            
-            # Determine favorite
-            home_favored = home_spread is not None and home_spread < 0
-            
-            # Draw odds
-            x_pos += int(draw.textlength(home_team_text, font=team_font)) + 10
-            if home_favored:
-                draw.text((x_pos, 18), f"{home_spread}", font=odds_font, fill=(0, 255, 0))
-                if over_under:
-                    draw.text((x_pos, 5), f"O/U {over_under}", font=odds_font, fill=(255, 255, 0))
-            else:
-                away_spread = away_team_odds.get('spread_odds')
-                if away_spread is not None:
-                    draw.text((x_pos, 5), f"{away_spread}", font=odds_font, fill=(0, 255, 0))
-                if over_under:
-                    draw.text((x_pos, 18), f"O/U {over_under}", font=odds_font, fill=(255, 255, 0))
-        
-        return image
+        vs_font = self.fonts['medium']
 
-    def _create_ticker_image(self, game: Dict[str, Any]) -> Image.Image:
-        """Create a scrolling ticker image for a game."""
-        width = self.display_manager.matrix.width
-        height = self.display_manager.matrix.height
-        
-        logger.debug(f"Creating ticker image for {width}x{height} display")
-        
-        # Create a wider image for scrolling
-        scroll_width = width * 3  # 3x width for smooth scrolling
-        image = Image.new('RGB', (scroll_width, height), color=(0, 0, 0))
-        draw = ImageDraw.Draw(image)
-        
-        # Format the odds text
-        odds_text = self._format_odds_text(game)
-        logger.debug(f"Formatted odds text: '{odds_text}'")
-        
-        # Load team logos
+        # Get team logos
         home_logo = self._get_team_logo(game['home_team'], game['logo_dir'])
         away_logo = self._get_team_logo(game['away_team'], game['logo_dir'])
-        
-        # Calculate text position (start off-screen to the right)
-        text_width = draw.textlength(odds_text, font=self.fonts['medium'])
-        text_x = scroll_width - text_width - 10  # Start off-screen right
-        text_y = (height - self.fonts['medium'].size) // 2
-        
-        logger.debug(f"Drawing text at position ({text_x}, {text_y})")
-        
-        # Draw the text
-        self._draw_text_with_outline(draw, odds_text, (text_x, text_y), self.fonts['medium'])
-        
-        # Add team logos if available
-        logo_size = 16
-        logo_y = (height - logo_size) // 2
-        
-        if away_logo:
-            away_logo.thumbnail((logo_size, logo_size), Image.Resampling.LANCZOS)
-            away_x = int(text_x - logo_size - 5)
-            image.paste(away_logo, (away_x, logo_y), away_logo)
-            logger.debug(f"Added away team logo at ({away_x}, {logo_y})")
-        
+
         if home_logo:
-            home_logo.thumbnail((logo_size, logo_size), Image.Resampling.LANCZOS)
-            home_x = int(text_x + text_width + 5)
-            image.paste(home_logo, (home_x, logo_y), home_logo)
-            logger.debug(f"Added home team logo at ({home_x}, {logo_y})")
+            home_logo = home_logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
+        if away_logo:
+            away_logo = away_logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
+
+        # Create a temporary draw object to measure text
+        temp_draw = ImageDraw.Draw(Image.new('RGB', (1, 1)))
+
+        # "vs." text
+        vs_text = "vs."
+        vs_width = temp_draw.textlength(vs_text, font=vs_font)
+
+        # Team and record text
+        away_team_text = f"{game.get('away_team', 'N/A')} ({game.get('away_record', '')})"
+        home_team_text = f"{game.get('home_team', 'N/A')} ({game.get('home_record', '')})"
+        away_team_width = temp_draw.textlength(away_team_text, font=team_font)
+        home_team_width = temp_draw.textlength(home_team_text, font=team_font)
+        team_info_width = max(away_team_width, home_team_width)
+
+        # Odds text
+        odds = game.get('odds', {})
+        home_team_odds = odds.get('home_team_odds', {})
+        away_team_odds = odds.get('away_team_odds', {})
+        home_spread = home_team_odds.get('spread_odds')
+        away_spread = away_team_odds.get('spread_odds')
+        over_under = odds.get('over_under')
         
-        logger.debug(f"Created ticker image with size {image.size}")
+        home_favored = home_spread is not None and home_spread < 0
+        away_favored = away_spread is not None and away_spread < 0
+
+        away_odds_text = ""
+        home_odds_text = ""
+        
+        if home_favored:
+            home_odds_text = f"{home_spread}"
+            if over_under:
+                away_odds_text = f"O/U {over_under}"
+        elif away_favored:
+            away_odds_text = f"{away_spread}"
+            if over_under:
+                home_odds_text = f"O/U {over_under}"
+        elif over_under: # No clear favorite, put O/U on home line
+            home_odds_text = f"O/U {over_under}"
+
+        away_odds_width = temp_draw.textlength(away_odds_text, font=odds_font)
+        home_odds_width = temp_draw.textlength(home_odds_text, font=odds_font)
+        odds_width = max(away_odds_width, home_odds_width)
+
+        # --- Calculate total width ---
+        total_width = (logo_size + logo_padding + vs_width + vs_padding + logo_size + section_padding +
+                       team_info_width + section_padding + odds_width + section_padding)
+
+        # --- Create final image ---
+        image = Image.new('RGB', (int(total_width), height), color=(0, 0, 0))
+        draw = ImageDraw.Draw(image)
+
+        # --- Draw elements ---
+        current_x = logo_padding
+
+        # Away Logo
+        if away_logo:
+            y_pos = (height - logo_size) // 2
+            image.paste(away_logo, (int(current_x), y_pos), away_logo if away_logo.mode == 'RGBA' else None)
+        current_x += logo_size + vs_padding
+
+        # "vs."
+        y_pos = (height - vs_font.size) // 2 if hasattr(vs_font, 'size') else (height - 8) // 2 # Added fallback for default font
+        draw.text((current_x, y_pos), vs_text, font=vs_font, fill=(255, 255, 255))
+        current_x += vs_width + vs_padding
+
+        # Home Logo
+        if home_logo:
+            y_pos = (height - logo_size) // 2
+            image.paste(home_logo, (int(current_x), y_pos), home_logo if home_logo.mode == 'RGBA' else None)
+        current_x += logo_size + section_padding
+
+        # Team Info (stacked)
+        team_font_height = team_font.size if hasattr(team_font, 'size') else 8
+        away_y = 2
+        home_y = height - team_font_height - 2
+        draw.text((current_x, away_y), away_team_text, font=team_font, fill=(255, 255, 255))
+        draw.text((current_x, home_y), home_team_text, font=team_font, fill=(255, 255, 255))
+        current_x += team_info_width + section_padding
+
+        # Odds (stacked)
+        odds_font_height = odds_font.size if hasattr(odds_font, 'size') else 6
+        odds_y_away = 2
+        odds_y_home = height - odds_font_height - 2
+        draw.text((current_x, odds_y_away), away_odds_text, font=odds_font, fill=(255, 255, 0)) # Yellow for odds
+        draw.text((current_x, odds_y_home), home_odds_text, font=odds_font, fill=(0, 255, 0)) # Green for favorite
+
         return image
+
+    def _create_ticker_image(self):
+        """Create a single wide image containing all game tickers."""
+        if not self.games_data:
+            self.ticker_image = None
+            return
+
+        game_images = [self._create_game_display(game) for game in self.games_data]
+        if not game_images:
+            self.ticker_image = None
+            return
+
+        gap_width = self.display_manager.matrix.width // 2  # Gap between games
+        total_width = sum(img.width for img in game_images) + gap_width * (len(game_images))
+        height = self.display_manager.matrix.height
+
+        self.ticker_image = Image.new('RGB', (total_width, height), color=(0, 0, 0))
+        
+        current_x = 0
+        for img in game_images:
+            self.ticker_image.paste(img, (current_x, 0))
+            current_x += img.width + gap_width
 
     def _draw_text_with_outline(self, draw: ImageDraw.Draw, text: str, position: tuple, font: ImageFont.FreeTypeFont, 
                                fill: tuple = (255, 255, 255), outline_color: tuple = (0, 0, 0)) -> None:
@@ -496,8 +518,9 @@ class OddsTickerManager:
             
             self.games_data = self._fetch_upcoming_games()
             self.last_update = current_time
-            self.current_position = 0
+            self.scroll_position = 0
             self.current_game_index = 0
+            self._create_ticker_image() # Create the composite image
             
             if self.games_data:
                 logger.info(f"Updated odds ticker with {len(self.games_data)} games")
@@ -528,23 +551,16 @@ class OddsTickerManager:
                 self._display_fallback_message()
                 return
         
+        if self.ticker_image is None:
+            logger.warning("Ticker image is not available. Attempting to create it.")
+            self._create_ticker_image()
+            if self.ticker_image is None:
+                logger.error("Failed to create ticker image.")
+                self._display_fallback_message()
+                return
+
         try:
             current_time = time.time()
-            
-            # Check if it's time to switch games
-            if current_time - self.last_display_time >= self.display_duration:
-                self.current_game_index = (self.current_game_index + 1) % len(self.games_data)
-                self.scroll_position = 0
-                self.last_display_time = current_time
-                self.current_image = None  # Force recreate image
-            
-            # Get current game
-            current_game = self.games_data[self.current_game_index]
-            logger.debug(f"Displaying game: {current_game['away_team']} @ {current_game['home_team']}")
-            
-            # Create ticker image if needed
-            if self.current_image is None:
-                self.current_image = self._create_game_display(current_game)
             
             # Scroll the image
             if current_time - self.last_scroll_time >= self.scroll_delay:
@@ -555,22 +571,21 @@ class OddsTickerManager:
             width = self.display_manager.matrix.width
             height = self.display_manager.matrix.height
             
-            # Reset position when we've scrolled past the end
-            if self.scroll_position >= self.current_image.width:
+            # Reset position when we've scrolled past the end for a continuous loop
+            if self.scroll_position >= self.ticker_image.width:
                 self.scroll_position = 0
             
-            # Crop the scrolling region
-            crop_x = self.scroll_position
-            
-            # Create the visible part of the image
+            # Create the visible part of the image by pasting from the ticker_image
             visible_image = Image.new('RGB', (width, height))
-            visible_image.paste(self.current_image, (-crop_x, 0))
             
+            # Main part
+            visible_image.paste(self.ticker_image, (-self.scroll_position, 0))
+
             # Handle wrap-around for continuous scroll
-            if crop_x + width > self.current_image.width:
-                wrap_around_width = (crop_x + width) - self.current_image.width
-                wrap_around_image = self.current_image.crop((0, 0, wrap_around_width, height))
-                visible_image.paste(wrap_around_image, (self.current_image.width - crop_x, 0))
+            if self.scroll_position + width > self.ticker_image.width:
+                wrap_around_width = (self.scroll_position + width) - self.ticker_image.width
+                wrap_around_image = self.ticker_image.crop((0, 0, wrap_around_width, height))
+                visible_image.paste(wrap_around_image, (self.ticker_image.width - self.scroll_position, 0))
             
             # Display the cropped image
             self.display_manager.image = visible_image

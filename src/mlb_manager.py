@@ -427,14 +427,9 @@ class BaseMLBManager:
                     home_abbr = home_team['team']['abbreviation']
                     away_abbr = away_team['team']['abbreviation']
                     
-                    # Get team records
-                    home_record = "0-0"
-                    if 'record' in home_team and len(home_team['record']) > 0:
-                        home_record = home_team['record'][0].get('summary', '0-0')
-                    
-                    away_record = "0-0"
-                    if 'record' in away_team and len(away_team['record']) > 0:
-                        away_record = away_team['record'][0].get('summary', '0-0')
+                    # Get team records - Corrected path
+                    home_record = home_team.get('records', [{}])[0].get('summary', '') if home_team.get('records') else ''
+                    away_record = away_team.get('records', [{}])[0].get('summary', '') if away_team.get('records') else ''
 
                     # Check if this is a favorite team game
                     is_favorite_game = (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams)
