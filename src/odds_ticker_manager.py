@@ -34,6 +34,7 @@ class OddsTickerManager:
         self.scroll_delay = self.odds_ticker_config.get('scroll_delay', 0.05)
         self.display_duration = self.odds_ticker_config.get('display_duration', 30)
         self.future_fetch_days = self.odds_ticker_config.get('future_fetch_days', 7)
+        self.loop = self.odds_ticker_config.get('loop', True)
         
         # Initialize managers
         self.cache_manager = CacheManager()
@@ -47,7 +48,6 @@ class OddsTickerManager:
         self.current_game_index = 0
         self.ticker_image = None # This will hold the single, wide image
         self.last_display_time = 0
-        self.dynamic_display_duration = 0
         
         # Font setup
         self.fonts = self._load_fonts()
@@ -500,7 +500,7 @@ class OddsTickerManager:
 
         # Away Logo
         if away_logo:
-            y_pos = logo_margin
+            y_pos = (height - logo_size) // 2  # Center the logo vertically
             image.paste(away_logo, (int(current_x), y_pos), away_logo if away_logo.mode == 'RGBA' else None)
         current_x += logo_size + vs_padding
 
@@ -511,7 +511,7 @@ class OddsTickerManager:
 
         # Home Logo
         if home_logo:
-            y_pos = logo_margin
+            y_pos = (height - logo_size) // 2  # Center the logo vertically
             image.paste(home_logo, (int(current_x), y_pos), home_logo if home_logo.mode == 'RGBA' else None)
         current_x += logo_size + section_padding
 
@@ -577,23 +577,6 @@ class OddsTickerManager:
                 for y in range(height):
                     self.ticker_image.putpixel((bar_x, y), (255, 255, 255))
             current_x += gap_width
-
-        if self.ticker_image and self.scroll_speed > 0 and self.scroll_delay > 0:
-            # Duration for the ticker to scroll its full width
-            self.dynamic_display_duration = (self.ticker_image.width / self.scroll_speed) * self.scroll_delay
-            logger.info(f"[OddsTickerManager] Calculated dynamic display duration: {self.dynamic_display_duration:.2f} seconds for a width of {self.ticker_image.width}px, scroll_speed={self.scroll_speed}, scroll_delay={self.scroll_delay}")
-        else:
-            # Fallback to the configured duration if something is wrong
-            self.dynamic_display_duration = self.display_duration
-            logger.warning(f"[OddsTickerManager] Using fallback display duration. ticker_image exists: {self.ticker_image is not None}, scroll_speed: {self.scroll_speed}, scroll_delay: {self.scroll_delay}")
-            if self.ticker_image:
-                logger.info(f"[OddsTickerManager] Ticker image width: {self.ticker_image.width}px")
-            else:
-                logger.warning("[OddsTickerManager] No ticker image available")
-
-    def get_dynamic_duration(self) -> float:
-        """Return the calculated dynamic duration for the ticker to complete one full scroll."""
-        return self.dynamic_display_duration
 
     def _draw_text_with_outline(self, draw: ImageDraw.Draw, text: str, position: tuple, font: ImageFont.FreeTypeFont, 
                                fill: tuple = (255, 255, 255), outline_color: tuple = (0, 0, 0)) -> None:
@@ -676,9 +659,15 @@ class OddsTickerManager:
             width = self.display_manager.matrix.width
             height = self.display_manager.matrix.height
             
-            # Reset position when we've scrolled past the end for a continuous loop
-            if self.scroll_position >= self.ticker_image.width:
-                self.scroll_position = 0
+            # Handle looping based on configuration
+            if self.loop:
+                # Reset position when we've scrolled past the end for a continuous loop
+                if self.scroll_position >= self.ticker_image.width:
+                    self.scroll_position = 0
+            else:
+                # Stop scrolling when we reach the end
+                if self.scroll_position >= self.ticker_image.width - width:
+                    self.scroll_position = self.ticker_image.width - width
             
             # Create the visible part of the image by pasting from the ticker_image
             visible_image = Image.new('RGB', (width, height))

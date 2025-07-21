@@ -370,6 +370,7 @@ The odds ticker displays betting odds for upcoming sports games. To configure it
 - **`scroll_speed`**: Pixels to scroll per update (default: 1)
 - **`scroll_delay`**: Delay between scroll updates in seconds (default: 0.05)
 - **`display_duration`**: How long to show each game in seconds (default: 30)
+- **`loop`**: Whether to continuously loop the scroll animation (default: true). When false, the scroll stops when it reaches the end of the content.
 
 **How it works:**
 - If `show_favorite_teams_only` is true, the ticker will show the next `games_per_favorite_team` games for each favorite team in each enabled league, deduplicated and capped at `max_games_per_league` per league.

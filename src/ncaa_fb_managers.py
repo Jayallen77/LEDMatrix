@@ -427,6 +427,12 @@ class BaseNCAAFBManager: # Renamed class
             away_abbr = away_team["team"]["abbreviation"]
             home_record = home_team.get('records', [{}])[0].get('summary', '') if home_team.get('records') else ''
             away_record = away_team.get('records', [{}])[0].get('summary', '') if away_team.get('records') else ''
+            
+            # Don't show "0-0" records - set to blank instead
+            if home_record == "0-0":
+                home_record = ''
+            if away_record == "0-0":
+                away_record = ''
 
             # Filter by favorite teams if the list is not empty
             if self.favorite_teams and not (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams):

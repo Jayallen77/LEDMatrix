@@ -555,6 +555,12 @@ class BaseSoccerManager:
             away_team = next(c for c in competitors if c.get("homeAway") == "away")
             home_record = home_team.get('records', [{}])[0].get('summary', '') if home_team.get('records') else ''
             away_record = away_team.get('records', [{}])[0].get('summary', '') if away_team.get('records') else ''
+            
+            # Don't show "0-0" records - set to blank instead
+            if home_record == "0-0":
+                home_record = ''
+            if away_record == "0-0":
+                away_record = ''
 
             game_time = ""
             game_date = ""

@@ -119,7 +119,8 @@
         "scroll_speed": 1,
         "scroll_delay": 0.01,
         "display_duration": 60,
-        "future_fetch_days": 45
+        "future_fetch_days": 45,
+        "loop": true
     },
     "calendar": {
         "enabled": true,
