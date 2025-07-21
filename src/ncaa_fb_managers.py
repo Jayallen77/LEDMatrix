@@ -220,6 +220,10 @@ class BaseNCAAFBManager: # Renamed class
             # Track games found for each favorite team
             favorite_team_games = {team: [] for team in self.favorite_teams} if self.favorite_teams else {}
             
+            # Debug: Log what we're looking for
+            if self.favorite_teams and need_future_games:
+                BaseNCAAFBManager.logger.info(f"[NCAAFB] Looking for {actual_future_games} games for each favorite team: {self.favorite_teams}")
+            
             # Check for cached search ranges and last successful date
             range_cache_key = f"search_ranges_ncaafb_{actual_past_games}_{actual_future_games}"
             cached_ranges = BaseNCAAFBManager.cache_manager.get(range_cache_key, max_age=86400)  # Cache for 24 hours
@@ -257,6 +261,17 @@ class BaseNCAAFBManager: # Renamed class
             while (len(past_events) < actual_past_games or 
                    (need_future_games and self.favorite_teams and 
                     not all(len(games) >= actual_future_games for games in favorite_team_games.values()))) and days_to_check <= max_days_to_check:
+                
+                # Debug: Log search loop condition
+                if need_future_games and self.favorite_teams:
+                    past_games_needed = len(past_events) < actual_past_games
+                    future_games_needed = not all(len(games) >= actual_future_games for games in favorite_team_games.values())
+                    days_limit_ok = days_to_check <= max_days_to_check
+                    BaseNCAAFBManager.logger.debug(f"[NCAAFB] Search loop condition: past_needed={past_games_needed}, future_needed={future_games_needed}, days_ok={days_limit_ok}")
+                    if not future_games_needed:
+                        BaseNCAAFBManager.logger.info(f"[NCAAFB] Stopping search - found enough games for all favorite teams")
+                        break
+                
                 # Check dates in both directions
                 dates_to_check = []
                 
@@ -336,17 +351,38 @@ class BaseNCAAFBManager: # Renamed class
                                             home_abbr = home_team['team']['abbreviation']
                                             away_abbr = away_team['team']['abbreviation']
                                             
+                                            # Debug: Log all teams found
+                                            BaseNCAAFBManager.logger.debug(f"[NCAAFB] Found game: {away_abbr}@{home_abbr}")
+                                            
                                             # Check if this game involves a favorite team
                                             for team in self.favorite_teams:
                                                 if team in [home_abbr, away_abbr]:
                                                     if len(favorite_team_games[team]) < actual_future_games:
                                                         favorite_team_games[team].append(event)
                                                         BaseNCAAFBManager.logger.debug(f"[NCAAFB] Found game for {team}: {away_abbr}@{home_abbr}")
+                                    else:
+                                        # Debug: Log all teams found even when not tracking favorite teams
+                                        competition = event.get('competitions', [{}])[0]
+                                        competitors = competition.get('competitors', [])
+                                        home_team = next((c for c in competitors if c.get('homeAway') == 'home'), None)
+                                        away_team = next((c for c in competitors if c.get('homeAway') == 'away'), None)
+                                        
+                                        if home_team and away_team:
+                                            home_abbr = home_team['team']['abbreviation']
+                                            away_abbr = away_team['team']['abbreviation']
+                                            BaseNCAAFBManager.logger.debug(f"[NCAAFB] Found game (not tracking favorites): {away_abbr}@{home_abbr}")
                             except Exception as e:
                                 BaseNCAAFBManager.logger.warning(f"[NCAAFB] Could not parse event date: {e}")
                                 continue
                 
                 days_to_check += 1
+            
+            # Debug: Log what we found for each favorite team
+            if self.favorite_teams and need_future_games:
+                BaseNCAAFBManager.logger.info(f"[NCAAFB] Search completed. Games found for each favorite team:")
+                for team in self.favorite_teams:
+                    games_found = len(favorite_team_games.get(team, []))
+                    BaseNCAAFBManager.logger.info(f"[NCAAFB] {team}: {games_found}/{actual_future_games} games")
             
             # Cache the search ranges for next time
             if len(past_events) >= actual_past_games and len(future_events) >= actual_future_games:
@@ -588,6 +624,9 @@ class BaseNCAAFBManager: # Renamed class
             competitors = competition["competitors"]
             game_date_str = game_event["date"]
 
+            # Debug: Log the game we're processing
+            self.logger.debug(f"[NCAAFB] Processing game event: {game_event.get('id')}")
+
             start_time_utc = None
             try:
                 start_time_utc = datetime.fromisoformat(game_date_str.replace("Z", "+00:00"))
@@ -603,6 +642,10 @@ class BaseNCAAFBManager: # Renamed class
 
             home_abbr = home_team["team"]["abbreviation"]
             away_abbr = away_team["team"]["abbreviation"]
+            
+            # Debug: Log the teams found
+            self.logger.debug(f"[NCAAFB] Found teams: {away_abbr}@{home_abbr}, Status: {status['type']['name']}")
+            
             home_record = home_team.get('records', [{}])[0].get('summary', '') if home_team.get('records') else ''
             away_record = away_team.get('records', [{}])[0].get('summary', '') if away_team.get('records') else ''
             
@@ -1320,6 +1363,11 @@ class NCAAFBUpcomingManager(BaseNCAAFBManager): # Renamed class
                 all_teams.add(game['away_abbr'])
                 all_teams.add(game['home_abbr'])
             self.logger.debug(f"[NCAAFB Upcoming] All teams found in API: {sorted(all_teams)}")
+
+            # Debug: Log what events we received and what we extracted
+            self.logger.debug(f"[NCAAFB Upcoming] Received {len(events)} events from shared data")
+            for i, event in enumerate(events):
+                self.logger.debug(f"[NCAAFB Upcoming] Event {i}: ID={event.get('id')}, Status={event.get('competitions', [{}])[0].get('status', {}).get('type', {}).get('name', 'unknown')}")
 
             # Filter for favorite teams
             if self.favorite_teams:

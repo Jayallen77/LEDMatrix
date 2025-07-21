@@ -105,7 +105,7 @@ python test_odds_ticker.py
 
 The LEDMatrix system uses persistent caching to improve performance and reduce API calls. When running with `sudo`, the system needs a persistent cache directory that survives restarts.
 
-**Automatic Setup:**
+**First-Time Setup:**
 Run the setup script to create a persistent cache directory:
 ```bash
 chmod +x setup_cache.sh
@@ -115,14 +115,22 @@ chmod +x setup_cache.sh
 This will:
 - Create `/var/cache/ledmatrix/` directory
 - Set proper ownership to your user account
-- Set appropriate permissions (755)
+- Set permissions to allow the daemon user (which the system runs as) to write
+- Test writability for both your user and the daemon user
+
+**If You Still See Cache Warnings:**
+If you see warnings about using temporary cache directory, run the permissions fix:
+```bash
+chmod +x fix_cache_permissions.sh
+./fix_cache_permissions.sh
+```
 
 **Manual Setup:**
 If you prefer to set up manually:
 ```bash
 sudo mkdir -p /var/cache/ledmatrix
 sudo chown $USER:$USER /var/cache/ledmatrix
-sudo chmod 755 /var/cache/ledmatrix
+sudo chmod 777 /var/cache/ledmatrix
 ```
 
 **Cache Locations (in order of preference):**
