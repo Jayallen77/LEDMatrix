@@ -161,7 +161,7 @@
         }
     },
     "nfl_scoreboard": {
-        "enabled": true,
+        "enabled": false,
         "show_odds": false,
         "test_mode": false,
         "update_interval_seconds": 3600,
@@ -179,7 +179,7 @@
         }
     },
     "ncaa_fb_scoreboard": {
-        "enabled": true,
+        "enabled": false,
         "show_odds": false,
         "test_mode": false,
         "update_interval_seconds": 3600,

@@ -69,6 +69,12 @@ class BaseNBAManager:
         self.logger.info(f"Initialized NBA manager with display dimensions: {self.display_width}x{self.display_height}")
         self.logger.info(f"Logo directory: {self.logo_dir}")
 
+    def _get_timezone(self):
+        try:
+            return pytz.timezone(self.config_manager.get_timezone())
+        except pytz.UnknownTimeZoneError:
+            return pytz.utc
+
     def _should_log(self, message_type: str, cooldown: int = 300) -> bool:
         """Check if a message should be logged based on cooldown period."""
         current_time = time.time()
