@@ -179,29 +179,43 @@ class BaseNCAAFBManager: # Renamed class
                 BaseNCAAFBManager._last_shared_update = current_time
                 return cached_data
 
-            # Smart game-based fetching: fetch incrementally until we have enough games
+            # Smart game-based fetching with range caching
             today = datetime.now(self._get_timezone()).date()
             all_events = []
             past_events = []
             future_events = []
             
-            # Start with today and expand outward until we have enough games
-            days_to_check = 0
+            # Check for cached search ranges
+            range_cache_key = f"search_ranges_ncaafb_{fetch_past_games}_{fetch_future_games}"
+            cached_ranges = BaseNCAAFBManager.cache_manager.get(range_cache_key, max_age=86400)  # Cache for 24 hours
+            
+            if cached_ranges:
+                past_days_needed = cached_ranges.get('past_days', 0)
+                future_days_needed = cached_ranges.get('future_days', 0)
+                BaseNCAAFBManager.logger.info(f"[NCAAFB] Using cached search ranges: {past_days_needed} days past, {future_days_needed} days future")
+            else:
+                past_days_needed = 0
+                future_days_needed = 0
+            
+            # Start with cached ranges or expand incrementally
+            days_to_check = max(past_days_needed, future_days_needed)
             max_days_to_check = 365  # Limit to 1 year to prevent infinite loops
             
             while (len(past_events) < fetch_past_games or len(future_events) < fetch_future_games) and days_to_check <= max_days_to_check:
                 # Check dates in both directions
                 dates_to_check = []
                 
-                # Check past dates
+                # Check past dates (start from cached range if available)
                 if len(past_events) < fetch_past_games:
-                    for i in range(1, days_to_check + 1):
+                    start_day = past_days_needed if cached_ranges else 1
+                    for i in range(start_day, days_to_check + 1):
                         past_date = today - timedelta(days=i)
                         dates_to_check.append(past_date.strftime('%Y%m%d'))
                 
-                # Check future dates
+                # Check future dates (start from cached range if available)
                 if len(future_events) < fetch_future_games:
-                    for i in range(1, days_to_check + 1):
+                    start_day = future_days_needed if cached_ranges else 1
+                    for i in range(start_day, days_to_check + 1):
                         future_date = today + timedelta(days=i)
                         dates_to_check.append(future_date.strftime('%Y%m%d'))
                 
@@ -209,57 +223,73 @@ class BaseNCAAFBManager: # Renamed class
                 if days_to_check == 0:
                     dates_to_check.append(today.strftime('%Y%m%d'))
                 
-                BaseNCAAFBManager.logger.info(f"[NCAAFB] Checking {len(dates_to_check)} dates (day {days_to_check}) to find {fetch_past_games} past and {fetch_future_games} future games")
-                
-                # Fetch data for each date
-                for fetch_date in dates_to_check:
-                    date_cache_key = f"{fetch_date}_ncaafb"
-                    cached_date_data = BaseNCAAFBManager.cache_manager.get(date_cache_key, max_age=300)
+                if dates_to_check:
+                    BaseNCAAFBManager.logger.info(f"[NCAAFB] Checking {len(dates_to_check)} dates (day {days_to_check}) to find {fetch_past_games} past and {fetch_future_games} future games")
                     
-                    if cached_date_data:
-                        BaseNCAAFBManager.logger.info(f"[NCAAFB] Using cached data for date {fetch_date}")
-                        if "events" in cached_date_data:
-                            all_events.extend(cached_date_data["events"])
-                        continue
-
-                    url = ESPN_NCAAFB_SCOREBOARD_URL
-                    params = {'dates': fetch_date}
-                    
-                    response = requests.get(url, params=params)
-                    response.raise_for_status()
-                    date_data = response.json()
-                    
-                    if date_data and "events" in date_data:
-                        all_events.extend(date_data["events"])
-                        BaseNCAAFBManager.logger.info(f"[NCAAFB] Fetched {len(date_data['events'])} events for date {fetch_date}")
-                        BaseNCAAFBManager.cache_manager.set(date_cache_key, date_data)
-                
-                # Process newly fetched events
-                if all_events:
-                    # Sort events by date
-                    all_events.sort(key=lambda x: x.get('date', ''))
-                    
-                    # Separate past and future events
-                    now = datetime.now(self._get_timezone())
-                    past_events = []
-                    future_events = []
-                    
-                    for event in all_events:
-                        try:
-                            event_time = datetime.fromisoformat(event['date'].replace('Z', '+00:00'))
-                            if event_time.tzinfo is None:
-                                event_time = event_time.replace(tzinfo=pytz.UTC)
-                            event_time = event_time.astimezone(self._get_timezone())
-                            
-                            if event_time < now:
-                                past_events.append(event)
-                            else:
-                                future_events.append(event)
-                        except Exception as e:
-                            BaseNCAAFBManager.logger.warning(f"[NCAAFB] Could not parse event date: {e}")
+                    # Fetch data for each date
+                    for fetch_date in dates_to_check:
+                        date_cache_key = f"{fetch_date}_ncaafb"
+                        cached_date_data = BaseNCAAFBManager.cache_manager.get(date_cache_key, max_age=300)
+                        
+                        if cached_date_data:
+                            BaseNCAAFBManager.logger.info(f"[NCAAFB] Using cached data for date {fetch_date}")
+                            if "events" in cached_date_data:
+                                all_events.extend(cached_date_data["events"])
                             continue
+
+                        url = ESPN_NCAAFB_SCOREBOARD_URL
+                        params = {'dates': fetch_date}
+                        
+                        response = requests.get(url, params=params)
+                        response.raise_for_status()
+                        date_data = response.json()
+                        
+                        if date_data and "events" in date_data:
+                            all_events.extend(date_data["events"])
+                            BaseNCAAFBManager.logger.info(f"[NCAAFB] Fetched {len(date_data['events'])} events for date {fetch_date}")
+                            BaseNCAAFBManager.cache_manager.set(date_cache_key, date_data)
+                    
+                    # Process newly fetched events
+                    if all_events:
+                        # Sort events by date
+                        all_events.sort(key=lambda x: x.get('date', ''))
+                        
+                        # Separate past and future events
+                        now = datetime.now(self._get_timezone())
+                        past_events = []
+                        future_events = []
+                        
+                        for event in all_events:
+                            try:
+                                event_time = datetime.fromisoformat(event['date'].replace('Z', '+00:00'))
+                                if event_time.tzinfo is None:
+                                    event_time = event_time.replace(tzinfo=pytz.UTC)
+                                event_time = event_time.astimezone(self._get_timezone())
+                                
+                                if event_time < now:
+                                    past_events.append(event)
+                                else:
+                                    future_events.append(event)
+                            except Exception as e:
+                                BaseNCAAFBManager.logger.warning(f"[NCAAFB] Could not parse event date: {e}")
+                                continue
                 
                 days_to_check += 1
+            
+            # Cache the search ranges for next time
+            if len(past_events) >= fetch_past_games and len(future_events) >= fetch_future_games:
+                # Calculate how many days we actually needed
+                actual_past_days = max(1, days_to_check - 1) if past_events else 0
+                actual_future_days = max(1, days_to_check - 1) if future_events else 0
+                
+                # Cache the ranges for next time
+                range_data = {
+                    'past_days': actual_past_days,
+                    'future_days': actual_future_days,
+                    'last_updated': current_time
+                }
+                BaseNCAAFBManager.cache_manager.set(range_cache_key, range_data)
+                BaseNCAAFBManager.logger.info(f"[NCAAFB] Cached search ranges: {actual_past_days} days past, {actual_future_days} days future")
             
             # Take the specified number of games
             selected_past_events = past_events[-fetch_past_games:] if past_events else []
