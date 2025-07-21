@@ -374,11 +374,9 @@ class OddsTickerManager:
         width = self.display_manager.matrix.width
         height = self.display_manager.matrix.height
         
-        # Create a wider image for scrolling. The width will be determined by the content.
-        # Let's start with a placeholder and calculate the actual width.
-        
-        # --- Pre-calculate widths ---
-        logo_size = 24  # Assuming square logos
+        # Make logos use most of the display height, with a small margin
+        logo_margin = 2
+        logo_size = height - 2 * logo_margin
         logo_padding = 5
         vs_padding = 8
         section_padding = 12
@@ -387,7 +385,7 @@ class OddsTickerManager:
         team_font = self.fonts['medium']
         odds_font = self.fonts['medium']
         vs_font = self.fonts['medium']
-        datetime_font = self.fonts['small'] # Use small font for date/time
+        datetime_font = self.fonts['medium'] # Use large font for date/time
 
         # Get team logos
         home_logo = self._get_team_logo(game['home_team'], game['logo_dir'])
@@ -417,9 +415,10 @@ class OddsTickerManager:
             game_time = game_time.replace(tzinfo=pytz.UTC)
         local_time = game_time.astimezone(tz)
         
-        day_text = local_time.strftime("%a").lower()
+        # Capitalize full day name, e.g., 'Tuesday'
+        day_text = local_time.strftime("%A")
         date_text = local_time.strftime("%-m/%d")
-        time_text = local_time.strftime("%-I:%M%p").lower()
+        time_text = local_time.strftime("%-I:%M %p")
 
         # Team and record text
         away_team_text = f"{game.get('away_team', 'N/A')} ({game.get('away_record', '') or 'N/A'})"
@@ -490,7 +489,7 @@ class OddsTickerManager:
 
         # Away Logo
         if away_logo:
-            y_pos = (height - logo_size) // 2
+            y_pos = logo_margin
             image.paste(away_logo, (int(current_x), y_pos), away_logo if away_logo.mode == 'RGBA' else None)
         current_x += logo_size + vs_padding
 
@@ -501,7 +500,7 @@ class OddsTickerManager:
 
         # Home Logo
         if home_logo:
-            y_pos = (height - logo_size) // 2
+            y_pos = logo_margin
             image.paste(home_logo, (int(current_x), y_pos), home_logo if home_logo.mode == 'RGBA' else None)
         current_x += logo_size + section_padding
 
