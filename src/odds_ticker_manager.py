@@ -41,6 +41,7 @@ class OddsTickerManager:
         self.games_data = []
         self.current_game_index = 0
         self.current_image = None
+        self.last_display_time = 0
         
         # Font setup
         self.fonts = self._load_fonts()
@@ -96,6 +97,21 @@ class OddsTickerManager:
                 'large': ImageFont.load_default()
             }
 
+    def _fetch_team_record(self, team_abbr: str, league: str) -> str:
+        """Fetch team record from ESPN API."""
+        # This is a simplified implementation; a more robust solution would cache team data
+        try:
+            sport = 'baseball' if league == 'mlb' else 'football' if league in ['nfl', 'college-football'] else 'basketball'
+            url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/teams/{team_abbr}"
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            record = data.get('team', {}).get('record', {}).get('summary', 'N/A')
+            return record
+        except Exception as e:
+            logger.error(f"Error fetching record for {team_abbr}: {e}")
+            return "N/A"
+
     def _get_team_logo(self, team_abbr: str, logo_dir: str) -> Optional[Image.Image]:
         """Get team logo from the configured directory."""
         try:
@@ -115,7 +131,7 @@ class OddsTickerManager:
         games_data = []
         now = datetime.now(timezone.utc)
         
-        logger.info(f"Fetching upcoming games for {len(self.enabled_leagues)} enabled leagues")
+        logger.debug(f"Fetching upcoming games for {len(self.enabled_leagues)} enabled leagues")
         
         for league_key in self.enabled_leagues:
             if league_key not in self.league_configs:
@@ -123,7 +139,7 @@ class OddsTickerManager:
                 continue
                 
             league_config = self.league_configs[league_key]
-            logger.info(f"Processing league {league_key}: enabled={league_config['enabled']}")
+            logger.debug(f"Processing league {league_key}: enabled={league_config['enabled']}")
             
             if not league_config['enabled']:
                 logger.debug(f"League {league_key} is disabled, skipping")
@@ -132,7 +148,7 @@ class OddsTickerManager:
             try:
                 # Fetch upcoming games for this league
                 games = self._fetch_league_games(league_config, now)
-                logger.info(f"Found {len(games)} games for {league_key}")
+                logger.debug(f"Found {len(games)} games for {league_key}")
                 games_data.extend(games)
                 
             except Exception as e:
@@ -146,14 +162,14 @@ class OddsTickerManager:
         if self.show_favorite_teams_only:
             logger.debug("Favorite team filtering already applied during game fetching")
         
-        logger.info(f"Total games found: {len(games_data)}")
+        logger.debug(f"Total games found: {len(games_data)}")
         
         # Log details about found games
         if games_data:
-            logger.info("Games found:")
+            logger.debug("Games found:")
             for i, game in enumerate(games_data):
                 odds_status = "Has odds" if game.get('odds') else "No odds"
-                logger.info(f"  {i+1}. {game['away_team']} @ {game['home_team']} - {odds_status}")
+                logger.debug(f"  {i+1}. {game['away_team']} @ {game['home_team']} - {odds_status}")
         
         return games_data
 
@@ -210,7 +226,7 @@ class OddsTickerManager:
                                     logger.debug(f"Skipping game {home_abbr} vs {away_abbr} - no favorite teams involved")
                                     continue
                             
-                            logger.info(f"Found upcoming game: {away_abbr} @ {home_abbr} on {game_time}")
+                            logger.debug(f"Found upcoming game: {away_abbr} @ {home_abbr} on {game_time}")
                             
                             # Fetch odds for this game (only if it involves favorite teams)
                             odds_data = self.odds_manager.get_odds(
@@ -237,6 +253,10 @@ class OddsTickerManager:
                                 logger.debug(f"Game {game_id} has no valid odds data, setting odds to None")
                                 odds_data = None
                             
+                            # Fetch team records
+                            home_record = self._fetch_team_record(home_abbr, league)
+                            away_record = self._fetch_team_record(away_abbr, league)
+
                             game_data = {
                                 'id': game_id,
                                 'league': league_config['league'],
@@ -245,7 +265,9 @@ class OddsTickerManager:
                                 'away_team': away_abbr,
                                 'start_time': game_time,
                                 'odds': odds_data,
-                                'logo_dir': league_config['logo_dir']
+                                'logo_dir': league_config['logo_dir'],
+                                'home_record': home_record,
+                                'away_record': away_record
                             }
                             
                             games.append(game_data)
@@ -330,12 +352,79 @@ class OddsTickerManager:
         
         return " ".join(odds_parts)
 
+    def _create_game_display(self, game: Dict[str, Any]) -> Image.Image:
+        """Create a display image for a game in the new format."""
+        width = self.display_manager.matrix.width
+        height = self.display_manager.matrix.height
+        image = Image.new('RGB', (width * 2, height), color=(0, 0, 0))  # Wider image for scrolling
+        draw = ImageDraw.Draw(image)
+        
+        # Load logos
+        home_logo = self._get_team_logo(game['home_team'], game['logo_dir'])
+        away_logo = self._get_team_logo(game['away_team'], game['logo_dir'])
+        
+        # Fonts
+        team_font = self.fonts['medium']
+        record_font = self.fonts['small']
+        odds_font = self.fonts['small']
+        
+        # Team names and records
+        away_team_text = f"{game['away_team']} ({game['away_record']})"
+        home_team_text = f"{game['home_team']} ({game['home_record']})"
+        
+        # Calculate positions
+        logo_size = 24
+        x_pos = 10
+        
+        # Away team logo and info
+        if away_logo:
+            away_logo = away_logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
+            image.paste(away_logo, (x_pos, (height - logo_size) // 2), away_logo)
+            x_pos += logo_size + 5
+            
+        draw.text((x_pos, 5), away_team_text, font=team_font, fill=(255, 255, 255))
+        
+        # Home team logo and info
+        x_pos += draw.textlength(away_team_text, font=team_font) + 10
+        if home_logo:
+            home_logo = home_logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
+            image.paste(home_logo, (x_pos, (height - logo_size) // 2), home_logo)
+            x_pos += logo_size + 5
+            
+        draw.text((x_pos, 18), home_team_text, font=team_font, fill=(255, 255, 255))
+        
+        # Odds
+        odds = game.get('odds', {})
+        if odds:
+            home_team_odds = odds.get('home_team_odds', {})
+            away_team_odds = odds.get('away_team_odds', {})
+            home_spread = home_team_odds.get('spread_odds')
+            over_under = odds.get('over_under')
+            
+            # Determine favorite
+            home_favored = home_spread is not None and home_spread < 0
+            
+            # Draw odds
+            x_pos += draw.textlength(home_team_text, font=team_font) + 10
+            if home_favored:
+                draw.text((x_pos, 18), f"{home_spread}", font=odds_font, fill=(0, 255, 0))
+                if over_under:
+                    draw.text((x_pos, 5), f"O/U {over_under}", font=odds_font, fill=(255, 255, 0))
+            else:
+                away_spread = away_team_odds.get('spread_odds')
+                if away_spread is not None:
+                    draw.text((x_pos, 5), f"{away_spread}", font=odds_font, fill=(0, 255, 0))
+                if over_under:
+                    draw.text((x_pos, 18), f"O/U {over_under}", font=odds_font, fill=(255, 255, 0))
+        
+        return image
+
     def _create_ticker_image(self, game: Dict[str, Any]) -> Image.Image:
         """Create a scrolling ticker image for a game."""
         width = self.display_manager.matrix.width
         height = self.display_manager.matrix.height
         
-        logger.info(f"Creating ticker image for {width}x{height} display")
+        logger.debug(f"Creating ticker image for {width}x{height} display")
         
         # Create a wider image for scrolling
         scroll_width = width * 3  # 3x width for smooth scrolling
@@ -344,7 +433,7 @@ class OddsTickerManager:
         
         # Format the odds text
         odds_text = self._format_odds_text(game)
-        logger.info(f"Formatted odds text: '{odds_text}'")
+        logger.debug(f"Formatted odds text: '{odds_text}'")
         
         # Load team logos
         home_logo = self._get_team_logo(game['home_team'], game['logo_dir'])
@@ -355,7 +444,7 @@ class OddsTickerManager:
         text_x = scroll_width - text_width - 10  # Start off-screen right
         text_y = (height - self.fonts['medium'].size) // 2
         
-        logger.info(f"Drawing text at position ({text_x}, {text_y})")
+        logger.debug(f"Drawing text at position ({text_x}, {text_y})")
         
         # Draw the text
         self._draw_text_with_outline(draw, odds_text, (text_x, text_y), self.fonts['medium'])
@@ -368,15 +457,15 @@ class OddsTickerManager:
             away_logo.thumbnail((logo_size, logo_size), Image.Resampling.LANCZOS)
             away_x = int(text_x - logo_size - 5)
             image.paste(away_logo, (away_x, logo_y), away_logo)
-            logger.info(f"Added away team logo at ({away_x}, {logo_y})")
+            logger.debug(f"Added away team logo at ({away_x}, {logo_y})")
         
         if home_logo:
             home_logo.thumbnail((logo_size, logo_size), Image.Resampling.LANCZOS)
             home_x = int(text_x + text_width + 5)
             image.paste(home_logo, (home_x, logo_y), home_logo)
-            logger.info(f"Added home team logo at ({home_x}, {logo_y})")
+            logger.debug(f"Added home team logo at ({home_x}, {logo_y})")
         
-        logger.info(f"Created ticker image with size {image.size}")
+        logger.debug(f"Created ticker image with size {image.size}")
         return image
 
     def _draw_text_with_outline(self, draw: ImageDraw.Draw, text: str, position: tuple, font: ImageFont.FreeTypeFont, 
@@ -402,8 +491,8 @@ class OddsTickerManager:
         
         try:
             logger.info("Updating odds ticker data")
-            logger.info(f"Enabled leagues: {self.enabled_leagues}")
-            logger.info(f"Show favorite teams only: {self.show_favorite_teams_only}")
+            logger.debug(f"Enabled leagues: {self.enabled_leagues}")
+            logger.debug(f"Show favorite teams only: {self.show_favorite_teams_only}")
             
             self.games_data = self._fetch_upcoming_games()
             self.last_update = current_time
@@ -443,25 +532,23 @@ class OddsTickerManager:
             current_time = time.time()
             
             # Check if it's time to switch games
-            if current_time - self.last_update >= self.display_duration:
+            if current_time - self.last_display_time >= self.display_duration:
                 self.current_game_index = (self.current_game_index + 1) % len(self.games_data)
                 self.current_position = 0
-                self.last_update = current_time
-                force_clear = True
+                self.last_display_time = current_time
+                self.current_image = None  # Force recreate image
             
             # Get current game
             current_game = self.games_data[self.current_game_index]
-            logger.info(f"Displaying game: {current_game['away_team']} @ {current_game['home_team']}")
+            logger.debug(f"Displaying game: {current_game['away_team']} @ {current_game['home_team']}")
             
             # Create ticker image if needed
-            if force_clear or self.current_image is None:
-                logger.info("Creating new ticker image")
-                self.current_image = self._create_ticker_image(current_game)
-                logger.info(f"Created ticker image with size: {self.current_image.size}")
+            if self.current_image is None:
+                self.current_image = self._create_game_display(current_game)
             
             # Scroll the image
             if current_time - self.last_scroll_time >= self.scroll_delay:
-                self.current_position += self.scroll_speed
+                self.scroll_position += self.scroll_speed
                 self.last_scroll_time = current_time
             
             # Calculate crop region
@@ -469,29 +556,26 @@ class OddsTickerManager:
             height = self.display_manager.matrix.height
             
             # Reset position when we've scrolled past the end
-            if self.current_position >= self.current_image.width - width:
-                self.current_position = 0
+            if self.scroll_position >= self.current_image.width:
+                self.scroll_position = 0
             
             # Crop the scrolling region
-            crop_x = self.current_position
-            crop_y = 0
-            crop_width = width
-            crop_height = height
+            crop_x = self.scroll_position
             
-            # Ensure we don't go out of bounds
-            if crop_x + crop_width > self.current_image.width:
-                crop_x = self.current_image.width - crop_width
+            # Create the visible part of the image
+            visible_image = Image.new('RGB', (width, height))
+            visible_image.paste(self.current_image, (-crop_x, 0))
             
-            logger.info(f"Cropping image at position ({crop_x}, {crop_y}) with size ({crop_width}, {crop_height})")
-            cropped_image = self.current_image.crop((crop_x, crop_y, crop_x + crop_width, crop_y + crop_height))
-            logger.info(f"Cropped image size: {cropped_image.size}")
+            # Handle wrap-around for continuous scroll
+            if crop_x + width > self.current_image.width:
+                wrap_around_width = (crop_x + width) - self.current_image.width
+                wrap_around_image = self.current_image.crop((0, 0, wrap_around_width, height))
+                visible_image.paste(wrap_around_image, (self.current_image.width - crop_x, 0))
             
             # Display the cropped image
-            self.display_manager.image = cropped_image
+            self.display_manager.image = visible_image
             self.display_manager.draw = ImageDraw.Draw(self.display_manager.image)
-            logger.info("Calling display_manager.update_display()")
             self.display_manager.update_display()
-            logger.info("Display update completed")
             
         except Exception as e:
             logger.error(f"Error displaying odds ticker: {e}", exc_info=True)
