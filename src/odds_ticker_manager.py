@@ -335,6 +335,8 @@ class OddsTickerManager:
         width = self.display_manager.matrix.width
         height = self.display_manager.matrix.height
         
+        logger.info(f"Creating ticker image for {width}x{height} display")
+        
         # Create a wider image for scrolling
         scroll_width = width * 3  # 3x width for smooth scrolling
         image = Image.new('RGB', (scroll_width, height), color=(0, 0, 0))
@@ -342,6 +344,7 @@ class OddsTickerManager:
         
         # Format the odds text
         odds_text = self._format_odds_text(game)
+        logger.info(f"Formatted odds text: '{odds_text}'")
         
         # Load team logos
         home_logo = self._get_team_logo(game['home_team'], game['logo_dir'])
@@ -351,6 +354,8 @@ class OddsTickerManager:
         text_width = draw.textlength(odds_text, font=self.fonts['medium'])
         text_x = scroll_width - text_width - 10  # Start off-screen right
         text_y = (height - self.fonts['medium'].size) // 2
+        
+        logger.info(f"Drawing text at position ({text_x}, {text_y})")
         
         # Draw the text
         self._draw_text_with_outline(draw, odds_text, (text_x, text_y), self.fonts['medium'])
@@ -363,12 +368,15 @@ class OddsTickerManager:
             away_logo.thumbnail((logo_size, logo_size), Image.Resampling.LANCZOS)
             away_x = int(text_x - logo_size - 5)
             image.paste(away_logo, (away_x, logo_y), away_logo)
+            logger.info(f"Added away team logo at ({away_x}, {logo_y})")
         
         if home_logo:
             home_logo.thumbnail((logo_size, logo_size), Image.Resampling.LANCZOS)
             home_x = int(text_x + text_width + 5)
             image.paste(home_logo, (home_x, logo_y), home_logo)
+            logger.info(f"Added home team logo at ({home_x}, {logo_y})")
         
+        logger.info(f"Created ticker image with size {image.size}")
         return image
 
     def _draw_text_with_outline(self, draw: ImageDraw.Draw, text: str, position: tuple, font: ImageFont.FreeTypeFont, 
@@ -443,12 +451,13 @@ class OddsTickerManager:
             
             # Get current game
             current_game = self.games_data[self.current_game_index]
-            logger.debug(f"Displaying game: {current_game['away_team']} @ {current_game['home_team']}")
+            logger.info(f"Displaying game: {current_game['away_team']} @ {current_game['home_team']}")
             
             # Create ticker image if needed
             if force_clear or self.current_image is None:
-                logger.debug("Creating new ticker image")
+                logger.info("Creating new ticker image")
                 self.current_image = self._create_ticker_image(current_game)
+                logger.info(f"Created ticker image with size: {self.current_image.size}")
             
             # Scroll the image
             if current_time - self.last_scroll_time >= self.scroll_delay:
@@ -473,13 +482,16 @@ class OddsTickerManager:
             if crop_x + crop_width > self.current_image.width:
                 crop_x = self.current_image.width - crop_width
             
-            logger.debug(f"Cropping image at position ({crop_x}, {crop_y}) with size ({crop_width}, {crop_height})")
+            logger.info(f"Cropping image at position ({crop_x}, {crop_y}) with size ({crop_width}, {crop_height})")
             cropped_image = self.current_image.crop((crop_x, crop_y, crop_x + crop_width, crop_y + crop_height))
+            logger.info(f"Cropped image size: {cropped_image.size}")
             
             # Display the cropped image
             self.display_manager.image = cropped_image
             self.display_manager.draw = ImageDraw.Draw(self.display_manager.image)
+            logger.info("Calling display_manager.update_display()")
             self.display_manager.update_display()
+            logger.info("Display update completed")
             
         except Exception as e:
             logger.error(f"Error displaying odds ticker: {e}", exc_info=True)

@@ -71,13 +71,14 @@ def test_odds_ticker():
             # Test display
             print("Testing display...")
             for i in range(5):  # Display for 5 iterations
+                print(f"  Display iteration {i+1} starting...")
                 odds_ticker.display()
+                print(f"  Display iteration {i+1} complete")
                 time.sleep(2)
-                print(f"Display iteration {i+1} complete")
         
         else:
             print("No games found even with favorite teams filter disabled. This suggests:")
-            print("- No upcoming MLB games in the next 7 days")
+            print("- No upcoming MLB games in the next 3 days")
             print("- API is not returning data")
             print("- MLB league is disabled")
             
