@@ -246,7 +246,7 @@
         "favorite_teams": ["TB", "TEX"],
         "logo_dir": "assets/sports/mlb_logos",
         "display_modes": {
-            "mlb_live": true,
+            "mlb_live": false,
             "mlb_recent": true,
             "mlb_upcoming": true
         }
