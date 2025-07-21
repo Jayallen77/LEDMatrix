@@ -386,6 +386,7 @@ class OddsTickerManager:
         team_font = self.fonts['medium']
         odds_font = self.fonts['medium']
         vs_font = self.fonts['medium']
+        datetime_font = self.fonts['small'] # Use small font for date/time
 
         # Get team logos
         home_logo = self._get_team_logo(game['home_team'], game['logo_dir'])
@@ -403,12 +404,28 @@ class OddsTickerManager:
         vs_text = "vs."
         vs_width = int(temp_draw.textlength(vs_text, font=vs_font))
 
+        # Format date and time
+        game_time = game['start_time']
+        timezone_str = self.config.get('timezone', 'UTC')
+        try:
+            tz = pytz.timezone(timezone_str)
+        except pytz.exceptions.UnknownTimeZoneError:
+            tz = pytz.UTC
+        
+        if game_time.tzinfo is None:
+            game_time = game_time.replace(tzinfo=pytz.UTC)
+        local_time = game_time.astimezone(tz)
+        
+        datetime_text = local_time.strftime("%a %-m/%d %-I:%M%p").lower()
+
         # Team and record text
         away_team_text = f"{game.get('away_team', 'N/A')} ({game.get('away_record', '') or 'N/A'})"
         home_team_text = f"{game.get('home_team', 'N/A')} ({game.get('home_record', '') or 'N/A'})"
+        
         away_team_width = int(temp_draw.textlength(away_team_text, font=team_font))
         home_team_width = int(temp_draw.textlength(home_team_text, font=team_font))
-        team_info_width = max(away_team_width, home_team_width)
+        datetime_width = int(temp_draw.textlength(datetime_text, font=datetime_font))
+        team_info_width = max(away_team_width, home_team_width, datetime_width)
 
         # Odds text
         odds = game.get('odds') or {}
@@ -419,6 +436,14 @@ class OddsTickerManager:
         home_spread = home_team_odds.get('spread_odds')
         away_spread = away_team_odds.get('spread_odds')
         
+        # Fallback to top-level spread from odds_manager
+        top_level_spread = odds.get('spread')
+        if top_level_spread is not None:
+            if home_spread is None or home_spread == 0.0:
+                home_spread = top_level_spread
+            if away_spread is None:
+                away_spread = -top_level_spread
+
         # Check for valid spread values before comparing
         home_favored = isinstance(home_spread, (int, float)) and home_spread < 0
         away_favored = isinstance(away_spread, (int, float)) and away_spread < 0
@@ -474,9 +499,17 @@ class OddsTickerManager:
 
         # Team Info (stacked)
         team_font_height = team_font.size if hasattr(team_font, 'size') else 8
-        away_y = 2
-        home_y = height - team_font_height - 2
+        datetime_font_height = datetime_font.size if hasattr(datetime_font, 'size') else 6
+        
+        total_text_height = team_font_height + datetime_font_height + team_font_height
+        padding_y = (height - total_text_height) // 2 # Center the whole block vertically
+        
+        away_y = padding_y
+        datetime_y = away_y + team_font_height
+        home_y = datetime_y + datetime_font_height
+
         draw.text((current_x, away_y), away_team_text, font=team_font, fill=(255, 255, 255))
+        draw.text((current_x, datetime_y), datetime_text, font=datetime_font, fill=(255, 255, 255))
         draw.text((current_x, home_y), home_team_text, font=team_font, fill=(255, 255, 255))
         current_x += team_info_width + section_padding
 
@@ -504,7 +537,7 @@ class OddsTickerManager:
             self.ticker_image = None
             return
 
-        gap_width = self.display_manager.matrix.width // 2  # Gap between games
+        gap_width = 24  # Reduced gap between games
         total_width = sum(img.width for img in game_images) + gap_width * (len(game_images))
         height = self.display_manager.matrix.height
 
