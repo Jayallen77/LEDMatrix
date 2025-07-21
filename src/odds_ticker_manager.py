@@ -593,6 +593,11 @@ class OddsTickerManager:
         else:
             # Fallback to the configured duration if something is wrong
             self.dynamic_display_duration = self.display_duration
+            logger.warning(f"[OddsTickerManager] Using fallback display duration. ticker_image exists: {self.ticker_image is not None}, scroll_speed: {self.scroll_speed}, scroll_delay: {self.scroll_delay}")
+            if self.ticker_image:
+                logger.info(f"[OddsTickerManager] Ticker image width: {self.ticker_image.width}px")
+            else:
+                logger.warning("[OddsTickerManager] No ticker image available")
 
     def get_dynamic_duration(self) -> float:
         """Return the calculated dynamic duration for the ticker to complete one full scroll."""
