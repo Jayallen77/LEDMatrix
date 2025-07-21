@@ -527,10 +527,8 @@ class BaseNCAAFBManager: # Renamed class
             if away_record == "0-0":
                 away_record = ''
 
-            # Filter by favorite teams if the list is not empty
-            if self.favorite_teams and not (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams):
-                self.logger.debug(f"[NCAAFB] Skipping non-favorite game: {away_abbr}@{home_abbr} in _extract_game_details")
-                return None
+            # Remove early filtering - let individual managers handle their own filtering
+            # This allows shared data to contain all games, and each manager can filter as needed
 
             game_time, game_date = "", ""
             if start_time_utc:
@@ -1226,11 +1224,19 @@ class NCAAFBUpcomingManager(BaseNCAAFBManager): # Renamed class
                 if game and game['is_upcoming'] and game.get('is_within_window', True): # Assume within window if key missing, check logic
                      processed_games.append(game)
 
+            # Debug logging to see what games we have
+            self.logger.debug(f"[NCAAFB Upcoming] Processed {len(processed_games)} upcoming games")
+            for game in processed_games:
+                self.logger.debug(f"[NCAAFB Upcoming] Game: {game['away_abbr']}@{game['home_abbr']} - Upcoming: {game['is_upcoming']}")
+
             # Filter for favorite teams
             if self.favorite_teams:
                 team_games = [game for game in processed_games
                               if game['home_abbr'] in self.favorite_teams or
                                  game['away_abbr'] in self.favorite_teams]
+                self.logger.debug(f"[NCAAFB Upcoming] After favorite team filtering: {len(team_games)} games")
+                for game in team_games:
+                    self.logger.debug(f"[NCAAFB Upcoming] Favorite game: {game['away_abbr']}@{game['home_abbr']}")
             else:
                 team_games = processed_games # Show all upcoming if no favorites
 
