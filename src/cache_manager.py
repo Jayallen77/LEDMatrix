@@ -62,18 +62,46 @@ class CacheManager:
         try:
             # Try /var/cache/ledmatrix first (most standard)
             system_cache_dir = '/var/cache/ledmatrix'
-            os.makedirs(system_cache_dir, exist_ok=True)
-            if os.access(system_cache_dir, os.W_OK):
-                return system_cache_dir
+            
+            # Check if directory exists and we can write to it
+            if os.path.exists(system_cache_dir):
+                # Test if we can write to the existing directory
+                test_file = os.path.join(system_cache_dir, '.writetest')
+                try:
+                    with open(test_file, 'w') as f:
+                        f.write('test')
+                    os.remove(test_file)
+                    return system_cache_dir
+                except (IOError, OSError):
+                    self.logger.warning(f"Directory exists but is not writable: {system_cache_dir}")
+            else:
+                # Try to create the directory
+                os.makedirs(system_cache_dir, exist_ok=True)
+                if os.access(system_cache_dir, os.W_OK):
+                    return system_cache_dir
         except Exception as e:
             self.logger.warning(f"Could not use /var/cache/ledmatrix: {e}")
 
         # Attempt 3: /opt/ledmatrix/cache (alternative persistent location)
         try:
             opt_cache_dir = '/opt/ledmatrix/cache'
-            os.makedirs(opt_cache_dir, exist_ok=True)
-            if os.access(opt_cache_dir, os.W_OK):
-                return opt_cache_dir
+            
+            # Check if directory exists and we can write to it
+            if os.path.exists(opt_cache_dir):
+                # Test if we can write to the existing directory
+                test_file = os.path.join(opt_cache_dir, '.writetest')
+                try:
+                    with open(test_file, 'w') as f:
+                        f.write('test')
+                    os.remove(test_file)
+                    return opt_cache_dir
+                except (IOError, OSError):
+                    self.logger.warning(f"Directory exists but is not writable: {opt_cache_dir}")
+            else:
+                # Try to create the directory
+                os.makedirs(opt_cache_dir, exist_ok=True)
+                if os.access(opt_cache_dir, os.W_OK):
+                    return opt_cache_dir
         except Exception as e:
             self.logger.warning(f"Could not use /opt/ledmatrix/cache: {e}")
 
