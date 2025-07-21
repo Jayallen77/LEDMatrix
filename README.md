@@ -442,6 +442,55 @@ This will:
 3. Display sample games
 4. Test the scrolling functionality
 
+## Football Game-Based Configuration (NFL & NCAA FB)
+
+For NFL and NCAA Football, the system now uses a game-based fetch approach instead of time-based windows. This is more practical for football since games are weekly and you want to show specific numbers of games rather than arbitrary time periods.
+
+### Configuration Options
+
+Instead of using `past_fetch_days` and `future_fetch_days`, the system now uses:
+
+- **`fetch_past_games`**: Number of recent games to fetch (default: 1)
+- **`fetch_future_games`**: Number of upcoming games to fetch (default: 1)
+
+### Example Configuration
+
+```json
+{
+    "nfl_scoreboard": {
+        "enabled": true,
+        "fetch_past_games": 1,
+        "fetch_future_games": 1,
+        "favorite_teams": ["TB", "DAL"]
+    },
+    "ncaa_fb_scoreboard": {
+        "enabled": true,
+        "fetch_past_games": 1,
+        "fetch_future_games": 1,
+        "favorite_teams": ["UGA", "AUB"]
+    }
+}
+```
+
+### How It Works
+
+- **`fetch_past_games: 1`**: Shows the most recent game for your favorite teams
+- **`fetch_future_games: 1`**: Shows the next upcoming game for your favorite teams
+- **`fetch_future_games: 2`**: Shows the next two upcoming games (e.g., Week 1 and Week 2 matchups)
+
+### Benefits
+
+1. **Predictable Results**: Always shows exactly the number of games you specify
+2. **Season Flexibility**: Works well both during the season and in the off-season
+3. **Future Planning**: Can show games far in the future (e.g., Week 1 when it's 40 days away)
+4. **Efficient**: Only fetches the games you actually want to see
+
+### Use Cases
+
+- **During Season**: `fetch_future_games: 1` shows next week's game
+- **Off-Season**: `fetch_future_games: 1` shows the first scheduled game (even if it's months away)
+- **Planning**: `fetch_future_games: 2` shows the next two matchups for planning purposes
+
 ## Music Display Configuration
 
 The Music Display module shows information about the currently playing track from either Spotify or YouTube Music (via the [YouTube Music Desktop App](https://ytmdesktop.app/) companion server).
