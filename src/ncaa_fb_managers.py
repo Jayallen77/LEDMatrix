@@ -232,7 +232,6 @@ class BaseNCAAFBManager: # Renamed class
                         cached_date_data = BaseNCAAFBManager.cache_manager.get(date_cache_key, max_age=300)
                         
                         if cached_date_data:
-                            BaseNCAAFBManager.logger.info(f"[NCAAFB] Using cached data for date {fetch_date}")
                             if "events" in cached_date_data:
                                 all_events.extend(cached_date_data["events"])
                             continue
