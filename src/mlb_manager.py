@@ -751,6 +751,15 @@ class MLBLiveManager(BaseMLBManager):
                 # Fetch live game data from MLB API
                 games = self._fetch_mlb_api_data()
                 if games:
+                    
+                    # --- Optimization: Filter for favorite teams before processing ---
+                    if self.mlb_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+                        games = {
+                            game_id: game for game_id, game in games.items()
+                            if game['home_team'] in self.favorite_teams or game['away_team'] in self.favorite_teams
+                        }
+                        self.logger.info(f"[MLB Live] Filtered to {len(games)} games for favorite teams.")
+
                     # Find all live games involving favorite teams
                     new_live_games = []
                     for game in games.values():
@@ -1095,6 +1104,14 @@ class MLBRecentManager(BaseMLBManager):
             if not games:
                 logger.warning("[MLB] No games returned from API for recent games update.")
                 return
+
+            # --- Optimization: Filter for favorite teams before processing ---
+            if self.mlb_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+                games = {
+                    game_id: game for game_id, game in games.items()
+                    if game['home_team'] in self.favorite_teams or game['away_team'] in self.favorite_teams
+                }
+                self.logger.info(f"[MLB Recent] Filtered to {len(games)} games for favorite teams.")
                 
             # Process games
             new_recent_games = []
@@ -1220,8 +1237,8 @@ class MLBUpcomingManager(BaseMLBManager):
         """Update upcoming games data."""
         current_time = time.time()
         # Log config state for debugging
-        self.logger.info(f"[MLB] show_favorite_teams_only: {self.mlb_config.get('show_favorite_teams_only', False)}")
-        self.logger.info(f"[MLB] favorite_teams: {self.favorite_teams}")
+        self.logger.debug(f"[MLB] show_favorite_teams_only: {self.mlb_config.get('show_favorite_teams_only', False)}")
+        self.logger.debug(f"[MLB] favorite_teams: {self.favorite_teams}")
         if self.last_update != 0 and (current_time - self.last_update < self.update_interval):
             return
             
@@ -1232,6 +1249,14 @@ class MLBUpcomingManager(BaseMLBManager):
                 self.logger.warning("[MLB] No games returned from API for upcoming games update.")
                 return
 
+            # --- Optimization: Filter for favorite teams before processing ---
+            if self.mlb_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+                games = {
+                    game_id: game for game_id, game in games.items()
+                    if game['home_team'] in self.favorite_teams or game['away_team'] in self.favorite_teams
+                }
+                self.logger.info(f"[MLB Upcoming] Filtered to {len(games)} games for favorite teams.")
+
             # Process games
             new_upcoming_games = []
             
@@ -1240,13 +1265,6 @@ class MLBUpcomingManager(BaseMLBManager):
             for game_id, game in games.items():
                 self.logger.debug(f"[MLB] Processing game {game_id} for upcoming games...")
                 # Only fetch odds for games that will be displayed
-                if self.mlb_config.get("show_favorite_teams_only", False):
-                    if not self.favorite_teams:
-                        self.logger.info(f"[MLB] Skipping game {game_id} - no favorite teams configured.")
-                        continue
-                    if game['home_team'] not in self.favorite_teams and game['away_team'] not in self.favorite_teams:
-                        self.logger.info(f"[MLB] Skipping non-favorite team game: {game['away_team']} @ {game['home_team']}")
-                        continue
                 is_favorite_game = (game['home_team'] in self.favorite_teams or 
                                   game['away_team'] in self.favorite_teams)
                 game_time = datetime.fromisoformat(game['start_time'].replace('Z', '+00:00'))
@@ -1263,6 +1281,7 @@ class MLBUpcomingManager(BaseMLBManager):
                 )
                 self.logger.info(f"[MLB] Is upcoming: {is_upcoming}")
                 if is_upcoming:
+                    # The redundant favorite team check from before is already covered by the initial filter
                     self.logger.info(f"[MLB] Adding game {game_id} to upcoming games list.")
                     self._fetch_odds(game)
                     new_upcoming_games.append(game)
