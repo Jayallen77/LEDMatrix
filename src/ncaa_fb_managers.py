@@ -483,7 +483,7 @@ class BaseNCAAFBManager: # Renamed class
             game_time, game_date = "", ""
             if start_time_utc:
                 local_time = start_time_utc.astimezone(self._get_timezone())
-                game_time = local_time.strftime("%I:%M %p").lstrip('0')
+                game_time = local_time.strftime("%I:%M%p").lstrip('0')
                 game_date = local_time.strftime("%-m/%-d")
 
             # --- Football Specific Details (Likely same for NFL/NCAAFB) ---

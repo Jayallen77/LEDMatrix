@@ -321,7 +321,7 @@ class OddsTickerManager:
             if game_time.tzinfo is None:
                 game_time = game_time.replace(tzinfo=pytz.UTC)
             local_time = game_time.astimezone(tz)
-            time_str = local_time.strftime("%I:%M %p").lstrip('0')
+            time_str = local_time.strftime("%I:%M%p").lstrip('0')
             
             return f"[{time_str}] {game['away_team']} vs {game['home_team']} (No odds)"
         
@@ -426,7 +426,7 @@ class OddsTickerManager:
         # Capitalize full day name, e.g., 'Tuesday'
         day_text = local_time.strftime("%A")
         date_text = local_time.strftime("%-m/%d")
-        time_text = local_time.strftime("%I:%M %p").lstrip('0')
+        time_text = local_time.strftime("%I:%M%p").lstrip('0')
 
         # Team and record text
         away_team_text = f"{game.get('away_team', 'N/A')} ({game.get('away_record', '') or 'N/A'})"

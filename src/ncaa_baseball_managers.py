@@ -361,7 +361,7 @@ class BaseNCAABaseballManager:
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=pytz.UTC)
             local_dt = dt.astimezone(tz)
-            return local_dt.strftime("%I:%M %p").lstrip('0')
+            return local_dt.strftime("%I:%M%p").lstrip('0')
         except Exception as e:
             logger.error(f"[NCAABaseball] Error formatting game time: {e}")
             return "TBD"

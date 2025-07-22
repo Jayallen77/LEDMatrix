@@ -408,10 +408,11 @@ class BaseNFLManager: # Renamed class
             # Remove early filtering - let individual managers handle their own filtering
             # This allows shared data to contain all games, and each manager can filter as needed
 
-            game_time, game_date = "", ""
+            game_time = ""
+            game_date = ""
             if start_time_utc:
                 local_time = start_time_utc.astimezone(self._get_timezone())
-                game_time = local_time.strftime("%I:%M %p").lstrip('0')
+                game_time = local_time.strftime("%I:%M%p").lstrip('0')
                 game_date = local_time.strftime("%-m/%-d")
 
             # --- NFL Specific Details ---

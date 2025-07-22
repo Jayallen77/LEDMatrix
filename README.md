@@ -62,84 +62,6 @@ The system supports live, recent, and upcoming game information for multiple spo
 - Soccer
 - (Note, some of these sports seasons were not active during development and might need fine tuning when games are active)
 
-### Odds Ticker Feature
-The system includes a comprehensive odds ticker that displays betting odds for upcoming sports games across multiple leagues. The ticker shows game times, team logos, spreads, money lines, and over/under totals in a scrolling format.
-
-**Features:**
-- **Multi-League Support**: NFL, NBA, MLB, NCAA Football
-- **Configurable Leagues**: Choose which leagues to display
-- **Favorite Teams Filter**: Option to show only favorite teams or all games
-- **Team Logos**: Displays team logos alongside odds information
-- **Comprehensive Odds**: Shows spreads, money lines, and over/under totals
-- **Scrolling Display**: Smooth scrolling text with team logos
-- **Time Display**: Shows game times in local timezone
-
-**Display Format:**
-```
-[12:00 PM] DAL -6.5 ML -200 O/U 47.5 vs NYG ML +175
-```
-
-**Configuration:**
-Add the following section to your `config/config.json`:
-```json
-{
-    "odds_ticker": {
-        "enabled": true,
-        "show_favorite_teams_only": false,
-        "enabled_leagues": ["nfl", "nba", "mlb", "ncaa_fb"],
-        "update_interval": 3600,
-        "scroll_speed": 2,
-        "scroll_delay": 0.05,
-        "display_duration": 30
-    }
-}
-```
-
-**Testing:**
-You can test the odds ticker functionality using:
-```bash
-python test_odds_ticker.py
-```
-
-### Persistent Caching Setup
-
-The LEDMatrix system uses persistent caching to improve performance and reduce API calls. When running with `sudo`, the system needs a persistent cache directory that survives restarts.
-
-**First-Time Setup:**
-Run the setup script to create a persistent cache directory:
-```bash
-chmod +x setup_cache.sh
-./setup_cache.sh
-```
-
-This will:
-- Create `/var/cache/ledmatrix/` directory
-- Set proper ownership to your user account
-- Set permissions to allow the daemon user (which the system runs as) to write
-- Test writability for both your user and the daemon user
-
-**If You Still See Cache Warnings:**
-If you see warnings about using temporary cache directory, run the permissions fix:
-```bash
-chmod +x fix_cache_permissions.sh
-./fix_cache_permissions.sh
-```
-
-**Manual Setup:**
-If you prefer to set up manually:
-```bash
-sudo mkdir -p /var/cache/ledmatrix
-sudo chown $USER:$USER /var/cache/ledmatrix
-sudo chmod 777 /var/cache/ledmatrix
-```
-
-**Cache Locations (in order of preference):**
-1. `~/.ledmatrix_cache/` (user's home directory) - **Most persistent**
-2. `/var/cache/ledmatrix/` (system cache directory) - **Persistent across restarts**
-3. `/opt/ledmatrix/cache/` (alternative persistent location)
-4. `/tmp/ledmatrix_cache/` (temporary directory) - **NOT persistent**
-
-**Note:** If the system falls back to `/tmp/ledmatrix_cache/`, you'll see a warning message and the cache will not persist across restarts.
 
 ### Financial Information
 - Near real-time stock & crypto price updates
@@ -387,7 +309,6 @@ The odds ticker displays betting odds for upcoming sports games. To configure it
 {
     "odds_ticker": {
         "enabled": true,
-        "show_favorite_teams_only": false,
         "enabled_leagues": ["nfl", "nba", "mlb", "ncaa_fb"],
         "update_interval": 3600,
         "scroll_speed": 2,
@@ -400,23 +321,15 @@ The odds ticker displays betting odds for upcoming sports games. To configure it
 ### Configuration Options
 
 - **`enabled`**: Enable/disable the odds ticker (default: false)
-- **`show_favorite_teams_only`**: Show only games involving favorite teams (default: false)
-- **`games_per_favorite_team`**: Number of upcoming games to show per favorite team, per league (default: 1)
-- **`max_games_per_league`**: Maximum number of games to show per league (default: 5)
-- **`show_odds_only`**: If true, only show games that have odds available (default: false)
-- **`sort_order`**: How to sort games in the ticker. Options: `soonest` (default; by start time). (More options can be added in the future.)
 - **`enabled_leagues`**: Array of leagues to display (options: "nfl", "nba", "mlb", "ncaa_fb")
 - **`update_interval`**: How often to fetch new odds data in seconds (default: 3600)
 - **`scroll_speed`**: Pixels to scroll per update (default: 1)
 - **`scroll_delay`**: Delay between scroll updates in seconds (default: 0.05)
 - **`display_duration`**: How long to show each game in seconds (default: 30)
-- **`loop`**: Whether to continuously loop the scroll animation (default: true). When false, the scroll stops when it reaches the end of the content.
 
 **How it works:**
-- If `show_favorite_teams_only` is true, the ticker will show the next `games_per_favorite_team` games for each favorite team in each enabled league, deduplicated and capped at `max_games_per_league` per league.
-- If `show_favorite_teams_only` is false, the ticker will show all games for all teams (up to `max_games_per_league` per league).
-- If `show_odds_only` is true, only games with odds will be shown.
-- Games are sorted by `sort_order` (default: soonest).
+- The ticker intelligently filters games based on the `"show_favorite_teams_only"` setting within each individual sport's configuration block (e.g., `"nfl_scoreboard"`). If set to `true` for a sport, only favorite teams from that sport will appear in the ticker.
+- Games are sorted by the soonest start time.
 
 ### Display Format
 
@@ -668,7 +581,105 @@ To get these credentials:
 *   Ensure your firewall (Windows Firewall) allows YTM Desktop app to access local networks.
 
 -----------------------------------------------------------------------------------
+### Favorite Team Filtering
+Across all sports displays (NFL, MLB, NBA, etc.), you can control which games are shown using the `"show_favorite_teams_only"` and `"favorite_teams"` settings in your `config/config.json`.
 
+**How it Works:**
+
+*   **`"show_favorite_teams_only": true`**: When this is set to `true` within a specific sport's configuration (e.g., in the `"nfl_scoreboard"` block), the system will **only** fetch and display games (Live, Recent, and Upcoming) that involve one of the teams listed in your `"favorite_teams"` array for that sport. This is the best way to reduce API calls and keep the display focused.
+
+*   **`"show_favorite_teams_only": false`**: When set to `false` (or omitted), the system will display **all** available games for that sport, ignoring the `"favorite_teams"` list completely.
+
+**Example `config.json` for NFL:**
+```json
+"nfl_scoreboard": {
+    "enabled": true,
+    "show_odds": true,
+    "show_favorite_teams_only": true, // <-- Only shows games for DAL & TB
+    "favorite_teams": ["DAL", "TB"],
+    "fetch_past_games": 1,
+    "fetch_future_games": 1
+},
+```
+
+### Odds Ticker Feature
+The system includes a comprehensive odds ticker that displays betting odds for upcoming sports games. The ticker respects the `show_favorite_teams_only` setting from each individual sports module. For example, if `"show_favorite_teams_only": true` is set in the `nfl_scoreboard` config, the odds ticker will only show odds for your favorite NFL teams.
+
+**Features:**
+- **Multi-League Support**: NFL, NBA, MLB, NCAA Football
+- **Configurable Leagues**: Choose which leagues to display
+- **Favorite Teams Filter**: Obeys the `show_favorite_teams_only` setting in each sport's configuration block.
+- **Team Logos**: Displays team logos alongside odds information
+- **Comprehensive Odds**: Shows spreads, money lines, and over/under totals
+- **Scrolling Display**: Smooth scrolling text with team logos
+- **Time Display**: Shows game times in local timezone
+
+**Display Format:**
+```
+[12:00 PM] DAL -6.5 ML -200 O/U 47.5 vs NYG ML +175
+```
+
+**Configuration:**
+Add the following section to your `config/config.json`:
+```json
+{
+    "odds_ticker": {
+        "enabled": true,
+        "enabled_leagues": ["nfl", "nba", "mlb", "ncaa_fb"],
+        "update_interval": 3600,
+        "scroll_speed": 2,
+        "scroll_delay": 0.05,
+        "display_duration": 30
+    }
+}
+```
+
+**Testing:**
+You can test the odds ticker functionality using:
+```bash
+python test_odds_ticker.py
+```
+
+### Persistent Caching Setup
+
+The LEDMatrix system uses persistent caching to improve performance and reduce API calls. When running with `sudo`, the system needs a persistent cache directory that survives restarts.
+
+**First-Time Setup:**
+Run the setup script to create a persistent cache directory:
+```bash
+chmod +x setup_cache.sh
+./setup_cache.sh
+```
+
+This will:
+- Create `/var/cache/ledmatrix/` directory
+- Set proper ownership to your user account
+- Set permissions to allow the daemon user (which the system runs as) to write
+- Test writability for both your user and the daemon user
+
+**If You Still See Cache Warnings:**
+If you see warnings about using temporary cache directory, run the permissions fix:
+```bash
+chmod +x fix_cache_permissions.sh
+./fix_cache_permissions.sh
+```
+
+**Manual Setup:**
+If you prefer to set up manually:
+```bash
+sudo mkdir -p /var/cache/ledmatrix
+sudo chown $USER:$USER /var/cache/ledmatrix
+sudo chmod 777 /var/cache/ledmatrix
+```
+
+**Cache Locations (in order of preference):**
+1. `~/.ledmatrix_cache/` (user's home directory) - **Most persistent**
+2. `/var/cache/ledmatrix/` (system cache directory) - **Persistent across restarts**
+3. `/opt/ledmatrix/cache/` (alternative persistent location)
+4. `/tmp/ledmatrix_cache/` (temporary directory) - **NOT persistent**
+
+**Note:** If the system falls back to `/tmp/ledmatrix_cache/`, you'll see a warning message and the cache will not persist across restarts.
+------------------------------------------------------------------------------------
 ## Before Running the Display
 - To allow the script to properly access fonts, you need to set the correct permissions on your home directory:
   ```bash

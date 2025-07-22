@@ -449,7 +449,7 @@ class BaseNCAAMBasketballManager:
             if start_time_utc:
                 # Convert to local time
                 local_time = start_time_utc.astimezone(self._get_timezone())
-                game_time = local_time.strftime("%I:%M %p").lstrip('0')
+                game_time = local_time.strftime("%I:%M%p").lstrip('0')
                 game_date = local_time.strftime("%-m/%-d")
 
             # Calculate if game is within recent window
