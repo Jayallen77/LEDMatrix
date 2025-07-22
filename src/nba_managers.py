@@ -368,13 +368,21 @@ class BaseNBAManager:
 
     def _fetch_odds(self, game: Dict) -> None:
         """Fetch odds for a specific game if conditions are met."""
-        self.logger.debug(f"Checking odds for game: {game.get('id', 'N/A')}")
-        
         # Check if odds should be shown for this sport
         if not self.show_odds:
-            self.logger.debug("Odds display is disabled for NBA.")
             return
 
+        # Check if we should only fetch for favorite teams
+        is_favorites_only = self.nba_config.get("show_favorite_teams_only", False)
+        if is_favorites_only:
+            home_abbr = game.get('home_abbr')
+            away_abbr = game.get('away_abbr')
+            if not (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams):
+                self.logger.debug(f"Skipping odds fetch for non-favorite game in favorites-only mode: {away_abbr}@{home_abbr}")
+                return
+
+        self.logger.debug(f"Proceeding with odds fetch for game: {game.get('id', 'N/A')}")
+        
         # Fetch odds using OddsManager (ESPN API)
         try:
             # Determine update interval based on game state
@@ -748,14 +756,7 @@ class NBALiveManager(BaseNBAManager):
                 for event in data["events"]:
                     details = self._extract_game_details(event)
                     if details and details["is_live"]:
-                        # Only fetch odds for games that will be displayed
-                        if self.nba_config.get("show_favorite_teams_only", False):
-                            if not self.favorite_teams:
-                                continue
-                            if details["home_abbr"] not in self.favorite_teams and details["away_abbr"] not in self.favorite_teams:
-                                continue
-                        if self.show_odds:
-                            self._fetch_odds(details)
+                        self._fetch_odds(details)
                         new_live_games.append(details)
 
                 # Update game list and current game
@@ -806,13 +807,11 @@ class NBARecentManager(BaseNBAManager):
             for event in events:
                 game = self._extract_game_details(event)
                 if game and game['is_final'] and game['is_within_window']:
-                    # Fetch odds if enabled
-                    if self.show_odds:
-                        self._fetch_odds(game)
+                    self._fetch_odds(game)
                     new_recent_games.append(game)
 
-            # Filter for favorite teams
-            if self.favorite_teams:
+            # Filter for favorite teams only if the config is set
+            if self.nba_config.get("show_favorite_teams_only", False):
                 team_games = [game for game in new_recent_games 
                              if game['home_abbr'] in self.favorite_teams or 
                                 game['away_abbr'] in self.favorite_teams]
@@ -874,13 +873,11 @@ class NBAUpcomingManager(BaseNBAManager):
             for event in events:
                 game = self._extract_game_details(event)
                 if game and game['is_upcoming']:
-                    # Fetch odds if enabled
-                    if self.show_odds:
-                        self._fetch_odds(game)
+                    self._fetch_odds(game)
                     self.upcoming_games.append(game)
 
-            # Filter for favorite teams
-            if self.favorite_teams:
+            # Filter for favorite teams only if the config is set
+            if self.nba_config.get("show_favorite_teams_only", False):
                 team_games = [game for game in self.upcoming_games 
                              if game['home_abbr'] in self.favorite_teams or 
                                 game['away_abbr'] in self.favorite_teams]

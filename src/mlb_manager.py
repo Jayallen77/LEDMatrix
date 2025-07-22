@@ -55,9 +55,21 @@ class BaseMLBManager:
 
     def _fetch_odds(self, game: Dict) -> None:
         """Fetch odds for a game and attach it to the game dictionary."""
+        # Check if odds should be shown for this sport
         if not self.show_odds:
             return
-        
+
+        # Check if we should only fetch for favorite teams
+        is_favorites_only = self.mlb_config.get("show_favorite_teams_only", False)
+        if is_favorites_only:
+            home_team = game.get('home_team')
+            away_team = game.get('away_team')
+            if not (home_team in self.favorite_teams or away_team in self.favorite_teams):
+                self.logger.debug(f"Skipping odds fetch for non-favorite game in favorites-only mode: {away_team}@{home_team}")
+                return
+
+        self.logger.debug(f"Proceeding with odds fetch for game: {game.get('id', 'N/A')}")
+            
         # Skip if odds are already attached to this game
         if 'odds' in game and game['odds']:
             return
@@ -777,7 +789,15 @@ class MLBLiveManager(BaseMLBManager):
                                     new_live_games.append(game)
                                 except (ValueError, TypeError):
                                     self.logger.warning(f"Invalid score format for game {game['away_team']} @ {game['home_team']}")
-                    
+                            else:
+                                # Not in favorites-only mode, so add the game
+                                try:
+                                    game['home_score'] = int(game['home_score'])
+                                    game['away_score'] = int(game['away_score'])
+                                    new_live_games.append(game)
+                                except (ValueError, TypeError):
+                                    self.logger.warning(f"Invalid score format for game {game['away_team']} @ {game['home_team']}")
+
                     # Only log if there's a change in games or enough time has passed
                     should_log = (
                         current_time - self.last_log_time >= self.log_interval or

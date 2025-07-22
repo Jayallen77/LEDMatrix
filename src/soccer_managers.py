@@ -153,8 +153,20 @@ class BaseSoccerManager:
 
     def _fetch_odds(self, game: Dict) -> None:
         """Fetch odds for a game and attach it to the game dictionary."""
+        # Check if odds should be shown for this sport
         if not self.show_odds:
             return
+
+        # Check if we should only fetch for favorite teams
+        is_favorites_only = self.soccer_config.get("show_favorite_teams_only", False)
+        if is_favorites_only:
+            home_abbr = game.get('home_abbr')
+            away_abbr = game.get('away_abbr')
+            if not (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams):
+                self.logger.debug(f"Skipping odds fetch for non-favorite game in favorites-only mode: {away_abbr}@{home_abbr}")
+                return
+
+        self.logger.debug(f"Proceeding with odds fetch for game: {game.get('id', 'N/A')}")
         
         try:
             odds_data = self.odds_manager.get_odds(
@@ -856,12 +868,8 @@ class SoccerLiveManager(BaseSoccerManager):
                         details = self._extract_game_details(event)
                         # Ensure it's live and involves a favorite team (if specified)
                         if details and details["is_live"]:
-                             if not self.favorite_teams or (
-                                details["home_abbr"] in self.favorite_teams or
-                                details["away_abbr"] in self.favorite_teams
-                            ):
-                                self._fetch_odds(details)
-                                new_live_games.append(details)
+                            self._fetch_odds(details)
+                            new_live_games.append(details)
 
                     # Logging
                     should_log = (current_time - self.last_log_time >= self.log_interval or
@@ -987,22 +995,26 @@ class SoccerRecentManager(BaseSoccerManager):
             for event in data['events']:
                 game = self._extract_game_details(event)
                 if game and game['is_final'] and game['start_time_utc'] and game['start_time_utc'] >= cutoff_time:
-                     # Check favorite teams if list is provided
-                     if not self.favorite_teams or (game['home_abbr'] in self.favorite_teams or game['away_abbr'] in self.favorite_teams):
-                        self._fetch_odds(game)
-                        new_recent_games.append(game)
+                    self._fetch_odds(game)
+                    new_recent_games.append(game)
 
+            # Filter for favorite teams only if the config is set
+            if self.soccer_config.get("show_favorite_teams_only", False):
+                team_games = [game for game in new_recent_games if game['home_abbr'] in self.favorite_teams or game['away_abbr'] in self.favorite_teams]
+            else:
+                team_games = new_recent_games
+            
             # Sort games by start time, most recent first
-            new_recent_games.sort(key=lambda x: x['start_time_utc'], reverse=True)
+            team_games.sort(key=lambda x: x['start_time_utc'], reverse=True)
 
             # Update only if the list content changes
-            new_ids = {g['id'] for g in new_recent_games}
+            new_ids = {g['id'] for g in team_games}
             current_ids = {g['id'] for g in self.games_list}
 
             if new_ids != current_ids:
-                self.logger.info(f"[Soccer] Found {len(new_recent_games)} recent games matching criteria.")
-                self.recent_games = new_recent_games # Keep raw filtered list
-                self.games_list = new_recent_games   # Use the same list for display rotation
+                self.logger.info(f"[Soccer] Found {len(team_games)} recent games matching criteria.")
+                self.recent_games = team_games
+                self.games_list = team_games
                 
                 # Reset display index if needed
                 if not self.current_game or self.current_game['id'] not in new_ids:
@@ -1090,34 +1102,38 @@ class SoccerUpcomingManager(BaseSoccerManager):
                 # Must be upcoming, have a start time, and be within the window
                 if game and game['is_upcoming'] and game['start_time_utc'] and \
                    game['start_time_utc'] >= now_utc and game['start_time_utc'] <= cutoff_time:
-                    # Check favorite teams if list is provided
-                     if not self.favorite_teams or (game['home_abbr'] in self.favorite_teams or game['away_abbr'] in self.favorite_teams):
-                        self._fetch_odds(game)
-                        new_upcoming_games.append(game)
+                    self._fetch_odds(game)
+                    new_upcoming_games.append(game)
+            
+            # Filter for favorite teams only if the config is set
+            if self.soccer_config.get("show_favorite_teams_only", False):
+                team_games = [game for game in new_upcoming_games if game['home_abbr'] in self.favorite_teams or game['away_abbr'] in self.favorite_teams]
+            else:
+                team_games = new_upcoming_games
 
             # Sort games by start time, soonest first
-            new_upcoming_games.sort(key=lambda x: x['start_time_utc'])
+            team_games.sort(key=lambda x: x['start_time_utc'])
 
              # Update only if the list content changes
-            new_ids = {g['id'] for g in new_upcoming_games}
+            new_ids = {g['id'] for g in team_games}
             current_ids = {g['id'] for g in self.upcoming_games}
 
             if new_ids != current_ids:
                 # Logging
                 should_log = (current_time - self.last_log_time >= self.log_interval or
-                              len(new_upcoming_games) != len(self.upcoming_games) or
+                              len(team_games) != len(self.upcoming_games) or
                               not self.upcoming_games)
                 if should_log:
-                    if new_upcoming_games:
-                        self.logger.info(f"[Soccer] Found {len(new_upcoming_games)} upcoming games matching criteria.")
+                    if team_games:
+                        self.logger.info(f"[Soccer] Found {len(team_games)} upcoming games matching criteria.")
                         # Log first few games for brevity
-                        for game in new_upcoming_games[:3]:
+                        for game in team_games[:3]:
                             self.logger.info(f"[Soccer] Upcoming game: {game['away_abbr']} vs {game['home_abbr']} ({game['game_date']} {game['game_time']}) - {game['league']}")
                     else:
                         self.logger.info("[Soccer] No upcoming games found matching criteria.")
                     self.last_log_time = current_time
 
-                self.upcoming_games = new_upcoming_games
+                self.upcoming_games = team_games
 
                 # Reset display index if needed
                 if not self.current_game or self.current_game['id'] not in new_ids:

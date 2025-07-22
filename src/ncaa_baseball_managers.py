@@ -59,8 +59,20 @@ class BaseNCAABaseballManager:
 
     def _fetch_odds(self, game: Dict) -> None:
         """Fetch odds for a game and attach it to the game dictionary."""
+        # Check if odds should be shown for this sport
         if not self.show_odds:
             return
+
+        # Check if we should only fetch for favorite teams
+        is_favorites_only = self.ncaa_baseball_config.get("show_favorite_teams_only", False)
+        if is_favorites_only:
+            home_team = game.get('home_team')
+            away_team = game.get('away_team')
+            if not (home_team in self.favorite_teams or away_team in self.favorite_teams):
+                self.logger.debug(f"Skipping odds fetch for non-favorite game in favorites-only mode: {away_team}@{home_team}")
+                return
+
+        self.logger.debug(f"Proceeding with odds fetch for game: {game.get('id', 'N/A')}")
         
         try:
             odds_data = self.odds_manager.get_odds(
@@ -579,14 +591,13 @@ class NCAABaseballLiveManager(BaseNCAABaseballManager):
                     new_live_games = []
                     for game in games.values():
                         if game['status_state'] == 'in':
-                            if not self.favorite_teams or (game['home_team'] in self.favorite_teams or game['away_team'] in self.favorite_teams):
-                                try:
-                                    game['home_score'] = int(game['home_score'])
-                                    game['away_score'] = int(game['away_score'])
-                                    self._fetch_odds(game)
-                                    new_live_games.append(game)
-                                except (ValueError, TypeError):
-                                    self.logger.warning(f"[NCAABaseball] Invalid score format for game {game['away_team']} @ {game['home_team']}")
+                            self._fetch_odds(game)
+                            try:
+                                game['home_score'] = int(game['home_score'])
+                                game['away_score'] = int(game['away_score'])
+                                new_live_games.append(game)
+                            except (ValueError, TypeError):
+                                self.logger.warning(f"[NCAABaseball] Invalid score format for game {game['away_team']} @ {game['home_team']}")
                     
                     should_log = (
                         current_time - self.last_log_time >= self.log_interval or
@@ -867,9 +878,15 @@ class NCAABaseballRecentManager(BaseNCAABaseballManager):
                     new_recent_games.append(game)
                     logger.info(f"[NCAABaseball] Added favorite team game to recent list: {game['away_team']} @ {game['home_team']}")
             
-            if new_recent_games:
-                logger.info(f"[NCAABaseball] Found {len(new_recent_games)} recent games for favorite teams: {self.favorite_teams}")
-                self.recent_games = sorted(new_recent_games, key=lambda g: g.get('start_time'), reverse=True)
+            # Filter for favorite teams only if the config is set
+            if self.ncaa_baseball_config.get("show_favorite_teams_only", False):
+                team_games = [game for game in new_recent_games if game['home_team'] in self.favorite_teams or game['away_team'] in self.favorite_teams]
+            else:
+                team_games = new_recent_games
+
+            if team_games:
+                logger.info(f"[NCAABaseball] Found {len(team_games)} recent games for favorite teams: {self.favorite_teams}")
+                self.recent_games = sorted(team_games, key=lambda g: g.get('start_time'), reverse=True)
                 if not self.current_game or self.current_game.get('id') not in [g.get('id') for g in self.recent_games]:
                     self.current_game_index = 0
                     self.current_game = self.recent_games[0] if self.recent_games else None
@@ -960,9 +977,15 @@ class NCAABaseballUpcomingManager(BaseNCAABaseballManager):
                         new_upcoming_games.append(game)
                         logger.info(f"[NCAABaseball] Added favorite team game to upcoming list: {game['away_team']} @ {game['home_team']}")
                 
-                if new_upcoming_games:
-                    logger.info(f"[NCAABaseball] Found {len(new_upcoming_games)} upcoming games for favorite teams")
-                    self.upcoming_games = sorted(new_upcoming_games, key=lambda g: g.get('start_time'))
+                # Filter for favorite teams only if the config is set
+                if self.ncaa_baseball_config.get("show_favorite_teams_only", False):
+                    team_games = [game for game in new_upcoming_games if game['home_team'] in self.favorite_teams or game['away_team'] in self.favorite_teams]
+                else:
+                    team_games = new_upcoming_games
+
+                if team_games:
+                    logger.info(f"[NCAABaseball] Found {len(team_games)} upcoming games for favorite teams")
+                    self.upcoming_games = sorted(team_games, key=lambda g: g.get('start_time'))
                     if not self.current_game or self.current_game.get('id') not in [g.get('id') for g in self.upcoming_games]:
                         self.current_game_index = 0
                         self.current_game = self.upcoming_games[0] if self.upcoming_games else None

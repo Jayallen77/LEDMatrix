@@ -101,13 +101,21 @@ class BaseNFLManager: # Renamed class
 
     def _fetch_odds(self, game: Dict) -> None:
         """Fetch odds for a specific game if conditions are met."""
-        self.logger.debug(f"Checking odds for game: {game.get('id', 'N/A')}")
-        
         # Check if odds should be shown for this sport
         if not self.show_odds:
-            self.logger.debug("Odds display is disabled for NFL.")
             return
 
+        # Check if we should only fetch for favorite teams
+        is_favorites_only = self.nfl_config.get("show_favorite_teams_only", False)
+        if is_favorites_only:
+            home_abbr = game.get('home_abbr')
+            away_abbr = game.get('away_abbr')
+            if not (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams):
+                self.logger.debug(f"Skipping odds fetch for non-favorite game in favorites-only mode: {away_abbr}@{home_abbr}")
+                return
+
+        self.logger.debug(f"Proceeding with odds fetch for game: {game.get('id', 'N/A')}")
+        
         # Fetch odds using OddsManager (ESPN API)
         try:
             # Determine update interval based on game state
@@ -646,8 +654,7 @@ class NFLLiveManager(BaseNFLManager): # Renamed class
                                 details["away_abbr"] in self.favorite_teams
                             ):
                                 # Fetch odds if enabled
-                                if self.show_odds:
-                                    self._fetch_odds(details)
+                                self._fetch_odds(details)
                                 new_live_games.append(details)
 
                     # Log changes or periodically
@@ -905,12 +912,11 @@ class NFLRecentManager(BaseNFLManager): # Renamed class
                 # Filter criteria: must be final
                 if game and game['is_final']:
                     # Fetch odds if enabled
-                    if self.show_odds:
-                        self._fetch_odds(game)
+                    self._fetch_odds(game)
                     processed_games.append(game)
 
-            # This check is now partially redundant if show_favorite_teams_only is true, but acts as the main filter otherwise
-            if self.favorite_teams:
+            # Filter for favorite teams only if the config is set
+            if self.nfl_config.get("show_favorite_teams_only", False):
                  team_games = [game for game in processed_games
                               if game['home_abbr'] in self.favorite_teams or
                                  game['away_abbr'] in self.favorite_teams]
@@ -1130,23 +1136,14 @@ class NFLUpcomingManager(BaseNFLManager): # Renamed class
                             continue
                         if game['home_abbr'] not in self.favorite_teams and game['away_abbr'] not in self.favorite_teams:
                             continue
-                    if self.show_odds:
-                        self._fetch_odds(game)
+                    self._fetch_odds(game)
                     processed_games.append(game)
 
-            # Debug logging to see what games we have
-            self.logger.debug(f"[NFL Upcoming] Processed {len(processed_games)} upcoming games")
-            for game in processed_games:
-                self.logger.debug(f"[NFL Upcoming] Game: {game['away_abbr']}@{game['home_abbr']} - Upcoming: {game['is_upcoming']}")
-
             # This check is now partially redundant if show_favorite_teams_only is true, but acts as the main filter otherwise
-            if self.favorite_teams:
+            if self.nfl_config.get("show_favorite_teams_only", False):
                 team_games = [game for game in processed_games
                               if game['home_abbr'] in self.favorite_teams or
                                  game['away_abbr'] in self.favorite_teams]
-                self.logger.debug(f"[NFL Upcoming] After favorite team filtering: {len(team_games)} games")
-                for game in team_games:
-                    self.logger.debug(f"[NFL Upcoming] Favorite game: {game['away_abbr']}@{game['home_abbr']}")
             else:
                 team_games = processed_games # Show all upcoming if no favorites
 

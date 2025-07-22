@@ -72,8 +72,20 @@ class BaseNCAAMBasketballManager:
 
     def _fetch_odds(self, game: Dict) -> None:
         """Fetch odds for a game and attach it to the game dictionary."""
+        # Check if odds should be shown for this sport
         if not self.show_odds:
             return
+
+        # Check if we should only fetch for favorite teams
+        is_favorites_only = self.ncaam_basketball_config.get("show_favorite_teams_only", False)
+        if is_favorites_only:
+            home_abbr = game.get('home_abbr')
+            away_abbr = game.get('away_abbr')
+            if not (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams):
+                self.logger.debug(f"Skipping odds fetch for non-favorite game in favorites-only mode: {away_abbr}@{home_abbr}")
+                return
+
+        self.logger.debug(f"Proceeding with odds fetch for game: {game.get('id', 'N/A')}")
         
         try:
             odds_data = self.odds_manager.get_odds(
@@ -732,17 +744,13 @@ class NCAAMBasketballLiveManager(BaseNCAAMBasketballManager):
                     for event in data["events"]:
                         details = self._extract_game_details(event)
                         if details and details["is_live"]: # is_live includes 'in' and 'halftime'
-                            if not self.favorite_teams or (
+                            self._fetch_odds(details)
+                            new_live_games.append(details)
+                            if self.favorite_teams and (
                                 details["home_abbr"] in self.favorite_teams or
                                 details["away_abbr"] in self.favorite_teams
                             ):
-                                self._fetch_odds(details)
-                                new_live_games.append(details)
-                                if self.favorite_teams and (
-                                    details["home_abbr"] in self.favorite_teams or
-                                    details["away_abbr"] in self.favorite_teams
-                                ):
-                                    has_favorite_team = True
+                                has_favorite_team = True
                     
                     # Update favorite team game status
                     self.has_favorite_team_game = has_favorite_team
@@ -873,11 +881,13 @@ class NCAAMBasketballRecentManager(BaseNCAAMBasketballManager):
                     self._fetch_odds(game)
                     new_recent_games.append(game)
 
-            # Filter for favorite teams
-            new_team_games = [game for game in new_recent_games
-                         if not self.favorite_teams or # Show all if no favorites
-                            game['home_abbr'] in self.favorite_teams or
+            # Filter for favorite teams only if the config is set
+            if self.ncaam_basketball_config.get("show_favorite_teams_only", False):
+                new_team_games = [game for game in new_recent_games
+                         if game['home_abbr'] in self.favorite_teams or
                             game['away_abbr'] in self.favorite_teams]
+            else:
+                new_team_games = new_recent_games
 
             # Sort by game time (most recent first)
             new_team_games.sort(key=lambda g: g.get('start_time_utc', datetime.min.replace(tzinfo=timezone.utc)), reverse=True)
@@ -1005,11 +1015,13 @@ class NCAAMBasketballUpcomingManager(BaseNCAAMBasketballManager):
                     new_upcoming_games.append(game)
                     self.logger.debug(f"Processing upcoming game: {game['away_abbr']} vs {game['home_abbr']}")
 
-            # Filter for favorite teams
-            team_games = [game for game in new_upcoming_games
-                         if not self.favorite_teams or # Show all if no favorites
-                            game['home_abbr'] in self.favorite_teams or
+            # Filter for favorite teams only if the config is set
+            if self.ncaam_basketball_config.get("show_favorite_teams_only", False):
+                team_games = [game for game in new_upcoming_games
+                         if game['home_abbr'] in self.favorite_teams or
                             game['away_abbr'] in self.favorite_teams]
+            else:
+                team_games = new_upcoming_games
 
              # Sort by game time (soonest first)
             team_games.sort(key=lambda g: g.get('start_time_utc', datetime.max.replace(tzinfo=timezone.utc)))

@@ -121,8 +121,20 @@ class BaseNHLManager:
 
     def _fetch_odds(self, game: Dict) -> None:
         """Fetch odds for a game and attach it to the game dictionary."""
+        # Check if odds should be shown for this sport
         if not self.show_odds:
             return
+
+        # Check if we should only fetch for favorite teams
+        is_favorites_only = self.nhl_config.get("show_favorite_teams_only", False)
+        if is_favorites_only:
+            home_abbr = game.get('home_abbr')
+            away_abbr = game.get('away_abbr')
+            if not (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams):
+                self.logger.debug(f"Skipping odds fetch for non-favorite game in favorites-only mode: {away_abbr}@{home_abbr}")
+                return
+
+        self.logger.debug(f"Proceeding with odds fetch for game: {game.get('id', 'N/A')}")
         
         try:
             odds_data = self.odds_manager.get_odds(
@@ -677,12 +689,8 @@ class NHLLiveManager(BaseNHLManager):
                     for event in data["events"]:
                         details = self._extract_game_details(event)
                         if details and details["is_live"]:
-                            if not self.favorite_teams or (
-                                details["home_abbr"] in self.favorite_teams or 
-                                details["away_abbr"] in self.favorite_teams
-                            ):
-                                self._fetch_odds(details)
-                                new_live_games.append(details)
+                            self._fetch_odds(details)
+                            new_live_games.append(details)
                     
                     # Only log if there's a change in games or enough time has passed
                     should_log = (
@@ -782,15 +790,17 @@ class NHLRecentManager(BaseNHLManager):
                 game = self._extract_game_details(event)
                 if game:
                     # Fetch odds if enabled
-                    if self.show_odds:
-                        self._fetch_odds(game)
+                    self._fetch_odds(game)
                     self.recent_games.append(game)
                     self.logger.debug(f"Processing game: {game['away_abbr']} vs {game['home_abbr']} - Final: {game['is_final']}, Within window: {game['is_within_window']}")
             
-            # Filter for favorite teams
-            team_games = [game for game in self.recent_games 
+            # Filter for favorite teams only if the config is set
+            if self.nhl_config.get("show_favorite_teams_only", False):
+                team_games = [game for game in self.recent_games 
                          if game['home_abbr'] in self.favorite_teams or 
                             game['away_abbr'] in self.favorite_teams]
+            else:
+                team_games = self.recent_games
             
             self.logger.info(f"[NHL] Found {len(team_games)} recent games for favorite teams")
             if not team_games:
@@ -878,15 +888,17 @@ class NHLUpcomingManager(BaseNHLManager):
                         if game['home_abbr'] not in self.favorite_teams and game['away_abbr'] not in self.favorite_teams:
                             continue
                     if not game['is_final'] and game['is_within_window']:
-                        if self.show_odds:
-                            self._fetch_odds(game)
+                        self._fetch_odds(game)
                         new_upcoming_games.append(game)
                         self.logger.debug(f"[NHL] Added to upcoming games: {game['away_abbr']} vs {game['home_abbr']}")
             
-            # Filter for favorite teams
-            new_team_games = [game for game in new_upcoming_games 
+            # Filter for favorite teams only if the config is set
+            if self.nhl_config.get("show_favorite_teams_only", False):
+                new_team_games = [game for game in new_upcoming_games 
                          if game['home_abbr'] in self.favorite_teams or 
                             game['away_abbr'] in self.favorite_teams]
+            else:
+                new_team_games = new_upcoming_games
             
             # Log all upcoming games found *before* filtering by favorite teams
             if new_upcoming_games:

@@ -948,6 +948,8 @@ class MiLBRecentManager(BaseMiLBManager):
         self.last_warning_time = 0
         self.warning_cooldown = 300  # Only show warning every 5 minutes
         logger.info(f"Initialized MiLBRecentManager with {len(self.favorite_teams)} favorite teams")
+        self.last_log_time = 0
+        self.log_interval = 300 # 5 minutes
 
     def update(self):
         """Update recent games data."""
@@ -1002,14 +1004,13 @@ class MiLBRecentManager(BaseMiLBManager):
                 
                 self.logger.info(f"[MiLB] Game Time: {game_time.isoformat()}")
                 self.logger.info(f"[MiLB] Is final: {is_final}")
-                self.logger.info(f"[MiLB] Status: {game['status']}, Status State: {game['status_state']}")
-
+                
                 # Only add favorite team games that are final
                 if is_final:
+                    self.logger.info(f"[MiLB] Adding game {game_id} to recent games list.")
                     new_recent_games.append(game)
-                    logger.info(f"[MiLB] Added favorite team game to recent list: {game['away_team']} @ {game['home_team']}")
                 else:
-                    logger.info(f"[MiLB] Skipping non-final game: {game['away_team']} @ {game['home_team']} (Status: {game['status_state']})")
+                    self.logger.info(f"[MiLB] Skipping game {game_id} - not final.")
             
             # Log summary of all games found
             logger.info(f"[MiLB] All games found ({len(all_games_log)}): {all_games_log}")
@@ -1091,7 +1092,7 @@ class MiLBUpcomingManager(BaseMiLBManager):
     """Manager for upcoming MiLB games."""
     def __init__(self, config: Dict[str, Any], display_manager):
         super().__init__(config, display_manager)
-        self.logger.info("Initialized MiLB Upcoming Manager")
+        self.logger = logging.getLogger(__name__)
         self.upcoming_games = []
         self.current_game = None
         self.current_game_index = 0
@@ -1102,75 +1103,76 @@ class MiLBUpcomingManager(BaseMiLBManager):
         self.warning_cooldown = 300  # Only show warning every 5 minutes
         self.last_game_switch = 0  # Track when we last switched games
         self.game_display_duration = 10  # Display each game for 10 seconds
-        logger.info(f"Initialized MiLBUpcomingManager with {len(self.favorite_teams)} favorite teams")
+        self.logger.info(f"Initialized MiLBUpcomingManager with {len(self.favorite_teams)} favorite teams")
 
     def update(self):
         """Update upcoming games data."""
         current_time = time.time()
-        if current_time - self.last_update >= self.update_interval:
-            self.last_update = current_time
-        else:
+        self.logger.debug(f"[MiLB] show_favorite_teams_only: {self.milb_config.get('show_favorite_teams_only', False)}")
+        self.logger.debug(f"[MiLB] favorite_teams: {self.favorite_teams}")
+        if self.last_update != 0 and (current_time - self.last_update < self.update_interval):
             return
             
         try:
             # Fetch data from MiLB API
             games = self._fetch_milb_api_data()
-            if games:
-                # Process games
-                new_upcoming_games = []
+            if not games:
+                self.logger.warning("[MiLB] No games returned from API for upcoming games update.")
+                return
+
+            # --- Optimization: Filter for favorite teams before processing ---
+            if self.milb_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+                games = {
+                    game_id: game for game_id, game in games.items()
+                    if game['home_team'] in self.favorite_teams or game['away_team'] in self.favorite_teams
+                }
+                self.logger.info(f"[MiLB Upcoming] Filtered to {len(games)} games for favorite teams.")
+
+            # Process games
+            new_upcoming_games = []
+            
+            self.logger.info(f"[MiLB] Processing {len(games)} games for upcoming games...")
+            
+            for game_id, game in games.items():
+                self.logger.debug(f"[MiLB] Processing game {game_id} for upcoming games...")
                 
-                logger.info(f"[MiLB] Processing {len(games)} games for upcoming games...")
+                game_time = datetime.fromisoformat(game['start_time'].replace('Z', '+00:00'))
+                if game_time.tzinfo is None:
+                    game_time = game_time.replace(tzinfo=timezone.utc)
                 
-                for game_id, game in games.items():
-                    # Only fetch odds for games that will be displayed
-                    if self.milb_config.get("show_favorite_teams_only", False):
-                        if not self.favorite_teams:
-                            continue
-                        if game['home_team'] not in self.favorite_teams and game['away_team'] not in self.favorite_teams:
-                            continue
-                    # Convert game time to UTC datetime
-                    game_time_str = game['start_time'].replace('Z', '+00:00')
-                    game_time = datetime.fromisoformat(game_time_str)
-                    if game_time.tzinfo is None:
-                        game_time = game_time.replace(tzinfo=timezone.utc)
-                    # For upcoming games, we'll consider any game that:
-                    # 1. Is not final (not 'post' or 'final' state)
-                    # 2. Has a future start time
-                    is_upcoming = (
-                        game['status_state'] not in ['post', 'final', 'completed'] and
-                        game_time > datetime.now(timezone.utc)
-                    )
-                    if is_upcoming:
-                        if self.show_odds:
-                            self._fetch_odds(game)
-                        new_upcoming_games.append(game)
-                        logger.info(f"[MiLB] Added favorite team game to upcoming list: {game['away_team']} @ {game['home_team']}")
+                is_upcoming = (
+                    game['status_state'] not in ['post', 'final', 'completed'] and
+                    game_time > datetime.now(timezone.utc)
+                )
                 
-                # Sort by game time (soonest first) and limit to upcoming_games_to_show
-                new_upcoming_games.sort(key=lambda x: x['start_time'])
-                new_upcoming_games = new_upcoming_games[:self.upcoming_games_to_show]
+                if is_upcoming:
+                    new_upcoming_games.append(game)
                 
-                if new_upcoming_games:
-                    logger.info(f"[MiLB] Found {len(new_upcoming_games)} upcoming games for favorite teams")
-                    self.upcoming_games = new_upcoming_games
-                    if not self.current_game:
-                        self.current_game = self.upcoming_games[0]
-                else:
-                    logger.info("[MiLB] No upcoming games found for favorite teams")
-                    self.upcoming_games = []
-                    self.current_game = None
+            # Sort by game time (soonest first) and limit to upcoming_games_to_show
+            new_upcoming_games.sort(key=lambda x: x['start_time'])
+            new_upcoming_games = new_upcoming_games[:self.upcoming_games_to_show]
                 
-                self.last_update = current_time
+            if new_upcoming_games:
+                self.logger.info(f"[MiLB] Found {len(new_upcoming_games)} upcoming games for favorite teams")
+                self.upcoming_games = new_upcoming_games
+                if not self.current_game:
+                    self.current_game = self.upcoming_games[0]
+            else:
+                self.logger.info("[MiLB] No upcoming games found for favorite teams")
+                self.upcoming_games = []
+                self.current_game = None
+                
+            self.last_update = current_time
                 
         except Exception as e:
-            logger.error(f"[MiLB] Error updating upcoming games: {e}", exc_info=True)
+            self.logger.error(f"[MiLB] Error updating upcoming games: {e}", exc_info=True)
 
     def display(self, force_clear: bool = False):
         """Display upcoming games."""
         if not self.upcoming_games:
             current_time = time.time()
             if current_time - self.last_warning_time > self.warning_cooldown:
-                logger.info("[MiLB] No upcoming games to display")
+                self.logger.info("[MiLB] No upcoming games to display")
                 self.last_warning_time = current_time
             return  # Skip display update entirely
             
@@ -1186,10 +1188,11 @@ class MiLBUpcomingManager(BaseMiLBManager):
                 force_clear = True  # Force clear when switching games
             
             # Create and display the game image
-            game_image = self._create_game_display(self.current_game)
-            self.display_manager.image = game_image
-            self.display_manager.draw = ImageDraw.Draw(self.display_manager.image)
-            self.display_manager.update_display()
+            if self.current_game:
+                game_image = self._create_game_display(self.current_game)
+                self.display_manager.image = game_image
+                self.display_manager.draw = ImageDraw.Draw(self.display_manager.image)
+                self.display_manager.update_display()
             
         except Exception as e:
-            logger.error(f"[MiLB] Error displaying upcoming game: {e}", exc_info=True) 
+            self.logger.error(f"[MiLB] Error displaying upcoming game: {e}", exc_info=True) 

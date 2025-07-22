@@ -120,13 +120,21 @@ class BaseNCAAFBManager: # Renamed class
 
     def _fetch_odds(self, game: Dict) -> None:
         """Fetch odds for a specific game if conditions are met."""
-        self.logger.debug(f"Checking odds for game: {game.get('id', 'N/A')}")
-        
         # Check if odds should be shown for this sport
         if not self.show_odds:
-            self.logger.debug("Odds display is disabled for NCAAFB.")
             return
 
+        # Check if we should only fetch for favorite teams
+        is_favorites_only = self.ncaa_fb_config.get("show_favorite_teams_only", False)
+        if is_favorites_only:
+            home_abbr = game.get('home_abbr')
+            away_abbr = game.get('away_abbr')
+            if not (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams):
+                self.logger.debug(f"Skipping odds fetch for non-favorite game in favorites-only mode: {away_abbr}@{home_abbr}")
+                return
+
+        self.logger.debug(f"Proceeding with odds fetch for game: {game.get('id', 'N/A')}")
+        
         # Fetch odds using OddsManager (ESPN API)
         try:
             # Determine update interval based on game state
@@ -715,12 +723,15 @@ class NCAAFBLiveManager(BaseNCAAFBManager): # Renamed class
                 if data and "events" in data:
                     for event in data["events"]:
                         details = self._extract_game_details(event)
-                        if details and (details["is_live"] or details["is_halftime"]): # Include halftime as 'live' display
-                            if not self.favorite_teams or (
-                                details["home_abbr"] in self.favorite_teams or
-                                details["away_abbr"] in self.favorite_teams
-                            ):
-                                # Fetch odds if enabled
+                        if details and (details["is_live"] or details["is_halftime"]):
+                            # If show_favorite_teams_only is true, only add if it's a favorite.
+                            # Otherwise, add all games.
+                            if self.ncaa_fb_config.get("show_favorite_teams_only", False):
+                                if details["home_abbr"] in self.favorite_teams or details["away_abbr"] in self.favorite_teams:
+                                    if self.show_odds:
+                                        self._fetch_odds(details)
+                                    new_live_games.append(details)
+                            else:
                                 if self.show_odds:
                                     self._fetch_odds(details)
                                 new_live_games.append(details)
@@ -1212,15 +1223,13 @@ class NCAAFBUpcomingManager(BaseNCAAFBManager): # Renamed class
                 # Summary logging instead of verbose debug
                 self.logger.info(f"[NCAAFB Upcoming] Found {len(processed_games)} total upcoming games")
 
-                # Filter for favorite teams
-                if self.favorite_teams:
+                # Filter for favorite teams only if the config is set
+                if self.ncaa_fb_config.get("show_favorite_teams_only", False):
                     team_games = [game for game in processed_games
                                   if game['home_abbr'] in self.favorite_teams or
                                      game['away_abbr'] in self.favorite_teams]
-                    self.logger.info(f"[NCAAFB Upcoming] Found {favorite_games_found} favorite team games out of {len(processed_games)} total upcoming games")
                 else:
                     team_games = processed_games # Show all upcoming if no favorites
-                    self.logger.info(f"[NCAAFB Upcoming] Found {len(processed_games)} total upcoming games (no favorite teams configured)")
 
                 # Sort by game time, earliest first
                 team_games.sort(key=lambda g: g.get('start_time_utc') or datetime.max.replace(tzinfo=timezone.utc))
