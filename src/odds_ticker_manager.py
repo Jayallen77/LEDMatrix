@@ -65,6 +65,7 @@ class OddsTickerManager:
         self.future_fetch_days = self.odds_ticker_config.get('future_fetch_days', 7)
         self.loop = self.odds_ticker_config.get('loop', True)
         self.show_channel_logos = self.odds_ticker_config.get('show_channel_logos', True)
+        self.request_timeout = self.odds_ticker_config.get('request_timeout', 30)
         
         # Initialize managers
         self.cache_manager = CacheManager()
@@ -180,7 +181,7 @@ class OddsTickerManager:
             else:
                 url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/teams/{team_abbr}"
 
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, timeout=self.request_timeout)
             response.raise_for_status()
             data = response.json()
             
@@ -320,11 +321,32 @@ class OddsTickerManager:
                 if not self.show_favorite_teams_only and max_games_per_league and games_found >= max_games_per_league:
                     break  # We have enough games for this league, stop searching
                 try:
-                    url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/scoreboard?dates={date}"
-                    logger.debug(f"Fetching {league} games from ESPN API for date: {date}")
-                    response = requests.get(url, timeout=10)
-                    response.raise_for_status()
-                    data = response.json()
+                    cache_key = f"scoreboard_data_{sport}_{league}_{date}"
+
+                    # Dynamically set TTL for scoreboard data
+                    current_date_obj = now.date()
+                    request_date_obj = datetime.strptime(date, "%Y%m%d").date()
+
+                    if request_date_obj < current_date_obj:
+                        ttl = 86400 * 30  # 30 days for past dates
+                    elif request_date_obj == current_date_obj:
+                        ttl = 3600  # 1 hour for today
+                    else:
+                        ttl = 43200  # 12 hours for future dates
+                    
+                    data = self.cache_manager.get(cache_key)
+
+                    if data is None:
+                        url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/scoreboard?dates={date}"
+                        logger.debug(f"Fetching {league} games from ESPN API for date: {date}")
+                        response = requests.get(url, timeout=self.request_timeout)
+                        response.raise_for_status()
+                        data = response.json()
+                        self.cache_manager.set(cache_key, data, ttl=ttl)
+                        logger.debug(f"Cached scoreboard for {league} on {date} with a TTL of {ttl} seconds.")
+                    else:
+                        logger.debug(f"Using cached scoreboard data for {league} on {date}.")
+
                     for event in data.get('events', []):
                         # Stop if we have enough games for the league (when not showing favorite teams only)
                         if not self.show_favorite_teams_only and max_games_per_league and games_found >= max_games_per_league:
