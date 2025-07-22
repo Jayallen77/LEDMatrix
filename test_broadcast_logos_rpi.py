@@ -12,9 +12,27 @@ from PIL import Image
 # Add the src directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from odds_ticker_manager import OddsTickerManager
-from display_manager import DisplayManager
-from config_manager import ConfigManager
+# Import with proper error handling
+try:
+    from odds_ticker_manager import OddsTickerManager
+    from config_manager import ConfigManager
+    
+    # Create a mock display manager to avoid hardware dependencies
+    class MockDisplayManager:
+        def __init__(self):
+            self.matrix = type('Matrix', (), {'width': 64, 'height': 32})()
+            self.image = None
+            self.draw = None
+        
+        def update_display(self):
+            pass
+    
+    display_manager = MockDisplayManager()
+    
+except ImportError as e:
+    print(f"Import error: {e}")
+    print("This script needs to be run from the LEDMatrix directory")
+    sys.exit(1)
 
 # Set up logging to see what's happening
 logging.basicConfig(
@@ -57,18 +75,6 @@ def test_broadcast_logo_mapping():
     # Load config
     config_manager = ConfigManager()
     config = config_manager.get_config()
-    
-    # Create a mock display manager
-    class MockDisplayManager:
-        def __init__(self):
-            self.matrix = type('Matrix', (), {'width': 64, 'height': 32})()
-            self.image = None
-            self.draw = None
-        
-        def update_display(self):
-            pass
-    
-    display_manager = MockDisplayManager()
     
     # Create odds ticker manager
     odds_ticker = OddsTickerManager(config, display_manager)
@@ -132,18 +138,6 @@ def test_game_display_with_broadcast():
     # Load config
     config_manager = ConfigManager()
     config = config_manager.get_config()
-    
-    # Create a mock display manager
-    class MockDisplayManager:
-        def __init__(self):
-            self.matrix = type('Matrix', (), {'width': 64, 'height': 32})()
-            self.image = None
-            self.draw = None
-        
-        def update_display(self):
-            pass
-    
-    display_manager = MockDisplayManager()
     
     # Create odds ticker manager
     odds_ticker = OddsTickerManager(config, display_manager)
