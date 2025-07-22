@@ -38,6 +38,7 @@ class OddsTickerManager:
         "FS2": "fs2",
         "MLBN": "mlbn",
         "MLB Network": "mlbn",
+        "MLB.TV": "mlbn",
         "NBC": "nbc",
         "NFLN": "nfln",
         "NFL Network": "nfln",
@@ -51,7 +52,18 @@ class OddsTickerManager:
         "Paramount+": "cbs",
         "Hulu": "espn",
         "Disney+": "espn",
-        "Apple TV+": "nbc"
+        "Apple TV+": "nbc",
+        # Regional sports networks
+        "MASN": "cbs",
+        "MASN2": "cbs",
+        "MAS+": "cbs",
+        "SportsNet": "nbc",
+        "FanDuel SN": "fox",
+        "FanDuel SN DET": "fox",
+        "FanDuel SN FL": "fox",
+        "SportsNet PIT": "nbc",
+        "Padres.TV": "espn",
+        "CLEGuardians.TV": "espn"
     }
     
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
@@ -374,7 +386,21 @@ class OddsTickerManager:
                                 broadcast_info = []
                                 broadcasts = event.get('competitions', [{}])[0].get('broadcasts', [])
                                 if broadcasts:
-                                    broadcast_info = [b.get('media', {}).get('shortName', '') for b in broadcasts if b.get('media', {}).get('shortName')]
+                                    # Handle new ESPN API format where broadcast names are in 'names' array
+                                    for broadcast in broadcasts:
+                                        if 'names' in broadcast:
+                                            # New format: broadcast names are in 'names' array
+                                            broadcast_names = broadcast.get('names', [])
+                                            broadcast_info.extend(broadcast_names)
+                                        elif 'media' in broadcast and 'shortName' in broadcast['media']:
+                                            # Old format: broadcast name is in media.shortName
+                                            short_name = broadcast['media']['shortName']
+                                            if short_name:
+                                                broadcast_info.append(short_name)
+                                    
+                                    # Remove duplicates and filter out empty strings
+                                    broadcast_info = list(set([name for name in broadcast_info if name]))
+                                    
                                     logger.info(f"Found broadcast channels for game {game_id}: {broadcast_info}")
                                     logger.debug(f"Raw broadcasts data for game {game_id}: {broadcasts}")
                                     # Log the first broadcast structure for debugging
