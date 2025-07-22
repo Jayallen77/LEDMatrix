@@ -257,6 +257,8 @@ class OddsTickerManager:
                             away_team = next(c for c in competitors if c['homeAway'] == 'away')
                             home_abbr = home_team['team']['abbreviation']
                             away_abbr = away_team['team']['abbreviation']
+                            home_name = home_team['team'].get('name', home_abbr)
+                            away_name = away_team['team'].get('name', away_abbr)
                             # Only process favorite teams if enabled
                             if self.show_favorite_teams_only:
                                 if not favorite_teams:
@@ -286,6 +288,8 @@ class OddsTickerManager:
                                 'id': game_id,
                                 'home_team': home_abbr,
                                 'away_team': away_abbr,
+                                'home_team_name': home_name,
+                                'away_team_name': away_name,
                                 'start_time': game_time,
                                 'home_record': home_record,
                                 'away_record': away_record,
@@ -323,7 +327,7 @@ class OddsTickerManager:
             local_time = game_time.astimezone(tz)
             time_str = local_time.strftime("%I:%M%p").lstrip('0')
             
-            return f"[{time_str}] {game['away_team']} vs {game['home_team']} (No odds)"
+            return f"[{time_str}] {game.get('away_team_name', game['away_team'])} vs {game.get('home_team_name', game['home_team'])} (No odds)"
         
         # Extract odds data
         home_team_odds = odds.get('home_team_odds', {})
@@ -352,7 +356,7 @@ class OddsTickerManager:
         odds_parts = [f"[{time_str}]"]
         
         # Add away team and odds
-        odds_parts.append(game['away_team'])
+        odds_parts.append(game.get('away_team_name', game['away_team']))
         if away_spread is not None:
             spread_str = f"{away_spread:+.1f}" if away_spread > 0 else f"{away_spread:.1f}"
             odds_parts.append(spread_str)
@@ -363,7 +367,7 @@ class OddsTickerManager:
         odds_parts.append("vs")
         
         # Add home team and odds
-        odds_parts.append(game['home_team'])
+        odds_parts.append(game.get('home_team_name', game['home_team']))
         if home_spread is not None:
             spread_str = f"{home_spread:+.1f}" if home_spread > 0 else f"{home_spread:.1f}"
             odds_parts.append(spread_str)
@@ -429,8 +433,8 @@ class OddsTickerManager:
         time_text = local_time.strftime("%I:%M%p").lstrip('0')
 
         # Team and record text
-        away_team_text = f"{game.get('away_team', 'N/A')} ({game.get('away_record', '') or 'N/A'})"
-        home_team_text = f"{game.get('home_team', 'N/A')} ({game.get('home_record', '') or 'N/A'})"
+        away_team_text = f"{game.get('away_team_name', game.get('away_team', 'N/A'))} ({game.get('away_record', '') or 'N/A'})"
+        home_team_text = f"{game.get('home_team_name', game.get('home_team', 'N/A'))} ({game.get('home_record', '') or 'N/A'})"
         
         away_team_width = int(temp_draw.textlength(away_team_text, font=team_font))
         home_team_width = int(temp_draw.textlength(home_team_text, font=team_font))
