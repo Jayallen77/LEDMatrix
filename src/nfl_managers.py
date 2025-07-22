@@ -870,7 +870,18 @@ class NFLRecentManager(BaseNFLManager): # Renamed class
                 return
 
             events = data['events']
-            # self.logger.info(f"[NFL Recent] Processing {len(events)} events from shared data.")
+
+            # --- Optimization: Filter for favorite teams before extracting details/odds ---
+            if self.nfl_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+                filtered_events = []
+                for event in events:
+                    try:
+                        competitors = event["competitions"][0]["competitors"]
+                        if any(c["team"]["abbreviation"] in self.favorite_teams for c in competitors):
+                            filtered_events.append(event)
+                    except Exception:
+                        continue
+                events = filtered_events
 
             # Process games and filter for final & within window & favorite teams
             processed_games = []
@@ -883,13 +894,13 @@ class NFLRecentManager(BaseNFLManager): # Renamed class
                         self._fetch_odds(game)
                     processed_games.append(game)
 
-            # Filter for favorite teams
-            if self.favorite_teams:
+            # Filter for favorite teams (legacy, in case show_favorite_teams_only is False)
+            if self.favorite_teams and not self.nfl_config.get("show_favorite_teams_only", False):
                  team_games = [game for game in processed_games
                               if game['home_abbr'] in self.favorite_teams or
                                  game['away_abbr'] in self.favorite_teams]
             else:
-                 team_games = processed_games # Show all recent games if no favorites defined
+                 team_games = processed_games # Show all recent games if no favorites defined or already filtered
 
             # Sort by game time, most recent first
             team_games.sort(key=lambda g: g.get('start_time_utc') or datetime.min.replace(tzinfo=self._get_timezone()), reverse=True)
@@ -1078,30 +1089,30 @@ class NFLUpcomingManager(BaseNFLManager): # Renamed class
                 return
 
             events = data['events']
-            # self.logger.info(f"[NFL Upcoming] Processing {len(events)} events from shared data.")
+
+            # --- Optimization: Filter for favorite teams before extracting details/odds ---
+            if self.nfl_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+                filtered_events = []
+                for event in events:
+                    try:
+                        competitors = event["competitions"][0]["competitors"]
+                        if any(c["team"]["abbreviation"] in self.favorite_teams for c in competitors):
+                            filtered_events.append(event)
+                    except Exception:
+                        continue
+                events = filtered_events
 
             processed_games = []
             for event in events:
                 game = self._extract_game_details(event)
                 # Filter criteria: must be upcoming ('pre' state)
                 if game and game['is_upcoming']:
-                    # Only fetch odds for games that will be displayed
-                    if self.nfl_config.get("show_favorite_teams_only", False):
-                        if not self.favorite_teams:
-                            continue
-                        if game['home_abbr'] not in self.favorite_teams and game['away_abbr'] not in self.favorite_teams:
-                            continue
                     if self.show_odds:
                         self._fetch_odds(game)
                     processed_games.append(game)
 
-            # Debug logging to see what games we have
-            self.logger.debug(f"[NFL Upcoming] Processed {len(processed_games)} upcoming games")
-            for game in processed_games:
-                self.logger.debug(f"[NFL Upcoming] Game: {game['away_abbr']}@{game['home_abbr']} - Upcoming: {game['is_upcoming']}")
-
-            # Filter for favorite teams
-            if self.favorite_teams:
+            # Filter for favorite teams (legacy, in case show_favorite_teams_only is False)
+            if self.favorite_teams and not self.nfl_config.get("show_favorite_teams_only", False):
                 team_games = [game for game in processed_games
                               if game['home_abbr'] in self.favorite_teams or
                                  game['away_abbr'] in self.favorite_teams]
@@ -1109,7 +1120,7 @@ class NFLUpcomingManager(BaseNFLManager): # Renamed class
                 for game in team_games:
                     self.logger.debug(f"[NFL Upcoming] Favorite game: {game['away_abbr']}@{game['home_abbr']}")
             else:
-                team_games = processed_games # Show all upcoming if no favorites
+                team_games = processed_games # Show all upcoming if no favorites or already filtered
 
             # Sort by game time, earliest first
             team_games.sort(key=lambda g: g.get('start_time_utc') or datetime.max.replace(tzinfo=self._get_timezone()))
