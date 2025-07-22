@@ -364,11 +364,11 @@ class OddsTickerManager:
                                 home_name = home_team['team'].get('name', home_abbr)
                                 away_name = away_team['team'].get('name', away_abbr)
 
-                                broadcast_info = ""
+                                broadcast_info = []
                                 broadcasts = event.get('competitions', [{}])[0].get('broadcasts', [])
                                 if broadcasts:
-                                    broadcast_info = broadcasts[0].get('media', {}).get('shortName', "")
-                                    logger.debug(f"Found broadcast info for game {game_id}: {broadcast_info}")
+                                    broadcast_info = [b.get('media', {}).get('shortName', '') for b in broadcasts if b.get('media', {}).get('shortName')]
+                                    logger.debug(f"Found broadcast channels for game {game_id}: {broadcast_info}")
 
                                 # Only process favorite teams if enabled
                                 if self.show_favorite_teams_only:
@@ -531,18 +531,23 @@ class OddsTickerManager:
         away_logo = self._get_team_logo(game['away_team'], game['logo_dir'])
         broadcast_logo = None
         if self.show_channel_logos:
-            broadcast_name = game.get('broadcast_info', '')
-            logger.debug(f"Game {game.get('id')}: Raw broadcast info from API: '{broadcast_name}'")
-            if broadcast_name:
+            broadcast_names = game.get('broadcast_info', [])  # This is now a list
+            logger.debug(f"Game {game.get('id')}: Raw broadcast info from API: {broadcast_names}")
+            
+            if broadcast_names:
                 logo_name = None
                 # Sort keys by length, descending, to match more specific names first (e.g., "ESPNEWS" before "ESPN")
                 sorted_keys = sorted(self.BROADCAST_LOGO_MAP.keys(), key=len, reverse=True)
-                for key in sorted_keys:
-                    if key in broadcast_name:
-                        logo_name = self.BROADCAST_LOGO_MAP[key]
-                        break
-                
-                logger.debug(f"Game {game.get('id')}: Mapped logo name: '{logo_name}' for broadcast name: '{broadcast_name}'")
+
+                for b_name in broadcast_names:
+                    for key in sorted_keys:
+                        if key in b_name:
+                            logo_name = self.BROADCAST_LOGO_MAP[key]
+                            break  # Found the best match for this b_name
+                    if logo_name:
+                        break  # Found a logo, stop searching through broadcast list
+
+                logger.debug(f"Game {game.get('id')}: Mapped logo name: '{logo_name}' from broadcast names: {broadcast_names}")
                 if logo_name:
                     broadcast_logo = self._get_team_logo(logo_name, 'assets/broadcast_logos')
                     if broadcast_logo:
@@ -550,7 +555,7 @@ class OddsTickerManager:
                     else:
                         logger.warning(f"Game {game.get('id')}: Failed to load broadcast logo for '{logo_name}'")
                 else:
-                    logger.warning(f"Game {game.get('id')}: No mapping found for broadcast name '{broadcast_name}' in BROADCAST_LOGO_MAP")
+                    logger.warning(f"Game {game.get('id')}: No mapping found for broadcast names {broadcast_names} in BROADCAST_LOGO_MAP")
             else:
                 logger.debug(f"Game {game.get('id')}: No broadcast info available.")
 
