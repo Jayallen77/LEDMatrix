@@ -18,6 +18,24 @@ logger = logging.getLogger(__name__)
 class OddsTickerManager:
     """Manager for displaying scrolling odds ticker for multiple sports leagues."""
     
+    BROADCAST_LOGO_MAP = {
+        "ESPN": "espn",
+        "ESPN2": "espn2",
+        "ESPNU": "espnu",
+        "ESPNEWS": "espn",
+        "SECN": "secn",
+        "ACC Network": "accn",
+        "FOX": "fox",
+        "FS1": "fs1",
+        "FS2": "fs2",
+        "BTN": "btn",
+        "CBS": "cbs",
+        "CBSSN": "cbssn",
+        "NBC": "nbc",
+        "NFLN": "nfln",
+        "ABC": "abc"
+    }
+    
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         self.config = config
         self.display_manager = display_manager
@@ -89,6 +107,34 @@ class OddsTickerManager:
                 'logo_dir': 'assets/sports/milb_logos',
                 'favorite_teams': config.get('milb', {}).get('favorite_teams', []),
                 'enabled': config.get('milb', {}).get('enabled', False)
+            },
+            'nhl': {
+                'sport': 'hockey',
+                'league': 'nhl',
+                'logo_dir': 'assets/sports/nhl_logos',
+                'favorite_teams': config.get('nhl_scoreboard', {}).get('favorite_teams', []),
+                'enabled': config.get('nhl_scoreboard', {}).get('enabled', False)
+            },
+            'ncaam_basketball': {
+                'sport': 'basketball',
+                'league': 'mens-college-basketball',
+                'logo_dir': 'assets/sports/ncaa_fbs_logos',
+                'favorite_teams': config.get('ncaam_basketball_scoreboard', {}).get('favorite_teams', []),
+                'enabled': config.get('ncaam_basketball_scoreboard', {}).get('enabled', False)
+            },
+            'ncaa_baseball': {
+                'sport': 'baseball',
+                'league': 'college-baseball',
+                'logo_dir': 'assets/sports/ncaa_fbs_logos',
+                'favorite_teams': config.get('ncaa_baseball_scoreboard', {}).get('favorite_teams', []),
+                'enabled': config.get('ncaa_baseball_scoreboard', {}).get('enabled', False)
+            },
+            'soccer': {
+                'sport': 'soccer',
+                'leagues': config.get('soccer_scoreboard', {}).get('leagues', []),
+                'logo_dir': 'assets/sports/soccer_logos',
+                'favorite_teams': config.get('soccer_scoreboard', {}).get('favorite_teams', []),
+                'enabled': config.get('soccer_scoreboard', {}).get('enabled', False)
             }
         }
         
@@ -236,94 +282,103 @@ class OddsTickerManager:
         games_found = 0
         max_games_per_league = self.max_games_per_league if not self.show_favorite_teams_only else None
 
-        for date in dates:
-            # Stop if we have enough games for favorite teams
-            if self.show_favorite_teams_only and all(team_games_found[t] >= max_games for t in favorite_teams):
-                break  # All favorite teams have enough games, stop searching
-            # Stop if we have enough games for the league (when not showing favorite teams only)
-            if not self.show_favorite_teams_only and max_games_per_league and games_found >= max_games_per_league:
-                break  # We have enough games for this league, stop searching
-            try:
-                sport = league_config['sport']
-                league = league_config['league']
-                url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/scoreboard?dates={date}"
-                logger.debug(f"Fetching {league} games from ESPN API for date: {date}")
-                response = requests.get(url, timeout=10)
-                response.raise_for_status()
-                data = response.json()
-                for event in data.get('events', []):
+        sport = league_config['sport']
+        leagues_to_fetch = []
+        if sport == 'soccer':
+            leagues_to_fetch.extend(league_config.get('leagues', []))
+        else:
+            if league_config.get('league'):
+                leagues_to_fetch.append(league_config.get('league'))
+
+        for league in leagues_to_fetch:
+            for date in dates:
+                # Stop if we have enough games for favorite teams
+                if self.show_favorite_teams_only and favorite_teams and all(team_games_found.get(t, 0) >= max_games for t in favorite_teams):
+                    break  # All favorite teams have enough games, stop searching
+                # Stop if we have enough games for the league (when not showing favorite teams only)
+                if not self.show_favorite_teams_only and max_games_per_league and games_found >= max_games_per_league:
+                    break  # We have enough games for this league, stop searching
+                try:
+                    url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/scoreboard?dates={date}"
+                    logger.debug(f"Fetching {league} games from ESPN API for date: {date}")
+                    response = requests.get(url, timeout=10)
+                    response.raise_for_status()
+                    data = response.json()
+                    for event in data.get('events', []):
+                        # Stop if we have enough games for the league (when not showing favorite teams only)
+                        if not self.show_favorite_teams_only and max_games_per_league and games_found >= max_games_per_league:
+                            break
+                        game_id = event['id']
+                        status = event['status']['type']['name'].lower()
+                        if status in ['scheduled', 'pre-game', 'status_scheduled']:
+                            game_time = datetime.fromisoformat(event['date'].replace('Z', '+00:00'))
+                            if now <= game_time <= future_window:
+                                competitors = event['competitions'][0]['competitors']
+                                home_team = next(c for c in competitors if c['homeAway'] == 'home')
+                                away_team = next(c for c in competitors if c['homeAway'] == 'away')
+                                home_abbr = home_team['team']['abbreviation']
+                                away_abbr = away_team['team']['abbreviation']
+                                home_name = home_team['team'].get('name', home_abbr)
+                                away_name = away_team['team'].get('name', away_abbr)
+
+                                broadcast_info = ""
+                                broadcasts = event.get('competitions', [{}])[0].get('broadcasts', [])
+                                if broadcasts:
+                                    broadcast_info = broadcasts[0].get('media', {}).get('shortName', "")
+                                    logger.info(f"Found broadcast info for game {game_id}: {broadcast_info}")
+
+                                # Only process favorite teams if enabled
+                                if self.show_favorite_teams_only:
+                                    if not favorite_teams:
+                                        continue
+                                    if home_abbr not in favorite_teams and away_abbr not in favorite_teams:
+                                        continue
+                                # Build game dict (existing logic)
+                                home_record = home_team.get('records', [{}])[0].get('summary', '') if home_team.get('records') else ''
+                                away_record = away_team.get('records', [{}])[0].get('summary', '') if away_team.get('records') else ''
+                                odds_data = self.odds_manager.get_odds(
+                                    sport=sport,
+                                    league=league,
+                                    event_id=game_id,
+                                    update_interval_seconds=7200
+                                )
+                                has_odds = False
+                                if odds_data and not odds_data.get('no_odds'):
+                                    if odds_data.get('spread') is not None:
+                                        has_odds = True
+                                    if odds_data.get('home_team_odds', {}).get('spread_odds') is not None:
+                                        has_odds = True
+                                    if odds_data.get('away_team_odds', {}).get('spread_odds') is not None:
+                                        has_odds = True
+                                    if odds_data.get('over_under') is not None:
+                                        has_odds = True
+                                game = {
+                                    'id': game_id,
+                                    'home_team': home_abbr,
+                                    'away_team': away_abbr,
+                                    'home_team_name': home_name,
+                                    'away_team_name': away_name,
+                                    'start_time': game_time,
+                                    'home_record': home_record,
+                                    'away_record': away_record,
+                                    'odds': odds_data if has_odds else None,
+                                    'broadcast_info': broadcast_info,
+                                    'logo_dir': league_config.get('logo_dir', f'assets/sports/{league.lower()}_logos')
+                                }
+                                all_games.append(game)
+                                games_found += 1
+                                # If favorite teams only, increment counters
+                                if self.show_favorite_teams_only:
+                                    for team in [home_abbr, away_abbr]:
+                                        if team in team_games_found and team_games_found[team] < max_games:
+                                            team_games_found[team] += 1
                     # Stop if we have enough games for the league (when not showing favorite teams only)
                     if not self.show_favorite_teams_only and max_games_per_league and games_found >= max_games_per_league:
                         break
-                    game_id = event['id']
-                    status = event['status']['type']['name'].lower()
-                    if status in ['scheduled', 'pre-game', 'status_scheduled']:
-                        game_time = datetime.fromisoformat(event['date'].replace('Z', '+00:00'))
-                        if now <= game_time <= future_window:
-                            competitors = event['competitions'][0]['competitors']
-                            home_team = next(c for c in competitors if c['homeAway'] == 'home')
-                            away_team = next(c for c in competitors if c['homeAway'] == 'away')
-                            home_abbr = home_team['team']['abbreviation']
-                            away_abbr = away_team['team']['abbreviation']
-                            home_name = home_team['team'].get('name', home_abbr)
-                            away_name = away_team['team'].get('name', away_abbr)
-
-                            broadcast_info = ""
-                            broadcasts = event.get('competitions', [{}])[0].get('broadcasts', [])
-                            if broadcasts:
-                                broadcast_info = broadcasts[0].get('media', {}).get('shortName', "")
-                                logger.info(f"Found broadcast info for game {game_id}: {broadcast_info}")
-
-                            # Only process favorite teams if enabled
-                            if self.show_favorite_teams_only:
-                                if not favorite_teams:
-                                    continue
-                                if home_abbr not in favorite_teams and away_abbr not in favorite_teams:
-                                    continue
-                            # Build game dict (existing logic)
-                            home_record = home_team.get('records', [{}])[0].get('summary', '') if home_team.get('records') else ''
-                            away_record = away_team.get('records', [{}])[0].get('summary', '') if away_team.get('records') else ''
-                            odds_data = self.odds_manager.get_odds(
-                                sport=sport,
-                                league=league,
-                                event_id=game_id,
-                                update_interval_seconds=7200
-                            )
-                            has_odds = False
-                            if odds_data and not odds_data.get('no_odds'):
-                                if odds_data.get('spread') is not None:
-                                    has_odds = True
-                                if odds_data.get('home_team_odds', {}).get('spread_odds') is not None:
-                                    has_odds = True
-                                if odds_data.get('away_team_odds', {}).get('spread_odds') is not None:
-                                    has_odds = True
-                                if odds_data.get('over_under') is not None:
-                                    has_odds = True
-                            game = {
-                                'id': game_id,
-                                'home_team': home_abbr,
-                                'away_team': away_abbr,
-                                'home_team_name': home_name,
-                                'away_team_name': away_name,
-                                'start_time': game_time,
-                                'home_record': home_record,
-                                'away_record': away_record,
-                                'odds': odds_data if has_odds else None,
-                                'broadcast_info': broadcast_info,
-                                'logo_dir': league_config.get('logo_dir', f'assets/sports/{league.lower()}_logos')
-                            }
-                            all_games.append(game)
-                            games_found += 1
-                            # If favorite teams only, increment counters
-                            if self.show_favorite_teams_only:
-                                for team in [home_abbr, away_abbr]:
-                                    if team in team_games_found and team_games_found[team] < max_games:
-                                        team_games_found[team] += 1
-                # Stop if we have enough games for the league (when not showing favorite teams only)
-                if not self.show_favorite_teams_only and max_games_per_league and games_found >= max_games_per_league:
-                    break
-            except Exception as e:
-                logger.error(f"Error fetching games for {league_config.get('league', 'unknown')} on {date}: {e}", exc_info=True)
+                except Exception as e:
+                    logger.error(f"Error fetching games for {league_config.get('league', 'unknown')} on {date}: {e}", exc_info=True)
+            if not self.show_favorite_teams_only and max_games_per_league and games_found >= max_games_per_league:
+                break
         return all_games
 
     def _format_odds_text(self, game: Dict[str, Any]) -> str:
@@ -420,17 +475,26 @@ class OddsTickerManager:
         away_logo = self._get_team_logo(game['away_team'], game['logo_dir'])
         broadcast_logo = None
         if self.show_channel_logos:
-            broadcast_logo = self._get_team_logo(game.get('broadcast_info', ''), 'assets/broadcast_logos')
+            broadcast_name = game.get('broadcast_info', '')
+            logo_name = self.BROADCAST_LOGO_MAP.get(broadcast_name, broadcast_name.lower())
+            broadcast_logo = self._get_team_logo(logo_name, 'assets/broadcast_logos')
 
         if home_logo:
             home_logo = home_logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
         if away_logo:
             away_logo = away_logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
-        if broadcast_logo:
-            broadcast_logo = broadcast_logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
+        
+        # Datetime column width
+        day_width = int(temp_draw.textlength(day_text, font=datetime_font))
+        date_width = int(temp_draw.textlength(date_text, font=datetime_font))
+        time_width = int(temp_draw.textlength(time_text, font=datetime_font))
+        datetime_col_width = max(day_width, date_width, time_width)
 
-        # Create a temporary draw object to measure text
-        temp_draw = ImageDraw.Draw(Image.new('RGB', (1, 1)))
+        if broadcast_logo:
+            # Resize broadcast logo to fit the datetime column width
+            ratio = datetime_col_width / broadcast_logo.width
+            new_height = int(broadcast_logo.height * ratio)
+            broadcast_logo = broadcast_logo.resize((datetime_col_width, new_height), Image.Resampling.LANCZOS)
 
         # "vs." text
         vs_text = "vs."
@@ -461,15 +525,6 @@ class OddsTickerManager:
         home_team_width = int(temp_draw.textlength(home_team_text, font=team_font))
         team_info_width = max(away_team_width, home_team_width)
         
-        # Datetime column width
-        day_width = int(temp_draw.textlength(day_text, font=datetime_font))
-        date_width = int(temp_draw.textlength(date_text, font=datetime_font))
-        time_width = int(temp_draw.textlength(time_text, font=datetime_font))
-        datetime_col_width = max(day_width, date_width, time_width)
-        if broadcast_logo:
-            datetime_col_width = max(datetime_col_width, broadcast_logo.width)
-
-
         # Odds text
         odds = game.get('odds') or {}
         home_team_odds = odds.get('home_team_odds', {})
@@ -562,10 +617,14 @@ class OddsTickerManager:
         
         # Datetime (stacked, 3 rows)
         datetime_font_height = datetime_font.size if hasattr(datetime_font, 'size') else 6
-        total_dt_height = 3 * datetime_font_height + 4 # Padding between lines
-        dt_padding_y = (height - total_dt_height) // 2
+        
+        # Calculate available height for the three text lines
+        total_text_height = (3 * datetime_font_height) + 4 # 2px padding between lines
+        
+        # Center the block of text vertically
+        dt_start_y = (height - total_text_height) // 2
 
-        day_y = dt_padding_y
+        day_y = dt_start_y
         date_y = day_y + datetime_font_height + 2
         time_y = date_y + datetime_font_height + 2
 
@@ -574,8 +633,10 @@ class OddsTickerManager:
         draw.text((current_x, time_y), time_text, font=datetime_font, fill=(255, 255, 255))
 
         if broadcast_logo:
-            broadcast_y = time_y + datetime_font_height + 2
-            image.paste(broadcast_logo, (int(current_x), broadcast_y), broadcast_logo if broadcast_logo.mode == 'RGBA' else None)
+            # Position the broadcast logo below the time text
+            logo_y = time_y + datetime_font_height + 2
+            image.paste(broadcast_logo, (int(current_x), logo_y), broadcast_logo if broadcast_logo.mode == 'RGBA' else None)
+
 
         return image
 
