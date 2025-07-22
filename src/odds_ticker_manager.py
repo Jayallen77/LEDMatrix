@@ -387,7 +387,11 @@ class OddsTickerManager:
                     if not self.show_favorite_teams_only and max_games_per_league and games_found >= max_games_per_league:
                         break
                 except requests.exceptions.HTTPError as http_err:
-                    logger.error(f"HTTP error occurred while fetching games for {league} on {date}: {http_err}")
+                    if league == 'milb' and http_err.response.status_code == 400:
+                        logger.warning(f"Received a 400 Bad Request for MiLB on {date}. This may be due to no odds being available or an invalid endpoint. Skipping date.")
+                        continue
+                    else:
+                        logger.error(f"HTTP error occurred while fetching games for {league} on {date}: {http_err}")
                 except Exception as e:
                     logger.error(f"Error fetching games for {league_config.get('league', 'unknown')} on {date}: {e}", exc_info=True)
             if not self.show_favorite_teams_only and max_games_per_league and games_found >= max_games_per_league:
