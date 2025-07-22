@@ -187,7 +187,7 @@ class BaseNCAAFBManager: # Renamed class
         all_events = []
         for year in years_to_check:
             cache_key = f"ncaafb_schedule_{year}"
-            cached_data = BaseNCAAFBManager.cache_manager.get_cached_data(cache_key)
+            cached_data = BaseNCAAFBManager.cache_manager.get(cache_key)
 
             if cached_data:
                 self.logger.info(f"[NCAAFB] Using cached schedule for {year}")
@@ -201,7 +201,7 @@ class BaseNCAAFBManager: # Renamed class
                     response.raise_for_status()
                     data = response.json()
                     events = data.get('events', [])
-                    BaseNCAAFBManager.cache_manager.save_cache(cache_key, events, expiration_seconds=86400) # Cache for 24 hours
+                    BaseNCAAFBManager.cache_manager.set(cache_key, events, expiration_seconds=86400) # Cache for 24 hours
                     self.logger.info(f"[NCAAFB] Successfully fetched and cached {len(events)} events for the {year} season.")
                     all_events.extend(events)
                 except requests.exceptions.RequestException as e:
