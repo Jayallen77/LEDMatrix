@@ -832,6 +832,30 @@ Example: NHL Configuration"nhl_scoreboard": {
 }
 ```
 
+## Date Format Configuration
+
+You can customize the date format for upcoming games across all sports displays. The `use_short_date_format` setting in `config/config.json` under the `display` section controls this behavior.
+
+- **`"use_short_date_format": true`**: Displays dates in a short, numerical format (e.g., "8/30").
+- **`"use_short_date_format": false`** (Default): Displays dates in a more descriptive format with an ordinal suffix (e.g., "Aug 30th").
+
+### Example `config.json`
+
+```json
+"display": {
+    "hardware": {
+        ...
+    },
+    "runtime": {
+        ...
+    },
+    "display_durations": {
+        ...
+    },
+    "use_short_date_format": false // Set to true for "8/30" format
+},
+```
+
 
 ## Project Structure
 

@@ -484,7 +484,13 @@ class BaseNCAAFBManager: # Renamed class
             if start_time_utc:
                 local_time = start_time_utc.astimezone(self._get_timezone())
                 game_time = local_time.strftime("%I:%M%p").lstrip('0')
-                game_date = local_time.strftime("%-m/%-d")
+                
+                # Check date format from config
+                use_short_date_format = self.config.get('display', {}).get('use_short_date_format', False)
+                if use_short_date_format:
+                    game_date = local_time.strftime("%-m/%-d")
+                else:
+                    game_date = self.display_manager.format_date_with_ordinal(local_time)
 
             # --- Football Specific Details (Likely same for NFL/NCAAFB) ---
             situation = competition.get("situation")

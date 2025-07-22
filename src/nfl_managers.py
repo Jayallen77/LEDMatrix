@@ -286,25 +286,6 @@ class BaseNFLManager: # Renamed class
         else:
             self.logger.debug("No clear favorite - spreads: home={home_spread}, away={away_spread}")
         
-        # Show the negative spread on the appropriate side
-        if favored_spread is not None:
-            spread_text = str(favored_spread)
-            font = self.fonts['detail']  # Use detail font for odds
-            
-            if favored_side == 'home':
-                # Home team is favored, show spread on right side
-                spread_width = draw.textlength(spread_text, font=font)
-                spread_x = width - spread_width  # Top right
-                spread_y = 0
-                self._draw_text_with_outline(draw, spread_text, (spread_x, spread_y), font, fill=(0, 255, 0))
-                self.logger.debug(f"Showing home spread '{spread_text}' on right side")
-            else:
-                # Away team is favored, show spread on left side
-                spread_x = 0  # Top left
-                spread_y = 0
-                self._draw_text_with_outline(draw, spread_text, (spread_x, spread_y), font, fill=(0, 255, 0))
-                self.logger.debug(f"Showing away spread '{spread_text}' on left side")
-        
         # Show over/under on the opposite side of the favored team
         over_under = odds.get('over_under')
         if over_under is not None:
@@ -413,7 +394,13 @@ class BaseNFLManager: # Renamed class
             if start_time_utc:
                 local_time = start_time_utc.astimezone(self._get_timezone())
                 game_time = local_time.strftime("%I:%M%p").lstrip('0')
-                game_date = local_time.strftime("%-m/%-d")
+                
+                # Check date format from config
+                use_short_date_format = self.config.get('display', {}).get('use_short_date_format', False)
+                if use_short_date_format:
+                    game_date = local_time.strftime("%-m/%-d")
+                else:
+                    game_date = self.display_manager.format_date_with_ordinal(local_time)
 
             # --- NFL Specific Details ---
             situation = competition.get("situation")

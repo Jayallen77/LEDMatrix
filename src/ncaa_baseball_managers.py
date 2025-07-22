@@ -253,7 +253,14 @@ class BaseNCAABaseballManager:
             if game_time.tzinfo is None:
                 game_time = game_time.replace(tzinfo=pytz.UTC)
             local_time = game_time.astimezone(tz)
-            game_date = local_time.strftime("%b %d")
+            
+            # Check date format from config
+            use_short_date_format = self.config.get('display', {}).get('use_short_date_format', False)
+            if use_short_date_format:
+                game_date = local_time.strftime("%-m/%-d")
+            else:
+                game_date = self.display_manager.format_date_with_ordinal(local_time)
+
             game_time_str = self._format_game_time(game_data['start_time'])
             
             date_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)

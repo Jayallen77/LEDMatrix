@@ -579,7 +579,13 @@ class BaseSoccerManager:
             if start_time_utc:
                 local_time = start_time_utc.astimezone(self._get_timezone())
                 game_time = local_time.strftime("%I:%M%p").lower().lstrip('0') # e.g., 2:30pm
-                game_date = local_time.strftime("%-m/%-d")
+                
+                # Check date format from config
+                use_short_date_format = self.config.get('display', {}).get('use_short_date_format', False)
+                if use_short_date_format:
+                    game_date = local_time.strftime("%-m/%-d")
+                else:
+                    game_date = self.display_manager.format_date_with_ordinal(local_time)
 
             status_type = status["type"]["name"]
             is_live = status_type == "STATUS_IN_PROGRESS"

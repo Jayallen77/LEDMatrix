@@ -70,7 +70,8 @@
             "ncaam_basketball_recent": 30,
             "ncaam_basketball_upcoming": 30,
             "music": 30
-        }
+        },
+        "use_short_date_format": true
     },
     "clock": {
         "enabled": true,

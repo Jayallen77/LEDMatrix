@@ -471,4 +471,14 @@ class DisplayManager:
         self.matrix.Clear()
         # Reset the singleton state when cleaning up
         DisplayManager._instance = None
-        DisplayManager._initialized = False 
+        DisplayManager._initialized = False
+
+    def format_date_with_ordinal(self, dt):
+        """Formats a datetime object into 'Mon Aug 30th' style."""
+        day = dt.day
+        if 11 <= day <= 13:
+            suffix = 'th'
+        else:
+            suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
+        
+        return dt.strftime(f"%b %-d{suffix}") 
