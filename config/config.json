@@ -195,6 +195,7 @@
         "live_update_interval": 30,
         "live_odds_update_interval": 3600,
         "odds_update_interval": 3600,
+        "season_cache_duration_seconds": 86400,
         "fetch_past_games": 1,
         "fetch_future_games": 2,
         "favorite_teams": ["UGA", "AUB"],
