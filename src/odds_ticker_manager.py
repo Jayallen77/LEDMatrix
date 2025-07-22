@@ -722,6 +722,9 @@ class OddsTickerManager:
             logo_y = (height - broadcast_logo.height) // 2
             logger.debug(f"Pasting broadcast logo at ({int(current_x)}, {logo_y})")
             image.paste(broadcast_logo, (int(current_x), logo_y), broadcast_logo if broadcast_logo.mode == 'RGBA' else None)
+        elif not broadcast_logo:
+             # Add padding even if there's no logo to match total_width calculation
+             current_x += h_padding
 
 
         return image
