@@ -74,7 +74,7 @@ def test_broadcast_logo_mapping():
     
     # Load config
     config_manager = ConfigManager()
-    config = config_manager.get_config()
+    config = config_manager.load_config()
     
     # Create odds ticker manager
     odds_ticker = OddsTickerManager(config, display_manager)
@@ -137,7 +137,7 @@ def test_game_display_with_broadcast():
     
     # Load config
     config_manager = ConfigManager()
-    config = config_manager.get_config()
+    config = config_manager.load_config()
     
     # Create odds ticker manager
     odds_ticker = OddsTickerManager(config, display_manager)
