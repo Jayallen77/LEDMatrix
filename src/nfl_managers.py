@@ -1111,7 +1111,9 @@ class NFLUpcomingManager(BaseNFLManager): # Renamed class
             
             # Limit to the specified number of upcoming games (default 10)
             upcoming_games_to_show = self.nfl_config.get("upcoming_games_to_show", 10)
+            self.logger.debug(f"[NFL Upcoming] Limiting to {upcoming_games_to_show} games (found {len(team_games)} total)")
             team_games = team_games[:upcoming_games_to_show]
+            self.logger.debug(f"[NFL Upcoming] After limiting: {len(team_games)} games")
 
             # Log changes or periodically
             should_log = (

@@ -562,12 +562,13 @@ class OddsTickerManager:
             return
 
         gap_width = 24  # Reduced gap between games
-        total_width = sum(img.width for img in game_images) + gap_width * (len(game_images))
+        display_width = self.display_manager.matrix.width  # Add display width of black space at start
+        total_width = display_width + sum(img.width for img in game_images) + gap_width * (len(game_images))
         height = self.display_manager.matrix.height
 
         self.ticker_image = Image.new('RGB', (total_width, height), color=(0, 0, 0))
         
-        current_x = 0
+        current_x = display_width  # Start after the black space
         for idx, img in enumerate(game_images):
             self.ticker_image.paste(img, (current_x, 0))
             current_x += img.width

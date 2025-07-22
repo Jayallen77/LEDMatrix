@@ -436,9 +436,6 @@ class BaseNCAAFBManager: # Renamed class
             competitors = competition["competitors"]
             game_date_str = game_event["date"]
 
-            # Debug: Log the game we're processing
-            self.logger.debug(f"[NCAAFB] Processing game event: {game_event.get('id')}")
-
             start_time_utc = None
             try:
                 start_time_utc = datetime.fromisoformat(game_date_str.replace("Z", "+00:00"))
@@ -455,8 +452,13 @@ class BaseNCAAFBManager: # Renamed class
             home_abbr = home_team["team"]["abbreviation"]
             away_abbr = away_team["team"]["abbreviation"]
             
-            # Debug: Log the teams found
-            self.logger.debug(f"[NCAAFB] Found teams: {away_abbr}@{home_abbr}, Status: {status['type']['name']}")
+            # Check if this is a favorite team game BEFORE doing expensive logging
+            is_favorite_game = (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams)
+            
+            # Only log debug info for favorite team games
+            if is_favorite_game:
+                self.logger.debug(f"[NCAAFB] Processing favorite team game: {game_event.get('id')}")
+                self.logger.debug(f"[NCAAFB] Found teams: {away_abbr}@{home_abbr}, Status: {status['type']['name']}")
             
             home_record = home_team.get('records', [{}])[0].get('summary', '') if home_team.get('records') else ''
             away_record = away_team.get('records', [{}])[0].get('summary', '') if away_team.get('records') else ''
@@ -969,19 +971,26 @@ class NCAAFBRecentManager(BaseNCAAFBManager): # Renamed class
 
                 # Process games and filter for final games & favorite teams
                 processed_games = []
+                favorite_games_found = 0
                 for event in events:
                     game = self._extract_game_details(event)
                     # Filter criteria: must be final
                     if game and game['is_final']:
                         processed_games.append(game)
+                        # Count favorite team games for logging
+                        if (game['home_abbr'] in self.favorite_teams or 
+                            game['away_abbr'] in self.favorite_teams):
+                            favorite_games_found += 1
 
                 # Filter for favorite teams
                 if self.favorite_teams:
-                     team_games = [game for game in processed_games
+                    team_games = [game for game in processed_games
                                   if game['home_abbr'] in self.favorite_teams or
                                      game['away_abbr'] in self.favorite_teams]
+                    self.logger.info(f"[NCAAFB Recent] Found {favorite_games_found} favorite team games out of {len(processed_games)} total final games")
                 else:
                      team_games = processed_games # Show all recent games if no favorites defined
+                     self.logger.info(f"[NCAAFB Recent] Found {len(processed_games)} total final games (no favorite teams configured)")
 
                 # Sort by game time, most recent first
                 team_games.sort(key=lambda g: g.get('start_time_utc') or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
@@ -1181,39 +1190,29 @@ class NCAAFBUpcomingManager(BaseNCAAFBManager): # Renamed class
                 # self.logger.info(f"[NCAAFB Upcoming] Processing {len(events)} events from shared data.") # Changed log prefix
 
                 processed_games = []
+                favorite_games_found = 0
                 for event in events:
                     game = self._extract_game_details(event)
                     # Filter criteria: must be upcoming ('pre' state)
                     if game and game['is_upcoming']:
                          processed_games.append(game)
+                         # Count favorite team games for logging
+                         if (game['home_abbr'] in self.favorite_teams or 
+                             game['away_abbr'] in self.favorite_teams):
+                             favorite_games_found += 1
 
-                # Debug logging to see what games we have
-                self.logger.debug(f"[NCAAFB Upcoming] Processed {len(processed_games)} upcoming games")
-                for game in processed_games:
-                    self.logger.debug(f"[NCAAFB Upcoming] Game: {game['away_abbr']}@{game['home_abbr']} - Upcoming: {game['is_upcoming']}")
-
-                # Log all unique teams found for debugging
-                all_teams = set()
-                for game in processed_games:
-                    all_teams.add(game['away_abbr'])
-                    all_teams.add(game['home_abbr'])
-                self.logger.debug(f"[NCAAFB Upcoming] All teams found in API: {sorted(all_teams)}")
-
-                # Debug: Log what events we received and what we extracted
-                self.logger.debug(f"[NCAAFB Upcoming] Received {len(events)} events from shared data")
-                for i, event in enumerate(events):
-                    self.logger.debug(f"[NCAAFB Upcoming] Event {i}: ID={event.get('id')}, Status={event.get('competitions', [{}])[0].get('status', {}).get('type', {}).get('name', 'unknown')}")
+                # Summary logging instead of verbose debug
+                self.logger.info(f"[NCAAFB Upcoming] Found {len(processed_games)} total upcoming games")
 
                 # Filter for favorite teams
                 if self.favorite_teams:
                     team_games = [game for game in processed_games
                                   if game['home_abbr'] in self.favorite_teams or
                                      game['away_abbr'] in self.favorite_teams]
-                    self.logger.debug(f"[NCAAFB Upcoming] After favorite team filtering: {len(team_games)} games")
-                    for game in team_games:
-                        self.logger.debug(f"[NCAAFB Upcoming] Favorite game: {game['away_abbr']}@{game['home_abbr']}")
+                    self.logger.info(f"[NCAAFB Upcoming] Found {favorite_games_found} favorite team games out of {len(processed_games)} total upcoming games")
                 else:
                     team_games = processed_games # Show all upcoming if no favorites
+                    self.logger.info(f"[NCAAFB Upcoming] Found {len(processed_games)} total upcoming games (no favorite teams configured)")
 
                 # Sort by game time, earliest first
                 team_games.sort(key=lambda g: g.get('start_time_utc') or datetime.max.replace(tzinfo=timezone.utc))

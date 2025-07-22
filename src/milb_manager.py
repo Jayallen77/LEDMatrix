@@ -964,6 +964,8 @@ class MiLBRecentManager(BaseMiLBManager):
                 logger.warning("[MiLB] No games returned from API")
                 return
                 
+            logger.info(f"[MiLB] Fetched {len(games)} total games from API")
+                
             # Process games
             new_recent_games = []
             
@@ -990,20 +992,24 @@ class MiLBRecentManager(BaseMiLBManager):
                 
                 if is_favorite_game:
                     favorite_games_log.append(game_info)
-                    logger.info(f"[MiLB] Checking favorite team game: {game['away_team']} @ {game['home_team']}")
+                    logger.info(f"[MiLB] Found favorite team game: {game['away_team']} @ {game['home_team']}")
                     logger.info(f"[MiLB] Game time (UTC): {game_time}")
                     logger.info(f"[MiLB] Game status: {game['status']}, State: {game['status_state']}")
+                    logger.info(f"[MiLB] Scores: {game['away_team']} {game.get('away_score', 0)} - {game['home_team']} {game.get('home_score', 0)}")
                 
                 # Use status_state to determine if game is final
                 is_final = game['status_state'] in ['post', 'final', 'completed']
                 
                 self.logger.info(f"[MiLB] Game Time: {game_time.isoformat()}")
                 self.logger.info(f"[MiLB] Is final: {is_final}")
+                self.logger.info(f"[MiLB] Status: {game['status']}, Status State: {game['status_state']}")
 
                 # Only add favorite team games that are final
                 if is_final:
                     new_recent_games.append(game)
                     logger.info(f"[MiLB] Added favorite team game to recent list: {game['away_team']} @ {game['home_team']}")
+                else:
+                    logger.info(f"[MiLB] Skipping non-final game: {game['away_team']} @ {game['home_team']} (Status: {game['status_state']})")
             
             # Log summary of all games found
             logger.info(f"[MiLB] All games found ({len(all_games_log)}): {all_games_log}")
@@ -1014,14 +1020,38 @@ class MiLBRecentManager(BaseMiLBManager):
             new_recent_games = new_recent_games[:self.recent_games_to_show]
             
             if new_recent_games:
-                logger.info(f"[MiLB] Found {len(new_recent_games)} recent games for favorite teams: {self.favorite_teams}")
+                logger.info(f"[MiLB] Found {len(new_recent_games)} recent final games for favorite teams: {self.favorite_teams}")
                 self.recent_games = new_recent_games
                 if not self.current_game:
                     self.current_game = self.recent_games[0]
             else:
-                logger.info("[MiLB] No recent games found for favorite teams")
-                self.recent_games = []
-                self.current_game = None
+                # Fallback: if no final games found, show any recent games for favorite teams
+                logger.info("[MiLB] No final games found for favorite teams, checking for any recent games...")
+                fallback_games = []
+                for game_id, game in games.items():
+                    if (game['home_team'] in self.favorite_teams or game['away_team'] in self.favorite_teams):
+                        game_time_str = game['start_time'].replace('Z', '+00:00')
+                        game_time = datetime.fromisoformat(game_time_str)
+                        if game_time.tzinfo is None:
+                            game_time = game_time.replace(tzinfo=timezone.utc)
+                        
+                        # Include any game from the last 7 days
+                        if game_time >= datetime.now(timezone.utc) - timedelta(days=7):
+                            fallback_games.append(game)
+                            logger.info(f"[MiLB] Added fallback game: {game['away_team']} @ {game['home_team']} (Status: {game['status_state']})")
+                
+                fallback_games.sort(key=lambda x: x['start_time'], reverse=True)
+                fallback_games = fallback_games[:self.recent_games_to_show]
+                
+                if fallback_games:
+                    logger.info(f"[MiLB] Found {len(fallback_games)} fallback games for favorite teams")
+                    self.recent_games = fallback_games
+                    if not self.current_game:
+                        self.current_game = self.recent_games[0]
+                else:
+                    logger.info("[MiLB] No recent games found for favorite teams (including fallback)")
+                    self.recent_games = []
+                    self.current_game = None
             
             self.last_update = current_time
             
