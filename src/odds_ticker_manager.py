@@ -514,11 +514,8 @@ class OddsTickerManager:
         height = self.display_manager.matrix.height
         
         # Make logos use most of the display height, with a small margin
-        logo_margin = 0
         logo_size = int(height * 1.2)
-        logo_padding = 2
-        vs_padding = 8
-        section_padding = 12
+        h_padding = 4 # Use a consistent horizontal padding
 
         # Fonts
         team_font = self.fonts['medium']
@@ -652,34 +649,34 @@ class OddsTickerManager:
         odds_width = max(away_odds_width, home_odds_width)
 
         # --- Calculate total width ---
-        total_width = (logo_size + logo_padding + vs_width + vs_padding + logo_size + section_padding +
-                       team_info_width + section_padding + odds_width + section_padding + datetime_col_width + section_padding)
+        total_width = (logo_size + h_padding + vs_width + h_padding + logo_size + h_padding +
+                       team_info_width + h_padding + odds_width + h_padding + datetime_col_width)
         if broadcast_logo:
-            total_width += broadcast_logo_col_width + section_padding
+            total_width += h_padding + broadcast_logo_col_width
 
         # --- Create final image ---
         image = Image.new('RGB', (int(total_width), height), color=(0, 0, 0))
         draw = ImageDraw.Draw(image)
 
         # --- Draw elements ---
-        current_x = logo_padding
+        current_x = 0
 
         # Away Logo
         if away_logo:
             y_pos = (height - logo_size) // 2  # Center the logo vertically
-            image.paste(away_logo, (int(current_x), y_pos), away_logo if away_logo.mode == 'RGBA' else None)
-        current_x += logo_size + vs_padding
+            image.paste(away_logo, (current_x, y_pos), away_logo if away_logo.mode == 'RGBA' else None)
+        current_x += logo_size + h_padding
 
         # "vs."
         y_pos = (height - vs_font.size) // 2 if hasattr(vs_font, 'size') else (height - 8) // 2 # Added fallback for default font
         draw.text((current_x, y_pos), vs_text, font=vs_font, fill=(255, 255, 255))
-        current_x += vs_width + vs_padding
+        current_x += vs_width + h_padding
 
         # Home Logo
         if home_logo:
             y_pos = (height - logo_size) // 2  # Center the logo vertically
-            image.paste(home_logo, (int(current_x), y_pos), home_logo if home_logo.mode == 'RGBA' else None)
-        current_x += logo_size + section_padding
+            image.paste(home_logo, (current_x, y_pos), home_logo if home_logo.mode == 'RGBA' else None)
+        current_x += logo_size + h_padding
 
         # Team Info (stacked)
         team_font_height = team_font.size if hasattr(team_font, 'size') else 8
@@ -687,7 +684,7 @@ class OddsTickerManager:
         home_y = height - team_font_height - 2
         draw.text((current_x, away_y), away_team_text, font=team_font, fill=(255, 255, 255))
         draw.text((current_x, home_y), home_team_text, font=team_font, fill=(255, 255, 255))
-        current_x += team_info_width + section_padding
+        current_x += team_info_width + h_padding
 
         # Odds (stacked)
         odds_font_height = odds_font.size if hasattr(odds_font, 'size') else 8
@@ -699,7 +696,7 @@ class OddsTickerManager:
 
         draw.text((current_x, odds_y_away), away_odds_text, font=odds_font, fill=odds_color)
         draw.text((current_x, odds_y_home), home_odds_text, font=odds_font, fill=odds_color)
-        current_x += odds_width + section_padding
+        current_x += odds_width + h_padding
         
         # Datetime (stacked, 3 rows)
         datetime_font_height = datetime_font.size if hasattr(datetime_font, 'size') else 6
@@ -717,9 +714,10 @@ class OddsTickerManager:
         draw.text((current_x, day_y), day_text, font=datetime_font, fill=(255, 255, 255))
         draw.text((current_x, date_y), date_text, font=datetime_font, fill=(255, 255, 255))
         draw.text((current_x, time_y), time_text, font=datetime_font, fill=(255, 255, 255))
-        current_x += datetime_col_width + section_padding
+        current_x += datetime_col_width
 
         if broadcast_logo:
+            current_x += h_padding
             # Position the broadcast logo in its own column
             logo_y = (height - broadcast_logo.height) // 2
             logger.debug(f"Pasting broadcast logo at ({int(current_x)}, {logo_y})")
