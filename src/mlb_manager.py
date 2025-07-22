@@ -1219,6 +1219,9 @@ class MLBUpcomingManager(BaseMLBManager):
     def update(self):
         """Update upcoming games data."""
         current_time = time.time()
+        # Log config state for debugging
+        self.logger.info(f"[MLB] show_favorite_teams_only: {self.mlb_config.get('show_favorite_teams_only', False)}")
+        self.logger.info(f"[MLB] favorite_teams: {self.favorite_teams}")
         if self.last_update != 0 and (current_time - self.last_update < self.update_interval):
             return
             
@@ -1239,15 +1242,20 @@ class MLBUpcomingManager(BaseMLBManager):
                 # Only fetch odds for games that will be displayed
                 if self.mlb_config.get("show_favorite_teams_only", False):
                     if not self.favorite_teams:
+                        self.logger.info(f"[MLB] Skipping game {game_id} - no favorite teams configured.")
                         continue
                     if game['home_team'] not in self.favorite_teams and game['away_team'] not in self.favorite_teams:
+                        self.logger.info(f"[MLB] Skipping non-favorite team game: {game['away_team']} @ {game['home_team']}")
                         continue
                 is_favorite_game = (game['home_team'] in self.favorite_teams or 
                                   game['away_team'] in self.favorite_teams)
                 game_time = datetime.fromisoformat(game['start_time'].replace('Z', '+00:00'))
                 if game_time.tzinfo is None:
                     game_time = game_time.replace(tzinfo=timezone.utc)
-                self.logger.info(f"[MLB] Favorite team game found: {game['away_team']} @ {game['home_team']} at {game_time}")
+                if is_favorite_game:
+                    self.logger.info(f"[MLB] Favorite team game found: {game['away_team']} @ {game['home_team']} at {game_time}")
+                else:
+                    self.logger.debug(f"[MLB] Non-favorite team game: {game['away_team']} @ {game['home_team']} at {game_time}")
                 self.logger.info(f"[MLB] Game status: {game['status']}, State: {game['status_state']}")
                 is_upcoming = (
                     game['status_state'] not in ['post', 'final', 'completed'] and
