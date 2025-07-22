@@ -748,14 +748,15 @@ class NBALiveManager(BaseNBAManager):
                 for event in data["events"]:
                     details = self._extract_game_details(event)
                     if details and details["is_live"]:
-                        if not self.favorite_teams or (
-                            details["home_abbr"] in self.favorite_teams or
-                            details["away_abbr"] in self.favorite_teams
-                        ):
-                            # Fetch odds if enabled
-                            if self.show_odds:
-                                self._fetch_odds(details)
-                            new_live_games.append(details)
+                        # Only fetch odds for games that will be displayed
+                        if self.nba_config.get("show_favorite_teams_only", False):
+                            if not self.favorite_teams:
+                                continue
+                            if details["home_abbr"] not in self.favorite_teams and details["away_abbr"] not in self.favorite_teams:
+                                continue
+                        if self.show_odds:
+                            self._fetch_odds(details)
+                        new_live_games.append(details)
 
                 # Update game list and current game
                 if new_live_games:

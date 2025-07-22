@@ -259,12 +259,9 @@ class OddsTickerManager:
                             away_abbr = away_team['team']['abbreviation']
                             # Only process favorite teams if enabled
                             if self.show_favorite_teams_only:
-                                # Skip if both teams have already met their quota
-                                for team in [home_abbr, away_abbr]:
-                                    if team in team_games_found and team_games_found[team] >= max_games:
-                                        continue
-                                # Only add if at least one team still needs games
-                                if not ((home_abbr in team_games_found and team_games_found[home_abbr] < max_games) or (away_abbr in team_games_found and team_games_found[away_abbr] < max_games)):
+                                if not favorite_teams:
+                                    continue
+                                if home_abbr not in favorite_teams and away_abbr not in favorite_teams:
                                     continue
                             # Build game dict (existing logic)
                             home_record = home_team.get('records', [{}])[0].get('summary', '') if home_team.get('records') else ''

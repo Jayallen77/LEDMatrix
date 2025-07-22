@@ -1085,10 +1085,15 @@ class NFLUpcomingManager(BaseNFLManager): # Renamed class
                 game = self._extract_game_details(event)
                 # Filter criteria: must be upcoming ('pre' state)
                 if game and game['is_upcoming']:
-                     # Fetch odds if enabled
-                     if self.show_odds:
-                         self._fetch_odds(game)
-                     processed_games.append(game)
+                    # Only fetch odds for games that will be displayed
+                    if self.nfl_config.get("show_favorite_teams_only", False):
+                        if not self.favorite_teams:
+                            continue
+                        if game['home_abbr'] not in self.favorite_teams and game['away_abbr'] not in self.favorite_teams:
+                            continue
+                    if self.show_odds:
+                        self._fetch_odds(game)
+                    processed_games.append(game)
 
             # Debug logging to see what games we have
             self.logger.debug(f"[NFL Upcoming] Processed {len(processed_games)} upcoming games")

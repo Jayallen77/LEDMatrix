@@ -1195,11 +1195,19 @@ class NCAAFBUpcomingManager(BaseNCAAFBManager): # Renamed class
                     game = self._extract_game_details(event)
                     # Filter criteria: must be upcoming ('pre' state)
                     if game and game['is_upcoming']:
-                         processed_games.append(game)
-                         # Count favorite team games for logging
-                         if (game['home_abbr'] in self.favorite_teams or 
-                             game['away_abbr'] in self.favorite_teams):
-                             favorite_games_found += 1
+                        # Only fetch odds for games that will be displayed
+                        if self.ncaa_fb_config.get("show_favorite_teams_only", False):
+                            if not self.favorite_teams:
+                                continue
+                            if game['home_abbr'] not in self.favorite_teams and game['away_abbr'] not in self.favorite_teams:
+                                continue
+                        processed_games.append(game)
+                        # Count favorite team games for logging
+                        if (game['home_abbr'] in self.favorite_teams or 
+                            game['away_abbr'] in self.favorite_teams):
+                            favorite_games_found += 1
+                        if self.show_odds:
+                            self._fetch_odds(game)
 
                 # Summary logging instead of verbose debug
                 self.logger.info(f"[NCAAFB Upcoming] Found {len(processed_games)} total upcoming games")

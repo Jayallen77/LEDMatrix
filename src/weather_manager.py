@@ -202,19 +202,21 @@ class WeatherManager:
         """Get current weather data, fetching new data if needed."""
         current_time = time.time()
         update_interval = self.weather_config.get('update_interval', 300)
-        
+        # Add a throttle for log spam
+        log_throttle_interval = 600  # 10 minutes
+        if not hasattr(self, '_last_weather_log_time'):
+            self._last_weather_log_time = 0
         # Check if we need to update based on time or if we have no data
         if (not self.weather_data or 
             current_time - self.last_update > update_interval):
-            
             # Check if data has changed before fetching
             current_state = self._get_weather_state()
             if current_state and not self.cache_manager.has_data_changed('weather', current_state):
-                print("Weather data hasn't changed, using existing data")
+                if current_time - self._last_weather_log_time > log_throttle_interval:
+                    print("Weather data hasn't changed, using existing data")
+                    self._last_weather_log_time = current_time
                 return self.weather_data
-                
             self._fetch_weather()
-            
         return self.weather_data
 
     def _get_weather_state(self) -> Dict[str, Any]:

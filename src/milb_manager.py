@@ -1122,21 +1122,17 @@ class MiLBUpcomingManager(BaseMiLBManager):
                 logger.info(f"[MiLB] Processing {len(games)} games for upcoming games...")
                 
                 for game_id, game in games.items():
+                    # Only fetch odds for games that will be displayed
+                    if self.milb_config.get("show_favorite_teams_only", False):
+                        if not self.favorite_teams:
+                            continue
+                        if game['home_team'] not in self.favorite_teams and game['away_team'] not in self.favorite_teams:
+                            continue
                     # Convert game time to UTC datetime
                     game_time_str = game['start_time'].replace('Z', '+00:00')
                     game_time = datetime.fromisoformat(game_time_str)
                     if game_time.tzinfo is None:
                         game_time = game_time.replace(tzinfo=timezone.utc)
-                    
-                    # Check if this is a favorite team game
-                    is_favorite_game = (game['home_team'] in self.favorite_teams or 
-                                      game['away_team'] in self.favorite_teams)
-                    
-                    if is_favorite_game:
-                        logger.info(f"[MiLB] Checking favorite team game: {game['away_team']} @ {game['home_team']}")
-                        logger.info(f"[MiLB] Game time (UTC): {game_time}")
-                        logger.info(f"[MiLB] Game status: {game['status']}, State: {game['status_state']}")
-                    
                     # For upcoming games, we'll consider any game that:
                     # 1. Is not final (not 'post' or 'final' state)
                     # 2. Has a future start time
@@ -1144,8 +1140,9 @@ class MiLBUpcomingManager(BaseMiLBManager):
                         game['status_state'] not in ['post', 'final', 'completed'] and
                         game_time > datetime.now(timezone.utc)
                     )
-                    
                     if is_upcoming:
+                        if self.show_odds:
+                            self._fetch_odds(game)
                         new_upcoming_games.append(game)
                         logger.info(f"[MiLB] Added favorite team game to upcoming list: {game['away_team']} @ {game['home_team']}")
                 

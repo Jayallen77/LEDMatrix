@@ -114,11 +114,12 @@
         "max_games_per_league": 5,
         "show_odds_only": false,
         "sort_order": "soonest",
-        "enabled_leagues": ["nfl","mlb", "ncaa_fb"],
+        "enabled_leagues": ["nfl","mlb", "ncaa_fb", "milb"],
         "update_interval": 3600,
         "scroll_speed": 1,
         "scroll_delay": 0.01,
-        "loop": true
+        "loop": true,
+        "future_fetch_days": 50
     },
     "calendar": {
         "enabled": true,

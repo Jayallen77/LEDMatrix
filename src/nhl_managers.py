@@ -871,9 +871,13 @@ class NHLUpcomingManager(BaseNHLManager):
                     self.logger.debug(f"[NHL] Processing game: {game['away_abbr']} vs {game['home_abbr']}")
                     self.logger.debug(f"[NHL] Game status: is_final={game['is_final']}, is_upcoming={game['is_upcoming']}, is_within_window={game['is_within_window']}")
                     self.logger.debug(f"[NHL] Game time: {game['start_time_utc']}")
-                    
+                    # Only fetch odds for games that will be displayed
+                    if self.nhl_config.get("show_favorite_teams_only", False):
+                        if not self.favorite_teams:
+                            continue
+                        if game['home_abbr'] not in self.favorite_teams and game['away_abbr'] not in self.favorite_teams:
+                            continue
                     if not game['is_final'] and game['is_within_window']:
-                        # Fetch odds if enabled
                         if self.show_odds:
                             self._fetch_odds(game)
                         new_upcoming_games.append(game)
