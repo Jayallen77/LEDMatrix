@@ -307,13 +307,16 @@ class OddsTickerManager:
                     url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/scoreboard?dates={date}"
                     logger.debug(f"Fetching {league} games from ESPN API for date: {date}")
                     response = requests.get(url, timeout=10)
-                    
-                    # Handle potential 400 error for MiLB, which seems to be an invalid endpoint
-                    if league == 'milb' and response.status_code == 400:
-                        logger.warning(f"Received a 400 Bad Request for MiLB on {date}. This league may no longer be supported by the API. Skipping.")
-                        continue  # Skip to the next date or league
 
-                    response.raise_for_status()
+                    # MiLB endpoint is flaky; don't treat a bad response as a fatal error.
+                    if league != 'milb':
+                        response.raise_for_status()
+
+                    # If the response isn't good (e.g., 400 for MiLB), just skip this date.
+                    if not response.ok:
+                        logger.warning(f"Skipping {league} for {date} due to bad response (status: {response.status_code})")
+                        continue
+                        
                     data = response.json()
                     for event in data.get('events', []):
                         # Stop if we have enough games for the league (when not showing favorite teams only)
@@ -347,12 +350,17 @@ class OddsTickerManager:
                                 # Build game dict (existing logic)
                                 home_record = home_team.get('records', [{}])[0].get('summary', '') if home_team.get('records') else ''
                                 away_record = away_team.get('records', [{}])[0].get('summary', '') if away_team.get('records') else ''
-                                odds_data = self.odds_manager.get_odds(
-                                    sport=sport,
-                                    league=league,
-                                    event_id=game_id,
-                                    update_interval_seconds=7200
-                                )
+                                
+                                # As requested by the user, do not fetch odds for MiLB
+                                odds_data = None
+                                if league != 'milb':
+                                    odds_data = self.odds_manager.get_odds(
+                                        sport=sport,
+                                        league=league,
+                                        event_id=game_id,
+                                        update_interval_seconds=7200
+                                    )
+                                
                                 has_odds = False
                                 if odds_data and not odds_data.get('no_odds'):
                                     if odds_data.get('spread') is not None:
@@ -386,12 +394,6 @@ class OddsTickerManager:
                     # Stop if we have enough games for the league (when not showing favorite teams only)
                     if not self.show_favorite_teams_only and max_games_per_league and games_found >= max_games_per_league:
                         break
-                except requests.exceptions.HTTPError as http_err:
-                    if league == 'milb' and http_err.response.status_code == 400:
-                        logger.warning(f"Received a 400 Bad Request for MiLB on {date}. This may be due to no odds being available or an invalid endpoint. Skipping date.")
-                        continue
-                    else:
-                        logger.error(f"HTTP error occurred while fetching games for {league} on {date}: {http_err}")
                 except Exception as e:
                     logger.error(f"Error fetching games for {league_config.get('league', 'unknown')} on {date}: {e}", exc_info=True)
             if not self.show_favorite_teams_only and max_games_per_league and games_found >= max_games_per_league:
@@ -493,20 +495,20 @@ class OddsTickerManager:
         broadcast_logo = None
         if self.show_channel_logos:
             broadcast_name = game.get('broadcast_info', '')
-            logger.info(f"Game {game.get('id')}: Raw broadcast info from API: '{broadcast_name}'")
+            logger.debug(f"Game {game.get('id')}: Raw broadcast info from API: '{broadcast_name}'")
             if broadcast_name:
                 logo_name = self.BROADCAST_LOGO_MAP.get(broadcast_name)
-                logger.info(f"Game {game.get('id')}: Mapped logo name: '{logo_name}' for broadcast name: '{broadcast_name}'")
+                logger.debug(f"Game {game.get('id')}: Mapped logo name: '{logo_name}' for broadcast name: '{broadcast_name}'")
                 if logo_name:
                     broadcast_logo = self._get_team_logo(logo_name, 'assets/broadcast_logos')
                     if broadcast_logo:
-                        logger.info(f"Game {game.get('id')}: Successfully loaded broadcast logo for '{logo_name}'")
+                        logger.debug(f"Game {game.get('id')}: Successfully loaded broadcast logo for '{logo_name}'")
                     else:
                         logger.warning(f"Game {game.get('id')}: Failed to load broadcast logo for '{logo_name}'")
                 else:
                     logger.warning(f"Game {game.get('id')}: No mapping found for broadcast name '{broadcast_name}' in BROADCAST_LOGO_MAP")
             else:
-                logger.info(f"Game {game.get('id')}: No broadcast info available.")
+                logger.debug(f"Game {game.get('id')}: No broadcast info available.")
 
         if home_logo:
             home_logo = home_logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
@@ -679,13 +681,13 @@ class OddsTickerManager:
 
     def _create_ticker_image(self):
         """Create a single wide image containing all game tickers."""
-        logger.info("Entering _create_ticker_image method")
+        logger.debug("Entering _create_ticker_image method")
         if not self.games_data:
             logger.warning("No games data available, cannot create ticker image.")
             self.ticker_image = None
             return
 
-        logger.info(f"Creating ticker image for {len(self.games_data)} games.")
+        logger.debug(f"Creating ticker image for {len(self.games_data)} games.")
         game_images = [self._create_game_display(game) for game in self.games_data]
         if not game_images:
             logger.warning("Failed to create any game images.")
@@ -722,7 +724,7 @@ class OddsTickerManager:
 
     def update(self):
         """Update odds ticker data."""
-        logger.info("Entering update method")
+        logger.debug("Entering update method")
         if not self.is_enabled:
             logger.debug("Odds ticker is disabled, skipping update")
             return
@@ -733,7 +735,7 @@ class OddsTickerManager:
             return
         
         try:
-            logger.info("Updating odds ticker data")
+            logger.debug("Updating odds ticker data")
             logger.debug(f"Enabled leagues: {self.enabled_leagues}")
             logger.debug(f"Show favorite teams only: {self.show_favorite_teams_only}")
             
@@ -755,14 +757,14 @@ class OddsTickerManager:
 
     def display(self, force_clear: bool = False):
         """Display the odds ticker."""
-        logger.info("Entering display method")
-        logger.info(f"Odds ticker enabled: {self.is_enabled}")
+        logger.debug("Entering display method")
+        logger.debug(f"Odds ticker enabled: {self.is_enabled}")
         
         if not self.is_enabled:
             logger.debug("Odds ticker is disabled, exiting display method.")
             return
         
-        logger.info(f"Number of games in data at start of display method: {len(self.games_data)}")
+        logger.debug(f"Number of games in data at start of display method: {len(self.games_data)}")
         if not self.games_data:
             logger.warning("Odds ticker has no games data. Attempting to update...")
             self.update()
