@@ -8,6 +8,7 @@ import os
 import sys
 import logging
 from PIL import Image
+from datetime import datetime
 
 # Add the src directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
@@ -150,7 +151,7 @@ def test_game_display_with_broadcast():
             'away_team': 'BOS',
             'home_team_name': 'Tampa Bay Rays',
             'away_team_name': 'Boston Red Sox',
-            'start_time': '2024-01-15T19:00:00Z',
+            'start_time': datetime.fromisoformat('2024-01-15T19:00:00+00:00'),
             'home_record': '95-67',
             'away_record': '78-84',
             'broadcast_info': ['ESPN'],
@@ -158,11 +159,11 @@ def test_game_display_with_broadcast():
         },
         {
             'id': 'test_game_2',
-            'home_team': 'NY',
-            'away_team': 'LA',
+            'home_team': 'NYY',  # Changed from NY to NYY for better logo matching
+            'away_team': 'LAD',  # Changed from LA to LAD for better logo matching
             'home_team_name': 'New York Yankees',
             'away_team_name': 'Los Angeles Dodgers',
-            'start_time': '2024-01-15T20:00:00Z',
+            'start_time': datetime.fromisoformat('2024-01-15T20:00:00+00:00'),
             'home_record': '82-80',
             'away_record': '100-62',
             'broadcast_info': ['FOX'],
@@ -170,11 +171,11 @@ def test_game_display_with_broadcast():
         },
         {
             'id': 'test_game_3',
-            'home_team': 'CHI',
+            'home_team': 'CHC',  # Changed from CHI to CHC for better logo matching
             'away_team': 'MIA',
             'home_team_name': 'Chicago Cubs',
             'away_team_name': 'Miami Marlins',
-            'start_time': '2024-01-15T21:00:00Z',
+            'start_time': datetime.fromisoformat('2024-01-15T21:00:00+00:00'),
             'home_record': '83-79',
             'away_record': '84-78',
             'broadcast_info': [],  # No broadcast info
