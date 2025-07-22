@@ -190,16 +190,21 @@ class OddsTickerManager:
 
     def _get_team_logo(self, team_abbr: str, logo_dir: str) -> Optional[Image.Image]:
         """Get team logo from the configured directory."""
+        if not team_abbr or not logo_dir:
+            logger.debug("Cannot get team logo with missing team_abbr or logo_dir")
+            return None
         try:
             logo_path = os.path.join(logo_dir, f"{team_abbr}.png")
+            logger.debug(f"Attempting to load logo from path: {logo_path}")
             if os.path.exists(logo_path):
                 logo = Image.open(logo_path)
+                logger.debug(f"Successfully loaded logo for {team_abbr} from {logo_path}")
                 return logo
             else:
-                logger.debug(f"Logo not found: {logo_path}")
+                logger.warning(f"Logo not found at path: {logo_path}")
                 return None
         except Exception as e:
-            logger.error(f"Error loading logo for {team_abbr}: {e}")
+            logger.error(f"Error loading logo for {team_abbr} from {logo_dir}: {e}")
             return None
 
     def _fetch_upcoming_games(self) -> List[Dict[str, Any]]:
@@ -476,8 +481,20 @@ class OddsTickerManager:
         broadcast_logo = None
         if self.show_channel_logos:
             broadcast_name = game.get('broadcast_info', '')
-            logo_name = self.BROADCAST_LOGO_MAP.get(broadcast_name, broadcast_name.lower())
-            broadcast_logo = self._get_team_logo(logo_name, 'assets/broadcast_logos')
+            logger.info(f"Game {game.get('id')}: Raw broadcast info from API: '{broadcast_name}'")
+            if broadcast_name:
+                logo_name = self.BROADCAST_LOGO_MAP.get(broadcast_name)
+                logger.info(f"Game {game.get('id')}: Mapped logo name: '{logo_name}' for broadcast name: '{broadcast_name}'")
+                if logo_name:
+                    broadcast_logo = self._get_team_logo(logo_name, 'assets/broadcast_logos')
+                    if broadcast_logo:
+                        logger.info(f"Game {game.get('id')}: Successfully loaded broadcast logo for '{logo_name}'")
+                    else:
+                        logger.warning(f"Game {game.get('id')}: Failed to load broadcast logo for '{logo_name}'")
+                else:
+                    logger.warning(f"Game {game.get('id')}: No mapping found for broadcast name '{broadcast_name}' in BROADCAST_LOGO_MAP")
+            else:
+                logger.info(f"Game {game.get('id')}: No broadcast info available.")
 
         if home_logo:
             home_logo = home_logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
