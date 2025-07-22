@@ -82,6 +82,13 @@ class OddsTickerManager:
                 'logo_dir': 'assets/sports/ncaa_fbs_logos',
                 'favorite_teams': config.get('ncaa_fb_scoreboard', {}).get('favorite_teams', []),
                 'enabled': config.get('ncaa_fb_scoreboard', {}).get('enabled', False)
+            },
+            'milb': {
+                'sport': 'baseball',
+                'league': 'milb',
+                'logo_dir': 'assets/sports/milb_logos',
+                'favorite_teams': config.get('milb', {}).get('favorite_teams', []),
+                'enabled': config.get('milb', {}).get('enabled', False)
             }
         }
         
