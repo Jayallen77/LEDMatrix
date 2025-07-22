@@ -38,7 +38,7 @@
             "hourly_forecast": 15,
             "daily_forecast": 15,
             "stock_news": 20,
-            "odds_ticker": 45,
+            "odds_ticker": 60,
             "nhl_live": 30,
             "nhl_recent": 20,
             "nhl_upcoming": 20,
@@ -118,7 +118,6 @@
         "update_interval": 3600,
         "scroll_speed": 1,
         "scroll_delay": 0.01,
-        "display_duration": 60,
         "loop": true
     },
     "calendar": {

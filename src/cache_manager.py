@@ -36,6 +36,14 @@ class CacheManager:
         self._memory_cache_timestamps = {}
         self._cache_lock = threading.Lock()
         
+        # Initialize config manager for sport-specific intervals
+        try:
+            from src.config_manager import ConfigManager
+            self.config_manager = ConfigManager()
+        except ImportError:
+            self.config_manager = None
+            self.logger.warning("ConfigManager not available, using default cache intervals")
+
     def _get_writable_cache_dir(self) -> Optional[str]:
         """Tries to find or create a writable cache directory in a few common locations."""
         # Attempt 1: User's home directory (handling sudo)
@@ -401,3 +409,226 @@ class CacheManager:
         except Exception as e:
             self.logger.error(f"Failed to set up persistent cache directory: {e}")
             return False 
+
+    def get_sport_live_interval(self, sport_key: str) -> int:
+        """
+        Get the live_update_interval for a specific sport from config.
+        Falls back to default values if config is not available.
+        """
+        if not self.config_manager:
+            # Default intervals - all sports use 60 seconds as default
+            default_intervals = {
+                'soccer': 60,      # Soccer default
+                'nfl': 60,         # NFL default
+                'nhl': 60,         # NHL default
+                'nba': 60,         # NBA default
+                'mlb': 60,         # MLB default
+                'milb': 60,        # Minor league default
+                'ncaa_fb': 60,    # College football default
+                'ncaa_baseball': 60,  # College baseball default
+                'ncaam_basketball': 60,  # College basketball default
+            }
+            return default_intervals.get(sport_key, 60)
+        
+        try:
+            config = self.config_manager.get_config()
+            sport_config = config.get(f"{sport_key}_scoreboard", {})
+            return sport_config.get("live_update_interval", 60)  # Default to 60 seconds
+        except Exception as e:
+            self.logger.warning(f"Could not get live_update_interval for {sport_key}: {e}")
+            return 60  # Default to 60 seconds
+
+    def get_cache_strategy(self, data_type: str, sport_key: str = None) -> Dict[str, Any]:
+        """
+        Get cache strategy for different data types.
+        Now respects sport-specific live_update_interval configurations.
+        """
+        # Get sport-specific live interval if provided
+        live_interval = None
+        if sport_key and data_type in ['sports_live', 'live_scores']:
+            live_interval = self.get_sport_live_interval(sport_key)
+        
+        strategies = {
+            # Ultra time-sensitive data (live scores, current weather)
+            'live_scores': {
+                'max_age': live_interval or 15,  # Use sport-specific interval
+                'memory_ttl': (live_interval or 15) * 2,  # 2x for memory cache
+                'force_refresh': True
+            },
+            'sports_live': {
+                'max_age': live_interval or 30,  # Use sport-specific interval
+                'memory_ttl': (live_interval or 30) * 2,
+                'force_refresh': True
+            },
+            'weather_current': {
+                'max_age': 300,  # 5 minutes
+                'memory_ttl': 600,
+                'force_refresh': False
+            },
+            
+            # Market data (stocks, crypto)
+            'stocks': {
+                'max_age': 600,  # 10 minutes
+                'memory_ttl': 1200,
+                'market_hours_only': True,
+                'force_refresh': False
+            },
+            'crypto': {
+                'max_age': 300,  # 5 minutes (crypto trades 24/7)
+                'memory_ttl': 600,
+                'force_refresh': False
+            },
+            
+            # Sports data
+            'sports_recent': {
+                'max_age': 300,  # 5 minutes
+                'memory_ttl': 600,
+                'force_refresh': False
+            },
+            'sports_upcoming': {
+                'max_age': 3600,  # 1 hour
+                'memory_ttl': 7200,
+                'force_refresh': False
+            },
+            'sports_schedules': {
+                'max_age': 86400,  # 24 hours
+                'memory_ttl': 172800,
+                'force_refresh': False
+            },
+            
+            # News and odds
+            'news': {
+                'max_age': 3600,  # 1 hour
+                'memory_ttl': 7200,
+                'force_refresh': False
+            },
+            'odds': {
+                'max_age': 3600,  # 1 hour
+                'memory_ttl': 7200,
+                'force_refresh': False
+            },
+            
+            # Static/stable data
+            'team_info': {
+                'max_age': 604800,  # 1 week
+                'memory_ttl': 1209600,
+                'force_refresh': False
+            },
+            'logos': {
+                'max_age': 2592000,  # 30 days
+                'memory_ttl': 5184000,
+                'force_refresh': False
+            },
+            
+            # Default fallback
+            'default': {
+                'max_age': 300,  # 5 minutes
+                'memory_ttl': 600,
+                'force_refresh': False
+            }
+        }
+        
+        return strategies.get(data_type, strategies['default'])
+
+    def get_data_type_from_key(self, key: str) -> str:
+        """
+        Determine the appropriate cache strategy based on the cache key.
+        This helps automatically select the right cache duration.
+        """
+        key_lower = key.lower()
+        
+        # Live sports data
+        if any(x in key_lower for x in ['live', 'current', 'scoreboard']):
+            if 'soccer' in key_lower:
+                return 'sports_live'  # Soccer live data is very time-sensitive
+            return 'sports_live'
+        
+        # Weather data
+        if 'weather' in key_lower:
+            return 'weather_current'
+        
+        # Market data
+        if 'stock' in key_lower or 'crypto' in key_lower:
+            if 'crypto' in key_lower:
+                return 'crypto'
+            return 'stocks'
+        
+        # News data
+        if 'news' in key_lower:
+            return 'news'
+        
+        # Odds data
+        if 'odds' in key_lower:
+            return 'odds'
+        
+        # Sports schedules and team info
+        if any(x in key_lower for x in ['schedule', 'team_map', 'league']):
+            return 'sports_schedules'
+        
+        # Recent games (last few hours)
+        if 'recent' in key_lower:
+            return 'sports_recent'
+        
+        # Upcoming games
+        if 'upcoming' in key_lower:
+            return 'sports_upcoming'
+        
+        # Static data like logos, team info
+        if any(x in key_lower for x in ['logo', 'team_info', 'config']):
+            return 'team_info'
+        
+        # Default fallback
+        return 'default'
+
+    def get_sport_key_from_cache_key(self, key: str) -> Optional[str]:
+        """
+        Extract sport key from cache key to determine appropriate live_update_interval.
+        """
+        key_lower = key.lower()
+        
+        # Map cache key patterns to sport keys
+        sport_patterns = {
+            'nfl': ['nfl', 'football'],
+            'nba': ['nba', 'basketball'],
+            'mlb': ['mlb', 'baseball'],
+            'nhl': ['nhl', 'hockey'],
+            'soccer': ['soccer', 'football'],
+            'ncaa_fb': ['ncaa_fb', 'ncaafb', 'college_football'],
+            'ncaa_baseball': ['ncaa_baseball', 'college_baseball'],
+            'ncaam_basketball': ['ncaam_basketball', 'college_basketball'],
+            'milb': ['milb', 'minor_league'],
+        }
+        
+        for sport_key, patterns in sport_patterns.items():
+            if any(pattern in key_lower for pattern in patterns):
+                return sport_key
+        
+        return None
+
+    def get_cached_data_with_strategy(self, key: str, data_type: str = 'default') -> Optional[Dict]:
+        """
+        Get data from cache using data-type-specific strategy.
+        Now respects sport-specific live_update_interval configurations.
+        """
+        # Extract sport key for live sports data
+        sport_key = None
+        if data_type in ['sports_live', 'live_scores']:
+            sport_key = self.get_sport_key_from_cache_key(key)
+        
+        strategy = self.get_cache_strategy(data_type, sport_key)
+        max_age = strategy['max_age']
+        
+        # For market data, check if market is open
+        if strategy.get('market_hours_only', False) and not self._is_market_open():
+            # During off-hours, extend cache duration
+            max_age *= 4  # 4x longer cache during off-hours
+        
+        return self.get_cached_data(key, max_age)
+
+    def get_with_auto_strategy(self, key: str) -> Optional[Dict]:
+        """
+        Get cached data using automatically determined strategy.
+        Now respects sport-specific live_update_interval configurations.
+        """
+        data_type = self.get_data_type_from_key(key)
+        return self.get_cached_data_with_strategy(key, data_type) 
