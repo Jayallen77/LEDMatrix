@@ -23,56 +23,7 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-# Re-add CacheManager definition temporarily until it's confirmed where it lives
-class CacheManager:
-    """Manages caching of ESPN API responses."""
-    _instance = None
-    _cache = {}
-    _cache_timestamps = {}
 
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(CacheManager, cls).__new__(cls)
-        return cls._instance
-
-    @classmethod
-    def get(cls, key: str, max_age: int = 60) -> Optional[Dict]:
-        """
-        Get data from cache if it exists and is not stale.
-        Args:
-            key: Cache key (usually the date string)
-            max_age: Maximum age of cached data in seconds
-        Returns:
-            Cached data if valid, None if missing or stale
-        """
-        if key not in cls._cache:
-            return None
-
-        timestamp = cls._cache_timestamps.get(key, 0)
-        if time.time() - timestamp > max_age:
-            # Data is stale, remove it
-            del cls._cache[key]
-            del cls._cache_timestamps[key]
-            return None
-
-        return cls._cache[key]
-
-    @classmethod
-    def set(cls, key: str, data: Dict) -> None:
-        """
-        Store data in cache with current timestamp.
-        Args:
-            key: Cache key (usually the date string)
-            data: Data to cache
-        """
-        cls._cache[key] = data
-        cls._cache_timestamps[key] = time.time()
-
-    @classmethod
-    def clear(cls) -> None:
-        """Clear all cached data."""
-        cls._cache.clear()
-        cls._cache_timestamps.clear()
 
 
 class BaseNFLManager: # Renamed class
@@ -102,8 +53,6 @@ class BaseNFLManager: # Renamed class
         self.current_game = None
         self.fonts = self._load_fonts()
         self.favorite_teams = self.nfl_config.get("favorite_teams", [])
-        self.fetch_past_games = self.nfl_config.get("fetch_past_games", 1)
-        self.fetch_future_games = self.nfl_config.get("fetch_future_games", 1)
 
         # Check display modes to determine what data to fetch
         display_modes = self.nfl_config.get("display_modes", {})
@@ -121,6 +70,16 @@ class BaseNFLManager: # Renamed class
         self.display_height = hardware_config.get("rows", 32)
 
         self._logo_cache = {}
+
+        # Set up session with retry logic
+        self.session = requests.Session()
+        self.session.mount('http://', requests.adapters.HTTPAdapter(max_retries=3))
+        self.session.mount('https://', requests.adapters.HTTPAdapter(max_retries=3))
+        
+        # Set up headers for ESPN API
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
 
         self.logger.info(f"Initialized NFL manager with display dimensions: {self.display_width}x{self.display_height}")
         self.logger.info(f"Logo directory: {self.logo_dir}")
@@ -172,7 +131,7 @@ class BaseNFLManager: # Renamed class
         except Exception as e:
             self.logger.error(f"Error fetching odds for game {game.get('id', 'N/A')}: {e}")
             
-    def _fetch_shared_data(self) -> None:
+    def _fetch_shared_data(self) -> Optional[Dict]:
         """
         Fetches the full season schedule for NFL, caches it, and then filters
         for relevant games based on the current configuration.
@@ -199,11 +158,11 @@ class BaseNFLManager: # Renamed class
                 self.logger.info(f"[NFL] Successfully fetched and cached {len(events)} events for the {current_year} season.")
             except requests.exceptions.RequestException as e:
                 self.logger.error(f"[NFL] API error fetching full schedule: {e}")
-                return
+                return None
         
         if not events:
             self.logger.warning("[NFL] No events found in the schedule data.")
-            return
+            return None
 
         # Filter the events for live, upcoming, and recent games
         live_events = []
@@ -227,52 +186,16 @@ class BaseNFLManager: # Renamed class
         upcoming_events.sort(key=lambda x: x['date'])
         past_events.sort(key=lambda x: x['date'], reverse=True)
 
-        # Select the correct number of games for favorite teams
-        selected_upcoming = []
-        if self.upcoming_enabled and self.favorite_teams:
-            games_found = {team: 0 for team in self.favorite_teams}
-            for game in upcoming_events:
-                competitors = game.get('competitions', [{}])[0].get('competitors', [])
-                home_team = next((c['team']['abbreviation'] for c in competitors if c.get('homeAway') == 'home'), '')
-                away_team = next((c['team']['abbreviation'] for c in competitors if c.get('homeAway') == 'away'), '')
-
-                # Check if this game involves any favorite teams that still need games
-                team_in_game = None
-                if home_team in self.favorite_teams and games_found[home_team] < self.fetch_future_games:
-                    team_in_game = home_team
-                elif away_team in self.favorite_teams and games_found[away_team] < self.fetch_future_games:
-                    team_in_game = away_team
-                
-                if team_in_game:
-                    selected_upcoming.append(game)
-                    games_found[team_in_game] += 1
-                    # Stop if we have found enough games for all teams
-                    if all(count >= self.fetch_future_games for count in games_found.values()):
-                        break
-        
-        selected_past = []
-        if self.recent_enabled and self.favorite_teams:
-            games_found = {team: 0 for team in self.favorite_teams}
-            for game in past_events:
-                competitors = game.get('competitions', [{}])[0].get('competitors', [])
-                home_team = next((c['team']['abbreviation'] for c in competitors if c.get('homeAway') == 'home'), '')
-                away_team = next((c['team']['abbreviation'] for c in competitors if c.get('homeAway') == 'away'), '')
-
-                team_in_game = None
-                if home_team in self.favorite_teams and games_found[home_team] < self.fetch_past_games:
-                    team_in_game = home_team
-                elif away_team in self.favorite_teams and games_found[away_team] < self.fetch_past_games:
-                    team_in_game = away_team
-
-                if team_in_game:
-                    selected_past.append(game)
-                    games_found[team_in_game] += 1
-                    if all(count >= self.fetch_past_games for count in games_found.values()):
-                        break
+        # Include all games in shared data - let individual managers filter by count
+        selected_upcoming = upcoming_events
+        selected_past = past_events
 
         # Combine all relevant events into a single list
         BaseNFLManager.all_events = live_events + selected_upcoming + selected_past
         self.logger.info(f"[NFL] Processed schedule: {len(live_events)} live, {len(selected_upcoming)} upcoming, {len(selected_past)} recent games.")
+        
+        # Return the data in the expected format
+        return {'events': BaseNFLManager.all_events}
 
     def _fetch_data(self, date_str: str = None) -> Optional[Dict]:
         """Fetch data using shared data mechanism or direct fetch for live."""
@@ -294,7 +217,11 @@ class BaseNFLManager: # Renamed class
                 return None
         else:
             # For non-live games, use the shared cache
-            return self._fetch_shared_data()
+            shared_data = self._fetch_shared_data()
+            if shared_data is None:
+                self.logger.warning("[NFL] No shared data available")
+                return None
+            return shared_data
 
     def _load_fonts(self):
         """Load fonts used by the scoreboard."""
@@ -949,8 +876,8 @@ class NFLRecentManager(BaseNFLManager): # Renamed class
             processed_games = []
             for event in events:
                 game = self._extract_game_details(event)
-                # Filter criteria: must be final, within time window
-                if game and game['is_final'] and game.get('is_within_window', True): # Assume within window if key missing
+                # Filter criteria: must be final
+                if game and game['is_final']:
                     # Fetch odds if enabled
                     if self.show_odds:
                         self._fetch_odds(game)
@@ -966,6 +893,10 @@ class NFLRecentManager(BaseNFLManager): # Renamed class
 
             # Sort by game time, most recent first
             team_games.sort(key=lambda g: g.get('start_time_utc') or datetime.min.replace(tzinfo=self._get_timezone()), reverse=True)
+            
+            # Limit to the specified number of recent games (default 5)
+            recent_games_to_show = self.nfl_config.get("recent_games_to_show", 5)
+            team_games = team_games[:recent_games_to_show]
 
             # Check if the list of games to display has changed
             new_game_ids = {g['id'] for g in team_games}
@@ -1152,8 +1083,8 @@ class NFLUpcomingManager(BaseNFLManager): # Renamed class
             processed_games = []
             for event in events:
                 game = self._extract_game_details(event)
-                # Filter criteria: must be upcoming ('pre' state) and within time window
-                if game and game['is_upcoming'] and game.get('is_within_window', True): # Assume within window if key missing
+                # Filter criteria: must be upcoming ('pre' state)
+                if game and game['is_upcoming']:
                      # Fetch odds if enabled
                      if self.show_odds:
                          self._fetch_odds(game)
@@ -1177,6 +1108,10 @@ class NFLUpcomingManager(BaseNFLManager): # Renamed class
 
             # Sort by game time, earliest first
             team_games.sort(key=lambda g: g.get('start_time_utc') or datetime.max.replace(tzinfo=self._get_timezone()))
+            
+            # Limit to the specified number of upcoming games (default 10)
+            upcoming_games_to_show = self.nfl_config.get("upcoming_games_to_show", 10)
+            team_games = team_games[:upcoming_games_to_show]
 
             # Log changes or periodically
             should_log = (

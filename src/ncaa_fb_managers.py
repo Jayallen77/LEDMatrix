@@ -54,6 +54,9 @@ class BaseNCAAFBManager: # Renamed class
         self.update_interval = self.ncaa_fb_config.get("update_interval_seconds", 60)
         self.show_records = self.ncaa_fb_config.get('show_records', False)
         self.season_cache_duration = self.ncaa_fb_config.get("season_cache_duration_seconds", 86400)  # 24 hours default
+        # Number of games to show (instead of time-based windows)
+        self.recent_games_to_show = self.ncaa_fb_config.get("recent_games_to_show", 5)  # Show last 5 games
+        self.upcoming_games_to_show = self.ncaa_fb_config.get("upcoming_games_to_show", 10)  # Show next 10 games
         
         # Set up session with retry logic
         self.session = requests.Session()
@@ -79,8 +82,6 @@ class BaseNCAAFBManager: # Renamed class
         self.current_game = None
         self.fonts = self._load_fonts()
         self.favorite_teams = self.ncaa_fb_config.get("favorite_teams", [])
-        self.fetch_past_games = self.ncaa_fb_config.get("fetch_past_games", 1)
-        self.fetch_future_games = self.ncaa_fb_config.get("fetch_future_games", 1)
 
         # Check display modes to determine what data to fetch
         display_modes = self.ncaa_fb_config.get("display_modes", {})
@@ -219,46 +220,9 @@ class BaseNCAAFBManager: # Renamed class
         upcoming_events.sort(key=lambda x: x['date'])
         past_events.sort(key=lambda x: x['date'], reverse=True)
 
-        # Select the correct number of games for favorite teams
-        selected_upcoming = []
-        if self.upcoming_enabled and self.favorite_teams:
-            games_found = {team: 0 for team in self.favorite_teams}
-            for game in upcoming_events:
-                competitors = game.get('competitions', [{}])[0].get('competitors', [])
-                home_team = next((c['team']['abbreviation'] for c in competitors if c.get('homeAway') == 'home'), '')
-                away_team = next((c['team']['abbreviation'] for c in competitors if c.get('homeAway') == 'away'), '')
-
-                team_in_game = None
-                if home_team in self.favorite_teams and games_found[home_team] < self.fetch_future_games:
-                    team_in_game = home_team
-                elif away_team in self.favorite_teams and games_found[away_team] < self.fetch_future_games:
-                    team_in_game = away_team
-                
-                if team_in_game:
-                    selected_upcoming.append(game)
-                    games_found[team_in_game] += 1
-                    if all(count >= self.fetch_future_games for count in games_found.values()):
-                        break
-        
-        selected_past = []
-        if self.recent_enabled and self.favorite_teams:
-            games_found = {team: 0 for team in self.favorite_teams}
-            for game in past_events:
-                competitors = game.get('competitions', [{}])[0].get('competitors', [])
-                home_team = next((c['team']['abbreviation'] for c in competitors if c.get('homeAway') == 'home'), '')
-                away_team = next((c['team']['abbreviation'] for c in competitors if c.get('homeAway') == 'away'), '')
-
-                team_in_game = None
-                if home_team in self.favorite_teams and games_found[home_team] < self.fetch_past_games:
-                    team_in_game = home_team
-                elif away_team in self.favorite_teams and games_found[away_team] < self.fetch_past_games:
-                    team_in_game = away_team
-
-                if team_in_game:
-                    selected_past.append(game)
-                    games_found[team_in_game] += 1
-                    if all(count >= self.fetch_past_games for count in games_found.values()):
-                        break
+        # Include all games in shared data - let individual managers filter by count
+        selected_upcoming = upcoming_events
+        selected_past = past_events
 
         # Combine all relevant events into a single list
         BaseNCAAFBManager.all_events = live_events + selected_upcoming + selected_past
@@ -559,6 +523,9 @@ class BaseNCAAFBManager: # Renamed class
             home_timeouts = home_team.get("timeouts", 3) # Default to 3 if not specified
             away_timeouts = away_team.get("timeouts", 3) # Default to 3 if not specified
 
+            # For upcoming games, we'll show based on number of games, not time window
+            # For recent games, we'll show based on number of games, not time window
+            is_within_window = True  # Always include games, let the managers filter by count
 
             details = {
                 "id": game_event.get("id"),
@@ -586,6 +553,7 @@ class BaseNCAAFBManager: # Renamed class
                 "down_distance_text": down_distance_text, # Added Down/Distance
                 "possession": situation.get("possession") if situation else None, # ID of team with possession
                 "possession_indicator": possession_indicator, # Added for easy home/away check
+                "is_within_window": is_within_window, # Whether game is within display window
             }
 
             # Basic validation (can be expanded)
@@ -999,12 +967,12 @@ class NCAAFBRecentManager(BaseNCAAFBManager): # Renamed class
                 events = data['events']
                 # self.logger.info(f"[NCAAFB Recent] Processing {len(events)} events from shared data.") # Changed log prefix
 
-                # Process games and filter for final & within window & favorite teams
+                # Process games and filter for final games & favorite teams
                 processed_games = []
                 for event in events:
                     game = self._extract_game_details(event)
-                    # Filter criteria: must be final, within time window
-                    if game and game['is_final'] and game.get('is_within_window', True): # Assume within window if key missing, check logic
+                    # Filter criteria: must be final
+                    if game and game['is_final']:
                         processed_games.append(game)
 
                 # Filter for favorite teams
@@ -1017,6 +985,9 @@ class NCAAFBRecentManager(BaseNCAAFBManager): # Renamed class
 
                 # Sort by game time, most recent first
                 team_games.sort(key=lambda g: g.get('start_time_utc') or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+                
+                # Limit to the specified number of recent games
+                team_games = team_games[:self.recent_games_to_show]
 
                 # Cache the processed games
                 self._cache_processed_games('recent', team_games)
@@ -1212,8 +1183,8 @@ class NCAAFBUpcomingManager(BaseNCAAFBManager): # Renamed class
                 processed_games = []
                 for event in events:
                     game = self._extract_game_details(event)
-                    # Filter criteria: must be upcoming ('pre' state) and within time window
-                    if game and game['is_upcoming'] and game.get('is_within_window', True): # Assume within window if key missing, check logic
+                    # Filter criteria: must be upcoming ('pre' state)
+                    if game and game['is_upcoming']:
                          processed_games.append(game)
 
                 # Debug logging to see what games we have
@@ -1246,6 +1217,9 @@ class NCAAFBUpcomingManager(BaseNCAAFBManager): # Renamed class
 
                 # Sort by game time, earliest first
                 team_games.sort(key=lambda g: g.get('start_time_utc') or datetime.max.replace(tzinfo=timezone.utc))
+                
+                # Limit to the specified number of upcoming games
+                team_games = team_games[:self.upcoming_games_to_show]
 
                 # Cache the processed games
                 self._cache_processed_games('upcoming', team_games)

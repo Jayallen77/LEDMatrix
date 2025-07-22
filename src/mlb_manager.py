@@ -414,6 +414,7 @@ class BaseMLBManager:
                 response.raise_for_status()
                 
                 data = response.json()
+                self.logger.info(f"Found {len(data.get('events', []))} total games for date {date}")
                 
                 for event in data.get('events', []):
                     game_id = event['id']
@@ -435,6 +436,9 @@ class BaseMLBManager:
 
                     # Check if this is a favorite team game
                     is_favorite_game = (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams)
+                    
+                    # Log all teams found for debugging
+                    self.logger.debug(f"Found game: {away_abbr} @ {home_abbr} (Status: {status}, State: {status_state})")
                     
                     # Only log detailed information for favorite teams
                     if is_favorite_game:
@@ -1070,7 +1074,7 @@ class MLBRecentManager(BaseMLBManager):
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = self.mlb_config.get('recent_update_interval', 3600)
-        self.recent_hours = self.mlb_config.get('recent_game_hours', 72)  # Increased from 48 to 72 hours
+        self.recent_games_to_show = self.mlb_config.get('recent_games_to_show', 5)  # Show last 5 games
         self.last_game_switch = 0  # Track when we last switched games
         self.game_display_duration = 10  # Display each game for 10 seconds
         self.last_warning_time = 0
@@ -1094,13 +1098,11 @@ class MLBRecentManager(BaseMLBManager):
                 
             # Process games
             new_recent_games = []
-            now = datetime.now(timezone.utc)  # Make timezone-aware
-            recent_cutoff = now - timedelta(hours=self.recent_hours)
             
-            self.logger.info(f"[MLB] Recent games time window: {recent_cutoff} to {now}")
+            self.logger.info(f"[MLB] Processing {len(games)} games for recent games...")
             
             for game_id, game in games.items():
-                self.logger.info(f"[MLB] Processing game {game_id} for recent games...")
+                self.logger.debug(f"[MLB] Processing game {game_id} for recent games...")
                 # Convert game time to UTC datetime
                 game_time_str = game['start_time'].replace('Z', '+00:00')
                 game_time = datetime.fromisoformat(game_time_str)
@@ -1112,7 +1114,7 @@ class MLBRecentManager(BaseMLBManager):
                                   game['away_team'] in self.favorite_teams)
                 
                 if not is_favorite_game:
-                    self.logger.info(f"[MLB] Skipping game {game_id} - not a favorite team.")
+                    self.logger.debug(f"[MLB] Skipping game {game_id} - not a favorite team.")
                     continue
 
                 self.logger.info(f"[MLB] Favorite team game found: {game['away_team']} @ {game['home_team']}")
@@ -1121,18 +1123,21 @@ class MLBRecentManager(BaseMLBManager):
                 
                 # Use status_state to determine if game is final
                 is_final = game['status_state'] in ['post', 'final', 'completed']
-                is_within_time = recent_cutoff <= game_time <= now
                 
-                self.logger.info(f"[MLB] Game Time: {game_time.isoformat()}, Cutoff Time: {recent_cutoff.isoformat()}, Now: {now.isoformat()}")
-                self.logger.info(f"[MLB] Is final: {is_final}, Is within time window: {is_within_time}")
+                self.logger.info(f"[MLB] Game Time: {game_time.isoformat()}")
+                self.logger.info(f"[MLB] Is final: {is_final}")
                 
-                # Only add favorite team games that are final and within time window
-                if is_final and is_within_time:
+                # Only add favorite team games that are final
+                if is_final:
                     self.logger.info(f"[MLB] Adding game {game_id} to recent games list.")
                     self._fetch_odds(game)
                     new_recent_games.append(game)
                 else:
-                    self.logger.info(f"[MLB] Skipping game {game_id} - does not meet criteria for recent games.")
+                    self.logger.info(f"[MLB] Skipping game {game_id} - not final.")
+            
+            # Sort by game time (most recent first) and limit to recent_games_to_show
+            new_recent_games.sort(key=lambda x: x['start_time'], reverse=True)
+            new_recent_games = new_recent_games[:self.recent_games_to_show]
             
             if new_recent_games:
                 logger.info(f"[MLB] Found {len(new_recent_games)} recent games for favorite teams: {self.favorite_teams}")
@@ -1188,6 +1193,7 @@ class MLBUpcomingManager(BaseMLBManager):
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = self.mlb_config.get('upcoming_update_interval', 3600)
+        self.upcoming_games_to_show = self.mlb_config.get('upcoming_games_to_show', 10)  # Show next 10 games
         self.last_warning_time = 0
         self.warning_cooldown = 300  # Only show warning every 5 minutes
         self.last_game_switch = 0  # Track when we last switched games
@@ -1211,19 +1217,17 @@ class MLBUpcomingManager(BaseMLBManager):
 
             # Process games
             new_upcoming_games = []
-            now = datetime.now(timezone.utc)  # Make timezone-aware
-            upcoming_cutoff = now + timedelta(hours=24)
             
-            self.logger.info(f"[MLB] Upcoming games time window: {now} to {upcoming_cutoff}")
+            self.logger.info(f"[MLB] Processing {len(games)} games for upcoming games...")
             
             for game_id, game in games.items():
-                self.logger.info(f"[MLB] Processing game {game_id} for upcoming games...")
+                self.logger.debug(f"[MLB] Processing game {game_id} for upcoming games...")
                 # Check if this is a favorite team game first
                 is_favorite_game = (game['home_team'] in self.favorite_teams or 
                                   game['away_team'] in self.favorite_teams)
                 
                 if not is_favorite_game:
-                    self.logger.info(f"[MLB] Skipping game {game_id} - not a favorite team.")
+                    self.logger.debug(f"[MLB] Skipping game {game_id} - not a favorite team.")
                     continue
                         
                 game_time = datetime.fromisoformat(game['start_time'].replace('Z', '+00:00'))
@@ -1234,20 +1238,14 @@ class MLBUpcomingManager(BaseMLBManager):
                 self.logger.info(f"[MLB] Favorite team game found: {game['away_team']} @ {game['home_team']} at {game_time}")
                 self.logger.info(f"[MLB] Game status: {game['status']}, State: {game['status_state']}")
                 
-                # Check if game is within our time window
-                is_within_time = now <= game_time <= upcoming_cutoff
-                
                 # For upcoming games, we'll consider any game that:
-                # 1. Is within our time window
-                # 2. Is not final (not 'post' or 'final' state)
-                # 3. Has a future start time
+                # 1. Is not final (not 'post' or 'final' state)
+                # 2. Has a future start time
                 is_upcoming = (
-                    is_within_time and 
                     game['status_state'] not in ['post', 'final', 'completed'] and
-                    game_time > now
+                    game_time > datetime.now(timezone.utc)
                 )
                 
-                self.logger.info(f"[MLB] Is within time window: {is_within_time}")
                 self.logger.info(f"[MLB] Is upcoming: {is_upcoming}")
                 
                 if is_upcoming:
@@ -1255,16 +1253,15 @@ class MLBUpcomingManager(BaseMLBManager):
                     self._fetch_odds(game)
                     new_upcoming_games.append(game)
                 else:
-                    self.logger.info(f"[MLB] Skipping game {game_id} - does not meet criteria for upcoming games.")
+                    self.logger.info(f"[MLB] Skipping game {game_id} - not upcoming.")
                 
-            # Filter for favorite teams (though we already filtered above, this is a safety check)
-            new_team_games = [game for game in new_upcoming_games 
-                             if game['home_team'] in self.favorite_teams or 
-                                game['away_team'] in self.favorite_teams]
+            # Sort by game time (soonest first) and limit to upcoming_games_to_show
+            new_upcoming_games.sort(key=lambda x: x['start_time'])
+            new_upcoming_games = new_upcoming_games[:self.upcoming_games_to_show]
                 
-            if new_team_games:
-                logger.info(f"[MLB] Found {len(new_team_games)} upcoming games for favorite teams")
-                self.upcoming_games = new_team_games
+            if new_upcoming_games:
+                logger.info(f"[MLB] Found {len(new_upcoming_games)} upcoming games for favorite teams")
+                self.upcoming_games = new_upcoming_games
                 if not self.current_game:
                     self.current_game = self.upcoming_games[0]
             else:

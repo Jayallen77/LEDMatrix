@@ -942,7 +942,7 @@ class MiLBRecentManager(BaseMiLBManager):
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = self.milb_config.get('recent_update_interval', 3600)  # 1 hour
-        self.recent_hours = self.milb_config.get('recent_game_hours', 72)  # Increased from 48 to 72 hours
+        self.recent_games_to_show = self.milb_config.get('recent_games_to_show', 5)  # Show last 5 games
         self.last_game_switch = 0  # Track when we last switched games
         self.game_display_duration = 10  # Display each game for 10 seconds
         self.last_warning_time = 0
@@ -966,10 +966,8 @@ class MiLBRecentManager(BaseMiLBManager):
                 
             # Process games
             new_recent_games = []
-            now = datetime.now(timezone.utc)  # Make timezone-aware
-            recent_cutoff = now - timedelta(hours=self.recent_hours)
             
-            logger.info(f"[MiLB] Time window: {recent_cutoff} to {now}")
+            logger.info(f"[MiLB] Processing {len(games)} games for recent games...")
             
             for game_id, game in games.items():
                 # Convert game time to UTC datetime
@@ -989,15 +987,18 @@ class MiLBRecentManager(BaseMiLBManager):
                 
                 # Use status_state to determine if game is final
                 is_final = game['status_state'] in ['post', 'final', 'completed']
-                is_within_time = recent_cutoff <= game_time <= now
                 
-                self.logger.info(f"[MiLB] Game Time: {game_time.isoformat()}, Cutoff Time: {recent_cutoff.isoformat()}, Now: {now.isoformat()}")
-                self.logger.info(f"[MiLB] Is final: {is_final}, Is within time window: {is_within_time}")
+                self.logger.info(f"[MiLB] Game Time: {game_time.isoformat()}")
+                self.logger.info(f"[MiLB] Is final: {is_final}")
 
-                # Only add favorite team games that are final and within time window
-                if is_final and is_within_time:
+                # Only add favorite team games that are final
+                if is_final:
                     new_recent_games.append(game)
                     logger.info(f"[MiLB] Added favorite team game to recent list: {game['away_team']} @ {game['home_team']}")
+            
+            # Sort by game time (most recent first) and limit to recent_games_to_show
+            new_recent_games.sort(key=lambda x: x['start_time'], reverse=True)
+            new_recent_games = new_recent_games[:self.recent_games_to_show]
             
             if new_recent_games:
                 logger.info(f"[MiLB] Found {len(new_recent_games)} recent games for favorite teams: {self.favorite_teams}")
@@ -1053,6 +1054,7 @@ class MiLBUpcomingManager(BaseMiLBManager):
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = self.milb_config.get('upcoming_update_interval', 3600) # 1 hour
+        self.upcoming_games_to_show = self.milb_config.get('upcoming_games_to_show', 10)  # Show next 10 games
         self.last_warning_time = 0
         self.warning_cooldown = 300  # Only show warning every 5 minutes
         self.last_game_switch = 0  # Track when we last switched games
@@ -1073,24 +1075,44 @@ class MiLBUpcomingManager(BaseMiLBManager):
             if games:
                 # Process games
                 new_upcoming_games = []
-                now = datetime.now(timezone.utc)  # Make timezone-aware
-                upcoming_cutoff = now + timedelta(hours=24)
                 
-                logger.info(f"Looking for games between {now} and {upcoming_cutoff}")
+                logger.info(f"[MiLB] Processing {len(games)} games for upcoming games...")
                 
-                for game in games.get('events', []):
-                    game_data = self._extract_game_details(game)
-                    if game_data:
-                        new_upcoming_games.append(game_data)
+                for game_id, game in games.items():
+                    # Convert game time to UTC datetime
+                    game_time_str = game['start_time'].replace('Z', '+00:00')
+                    game_time = datetime.fromisoformat(game_time_str)
+                    if game_time.tzinfo is None:
+                        game_time = game_time.replace(tzinfo=timezone.utc)
+                    
+                    # Check if this is a favorite team game
+                    is_favorite_game = (game['home_team'] in self.favorite_teams or 
+                                      game['away_team'] in self.favorite_teams)
+                    
+                    if is_favorite_game:
+                        logger.info(f"[MiLB] Checking favorite team game: {game['away_team']} @ {game['home_team']}")
+                        logger.info(f"[MiLB] Game time (UTC): {game_time}")
+                        logger.info(f"[MiLB] Game status: {game['status']}, State: {game['status_state']}")
+                    
+                    # For upcoming games, we'll consider any game that:
+                    # 1. Is not final (not 'post' or 'final' state)
+                    # 2. Has a future start time
+                    is_upcoming = (
+                        game['status_state'] not in ['post', 'final', 'completed'] and
+                        game_time > datetime.now(timezone.utc)
+                    )
+                    
+                    if is_upcoming:
+                        new_upcoming_games.append(game)
+                        logger.info(f"[MiLB] Added favorite team game to upcoming list: {game['away_team']} @ {game['home_team']}")
                 
-                # Filter for favorite teams (though we already filtered above, this is a safety check)
-                new_team_games = [game for game in new_upcoming_games 
-                             if game['home_team'] in self.favorite_teams or 
-                                game['away_team'] in self.favorite_teams]
+                # Sort by game time (soonest first) and limit to upcoming_games_to_show
+                new_upcoming_games.sort(key=lambda x: x['start_time'])
+                new_upcoming_games = new_upcoming_games[:self.upcoming_games_to_show]
                 
-                if new_team_games:
-                    logger.info(f"[MiLB] Found {len(new_team_games)} upcoming games for favorite teams")
-                    self.upcoming_games = new_team_games
+                if new_upcoming_games:
+                    logger.info(f"[MiLB] Found {len(new_upcoming_games)} upcoming games for favorite teams")
+                    self.upcoming_games = new_upcoming_games
                     if not self.current_game:
                         self.current_game = self.upcoming_games[0]
                 else:
