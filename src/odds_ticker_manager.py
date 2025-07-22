@@ -484,6 +484,15 @@ class OddsTickerManager:
         if away_logo:
             away_logo = away_logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
         
+        broadcast_logo_col_width = 0
+        if broadcast_logo:
+            # Make the broadcast logo fit neatly within the display height
+            b_logo_h = height - 4  # 2px padding top and bottom
+            ratio = b_logo_h / broadcast_logo.height
+            b_logo_w = int(broadcast_logo.width * ratio)
+            broadcast_logo = broadcast_logo.resize((b_logo_w, b_logo_h), Image.Resampling.LANCZOS)
+            broadcast_logo_col_width = b_logo_w
+        
         # Format date and time into 3 parts
         game_time = game['start_time']
         timezone_str = self.config.get('timezone', 'UTC')
@@ -507,12 +516,6 @@ class OddsTickerManager:
         date_width = int(temp_draw.textlength(date_text, font=datetime_font))
         time_width = int(temp_draw.textlength(time_text, font=datetime_font))
         datetime_col_width = max(day_width, date_width, time_width)
-
-        if broadcast_logo:
-            # Resize broadcast logo to fit the datetime column width
-            ratio = datetime_col_width / broadcast_logo.width
-            new_height = int(broadcast_logo.height * ratio)
-            broadcast_logo = broadcast_logo.resize((datetime_col_width, new_height), Image.Resampling.LANCZOS)
 
         # "vs." text
         vs_text = "vs."
@@ -571,6 +574,8 @@ class OddsTickerManager:
         # --- Calculate total width ---
         total_width = (logo_size + logo_padding + vs_width + vs_padding + logo_size + section_padding +
                        team_info_width + section_padding + odds_width + section_padding + datetime_col_width + section_padding)
+        if broadcast_logo:
+            total_width += broadcast_logo_col_width + section_padding
 
         # --- Create final image ---
         image = Image.new('RGB', (int(total_width), height), color=(0, 0, 0))
@@ -632,10 +637,12 @@ class OddsTickerManager:
         draw.text((current_x, day_y), day_text, font=datetime_font, fill=(255, 255, 255))
         draw.text((current_x, date_y), date_text, font=datetime_font, fill=(255, 255, 255))
         draw.text((current_x, time_y), time_text, font=datetime_font, fill=(255, 255, 255))
+        current_x += datetime_col_width + section_padding
 
         if broadcast_logo:
-            # Position the broadcast logo below the time text
-            logo_y = time_y + datetime_font_height + 2
+            # Position the broadcast logo in its own column
+            logo_y = (height - broadcast_logo.height) // 2
+            logger.debug(f"Pasting broadcast logo at ({int(current_x)}, {logo_y})")
             image.paste(broadcast_logo, (int(current_x), logo_y), broadcast_logo if broadcast_logo.mode == 'RGBA' else None)
 
 
