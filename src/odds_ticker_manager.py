@@ -31,6 +31,8 @@ class OddsTickerManager:
         "ESPN3": "espn3",
         "ESPNU": "espnu",
         "ESPNEWS": "espn",
+        "ESPN+": "espn",
+        "ESPN Plus": "espn",
         "FOX": "fox",
         "FS1": "fs1",
         "FS2": "fs2",
@@ -44,7 +46,12 @@ class OddsTickerManager:
         "SECN": "espn-sec-us",
         "TBS": "tbs",
         "TNT": "tnt",
-        "truTV": "tru"
+        "truTV": "tru",
+        "Peacock": "nbc",
+        "Paramount+": "cbs",
+        "Hulu": "espn",
+        "Disney+": "espn",
+        "Apple TV+": "nbc"
     }
     
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
@@ -368,7 +375,19 @@ class OddsTickerManager:
                                 broadcasts = event.get('competitions', [{}])[0].get('broadcasts', [])
                                 if broadcasts:
                                     broadcast_info = [b.get('media', {}).get('shortName', '') for b in broadcasts if b.get('media', {}).get('shortName')]
-                                    logger.debug(f"Found broadcast channels for game {game_id}: {broadcast_info}")
+                                    logger.info(f"Found broadcast channels for game {game_id}: {broadcast_info}")
+                                    logger.debug(f"Raw broadcasts data for game {game_id}: {broadcasts}")
+                                    # Log the first broadcast structure for debugging
+                                    if broadcasts:
+                                        logger.debug(f"First broadcast structure: {broadcasts[0]}")
+                                        if 'media' in broadcasts[0]:
+                                            logger.debug(f"Media structure: {broadcasts[0]['media']}")
+                                else:
+                                    logger.debug(f"No broadcasts data found for game {game_id}")
+                                    # Log the competitions structure to see what's available
+                                    competitions = event.get('competitions', [])
+                                    if competitions:
+                                        logger.debug(f"Competitions structure for game {game_id}: {competitions[0].keys()}")
 
                                 # Only process favorite teams if enabled
                                 if self.show_favorite_teams_only:
@@ -527,34 +546,43 @@ class OddsTickerManager:
         home_logo = self._get_team_logo(game['home_team'], game['logo_dir'])
         away_logo = self._get_team_logo(game['away_team'], game['logo_dir'])
         broadcast_logo = None
+        
+        # Enhanced broadcast logo debugging
         if self.show_channel_logos:
             broadcast_names = game.get('broadcast_info', [])  # This is now a list
-            logger.debug(f"Game {game.get('id')}: Raw broadcast info from API: {broadcast_names}")
+            logger.info(f"Game {game.get('id')}: Raw broadcast info from API: {broadcast_names}")
+            logger.info(f"Game {game.get('id')}: show_channel_logos setting: {self.show_channel_logos}")
             
             if broadcast_names:
                 logo_name = None
                 # Sort keys by length, descending, to match more specific names first (e.g., "ESPNEWS" before "ESPN")
                 sorted_keys = sorted(self.BROADCAST_LOGO_MAP.keys(), key=len, reverse=True)
+                logger.debug(f"Game {game.get('id')}: Available broadcast logo keys: {sorted_keys}")
 
                 for b_name in broadcast_names:
+                    logger.debug(f"Game {game.get('id')}: Checking broadcast name: '{b_name}'")
                     for key in sorted_keys:
                         if key in b_name:
                             logo_name = self.BROADCAST_LOGO_MAP[key]
+                            logger.info(f"Game {game.get('id')}: Matched '{key}' to logo '{logo_name}' for broadcast '{b_name}'")
                             break  # Found the best match for this b_name
                     if logo_name:
                         break  # Found a logo, stop searching through broadcast list
 
-                logger.debug(f"Game {game.get('id')}: Mapped logo name: '{logo_name}' from broadcast names: {broadcast_names}")
+                logger.info(f"Game {game.get('id')}: Final mapped logo name: '{logo_name}' from broadcast names: {broadcast_names}")
                 if logo_name:
                     broadcast_logo = self._get_team_logo(logo_name, 'assets/broadcast_logos')
                     if broadcast_logo:
-                        logger.debug(f"Game {game.get('id')}: Successfully loaded broadcast logo for '{logo_name}'")
+                        logger.info(f"Game {game.get('id')}: Successfully loaded broadcast logo for '{logo_name}' - Size: {broadcast_logo.size}")
                     else:
                         logger.warning(f"Game {game.get('id')}: Failed to load broadcast logo for '{logo_name}'")
+                        # Check if the file exists
+                        logo_path = os.path.join('assets', 'broadcast_logos', f"{logo_name}.png")
+                        logger.warning(f"Game {game.get('id')}: Logo file exists: {os.path.exists(logo_path)}")
                 else:
                     logger.warning(f"Game {game.get('id')}: No mapping found for broadcast names {broadcast_names} in BROADCAST_LOGO_MAP")
             else:
-                logger.debug(f"Game {game.get('id')}: No broadcast info available.")
+                logger.info(f"Game {game.get('id')}: No broadcast info available.")
 
         if home_logo:
             home_logo = home_logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
@@ -569,7 +597,8 @@ class OddsTickerManager:
             b_logo_w = int(broadcast_logo.width * ratio)
             broadcast_logo = broadcast_logo.resize((b_logo_w, b_logo_h), Image.Resampling.LANCZOS)
             broadcast_logo_col_width = b_logo_w
-        
+            logger.info(f"Game {game.get('id')}: Resized broadcast logo to {broadcast_logo.size}, column width: {broadcast_logo_col_width}")
+
         # Format date and time into 3 parts
         game_time = game['start_time']
         timezone_str = self.config.get('timezone', 'UTC')
@@ -659,7 +688,9 @@ class OddsTickerManager:
         
         # Add width for the broadcast logo if it exists
         if broadcast_logo:
-            total_width += broadcast_logo_col_width
+            total_width += broadcast_logo_col_width + h_padding  # Add padding after broadcast logo
+        
+        logger.info(f"Game {game.get('id')}: Total width calculation - logo_size: {logo_size}, vs_width: {vs_width}, team_info_width: {team_info_width}, odds_width: {odds_width}, datetime_col_width: {datetime_col_width}, broadcast_logo_col_width: {broadcast_logo_col_width}, total_width: {total_width}")
 
         # --- Create final image ---
         image = Image.new('RGB', (int(total_width), height), color=(0, 0, 0))
@@ -726,8 +757,12 @@ class OddsTickerManager:
         if broadcast_logo:
             # Position the broadcast logo in its own column
             logo_y = (height - broadcast_logo.height) // 2
-            logger.debug(f"Pasting broadcast logo at ({int(current_x)}, {logo_y})")
+            logger.info(f"Game {game.get('id')}: Pasting broadcast logo at ({int(current_x)}, {logo_y})")
+            logger.info(f"Game {game.get('id')}: Broadcast logo size: {broadcast_logo.size}, image total width: {image.width}")
             image.paste(broadcast_logo, (int(current_x), logo_y), broadcast_logo if broadcast_logo.mode == 'RGBA' else None)
+            logger.info(f"Game {game.get('id')}: Successfully pasted broadcast logo")
+        else:
+            logger.info(f"Game {game.get('id')}: No broadcast logo to paste")
 
 
         return image
