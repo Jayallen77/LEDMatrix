@@ -649,10 +649,17 @@ class OddsTickerManager:
         odds_width = max(away_odds_width, home_odds_width)
 
         # --- Calculate total width ---
-        total_width = (logo_size + h_padding + vs_width + h_padding + logo_size + h_padding +
-                       team_info_width + h_padding + odds_width + h_padding + datetime_col_width)
+        # Start with the sum of all visible components and consistent padding
+        total_width = (logo_size + h_padding + 
+                       vs_width + h_padding + 
+                       logo_size + h_padding +
+                       team_info_width + h_padding + 
+                       odds_width + h_padding + 
+                       datetime_col_width + h_padding) # Always add padding at the end
+        
+        # Add width for the broadcast logo if it exists
         if broadcast_logo:
-            total_width += h_padding + broadcast_logo_col_width
+            total_width += broadcast_logo_col_width
 
         # --- Create final image ---
         image = Image.new('RGB', (int(total_width), height), color=(0, 0, 0))
@@ -714,17 +721,13 @@ class OddsTickerManager:
         draw.text((current_x, day_y), day_text, font=datetime_font, fill=(255, 255, 255))
         draw.text((current_x, date_y), date_text, font=datetime_font, fill=(255, 255, 255))
         draw.text((current_x, time_y), time_text, font=datetime_font, fill=(255, 255, 255))
-        current_x += datetime_col_width
+        current_x += datetime_col_width + h_padding # Add padding after datetime
 
         if broadcast_logo:
-            current_x += h_padding
             # Position the broadcast logo in its own column
             logo_y = (height - broadcast_logo.height) // 2
             logger.debug(f"Pasting broadcast logo at ({int(current_x)}, {logo_y})")
             image.paste(broadcast_logo, (int(current_x), logo_y), broadcast_logo if broadcast_logo.mode == 'RGBA' else None)
-        elif not broadcast_logo:
-             # Add padding even if there's no logo to match total_width calculation
-             current_x += h_padding
 
 
         return image

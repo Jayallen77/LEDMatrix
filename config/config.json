@@ -104,7 +104,7 @@
         "enabled": false,
         "update_interval": 3600,
         "scroll_speed": 1,
-        "scroll_delay": 0.001,
+        "scroll_delay": 0.01,
         "max_headlines_per_symbol": 1,
         "headlines_per_rotation": 2
     },
@@ -286,7 +286,7 @@
         "logo_dir": "assets/sports/milb_logos",
         "show_records": true,
         "display_modes": {
-            "milb_live": true,
+            "milb_live": false,
             "milb_recent": true,
             "milb_upcoming": true
         }
