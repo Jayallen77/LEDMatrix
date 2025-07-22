@@ -19,21 +19,32 @@ class OddsTickerManager:
     """Manager for displaying scrolling odds ticker for multiple sports leagues."""
     
     BROADCAST_LOGO_MAP = {
-        "ESPN": "espn",
-        "ESPN2": "espn2",
-        "ESPNU": "espnu",
-        "ESPNEWS": "espn",
-        "SECN": "secn",
         "ACC Network": "accn",
-        "FOX": "fox",
-        "FS1": "fs1",
-        "FS2": "fs2",
+        "ACCN": "accn",
+        "ABC": "abc",
         "BTN": "btn",
         "CBS": "cbs",
         "CBSSN": "cbssn",
+        "CBS Sports Network": "cbssn",
+        "ESPN": "espn",
+        "ESPN2": "espn2",
+        "ESPN3": "espn3",
+        "ESPNU": "espnu",
+        "ESPNEWS": "espn",
+        "FOX": "fox",
+        "FS1": "fs1",
+        "FS2": "fs2",
+        "MLBN": "mlbn",
+        "MLB Network": "mlbn",
         "NBC": "nbc",
         "NFLN": "nfln",
-        "ABC": "abc"
+        "NFL Network": "nfln",
+        "PAC12": "pac12n",
+        "Pac-12 Network": "pac12n",
+        "SECN": "espn-sec-us",
+        "TBS": "tbs",
+        "TNT": "tnt",
+        "truTV": "tru"
     }
     
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
@@ -296,6 +307,11 @@ class OddsTickerManager:
                 leagues_to_fetch.append(league_config.get('league'))
 
         for league in leagues_to_fetch:
+            # As requested, do not even attempt to make API calls for MiLB.
+            if league == 'milb':
+                logger.warning("Skipping all MiLB game requests as the API endpoint is not supported.")
+                continue
+                
             for date in dates:
                 # Stop if we have enough games for favorite teams
                 if self.show_favorite_teams_only and favorite_teams and all(team_games_found.get(t, 0) >= max_games for t in favorite_teams):
@@ -307,16 +323,7 @@ class OddsTickerManager:
                     url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/scoreboard?dates={date}"
                     logger.debug(f"Fetching {league} games from ESPN API for date: {date}")
                     response = requests.get(url, timeout=10)
-
-                    # MiLB endpoint is flaky; don't treat a bad response as a fatal error.
-                    if league != 'milb':
-                        response.raise_for_status()
-
-                    # If the response isn't good (e.g., 400 for MiLB), just skip this date.
-                    if not response.ok:
-                        logger.warning(f"Skipping {league} for {date} due to bad response (status: {response.status_code})")
-                        continue
-                        
+                    response.raise_for_status()
                     data = response.json()
                     for event in data.get('events', []):
                         # Stop if we have enough games for the league (when not showing favorite teams only)
@@ -339,7 +346,7 @@ class OddsTickerManager:
                                 broadcasts = event.get('competitions', [{}])[0].get('broadcasts', [])
                                 if broadcasts:
                                     broadcast_info = broadcasts[0].get('media', {}).get('shortName', "")
-                                    logger.info(f"Found broadcast info for game {game_id}: {broadcast_info}")
+                                    logger.debug(f"Found broadcast info for game {game_id}: {broadcast_info}")
 
                                 # Only process favorite teams if enabled
                                 if self.show_favorite_teams_only:
@@ -351,15 +358,12 @@ class OddsTickerManager:
                                 home_record = home_team.get('records', [{}])[0].get('summary', '') if home_team.get('records') else ''
                                 away_record = away_team.get('records', [{}])[0].get('summary', '') if away_team.get('records') else ''
                                 
-                                # As requested by the user, do not fetch odds for MiLB
-                                odds_data = None
-                                if league != 'milb':
-                                    odds_data = self.odds_manager.get_odds(
-                                        sport=sport,
-                                        league=league,
-                                        event_id=game_id,
-                                        update_interval_seconds=7200
-                                    )
+                                odds_data = self.odds_manager.get_odds(
+                                    sport=sport,
+                                    league=league,
+                                    event_id=game_id,
+                                    update_interval_seconds=7200
+                                )
                                 
                                 has_odds = False
                                 if odds_data and not odds_data.get('no_odds'):
@@ -394,6 +398,8 @@ class OddsTickerManager:
                     # Stop if we have enough games for the league (when not showing favorite teams only)
                     if not self.show_favorite_teams_only and max_games_per_league and games_found >= max_games_per_league:
                         break
+                except requests.exceptions.HTTPError as http_err:
+                    logger.error(f"HTTP error occurred while fetching games for {league} on {date}: {http_err}")
                 except Exception as e:
                     logger.error(f"Error fetching games for {league_config.get('league', 'unknown')} on {date}: {e}", exc_info=True)
             if not self.show_favorite_teams_only and max_games_per_league and games_found >= max_games_per_league:
@@ -497,7 +503,14 @@ class OddsTickerManager:
             broadcast_name = game.get('broadcast_info', '')
             logger.debug(f"Game {game.get('id')}: Raw broadcast info from API: '{broadcast_name}'")
             if broadcast_name:
-                logo_name = self.BROADCAST_LOGO_MAP.get(broadcast_name)
+                logo_name = None
+                # Sort keys by length, descending, to match more specific names first (e.g., "ESPNEWS" before "ESPN")
+                sorted_keys = sorted(self.BROADCAST_LOGO_MAP.keys(), key=len, reverse=True)
+                for key in sorted_keys:
+                    if key in broadcast_name:
+                        logo_name = self.BROADCAST_LOGO_MAP[key]
+                        break
+                
                 logger.debug(f"Game {game.get('id')}: Mapped logo name: '{logo_name}' for broadcast name: '{broadcast_name}'")
                 if logo_name:
                     broadcast_logo = self._get_team_logo(logo_name, 'assets/broadcast_logos')
