@@ -1101,6 +1101,10 @@ class MLBRecentManager(BaseMLBManager):
             
             self.logger.info(f"[MLB] Processing {len(games)} games for recent games...")
             
+            # Log all games found for debugging
+            all_games_log = []
+            favorite_games_log = []
+            
             for game_id, game in games.items():
                 self.logger.debug(f"[MLB] Processing game {game_id} for recent games...")
                 # Convert game time to UTC datetime
@@ -1113,14 +1117,20 @@ class MLBRecentManager(BaseMLBManager):
                 is_favorite_game = (game['home_team'] in self.favorite_teams or 
                                   game['away_team'] in self.favorite_teams)
                 
+                # Log all games for debugging
+                game_info = f"{game['away_team']} @ {game['home_team']} (Status: {game['status']}, State: {game['status_state']})"
+                all_games_log.append(game_info)
+                
+                if is_favorite_game:
+                    favorite_games_log.append(game_info)
+                    self.logger.info(f"[MLB] Favorite team game found: {game['away_team']} @ {game['home_team']}")
+                    self.logger.info(f"[MLB] Game time (UTC): {game_time}")
+                    self.logger.info(f"[MLB] Game status: {game['status']}, State: {game['status_state']}")
+                
                 if not is_favorite_game:
                     self.logger.debug(f"[MLB] Skipping game {game_id} - not a favorite team.")
                     continue
 
-                self.logger.info(f"[MLB] Favorite team game found: {game['away_team']} @ {game['home_team']}")
-                self.logger.info(f"[MLB] Game time (UTC): {game_time}")
-                self.logger.info(f"[MLB] Game status: {game['status']}, State: {game['status_state']}")
-                
                 # Use status_state to determine if game is final
                 is_final = game['status_state'] in ['post', 'final', 'completed']
                 
@@ -1134,6 +1144,10 @@ class MLBRecentManager(BaseMLBManager):
                     new_recent_games.append(game)
                 else:
                     self.logger.info(f"[MLB] Skipping game {game_id} - not final.")
+            
+            # Log summary of all games found
+            self.logger.info(f"[MLB] All games found ({len(all_games_log)}): {all_games_log}")
+            self.logger.info(f"[MLB] Favorite team games found ({len(favorite_games_log)}): {favorite_games_log}")
             
             # Sort by game time (most recent first) and limit to recent_games_to_show
             new_recent_games.sort(key=lambda x: x['start_time'], reverse=True)

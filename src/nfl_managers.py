@@ -154,7 +154,7 @@ class BaseNFLManager: # Renamed class
                 response.raise_for_status()
                 data = response.json()
                 events = data.get('events', [])
-                BaseNFLManager.cache_manager.set(cache_key, events, expiration_seconds=86400) # Cache for 24 hours
+                BaseNFLManager.cache_manager.set(cache_key, events) # Cache for 24 hours
                 self.logger.info(f"[NFL] Successfully fetched and cached {len(events)} events for the {current_year} season.")
             except requests.exceptions.RequestException as e:
                 self.logger.error(f"[NFL] API error fetching full schedule: {e}")

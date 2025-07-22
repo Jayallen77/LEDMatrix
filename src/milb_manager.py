@@ -969,6 +969,10 @@ class MiLBRecentManager(BaseMiLBManager):
             
             logger.info(f"[MiLB] Processing {len(games)} games for recent games...")
             
+            # Log all games found for debugging
+            all_games_log = []
+            favorite_games_log = []
+            
             for game_id, game in games.items():
                 # Convert game time to UTC datetime
                 game_time_str = game['start_time'].replace('Z', '+00:00')
@@ -980,7 +984,12 @@ class MiLBRecentManager(BaseMiLBManager):
                 is_favorite_game = (game['home_team'] in self.favorite_teams or 
                                   game['away_team'] in self.favorite_teams)
                 
+                # Log all games for debugging
+                game_info = f"{game['away_team']} @ {game['home_team']} (Status: {game['status']}, State: {game['status_state']})"
+                all_games_log.append(game_info)
+                
                 if is_favorite_game:
+                    favorite_games_log.append(game_info)
                     logger.info(f"[MiLB] Checking favorite team game: {game['away_team']} @ {game['home_team']}")
                     logger.info(f"[MiLB] Game time (UTC): {game_time}")
                     logger.info(f"[MiLB] Game status: {game['status']}, State: {game['status_state']}")
@@ -995,6 +1004,10 @@ class MiLBRecentManager(BaseMiLBManager):
                 if is_final:
                     new_recent_games.append(game)
                     logger.info(f"[MiLB] Added favorite team game to recent list: {game['away_team']} @ {game['home_team']}")
+            
+            # Log summary of all games found
+            logger.info(f"[MiLB] All games found ({len(all_games_log)}): {all_games_log}")
+            logger.info(f"[MiLB] Favorite team games found ({len(favorite_games_log)}): {favorite_games_log}")
             
             # Sort by game time (most recent first) and limit to recent_games_to_show
             new_recent_games.sort(key=lambda x: x['start_time'], reverse=True)
