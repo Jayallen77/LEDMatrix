@@ -89,7 +89,7 @@ class BaseNCAAFBManager: # Renamed class
         self.upcoming_enabled = display_modes.get("ncaa_fb_upcoming", False)
         self.live_enabled = display_modes.get("ncaa_fb_live", False)
 
-        self.logger.setLevel(logging.DEBUG)
+        self.logger.setLevel(logging.INFO)
 
         display_config = config.get("display", {})
         hardware_config = display_config.get("hardware", {})

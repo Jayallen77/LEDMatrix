@@ -1,45 +1,42 @@
 #!/bin/bash
 
 # LEDMatrix Cache Permissions Fix Script
-# This script fixes permissions on the cache directory so it's writable by the daemon user
+# This script fixes permissions on all known cache directories so they're writable by the daemon or current user
 
 echo "Fixing LEDMatrix cache directory permissions..."
 
-CACHE_DIR="/var/cache/ledmatrix"
-
-if [ ! -d "$CACHE_DIR" ]; then
-    echo "Cache directory does not exist. Run setup_cache.sh first."
-    exit 1
-fi
+CACHE_DIRS=(
+    "/var/cache/ledmatrix"
+    "/home/ledpi/.ledmatrix_cache"
+)
 
 # Get the real user (not root when running with sudo)
 REAL_USER=${SUDO_USER:-$USER}
+REAL_GROUP=$(id -gn "$REAL_USER")
 
-echo "Current cache directory permissions:"
-ls -la "$CACHE_DIR"
+for CACHE_DIR in "${CACHE_DIRS[@]}"; do
+    echo ""
+    echo "Checking cache directory: $CACHE_DIR"
+    if [ ! -d "$CACHE_DIR" ]; then
+        echo "  - Directory does not exist. Skipping."
+        continue
+    fi
+    echo "  - Current permissions:"
+    ls -ld "$CACHE_DIR"
+    echo "  - Fixing permissions..."
+    sudo chmod 777 "$CACHE_DIR"
+    sudo chown "$REAL_USER":"$REAL_GROUP" "$CACHE_DIR"
+    echo "  - Updated permissions:"
+    ls -ld "$CACHE_DIR"
+    echo "  - Testing write access as $REAL_USER..."
+    if sudo -u "$REAL_USER" test -w "$CACHE_DIR"; then
+        echo "    ✓ $CACHE_DIR is now writable by $REAL_USER"
+    else
+        echo "    ✗ $CACHE_DIR is still not writable by $REAL_USER"
+    fi
+    echo "  - Permissions fix complete for $CACHE_DIR."
+done
 
 echo ""
-echo "Fixing permissions..."
-
-# Make the directory writable by the daemon user (which the system runs as)
-sudo chmod 777 "$CACHE_DIR"
-
-# Also set ownership to daemon:daemon to match the cache files
-sudo chown daemon:daemon "$CACHE_DIR"
-
-echo ""
-echo "Updated cache directory permissions:"
-ls -la "$CACHE_DIR"
-
-echo ""
-echo "Testing write access..."
-if sudo -u daemon test -w "$CACHE_DIR"; then
-    echo "✓ Cache directory is now writable by daemon user"
-else
-    echo "✗ Cache directory is still not writable by daemon user"
-    exit 1
-fi
-
-echo ""
-echo "Permissions fix complete! LEDMatrix should now use persistent caching."
-echo "The cache will survive system restarts." 
+echo "All cache directory permission fixes attempted."
+echo "If you still see errors, check which user is running the LEDMatrix service and ensure it matches the owner above." 
