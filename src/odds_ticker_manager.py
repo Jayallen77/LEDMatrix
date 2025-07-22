@@ -667,12 +667,16 @@ class OddsTickerManager:
 
     def _create_ticker_image(self):
         """Create a single wide image containing all game tickers."""
+        logger.info("Entering _create_ticker_image method")
         if not self.games_data:
+            logger.warning("No games data available, cannot create ticker image.")
             self.ticker_image = None
             return
 
+        logger.info(f"Creating ticker image for {len(self.games_data)} games.")
         game_images = [self._create_game_display(game) for game in self.games_data]
         if not game_images:
+            logger.warning("Failed to create any game images.")
             self.ticker_image = None
             return
 
@@ -706,6 +710,7 @@ class OddsTickerManager:
 
     def update(self):
         """Update odds ticker data."""
+        logger.info("Entering update method")
         if not self.is_enabled:
             logger.debug("Odds ticker is disabled, skipping update")
             return
@@ -738,10 +743,14 @@ class OddsTickerManager:
 
     def display(self, force_clear: bool = False):
         """Display the odds ticker."""
+        logger.info("Entering display method")
+        logger.info(f"Odds ticker enabled: {self.is_enabled}")
+        
         if not self.is_enabled:
-            logger.debug("Odds ticker is disabled")
+            logger.debug("Odds ticker is disabled, exiting display method.")
             return
         
+        logger.info(f"Number of games in data at start of display method: {len(self.games_data)}")
         if not self.games_data:
             logger.warning("Odds ticker has no games data. Attempting to update...")
             self.update()
