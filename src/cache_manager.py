@@ -376,7 +376,11 @@ class CacheManager:
 
     def set(self, key: str, data: Dict) -> None:
         """Store data in cache with current timestamp."""
-        self.save_cache(key, data)
+        cache_data = {
+            'data': data,
+            'timestamp': time.time()
+        }
+        self.save_cache(key, cache_data)
 
     def setup_persistent_cache(self) -> bool:
         """

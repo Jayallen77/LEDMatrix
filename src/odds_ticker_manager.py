@@ -334,7 +334,7 @@ class OddsTickerManager:
                     else:
                         ttl = 43200  # 12 hours for future dates
                     
-                    data = self.cache_manager.get(cache_key)
+                    data = self.cache_manager.get(cache_key, max_age=ttl)
 
                     if data is None:
                         url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/scoreboard?dates={date}"
@@ -342,7 +342,7 @@ class OddsTickerManager:
                         response = requests.get(url, timeout=self.request_timeout)
                         response.raise_for_status()
                         data = response.json()
-                        self.cache_manager.set(cache_key, data, ttl=ttl)
+                        self.cache_manager.set(cache_key, data)
                         logger.debug(f"Cached scoreboard for {league} on {date} with a TTL of {ttl} seconds.")
                     else:
                         logger.debug(f"Using cached scoreboard data for {league} on {date}.")
