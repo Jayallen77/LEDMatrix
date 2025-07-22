@@ -484,23 +484,6 @@ class OddsTickerManager:
         if away_logo:
             away_logo = away_logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
         
-        # Datetime column width
-        day_text = local_time.strftime("%A")
-        date_text = local_time.strftime("%-m/%d")
-        time_text = local_time.strftime("%I:%M%p").lstrip('0')
-        datetime_col_width = max(day_width, date_width, time_width)
-
-        if broadcast_logo:
-            # Resize broadcast logo to fit the datetime column width
-            ratio = datetime_col_width / broadcast_logo.width
-            new_height = int(broadcast_logo.height * ratio)
-            broadcast_logo = broadcast_logo.resize((datetime_col_width, new_height), Image.Resampling.LANCZOS)
-
-        # "vs." text
-        vs_text = "vs."
-        temp_draw = ImageDraw.Draw(Image.new('RGB', (1, 1)))
-        vs_width = int(temp_draw.textlength(vs_text, font=vs_font))
-
         # Format date and time into 3 parts
         game_time = game['start_time']
         timezone_str = self.config.get('timezone', 'UTC')
@@ -517,6 +500,23 @@ class OddsTickerManager:
         day_text = local_time.strftime("%A")
         date_text = local_time.strftime("%-m/%d")
         time_text = local_time.strftime("%I:%M%p").lstrip('0')
+        
+        # Datetime column width
+        temp_draw = ImageDraw.Draw(Image.new('RGB', (1, 1)))
+        day_width = int(temp_draw.textlength(day_text, font=datetime_font))
+        date_width = int(temp_draw.textlength(date_text, font=datetime_font))
+        time_width = int(temp_draw.textlength(time_text, font=datetime_font))
+        datetime_col_width = max(day_width, date_width, time_width)
+
+        if broadcast_logo:
+            # Resize broadcast logo to fit the datetime column width
+            ratio = datetime_col_width / broadcast_logo.width
+            new_height = int(broadcast_logo.height * ratio)
+            broadcast_logo = broadcast_logo.resize((datetime_col_width, new_height), Image.Resampling.LANCZOS)
+
+        # "vs." text
+        vs_text = "vs."
+        vs_width = int(temp_draw.textlength(vs_text, font=vs_font))
 
         # Team and record text
         away_team_text = f"{game.get('away_team_name', game.get('away_team', 'N/A'))} ({game.get('away_record', '') or 'N/A'})"
