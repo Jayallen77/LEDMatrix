@@ -162,7 +162,7 @@ class StockNewsManager:
                 return
 
             # Get cached data
-            cached_data = self.cache_manager.get_cached_data('stock_news')
+            cached_data = self.cache_manager.get('stock_news')
             
             # Update each symbol
             new_data = {}
@@ -186,6 +186,8 @@ class StockNewsManager:
                     success = True
                     
             if success:
+                # Cache the new data
+                self.cache_manager.update_cache('stock_news', new_data)
                 # Only update the displayed data when we have new data
                 self.news_data = new_data
                 self.last_update = current_time

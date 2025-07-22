@@ -255,6 +255,21 @@ class CacheManager:
 
     def _has_weather_changed(self, cached: Dict[str, Any], new: Dict[str, Any]) -> bool:
         """Check if weather data has changed."""
+        # Handle new cache structure where data is nested under 'data' key
+        if 'data' in cached:
+            cached = cached['data']
+        
+        # Handle case where cached data might be the weather data directly
+        if 'current' in cached:
+            # This is the new structure with 'current' and 'forecast' keys
+            current_weather = cached.get('current', {})
+            if current_weather and 'main' in current_weather and 'weather' in current_weather:
+                cached_temp = round(current_weather['main']['temp'])
+                cached_condition = current_weather['weather'][0]['main']
+                return (cached_temp != new.get('temp') or 
+                        cached_condition != new.get('condition'))
+        
+        # Handle old structure where temp and condition are directly accessible
         return (cached.get('temp') != new.get('temp') or 
                 cached.get('condition') != new.get('condition'))
 
@@ -346,7 +361,10 @@ class CacheManager:
 
     def get(self, key: str, max_age: int = 300) -> Optional[Dict]:
         """Get data from cache if it exists and is not stale."""
-        return self.get_cached_data(key, max_age)
+        cached_data = self.get_cached_data(key, max_age)
+        if cached_data and 'data' in cached_data:
+            return cached_data['data']
+        return cached_data
 
     def set(self, key: str, data: Dict) -> None:
         """Store data in cache with current timestamp."""

@@ -311,7 +311,7 @@ class BaseNCAAMBasketballManager:
         try:
             # Check cache first
             cache_key = f"ncaam_basketball_{date_str}" if date_str else 'ncaam_basketball_today' # Prefix cache key
-            cached_data = cls.cache_manager.get_cached_data(cache_key, max_age=300)  # 5 minutes cache
+            cached_data = cls.cache_manager.get(cache_key)
             if cached_data:
                 cls.logger.info(f"[NCAAMBasketball] Using cached data for {cache_key}")
                 cls._shared_data = cached_data
@@ -330,7 +330,7 @@ class BaseNCAAMBasketballManager:
             cls.logger.info(f"[NCAAMBasketball] Successfully fetched data from ESPN API")
             
             # Cache the response
-            cls.cache_manager.save_cache(cache_key, data)
+            cls.cache_manager.update_cache(cache_key, data)
             cls._shared_data = data
             cls._last_shared_update = current_time
             
@@ -350,7 +350,7 @@ class BaseNCAAMBasketballManager:
                     if fetch_date != today.strftime('%Y%m%d'):  # Skip today as we already have it
                         date_cache_key = f"ncaam_basketball_{fetch_date}" # Prefix cache key
                         # Check cache for this date
-                        cached_date_data = cls.cache_manager.get_cached_data(date_cache_key, max_age=300)
+                        cached_date_data = cls.cache_manager.get(date_cache_key)
                         if cached_date_data:
                             cls.logger.info(f"[NCAAMBasketball] Using cached data for date {fetch_date}")
                             if "events" in cached_date_data:
@@ -365,7 +365,7 @@ class BaseNCAAMBasketballManager:
                             all_events.extend(date_data["events"])
                             cls.logger.info(f"[NCAAMBasketball] Fetched {len(date_data['events'])} events for date {fetch_date}")
                             # Cache the response
-                            cls.cache_manager.save_cache(date_cache_key, date_data)
+                            cls.cache_manager.update_cache(date_cache_key, date_data)
                 
                 # Combine events from all dates
                 if all_events:

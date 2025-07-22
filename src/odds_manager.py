@@ -17,7 +17,7 @@ class OddsManager:
         cache_key = f"odds_espn_{sport}_{league}_{event_id}"
 
         # Check cache first with 1-hour update interval
-        cached_data = self.cache_manager.get_cached_data(cache_key, max_age=update_interval_seconds)
+        cached_data = self.cache_manager.get(cache_key)
 
         if cached_data:
             self.logger.info(f"Using cached odds from ESPN for {cache_key}")
@@ -37,12 +37,12 @@ class OddsManager:
             self.logger.info(f"Extracted odds data: {odds_data}")
             
             if odds_data:
-                self.cache_manager.save_cache(cache_key, odds_data)
+                self.cache_manager.update_cache(cache_key, odds_data)
                 self.logger.info(f"Saved odds data to cache for {cache_key}")
             else:
                 self.logger.warning(f"No odds data extracted for {cache_key}")
                 # Cache the fact that no odds are available to avoid repeated API calls
-                self.cache_manager.save_cache(cache_key, {"no_odds": True})
+                self.cache_manager.update_cache(cache_key, {"no_odds": True})
             
             return odds_data
 
@@ -51,7 +51,7 @@ class OddsManager:
         except json.JSONDecodeError:
             self.logger.error(f"Error decoding JSON response from ESPN API for {cache_key}.")
         
-        return self.cache_manager.load_cache(cache_key)
+        return self.cache_manager.get(cache_key)
 
     def _extract_espn_data(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         self.logger.debug(f"Extracting ESPN odds data. Data keys: {list(data.keys())}")

@@ -153,7 +153,7 @@ class StockManager:
         """Fetch stock or crypto data from Yahoo Finance public API."""
         # Try to get cached data first
         cache_key = 'crypto' if is_crypto else 'stocks'
-        cached_data = self.cache_manager.get_cached_data(cache_key)
+        cached_data = self.cache_manager.get(cache_key)
         if cached_data and symbol in cached_data:
             logger.info(f"Using cached data for {symbol}")
             return cached_data[symbol]

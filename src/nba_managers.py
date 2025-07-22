@@ -277,7 +277,7 @@ class BaseNBAManager:
         try:
             # Check cache first
             cache_key = date_str if date_str else 'today'
-            cached_data = cls.cache_manager.get_cached_data(cache_key, max_age=300)  # 5 minutes cache
+            cached_data = cls.cache_manager.get(cache_key)
             if cached_data:
                 cls.logger.info(f"[NBA] Using cached data for {cache_key}")
                 cls._shared_data = cached_data
@@ -296,7 +296,7 @@ class BaseNBAManager:
             cls.logger.info(f"[NBA] Successfully fetched data from ESPN API")
             
             # Cache the response
-            cls.cache_manager.save_cache(cache_key, data)
+            cls.cache_manager.update_cache(cache_key, data)
             cls._shared_data = data
             cls._last_shared_update = current_time
             
@@ -315,7 +315,7 @@ class BaseNBAManager:
                 for fetch_date in dates_to_fetch:
                     if fetch_date != today.strftime('%Y%m%d'):  # Skip today as we already have it
                         # Check cache for this date
-                        cached_date_data = cls.cache_manager.get_cached_data(fetch_date, max_age=300)
+                        cached_date_data = cls.cache_manager.get(fetch_date)
                         if cached_date_data:
                             cls.logger.info(f"[NBA] Using cached data for date {fetch_date}")
                             if "events" in cached_date_data:
@@ -330,7 +330,7 @@ class BaseNBAManager:
                             all_events.extend(date_data["events"])
                             cls.logger.info(f"[NBA] Fetched {len(date_data['events'])} events for date {fetch_date}")
                             # Cache the response
-                            cls.cache_manager.save_cache(fetch_date, date_data)
+                            cls.cache_manager.update_cache(fetch_date, date_data)
                 
                 # Combine events from all dates
                 if all_events:

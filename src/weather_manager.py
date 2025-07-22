@@ -73,7 +73,7 @@ class WeatherManager:
             return
 
         # Try to get cached data first
-        cached_data = self.cache_manager.get_cached_data('weather')
+        cached_data = self.cache_manager.get('weather')
         if cached_data:
             self.weather_data = cached_data.get('current')
             self.forecast_data = cached_data.get('forecast')
