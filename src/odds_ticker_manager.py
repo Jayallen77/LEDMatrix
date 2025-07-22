@@ -358,11 +358,20 @@ class OddsTickerManager:
                                 home_record = home_team.get('records', [{}])[0].get('summary', '') if home_team.get('records') else ''
                                 away_record = away_team.get('records', [{}])[0].get('summary', '') if away_team.get('records') else ''
                                 
+                                # Dynamically set update interval based on game start time
+                                time_until_game = game_time - now
+                                if time_until_game > timedelta(hours=48):
+                                    update_interval_seconds = 86400  # 24 hours
+                                else:
+                                    update_interval_seconds = 3600   # 1 hour
+                                
+                                logger.debug(f"Game {game_id} starts in {time_until_game}. Setting odds update interval to {update_interval_seconds}s.")
+                                
                                 odds_data = self.odds_manager.get_odds(
                                     sport=sport,
                                     league=league,
                                     event_id=game_id,
-                                    update_interval_seconds=7200
+                                    update_interval_seconds=update_interval_seconds
                                 )
                                 
                                 has_odds = False
