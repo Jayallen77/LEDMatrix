@@ -485,9 +485,9 @@ class OddsTickerManager:
             away_logo = away_logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
         
         # Datetime column width
-        day_width = int(temp_draw.textlength(day_text, font=datetime_font))
-        date_width = int(temp_draw.textlength(date_text, font=datetime_font))
-        time_width = int(temp_draw.textlength(time_text, font=datetime_font))
+        day_text = local_time.strftime("%A")
+        date_text = local_time.strftime("%-m/%d")
+        time_text = local_time.strftime("%I:%M%p").lstrip('0')
         datetime_col_width = max(day_width, date_width, time_width)
 
         if broadcast_logo:
@@ -498,6 +498,7 @@ class OddsTickerManager:
 
         # "vs." text
         vs_text = "vs."
+        temp_draw = ImageDraw.Draw(Image.new('RGB', (1, 1)))
         vs_width = int(temp_draw.textlength(vs_text, font=vs_font))
 
         # Format date and time into 3 parts
