@@ -991,13 +991,11 @@ class MiLBRecentManager(BaseMiLBManager):
                 is_final = game['status_state'] in ['post', 'final', 'completed']
                 is_within_time = recent_cutoff <= game_time <= now
                 
-                if is_favorite_game:
-                    logger.info(f"[MiLB] Is final: {is_final}")
-                    logger.info(f"[MiLB] Is within time window: {is_within_time}")
-                    logger.info(f"[MiLB] Time comparison: {recent_cutoff} <= {game_time} <= {now}")
-                
+                self.logger.info(f"[MiLB] Game Time: {game_time.isoformat()}, Cutoff Time: {recent_cutoff.isoformat()}, Now: {now.isoformat()}")
+                self.logger.info(f"[MiLB] Is final: {is_final}, Is within time window: {is_within_time}")
+
                 # Only add favorite team games that are final and within time window
-                if is_favorite_game and is_final and is_within_time:
+                if is_final and is_within_time:
                     new_recent_games.append(game)
                     logger.info(f"[MiLB] Added favorite team game to recent list: {game['away_team']} @ {game['home_team']}")
             

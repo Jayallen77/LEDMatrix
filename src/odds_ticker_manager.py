@@ -364,117 +364,121 @@ class OddsTickerManager:
         return games_data
 
     def _fetch_league_games(self, league_config: Dict[str, Any], now: datetime) -> List[Dict[str, Any]]:
-        """Fetch upcoming games for a specific league."""
-        games = []
-        yesterday = now - timedelta(days=1)
-        future_window = now + timedelta(days=self.future_fetch_days)
-        num_days = (future_window - yesterday).days + 1
-        dates = [(yesterday + timedelta(days=i)).strftime("%Y%m%d") for i in range(num_days)]
-
-        # Optimization: If showing favorite teams only, track games found per team
-        favorite_teams = league_config.get('favorite_teams', []) if self.show_favorite_teams_only else []
-        team_games_found = {team: 0 for team in favorite_teams}
-        max_games = self.games_per_favorite_team if self.show_favorite_teams_only else None
-        all_games = []
+        """
+        Fetches the full season schedule for a league from cache or API, 
+        then filters for relevant upcoming games.
+        """
+        sport = league_config['sport']
+        league = league_config['league']
+        current_year = now.year
+        cache_key = f"odds_ticker_schedule_{league}_{current_year}"
         
-        # Optimization: Track total games found when not showing favorite teams only
-        games_found = 0
-        max_games_per_league = self.max_games_per_league if not self.show_favorite_teams_only else None
-
-        logger.debug(f"[OddsTicker] Searching {len(dates)} dates for {league_config['league']} games")
-        logger.debug(f"[OddsTicker] Date range: {dates[0]} to {dates[-1]}")
-
-        for date in dates:
-            # Stop if we have enough games for favorite teams
-            if self.show_favorite_teams_only and all(team_games_found[t] >= max_games for t in favorite_teams):
-                break  # All favorite teams have enough games, stop searching
-            # Stop if we have enough games for the league (when not showing favorite teams only)
-            if not self.show_favorite_teams_only and max_games_per_league and games_found >= max_games_per_league:
-                break  # We have enough games for this league, stop searching
+        # 1. Fetch full schedule from cache or API
+        events = self.cache_manager.get(cache_key)
+        if not events:
+            logger.info(f"[OddsTicker] Fetching full {current_year} schedule for {league.upper()}...")
             try:
-                sport = league_config['sport']
-                league = league_config['league']
-                url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/scoreboard?dates={date}"
-                logger.debug(f"Fetching {league} games from ESPN API for date: {date}")
-                response = requests.get(url, timeout=10)
+                # NCAAFB needs a specific seasontype for regular season
+                if league == 'college-football':
+                    url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/scoreboard?dates={current_year}&seasontype=2"
+                else:
+                    url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/scoreboard?dates={current_year}"
+                
+                response = requests.get(url, timeout=15)
                 response.raise_for_status()
                 data = response.json()
                 events = data.get('events', [])
-                logger.debug(f"[OddsTicker] {league_config['league']} API returned {len(events)} events for date {date}")
-                
-                for event in events:
-                    # Stop if we have enough games for the league (when not showing favorite teams only)
-                    if not self.show_favorite_teams_only and max_games_per_league and games_found >= max_games_per_league:
-                        break
-                    game_id = event['id']
-                    status = event['status']['type']['name'].lower()
-                    logger.debug(f"[OddsTicker] Processing {league_config['league']} event {game_id}: status={status}")
-                    
-                    if status in ['scheduled', 'pre-game', 'status_scheduled']:
-                        game_time = datetime.fromisoformat(event['date'].replace('Z', '+00:00'))
-                        if now <= game_time <= future_window:
-                            competitors = event['competitions'][0]['competitors']
-                            home_team = next(c for c in competitors if c['homeAway'] == 'home')
-                            away_team = next(c for c in competitors if c['homeAway'] == 'away')
-                            home_abbr = home_team['team']['abbreviation']
-                            away_abbr = away_team['team']['abbreviation']
-                            # Only process favorite teams if enabled
-                            if self.show_favorite_teams_only:
-                                # Skip if both teams have already met their quota
-                                for team in [home_abbr, away_abbr]:
-                                    if team in team_games_found and team_games_found[team] >= max_games:
-                                        continue
-                                # Only add if at least one team still needs games
-                                if not ((home_abbr in team_games_found and team_games_found[home_abbr] < max_games) or (away_abbr in team_games_found and team_games_found[away_abbr] < max_games)):
-                                    continue
-                            # Build game dict (existing logic)
-                            home_record = home_team.get('records', [{}])[0].get('summary', '') if home_team.get('records') else ''
-                            away_record = away_team.get('records', [{}])[0].get('summary', '') if away_team.get('records') else ''
-                            odds_data = self.odds_manager.get_odds(
-                                sport=sport,
-                                league=league,
-                                event_id=game_id,
-                                update_interval_seconds=7200
-                            )
-                            has_odds = False
-                            if odds_data and not odds_data.get('no_odds'):
-                                if odds_data.get('spread') is not None:
-                                    has_odds = True
-                                if odds_data.get('home_team_odds', {}).get('spread_odds') is not None:
-                                    has_odds = True
-                                if odds_data.get('away_team_odds', {}).get('spread_odds') is not None:
-                                    has_odds = True
-                                if odds_data.get('over_under') is not None:
-                                    has_odds = True
-                            
-                            # Convert abbreviations to full team names
-                            home_team_name = self._get_team_name(home_abbr, league)
-                            away_team_name = self._get_team_name(away_abbr, league)
-                            
-                            game = {
-                                'id': game_id,
-                                'home_team': home_team_name,
-                                'away_team': away_team_name,
-                                'home_abbr': home_abbr,  # Keep original for logo loading
-                                'away_abbr': away_abbr,  # Keep original for logo loading
-                                'start_time': game_time,
-                                'home_record': home_record,
-                                'away_record': away_record,
-                                'odds': odds_data if has_odds else None,
-                                'logo_dir': league_config.get('logo_dir', f'assets/sports/{league.lower()}_logos')
-                            }
-                            all_games.append(game)
-                            games_found += 1
-                            # If favorite teams only, increment counters
-                            if self.show_favorite_teams_only:
-                                for team in [home_abbr, away_abbr]:
-                                    if team in team_games_found and team_games_found[team] < max_games:
-                                        team_games_found[team] += 1
-                # Stop if we have enough games for the league (when not showing favorite teams only)
-                if not self.show_favorite_teams_only and max_games_per_league and games_found >= max_games_per_league:
+                self.cache_manager.set(cache_key, events, expiration_seconds=86400) # Cache for 24 hours
+                logger.info(f"[OddsTicker] Cached {len(events)} events for {league.upper()} {current_year} season.")
+            except requests.exceptions.RequestException as e:
+                logger.error(f"[OddsTicker] API error fetching schedule for {league.upper()}: {e}")
+                return []
+        else:
+            logger.info(f"[OddsTicker] Using cached {len(events)}-event schedule for {league.upper()} {current_year}")
+
+        if not events:
+            return []
+
+        # 2. Filter the schedule for upcoming games within the display window
+        all_games = []
+        future_window = now + timedelta(days=self.future_fetch_days)
+        
+        # Prepare for favorite team logic
+        favorite_teams = league_config.get('favorite_teams', []) if self.show_favorite_teams_only else []
+        team_games_found = {team: 0 for team in favorite_teams}
+        max_games_per_team = self.games_per_favorite_team
+        
+        # Prepare for general league game limit
+        games_found_total = 0
+        max_games_per_league = self.max_games_per_league
+
+        # Sort all events by date to process them chronologically
+        events.sort(key=lambda x: x.get('date', ''))
+
+        for event in events:
+            # Apply global game limits to stop processing early
+            if self.show_favorite_teams_only:
+                if all(count >= max_games_per_team for count in team_games_found.values()):
+                    logger.info(f"[OddsTicker] Found enough games for all favorite teams in {league.upper()}. Stopping search.")
                     break
-            except Exception as e:
-                logger.error(f"Error fetching games for {league_config.get('league', 'unknown')} on {date}: {e}", exc_info=True)
+            elif max_games_per_league and games_found_total >= max_games_per_league:
+                logger.info(f"[OddsTicker] Found max games ({max_games_per_league}) for {league.upper()}. Stopping search.")
+                break
+
+            status = event.get('status', {}).get('type', {}).get('name', 'unknown').lower()
+            if status not in ('status_scheduled', 'scheduled', 'pre-game'):
+                continue
+
+            game_time = datetime.fromisoformat(event['date'].replace('Z', '+00:00'))
+            if not (now <= game_time <= future_window):
+                continue
+            
+            # This is a valid upcoming game, extract details
+            competitors = event.get('competitions', [{}])[0].get('competitors', [])
+            home_team = next((c for c in competitors if c.get('homeAway') == 'home'), None)
+            away_team = next((c for c in competitors if c.get('homeAway') == 'away'), None)
+
+            if not home_team or not away_team:
+                continue
+
+            home_abbr = home_team['team']['abbreviation']
+            away_abbr = away_team['team']['abbreviation']
+
+            # Apply favorite team filtering if necessary
+            if self.show_favorite_teams_only:
+                is_favorite_game = home_abbr in favorite_teams or away_abbr in favorite_teams
+                if not is_favorite_game:
+                    continue
+                # Check if both teams in the game have already met their quota
+                if (home_abbr not in favorite_teams or team_games_found.get(home_abbr, 0) >= max_games_per_team) and \
+                   (away_abbr not in favorite_teams or team_games_found.get(away_abbr, 0) >= max_games_per_team):
+                    continue
+            
+            # --- Game processing logic from old function ---
+            game_id = event['id']
+            home_record = home_team.get('records', [{}])[0].get('summary', '') if home_team.get('records') else ''
+            away_record = away_team.get('records', [{}])[0].get('summary', '') if away_team.get('records') else ''
+            odds_data = self.odds_manager.get_odds(sport=sport, league=league, event_id=game_id, update_interval_seconds=7200)
+            
+            home_team_name = self._get_team_name(home_abbr, league)
+            away_team_name = self._get_team_name(away_abbr, league)
+            
+            game = {
+                'id': game_id, 'home_team': home_team_name, 'away_team': away_team_name,
+                'home_abbr': home_abbr, 'away_abbr': away_abbr, 'start_time': game_time,
+                'home_record': home_record, 'away_record': away_record,
+                'odds': odds_data, 'logo_dir': league_config.get('logo_dir')
+            }
+            
+            if not any(g['id'] == game['id'] for g in all_games):
+                all_games.append(game)
+                games_found_total += 1
+                if self.show_favorite_teams_only:
+                    if home_abbr in team_games_found:
+                        team_games_found[home_abbr] += 1
+                    if away_abbr in team_games_found:
+                        team_games_found[away_abbr] += 1
+                        
         return all_games
 
     def _format_odds_text(self, game: Dict[str, Any]) -> str:

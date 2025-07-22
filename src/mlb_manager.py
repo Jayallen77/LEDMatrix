@@ -1123,8 +1123,8 @@ class MLBRecentManager(BaseMLBManager):
                 is_final = game['status_state'] in ['post', 'final', 'completed']
                 is_within_time = recent_cutoff <= game_time <= now
                 
-                self.logger.info(f"[MLB] Is final: {is_final}")
-                self.logger.info(f"[MLB] Is within time window: {is_within_time}")
+                self.logger.info(f"[MLB] Game Time: {game_time.isoformat()}, Cutoff Time: {recent_cutoff.isoformat()}, Now: {now.isoformat()}")
+                self.logger.info(f"[MLB] Is final: {is_final}, Is within time window: {is_within_time}")
                 
                 # Only add favorite team games that are final and within time window
                 if is_final and is_within_time:
