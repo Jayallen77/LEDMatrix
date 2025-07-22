@@ -304,10 +304,22 @@ class OddsTickerManager:
             league_config = self.league_configs[league_key]
             logger.debug(f"Processing league {league_key}: enabled={league_config['enabled']}")
             
+            # Debug: Log what we're trying to fetch
+            logger.info(f"[OddsTicker] Fetching data for {league_key.upper()} (enabled: {league_config['enabled']})")
+            
             try:
                 # Fetch all upcoming games for this league
                 all_games = self._fetch_league_games(league_config, now)
                 logger.debug(f"Found {len(all_games)} games for {league_key}")
+                
+                # Debug: Log what games were found
+                if all_games:
+                    logger.info(f"[OddsTicker] Found {len(all_games)} games for {league_key.upper()}")
+                    for game in all_games[:3]:  # Show first 3 games
+                        logger.info(f"[OddsTicker] {league_key.upper()} game: {game.get('away_team', 'N/A')} vs {game.get('home_team', 'N/A')}")
+                else:
+                    logger.info(f"[OddsTicker] No games found for {league_key.upper()}")
+                
                 league_games = []
                 
                 if self.show_favorite_teams_only:
@@ -369,6 +381,9 @@ class OddsTickerManager:
         games_found = 0
         max_games_per_league = self.max_games_per_league if not self.show_favorite_teams_only else None
 
+        logger.debug(f"[OddsTicker] Searching {len(dates)} dates for {league_config['league']} games")
+        logger.debug(f"[OddsTicker] Date range: {dates[0]} to {dates[-1]}")
+
         for date in dates:
             # Stop if we have enough games for favorite teams
             if self.show_favorite_teams_only and all(team_games_found[t] >= max_games for t in favorite_teams):
@@ -384,12 +399,17 @@ class OddsTickerManager:
                 response = requests.get(url, timeout=10)
                 response.raise_for_status()
                 data = response.json()
-                for event in data.get('events', []):
+                events = data.get('events', [])
+                logger.debug(f"[OddsTicker] {league_config['league']} API returned {len(events)} events for date {date}")
+                
+                for event in events:
                     # Stop if we have enough games for the league (when not showing favorite teams only)
                     if not self.show_favorite_teams_only and max_games_per_league and games_found >= max_games_per_league:
                         break
                     game_id = event['id']
                     status = event['status']['type']['name'].lower()
+                    logger.debug(f"[OddsTicker] Processing {league_config['league']} event {game_id}: status={status}")
+                    
                     if status in ['scheduled', 'pre-game', 'status_scheduled']:
                         game_time = datetime.fromisoformat(event['date'].replace('Z', '+00:00'))
                         if now <= game_time <= future_window:

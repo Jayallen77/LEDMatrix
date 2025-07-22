@@ -172,249 +172,107 @@ class BaseNFLManager: # Renamed class
         except Exception as e:
             self.logger.error(f"Error fetching odds for game {game.get('id', 'N/A')}: {e}")
             
-    def _fetch_shared_data(self, fetch_past_games: int, fetch_future_games: int, date_str: str = None) -> Optional[Dict]:
-        """Fetch and cache data for all managers to share, using game counts instead of days."""
-        current_time = time.time()
+    def _fetch_shared_data(self) -> None:
+        """
+        Fetches the full season schedule for NFL, caches it, and then filters
+        for relevant games based on the current configuration.
+        """
+        now = datetime.now(pytz.utc)
+        current_year = now.year
+        cache_key = f"nfl_schedule_{current_year}"
+        
+        # Try to get the full schedule from cache
+        cached_data = BaseNFLManager.cache_manager.get_cached_data(cache_key)
+        
+        if cached_data:
+            self.logger.info(f"[NFL] Using cached schedule for {current_year}")
+            events = cached_data
+        else:
+            self.logger.info(f"[NFL] Fetching full {current_year} season schedule from ESPN API...")
+            try:
+                url = f"https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates={current_year}"
+                response = self.session.get(url, headers=self.headers, timeout=15)
+                response.raise_for_status()
+                data = response.json()
+                events = data.get('events', [])
+                BaseNFLManager.cache_manager.save_cache(cache_key, events, expiration_seconds=86400) # Cache for 24 hours
+                self.logger.info(f"[NFL] Successfully fetched and cached {len(events)} events for the {current_year} season.")
+            except requests.exceptions.RequestException as e:
+                self.logger.error(f"[NFL] API error fetching full schedule: {e}")
+                return
+        
+        if not events:
+            self.logger.warning("[NFL] No events found in the schedule data.")
+            return
 
-        if BaseNFLManager._shared_data and (current_time - BaseNFLManager._last_shared_update) < 300:
-            return BaseNFLManager._shared_data
+        # Filter the events for live, upcoming, and recent games
+        live_events = []
+        upcoming_events = []
+        past_events = []
 
-        try:
-            cache_key = date_str if date_str else 'today_nfl'
-            cached_data = BaseNFLManager.cache_manager.get(cache_key, max_age=300)
-            if cached_data:
-                BaseNFLManager.logger.info(f"[NFL] Using cached data for {cache_key}")
-                BaseNFLManager._shared_data = cached_data
-                BaseNFLManager._last_shared_update = current_time
-                return cached_data
+        for event in events:
+            status = event.get('status', {}).get('type', {}).get('name', 'unknown').lower()
+            is_live = status in ('status_in_progress', 'status_halftime')
+            is_upcoming = status in ('status_scheduled', 'status_pre_game')
+            is_final = status == 'status_final'
 
-            # Check if we need to fetch past or future games based on display modes
-            need_past_games = self.recent_enabled and fetch_past_games > 0
-            need_future_games = self.upcoming_enabled and fetch_future_games > 0
-            
-            if not need_past_games and not need_future_games:
-                BaseNFLManager.logger.info("[NFL] Skipping data fetch - no enabled display modes require past or future games")
-                return None
+            if is_live:
+                live_events.append(event)
+            elif is_upcoming:
+                upcoming_events.append(event)
+            elif is_final:
+                past_events.append(event)
+        
+        # Sort games by date
+        upcoming_events.sort(key=lambda x: x['date'])
+        past_events.sort(key=lambda x: x['date'], reverse=True)
 
-            # Adjust fetch parameters based on enabled modes
-            actual_past_games = fetch_past_games if need_past_games else 0
-            actual_future_games = fetch_future_games if need_future_games else 0
-            
-            # For upcoming games, we need to find games for each favorite team
-            if need_future_games and self.favorite_teams:
-                # Calculate how many games we need to find for favorite teams
-                games_needed_per_team = actual_future_games
-                total_favorite_games_needed = len(self.favorite_teams) * games_needed_per_team
-                BaseNFLManager.logger.info(f"[NFL] Need to find {games_needed_per_team} games for each of {len(self.favorite_teams)} favorite teams ({total_favorite_games_needed} total)")
-            else:
-                total_favorite_games_needed = actual_future_games
-            
-            BaseNFLManager.logger.info(f"[NFL] Fetching data - Past games: {actual_past_games}, Future games: {actual_future_games}")
+        # Select the correct number of games for favorite teams
+        selected_upcoming = []
+        if self.upcoming_enabled and self.favorite_teams:
+            games_found = {team: 0 for team in self.favorite_teams}
+            for game in upcoming_events:
+                competitors = game.get('competitions', [{}])[0].get('competitors', [])
+                home_team = next((c['team']['abbreviation'] for c in competitors if c.get('homeAway') == 'home'), '')
+                away_team = next((c['team']['abbreviation'] for c in competitors if c.get('homeAway') == 'away'), '')
 
-            # Smart game-based fetching with range caching
-            today = datetime.now(self._get_timezone()).date()
-            all_events = []
-            past_events = []
-            future_events = []
-            
-            # Track games found for each favorite team
-            favorite_team_games = {team: [] for team in self.favorite_teams} if self.favorite_teams else {}
-            
-            # Check for cached search ranges and last successful date
-            range_cache_key = f"search_ranges_nfl_{actual_past_games}_{actual_future_games}"
-            cached_ranges = BaseNFLManager.cache_manager.get(range_cache_key, max_age=86400)  # Cache for 24 hours
-            
-            # Check for last successful date cache
-            last_successful_cache_key = f"last_successful_date_nfl_{actual_past_games}_{actual_future_games}"
-            last_successful_date = BaseNFLManager.cache_manager.get(last_successful_cache_key, max_age=86400)
-            
-            if cached_ranges:
-                past_days_needed = cached_ranges.get('past_days', 0)
-                future_days_needed = cached_ranges.get('future_days', 0)
-                BaseNFLManager.logger.info(f"[NFL] Using cached search ranges: {past_days_needed} days past, {future_days_needed} days future")
-            else:
-                past_days_needed = 0
-                future_days_needed = 0
-            
-            # Start with cached ranges or expand incrementally
-            days_to_check = max(past_days_needed, future_days_needed)
-            max_days_to_check = 365  # Limit to 1 year to prevent infinite loops
-            
-            # If we have a last successful date, start from there
-            if last_successful_date and need_future_games:
-                last_successful_str = last_successful_date.get('date')
-                if last_successful_str:
-                    try:
-                        last_successful = datetime.strptime(last_successful_str, '%Y%m%d').date()
-                        days_since_last = (today - last_successful).days
-                        if days_since_last > 0:
-                            BaseNFLManager.logger.info(f"[NFL] Starting search from last successful date: {last_successful_str} ({days_since_last} days ago)")
-                            # Start from the day after the last successful date
-                            days_to_check = max(days_to_check, days_since_last + 1)
-                    except ValueError:
-                        BaseNFLManager.logger.warning(f"[NFL] Invalid last successful date format: {last_successful_str}")
-            
-            while (len(past_events) < actual_past_games or 
-                   (need_future_games and self.favorite_teams and 
-                    not all(len(games) >= actual_future_games for games in favorite_team_games.values()))) and days_to_check <= max_days_to_check:
-                # Check dates in both directions
-                dates_to_check = []
+                # Check if this game involves any favorite teams that still need games
+                team_in_game = None
+                if home_team in self.favorite_teams and games_found[home_team] < self.fetch_future_games:
+                    team_in_game = home_team
+                elif away_team in self.favorite_teams and games_found[away_team] < self.fetch_future_games:
+                    team_in_game = away_team
                 
-                # Check past dates (start from cached range if available)
-                if len(past_events) < actual_past_games:
-                    start_day = past_days_needed if cached_ranges else 1
-                    for i in range(start_day, days_to_check + 1):
-                        past_date = today - timedelta(days=i)
-                        dates_to_check.append(past_date.strftime('%Y%m%d'))
-                
-                # Check future dates (start from cached range if available)
-                if len(future_events) < actual_future_games:
-                    start_day = future_days_needed if cached_ranges else 1
-                    for i in range(start_day, days_to_check + 1):
-                        future_date = today + timedelta(days=i)
-                        dates_to_check.append(future_date.strftime('%Y%m%d'))
-                
-                # Also check today if we haven't already
-                if days_to_check == 0:
-                    dates_to_check.append(today.strftime('%Y%m%d'))
-                
-                if dates_to_check:
-                    BaseNFLManager.logger.info(f"[NFL] Checking {len(dates_to_check)} dates (day {days_to_check}) to find {actual_past_games} past and {actual_future_games} future games")
-                    
-                    # Fetch data for each date
-                    for fetch_date in dates_to_check:
-                        date_cache_key = f"{fetch_date}_nfl"
-                        cached_date_data = BaseNFLManager.cache_manager.get(date_cache_key, max_age=300)
-                        
-                        if cached_date_data:
-                            if "events" in cached_date_data:
-                                all_events.extend(cached_date_data["events"])
-                            continue
+                if team_in_game:
+                    selected_upcoming.append(game)
+                    games_found[team_in_game] += 1
+                    # Stop if we have found enough games for all teams
+                    if all(count >= self.fetch_future_games for count in games_found.values()):
+                        break
+        
+        selected_past = []
+        if self.recent_enabled and self.favorite_teams:
+            games_found = {team: 0 for team in self.favorite_teams}
+            for game in past_events:
+                competitors = game.get('competitions', [{}])[0].get('competitors', [])
+                home_team = next((c['team']['abbreviation'] for c in competitors if c.get('homeAway') == 'home'), '')
+                away_team = next((c['team']['abbreviation'] for c in competitors if c.get('homeAway') == 'away'), '')
 
-                        url = ESPN_NFL_SCOREBOARD_URL
-                        params = {'dates': fetch_date}
-                        
-                        response = requests.get(url, params=params)
-                        response.raise_for_status()
-                        date_data = response.json()
-                        
-                        if date_data and "events" in date_data:
-                            all_events.extend(date_data["events"])
-                            BaseNFLManager.logger.info(f"[NFL] Fetched {len(date_data['events'])} events for date {fetch_date}")
-                            BaseNFLManager.cache_manager.set(date_cache_key, date_data)
-                    
-                    # Process newly fetched events
-                    if all_events:
-                        # Sort events by date
-                        all_events.sort(key=lambda x: x.get('date', ''))
-                        
-                        # Separate past and future events
-                        now = datetime.now(self._get_timezone())
-                        past_events = []
-                        future_events = []
-                        
-                        for event in all_events:
-                            try:
-                                event_time = datetime.fromisoformat(event['date'].replace('Z', '+00:00'))
-                                if event_time.tzinfo is None:
-                                    event_time = event_time.replace(tzinfo=pytz.UTC)
-                                event_time = event_time.astimezone(self._get_timezone())
-                                
-                                if event_time < now:
-                                    past_events.append(event)
-                                else:
-                                    future_events.append(event)
-                                    
-                                    # Track games for favorite teams
-                                    if self.favorite_teams and need_future_games:
-                                        competition = event.get('competitions', [{}])[0]
-                                        competitors = competition.get('competitors', [])
-                                        home_team = next((c for c in competitors if c.get('homeAway') == 'home'), None)
-                                        away_team = next((c for c in competitors if c.get('homeAway') == 'away'), None)
-                                        
-                                        if home_team and away_team:
-                                            home_abbr = home_team['team']['abbreviation']
-                                            away_abbr = away_team['team']['abbreviation']
-                                            
-                                            # Check if this game involves a favorite team
-                                            for team in self.favorite_teams:
-                                                if team in [home_abbr, away_abbr]:
-                                                    if len(favorite_team_games[team]) < actual_future_games:
-                                                        favorite_team_games[team].append(event)
-                                                        BaseNFLManager.logger.debug(f"[NFL] Found game for {team}: {away_abbr}@{home_abbr}")
-                            except Exception as e:
-                                BaseNFLManager.logger.warning(f"[NFL] Could not parse event date: {e}")
-                                continue
-                
-                days_to_check += 1
-            
-            # Cache the search ranges for next time
-            if len(past_events) >= actual_past_games and len(future_events) >= actual_future_games:
-                # Calculate how many days we actually needed
-                actual_past_days = max(1, days_to_check - 1) if past_events else 0
-                actual_future_days = max(1, days_to_check - 1) if future_events else 0
-                
-                # Cache the ranges for next time
-                range_data = {
-                    'past_days': actual_past_days,
-                    'future_days': actual_future_days,
-                    'last_updated': current_time
-                }
-                BaseNFLManager.cache_manager.set(range_cache_key, range_data)
-                BaseNFLManager.logger.info(f"[NFL] Cached search ranges: {actual_past_days} days past, {actual_future_days} days future")
-                
-                # Store the last successful date for future searches
-                if future_events:
-                    # Find the furthest future date where we found games
-                    furthest_future_date = None
-                    for event in future_events:
-                        try:
-                            event_time = datetime.fromisoformat(event['date'].replace('Z', '+00:00'))
-                            if event_time.tzinfo is None:
-                                event_time = event_time.replace(tzinfo=pytz.UTC)
-                            event_date = event_time.date()
-                            if furthest_future_date is None or event_date > furthest_future_date:
-                                furthest_future_date = event_date
-                        except Exception:
-                            continue
-                    
-                    if furthest_future_date:
-                        last_successful_data = {
-                            'date': furthest_future_date.strftime('%Y%m%d'),
-                            'last_updated': current_time
-                        }
-                        BaseNFLManager.cache_manager.set(last_successful_cache_key, last_successful_data)
-                        BaseNFLManager.logger.info(f"[NFL] Cached last successful date: {furthest_future_date.strftime('%Y%m%d')}")
-            
-            # Take the specified number of games
-            selected_past_events = past_events[-actual_past_games:] if past_events else []
-            
-            # For future games, use favorite team games if available
-            if self.favorite_teams and need_future_games:
-                selected_future_events = []
-                for team in self.favorite_teams:
-                    team_games = favorite_team_games.get(team, [])
-                    selected_future_events.extend(team_games[:actual_future_games])
-                BaseNFLManager.logger.info(f"[NFL] Selected {len(selected_past_events)} past games and {len(selected_future_events)} favorite team future games")
-            else:
-                selected_future_events = future_events[:actual_future_games] if future_events else []
-                BaseNFLManager.logger.info(f"[NFL] Selected {len(selected_past_events)} past games and {len(selected_future_events)} future games after checking {days_to_check} days")
-            
-            # Combine selected events
-            selected_events = selected_past_events + selected_future_events
-            
-            BaseNFLManager.logger.info(f"[NFL] Selected {len(selected_past_events)} past games and {len(selected_future_events)} future games after checking {days_to_check} days")
-            
-            # Create the final data structure
-            data = {"events": selected_events}
-            BaseNFLManager._shared_data = data
-            BaseNFLManager._last_shared_update = current_time
-            
-            return data
+                team_in_game = None
+                if home_team in self.favorite_teams and games_found[home_team] < self.fetch_past_games:
+                    team_in_game = home_team
+                elif away_team in self.favorite_teams and games_found[away_team] < self.fetch_past_games:
+                    team_in_game = away_team
 
-        except requests.exceptions.RequestException as e:
-            BaseNFLManager.logger.error(f"[NFL] Error fetching data from ESPN: {e}")
-            return None
+                if team_in_game:
+                    selected_past.append(game)
+                    games_found[team_in_game] += 1
+                    if all(count >= self.fetch_past_games for count in games_found.values()):
+                        break
+
+        # Combine all relevant events into a single list
+        BaseNFLManager.all_events = live_events + selected_upcoming + selected_past
+        self.logger.info(f"[NFL] Processed schedule: {len(live_events)} live, {len(selected_upcoming)} upcoming, {len(selected_past)} recent games.")
 
     def _fetch_data(self, date_str: str = None) -> Optional[Dict]:
         """Fetch data using shared data mechanism or direct fetch for live."""
@@ -436,7 +294,7 @@ class BaseNFLManager: # Renamed class
                 return None
         else:
             # For non-live games, use the shared cache
-            return self._fetch_shared_data(self.fetch_past_games, self.fetch_future_games, date_str)
+            return self._fetch_shared_data()
 
     def _load_fonts(self):
         """Load fonts used by the scoreboard."""

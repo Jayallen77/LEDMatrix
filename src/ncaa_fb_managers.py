@@ -172,285 +172,112 @@ class BaseNCAAFBManager: # Renamed class
         except Exception as e:
             self.logger.error(f"Error fetching odds for game {game.get('id', 'N/A')}: {e}")
 
-    def _fetch_shared_data(self, fetch_past_games: int, fetch_future_games: int, date_str: str = None) -> Optional[Dict]:
-        """Fetch and cache data for all managers to share, using game counts instead of days."""
-        current_time = time.time()
+    def _fetch_shared_data(self) -> None:
+        """
+        Fetches the full season schedule for NCAAFB, caches it, and then filters
+        for relevant games based on the current configuration.
+        """
+        now = datetime.now(pytz.utc)
+        current_year = now.year
+        # NCAAFB season spans years, so we might need to check last year too if it's early in the current year
+        years_to_check = [current_year]
+        if now.month < 8: # If it's before August, check previous year's schedule too
+            years_to_check.append(current_year - 1)
 
-        if BaseNCAAFBManager._shared_data and (current_time - BaseNCAAFBManager._last_shared_update) < 300:
-            return BaseNCAAFBManager._shared_data
+        all_events = []
+        for year in years_to_check:
+            cache_key = f"ncaafb_schedule_{year}"
+            cached_data = BaseNCAAFBManager.cache_manager.get_cached_data(cache_key)
 
-        try:
-            cache_key = date_str if date_str else 'today_ncaafb'
-            cached_data = BaseNCAAFBManager.cache_manager.get(cache_key, max_age=300)
             if cached_data:
-                BaseNCAAFBManager.logger.info(f"[NCAAFB] Using cached data for {cache_key}")
-                BaseNCAAFBManager._shared_data = cached_data
-                BaseNCAAFBManager._last_shared_update = current_time
-                return cached_data
-
-            # Check if we need to fetch past or future games based on display modes
-            need_past_games = self.recent_enabled and fetch_past_games > 0
-            need_future_games = self.upcoming_enabled and fetch_future_games > 0
-            
-            if not need_past_games and not need_future_games:
-                BaseNCAAFBManager.logger.info("[NCAAFB] Skipping data fetch - no enabled display modes require past or future games")
-                return None
-
-            # Adjust fetch parameters based on enabled modes
-            actual_past_games = fetch_past_games if need_past_games else 0
-            actual_future_games = fetch_future_games if need_future_games else 0
-            
-            # For upcoming games, we need to find games for each favorite team
-            if need_future_games and self.favorite_teams:
-                # Calculate how many games we need to find for favorite teams
-                games_needed_per_team = actual_future_games
-                total_favorite_games_needed = len(self.favorite_teams) * games_needed_per_team
-                BaseNCAAFBManager.logger.info(f"[NCAAFB] Need to find {games_needed_per_team} games for each of {len(self.favorite_teams)} favorite teams ({total_favorite_games_needed} total)")
+                self.logger.info(f"[NCAAFB] Using cached schedule for {year}")
+                all_events.extend(cached_data)
             else:
-                total_favorite_games_needed = actual_future_games
-            
-            BaseNCAAFBManager.logger.info(f"[NCAAFB] Fetching data - Past games: {actual_past_games}, Future games: {actual_future_games}")
+                self.logger.info(f"[NCAAFB] Fetching full {year} season schedule from ESPN API...")
+                try:
+                    # Fetching only regular season type for now. Can be expanded.
+                    url = f"https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates={year}&seasontype=2"
+                    response = self.session.get(url, headers=self.headers, timeout=15)
+                    response.raise_for_status()
+                    data = response.json()
+                    events = data.get('events', [])
+                    BaseNCAAFBManager.cache_manager.save_cache(cache_key, events, expiration_seconds=86400) # Cache for 24 hours
+                    self.logger.info(f"[NCAAFB] Successfully fetched and cached {len(events)} events for the {year} season.")
+                    all_events.extend(events)
+                except requests.exceptions.RequestException as e:
+                    self.logger.error(f"[NCAAFB] API error fetching full schedule for {year}: {e}")
+                    continue
+        
+        if not all_events:
+            self.logger.warning("[NCAAFB] No events found in the schedule data for checked years.")
+            return
 
-            # Smart game-based fetching with range caching
-            today = datetime.now(self._get_timezone()).date()
-            all_events = []
-            past_events = []
-            future_events = []
-            
-            # Track games found for each favorite team
-            favorite_team_games = {team: [] for team in self.favorite_teams} if self.favorite_teams else {}
-            
-            # Debug: Log what we're looking for
-            if self.favorite_teams and need_future_games:
-                BaseNCAAFBManager.logger.info(f"[NCAAFB] Looking for {actual_future_games} games for each favorite team: {self.favorite_teams}")
-            
-            # Check for cached search ranges and last successful date
-            range_cache_key = f"search_ranges_ncaafb_{actual_past_games}_{actual_future_games}"
-            cached_ranges = BaseNCAAFBManager.cache_manager.get(range_cache_key, max_age=86400)  # Cache for 24 hours
-            
-            # Check for last successful date cache
-            last_successful_cache_key = f"last_successful_date_ncaafb_{actual_past_games}_{actual_future_games}"
-            last_successful_date = BaseNCAAFBManager.cache_manager.get(last_successful_cache_key, max_age=86400)
-            
-            if cached_ranges:
-                past_days_needed = cached_ranges.get('past_days', 0)
-                future_days_needed = cached_ranges.get('future_days', 0)
-                BaseNCAAFBManager.logger.info(f"[NCAAFB] Using cached search ranges: {past_days_needed} days past, {future_days_needed} days future")
-            else:
-                past_days_needed = 0
-                future_days_needed = 0
-            
-            # Start with cached ranges or expand incrementally
-            days_to_check = max(past_days_needed, future_days_needed)
-            max_days_to_check = 365  # Limit to 1 year to prevent infinite loops
-            
-            # If we have a last successful date, start from there
-            if last_successful_date and need_future_games:
-                last_successful_str = last_successful_date.get('date')
-                if last_successful_str:
-                    try:
-                        last_successful = datetime.strptime(last_successful_str, '%Y%m%d').date()
-                        days_since_last = (today - last_successful).days
-                        if days_since_last > 0:
-                            BaseNCAAFBManager.logger.info(f"[NCAAFB] Starting search from last successful date: {last_successful_str} ({days_since_last} days ago)")
-                            # Start from the day after the last successful date
-                            days_to_check = max(days_to_check, days_since_last + 1)
-                    except ValueError:
-                        BaseNCAAFBManager.logger.warning(f"[NCAAFB] Invalid last successful date format: {last_successful_str}")
-            
-            while (len(past_events) < actual_past_games or 
-                   (need_future_games and self.favorite_teams and 
-                    not all(len(games) >= actual_future_games for games in favorite_team_games.values()))) and days_to_check <= max_days_to_check:
+        # Filter the events for live, upcoming, and recent games
+        live_events = []
+        upcoming_events = []
+        past_events = []
+
+        for event in all_events:
+            status = event.get('status', {}).get('type', {}).get('name', 'unknown').lower()
+            is_live = status in ('status_in_progress', 'status_halftime')
+            is_upcoming = status in ('status_scheduled', 'status_pre_game')
+            is_final = status == 'status_final'
+
+            if is_live:
+                live_events.append(event)
+            elif is_upcoming:
+                upcoming_events.append(event)
+            elif is_final:
+                past_events.append(event)
+        
+        # Sort games by date
+        upcoming_events.sort(key=lambda x: x['date'])
+        past_events.sort(key=lambda x: x['date'], reverse=True)
+
+        # Select the correct number of games for favorite teams
+        selected_upcoming = []
+        if self.upcoming_enabled and self.favorite_teams:
+            games_found = {team: 0 for team in self.favorite_teams}
+            for game in upcoming_events:
+                competitors = game.get('competitions', [{}])[0].get('competitors', [])
+                home_team = next((c['team']['abbreviation'] for c in competitors if c.get('homeAway') == 'home'), '')
+                away_team = next((c['team']['abbreviation'] for c in competitors if c.get('homeAway') == 'away'), '')
+
+                team_in_game = None
+                if home_team in self.favorite_teams and games_found[home_team] < self.fetch_future_games:
+                    team_in_game = home_team
+                elif away_team in self.favorite_teams and games_found[away_team] < self.fetch_future_games:
+                    team_in_game = away_team
                 
-                # Debug: Log search loop condition
-                if need_future_games and self.favorite_teams:
-                    past_games_needed = len(past_events) < actual_past_games
-                    future_games_needed = not all(len(games) >= actual_future_games for games in favorite_team_games.values())
-                    days_limit_ok = days_to_check <= max_days_to_check
-                    BaseNCAAFBManager.logger.debug(f"[NCAAFB] Search loop condition: past_needed={past_games_needed}, future_needed={future_games_needed}, days_ok={days_limit_ok}")
-                    if not future_games_needed:
-                        BaseNCAAFBManager.logger.info(f"[NCAAFB] Stopping search - found enough games for all favorite teams")
+                if team_in_game:
+                    selected_upcoming.append(game)
+                    games_found[team_in_game] += 1
+                    if all(count >= self.fetch_future_games for count in games_found.values()):
                         break
-                
-                # Check dates in both directions
-                dates_to_check = []
-                
-                # Check past dates (start from cached range if available)
-                if len(past_events) < actual_past_games:
-                    start_day = past_days_needed if cached_ranges else 1
-                    for i in range(start_day, days_to_check + 1):
-                        past_date = today - timedelta(days=i)
-                        dates_to_check.append(past_date.strftime('%Y%m%d'))
-                
-                # Check future dates (start from cached range if available)
-                if len(future_events) < actual_future_games:
-                    start_day = future_days_needed if cached_ranges else 1
-                    for i in range(start_day, days_to_check + 1):
-                        future_date = today + timedelta(days=i)
-                        dates_to_check.append(future_date.strftime('%Y%m%d'))
-                
-                # Also check today if we haven't already
-                if days_to_check == 0:
-                    dates_to_check.append(today.strftime('%Y%m%d'))
-                
-                if dates_to_check:
-                    BaseNCAAFBManager.logger.info(f"[NCAAFB] Checking {len(dates_to_check)} dates (day {days_to_check}) to find {actual_past_games} past and {actual_future_games} future games")
-                    
-                    # Fetch data for each date
-                    for fetch_date in dates_to_check:
-                        date_cache_key = f"{fetch_date}_ncaafb"
-                        cached_date_data = BaseNCAAFBManager.cache_manager.get(date_cache_key, max_age=300)
-                        
-                        if cached_date_data:
-                            if "events" in cached_date_data:
-                                all_events.extend(cached_date_data["events"])
-                            continue
+        
+        selected_past = []
+        if self.recent_enabled and self.favorite_teams:
+            games_found = {team: 0 for team in self.favorite_teams}
+            for game in past_events:
+                competitors = game.get('competitions', [{}])[0].get('competitors', [])
+                home_team = next((c['team']['abbreviation'] for c in competitors if c.get('homeAway') == 'home'), '')
+                away_team = next((c['team']['abbreviation'] for c in competitors if c.get('homeAway') == 'away'), '')
 
-                        url = ESPN_NCAAFB_SCOREBOARD_URL
-                        params = {'dates': fetch_date}
-                        
-                        response = requests.get(url, params=params)
-                        response.raise_for_status()
-                        date_data = response.json()
-                        
-                        if date_data and "events" in date_data:
-                            all_events.extend(date_data["events"])
-                            BaseNCAAFBManager.logger.info(f"[NCAAFB] Fetched {len(date_data['events'])} events for date {fetch_date}")
-                            BaseNCAAFBManager.cache_manager.set(date_cache_key, date_data)
-                    
-                    # Process newly fetched events
-                    if all_events:
-                        # Sort events by date
-                        all_events.sort(key=lambda x: x.get('date', ''))
-                        
-                        # Separate past and future events
-                        now = datetime.now(self._get_timezone())
-                        past_events = []
-                        future_events = []
-                        
-                        for event in all_events:
-                            try:
-                                event_time = datetime.fromisoformat(event['date'].replace('Z', '+00:00'))
-                                if event_time.tzinfo is None:
-                                    event_time = event_time.replace(tzinfo=pytz.UTC)
-                                event_time = event_time.astimezone(self._get_timezone())
-                                
-                                if event_time < now:
-                                    past_events.append(event)
-                                else:
-                                    future_events.append(event)
-                                    
-                                    # Track games for favorite teams
-                                    if self.favorite_teams and need_future_games:
-                                        competition = event.get('competitions', [{}])[0]
-                                        competitors = competition.get('competitors', [])
-                                        home_team = next((c for c in competitors if c.get('homeAway') == 'home'), None)
-                                        away_team = next((c for c in competitors if c.get('homeAway') == 'away'), None)
-                                        
-                                        if home_team and away_team:
-                                            home_abbr = home_team['team']['abbreviation']
-                                            away_abbr = away_team['team']['abbreviation']
-                                            
-                                            # Debug: Log all teams found
-                                            BaseNCAAFBManager.logger.debug(f"[NCAAFB] Found game: {away_abbr}@{home_abbr}")
-                                            
-                                            # Check if this game involves a favorite team
-                                            for team in self.favorite_teams:
-                                                if team in [home_abbr, away_abbr]:
-                                                    if len(favorite_team_games[team]) < actual_future_games:
-                                                        favorite_team_games[team].append(event)
-                                                        BaseNCAAFBManager.logger.debug(f"[NCAAFB] Found game for {team}: {away_abbr}@{home_abbr}")
-                                    else:
-                                        # Debug: Log all teams found even when not tracking favorite teams
-                                        competition = event.get('competitions', [{}])[0]
-                                        competitors = competition.get('competitors', [])
-                                        home_team = next((c for c in competitors if c.get('homeAway') == 'home'), None)
-                                        away_team = next((c for c in competitors if c.get('homeAway') == 'away'), None)
-                                        
-                                        if home_team and away_team:
-                                            home_abbr = home_team['team']['abbreviation']
-                                            away_abbr = away_team['team']['abbreviation']
-                                            BaseNCAAFBManager.logger.debug(f"[NCAAFB] Found game (not tracking favorites): {away_abbr}@{home_abbr}")
-                            except Exception as e:
-                                BaseNCAAFBManager.logger.warning(f"[NCAAFB] Could not parse event date: {e}")
-                                continue
-                
-                days_to_check += 1
-            
-            # Debug: Log what we found for each favorite team
-            if self.favorite_teams and need_future_games:
-                BaseNCAAFBManager.logger.info(f"[NCAAFB] Search completed. Games found for each favorite team:")
-                for team in self.favorite_teams:
-                    games_found = len(favorite_team_games.get(team, []))
-                    BaseNCAAFBManager.logger.info(f"[NCAAFB] {team}: {games_found}/{actual_future_games} games")
-            
-            # Cache the search ranges for next time
-            if len(past_events) >= actual_past_games and len(future_events) >= actual_future_games:
-                # Calculate how many days we actually needed
-                actual_past_days = max(1, days_to_check - 1) if past_events else 0
-                actual_future_days = max(1, days_to_check - 1) if future_events else 0
-                
-                # Cache the ranges for next time
-                range_data = {
-                    'past_days': actual_past_days,
-                    'future_days': actual_future_days,
-                    'last_updated': current_time
-                }
-                BaseNCAAFBManager.cache_manager.set(range_cache_key, range_data)
-                BaseNCAAFBManager.logger.info(f"[NCAAFB] Cached search ranges: {actual_past_days} days past, {actual_future_days} days future")
-                
-                # Store the last successful date for future searches
-                if future_events:
-                    # Find the furthest future date where we found games
-                    furthest_future_date = None
-                    for event in future_events:
-                        try:
-                            event_time = datetime.fromisoformat(event['date'].replace('Z', '+00:00'))
-                            if event_time.tzinfo is None:
-                                event_time = event_time.replace(tzinfo=pytz.UTC)
-                            event_date = event_time.date()
-                            if furthest_future_date is None or event_date > furthest_future_date:
-                                furthest_future_date = event_date
-                        except Exception:
-                            continue
-                    
-                    if furthest_future_date:
-                        last_successful_data = {
-                            'date': furthest_future_date.strftime('%Y%m%d'),
-                            'last_updated': current_time
-                        }
-                        BaseNCAAFBManager.cache_manager.set(last_successful_cache_key, last_successful_data)
-                        BaseNCAAFBManager.logger.info(f"[NCAAFB] Cached last successful date: {furthest_future_date.strftime('%Y%m%d')}")
-            
-            # Take the specified number of games
-            selected_past_events = past_events[-actual_past_games:] if past_events else []
-            
-            # For future games, use favorite team games if available
-            if self.favorite_teams and need_future_games:
-                selected_future_events = []
-                for team in self.favorite_teams:
-                    team_games = favorite_team_games.get(team, [])
-                    selected_future_events.extend(team_games[:actual_future_games])
-                BaseNCAAFBManager.logger.info(f"[NCAAFB] Selected {len(selected_past_events)} past games and {len(selected_future_events)} favorite team future games")
-            else:
-                selected_future_events = future_events[:actual_future_games] if future_events else []
-                BaseNCAAFBManager.logger.info(f"[NCAAFB] Selected {len(selected_past_events)} past games and {len(selected_future_events)} future games after checking {days_to_check} days")
-            
-            # Combine selected events
-            selected_events = selected_past_events + selected_future_events
-            
-            BaseNCAAFBManager.logger.info(f"[NCAAFB] Selected {len(selected_past_events)} past games and {len(selected_future_events)} future games after checking {days_to_check} days")
-            
-            # Create the final data structure
-            data = {"events": selected_events}
-            BaseNCAAFBManager._shared_data = data
-            BaseNCAAFBManager._last_shared_update = current_time
-            
-            return data
+                team_in_game = None
+                if home_team in self.favorite_teams and games_found[home_team] < self.fetch_past_games:
+                    team_in_game = home_team
+                elif away_team in self.favorite_teams and games_found[away_team] < self.fetch_past_games:
+                    team_in_game = away_team
 
-        except requests.exceptions.RequestException as e:
-            BaseNCAAFBManager.logger.error(f"[NCAAFB] Error fetching data from ESPN: {e}")
-            return None
+                if team_in_game:
+                    selected_past.append(game)
+                    games_found[team_in_game] += 1
+                    if all(count >= self.fetch_past_games for count in games_found.values()):
+                        break
+
+        # Combine all relevant events into a single list
+        BaseNCAAFBManager.all_events = live_events + selected_upcoming + selected_past
+        self.logger.info(f"[NCAAFB] Processed schedule: {len(live_events)} live, {len(selected_upcoming)} upcoming, {len(selected_past)} recent games.")
 
     def _fetch_data(self, date_str: str = None) -> Optional[Dict]:
         """Fetch data using shared data mechanism or direct fetch for live."""
@@ -472,7 +299,7 @@ class BaseNCAAFBManager: # Renamed class
                 return None
         else:
             # For non-live games, use the shared cache
-            return self._fetch_shared_data(self.fetch_past_games, self.fetch_future_games, date_str)
+            return self._fetch_shared_data()
 
     def _load_fonts(self):
         """Load fonts used by the scoreboard."""
