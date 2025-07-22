@@ -35,6 +35,7 @@ class OddsTickerManager:
         self.display_duration = self.odds_ticker_config.get('display_duration', 30)
         self.future_fetch_days = self.odds_ticker_config.get('future_fetch_days', 7)
         self.loop = self.odds_ticker_config.get('loop', True)
+        self.show_channel_logos = self.odds_ticker_config.get('show_channel_logos', True)
         
         # Initialize managers
         self.cache_manager = CacheManager()
@@ -410,7 +411,9 @@ class OddsTickerManager:
         # Get team logos
         home_logo = self._get_team_logo(game['home_team'], game['logo_dir'])
         away_logo = self._get_team_logo(game['away_team'], game['logo_dir'])
-        broadcast_logo = self._get_team_logo(game.get('broadcast_info', ''), 'assets/broadcast_logos')
+        broadcast_logo = None
+        if self.show_channel_logos:
+            broadcast_logo = self._get_team_logo(game.get('broadcast_info', ''), 'assets/broadcast_logos')
 
         if home_logo:
             home_logo = home_logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)

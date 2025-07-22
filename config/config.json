@@ -120,7 +120,8 @@
         "scroll_speed": 1,
         "scroll_delay": 0.01,
         "loop": true,
-        "future_fetch_days": 50
+        "future_fetch_days": 50,
+        "show_channel_logos": true
     },
     "calendar": {
         "enabled": true,
