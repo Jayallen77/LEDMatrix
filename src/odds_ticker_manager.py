@@ -259,6 +259,13 @@ class OddsTickerManager:
                             away_abbr = away_team['team']['abbreviation']
                             home_name = home_team['team'].get('name', home_abbr)
                             away_name = away_team['team'].get('name', away_abbr)
+
+                            broadcast_info = ""
+                            broadcasts = event.get('competitions', [{}])[0].get('broadcasts', [])
+                            if broadcasts:
+                                broadcast_info = broadcasts[0].get('media', {}).get('shortName', "")
+                                logger.info(f"Found broadcast info for game {game_id}: {broadcast_info}")
+
                             # Only process favorite teams if enabled
                             if self.show_favorite_teams_only:
                                 if not favorite_teams:
@@ -294,6 +301,7 @@ class OddsTickerManager:
                                 'home_record': home_record,
                                 'away_record': away_record,
                                 'odds': odds_data if has_odds else None,
+                                'broadcast_info': broadcast_info,
                                 'logo_dir': league_config.get('logo_dir', f'assets/sports/{league.lower()}_logos')
                             }
                             all_games.append(game)
@@ -402,11 +410,14 @@ class OddsTickerManager:
         # Get team logos
         home_logo = self._get_team_logo(game['home_team'], game['logo_dir'])
         away_logo = self._get_team_logo(game['away_team'], game['logo_dir'])
+        broadcast_logo = self._get_team_logo(game.get('broadcast_info', ''), 'assets/broadcast_logos')
 
         if home_logo:
             home_logo = home_logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
         if away_logo:
             away_logo = away_logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
+        if broadcast_logo:
+            broadcast_logo = broadcast_logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
 
         # Create a temporary draw object to measure text
         temp_draw = ImageDraw.Draw(Image.new('RGB', (1, 1)))
@@ -445,6 +456,9 @@ class OddsTickerManager:
         date_width = int(temp_draw.textlength(date_text, font=datetime_font))
         time_width = int(temp_draw.textlength(time_text, font=datetime_font))
         datetime_col_width = max(day_width, date_width, time_width)
+        if broadcast_logo:
+            datetime_col_width = max(datetime_col_width, broadcast_logo.width)
+
 
         # Odds text
         odds = game.get('odds') or {}
@@ -548,6 +562,10 @@ class OddsTickerManager:
         draw.text((current_x, day_y), day_text, font=datetime_font, fill=(255, 255, 255))
         draw.text((current_x, date_y), date_text, font=datetime_font, fill=(255, 255, 255))
         draw.text((current_x, time_y), time_text, font=datetime_font, fill=(255, 255, 255))
+
+        if broadcast_logo:
+            broadcast_y = time_y + datetime_font_height + 2
+            image.paste(broadcast_logo, (int(current_x), broadcast_y), broadcast_logo if broadcast_logo.mode == 'RGBA' else None)
 
         return image
 
