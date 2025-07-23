@@ -3,28 +3,11 @@ import time
 from datetime import datetime
 from typing import Dict, Any, List
 from PIL import Image, ImageDraw
+import freetype
 from .weather_icons import WeatherIcons
 from .cache_manager import CacheManager
 
 class WeatherManager:
-    # Weather condition to larger colored icons (we'll use these as placeholders until you provide custom ones)
-    WEATHER_ICONS = {
-        'Clear': '🌞',      # Larger sun with rays
-        'Clouds': '☁️',     # Cloud
-        'Rain': '🌧️',      # Rain cloud
-        'Snow': '❄️',      # Snowflake
-        'Thunderstorm': '⛈️', # Storm cloud
-        'Drizzle': '🌦️',    # Sun behind rain cloud
-        'Mist': '🌫️',      # Fog
-        'Fog': '🌫️',       # Fog
-        'Haze': '🌫️',      # Fog
-        'Smoke': '🌫️',     # Fog
-        'Dust': '🌫️',      # Fog
-        'Sand': '🌫️',      # Fog
-        'Ash': '🌫️',       # Fog
-        'Squall': '💨',     # Dash symbol
-        'Tornado': '🌪️'     # Tornado
-    }
 
     def __init__(self, config: Dict[str, Any], display_manager):
         self.config = config
@@ -520,12 +503,23 @@ class WeatherManager:
                     
                     # Draw high/low temperatures at bottom (without degree symbol)
                     temp_text = f"{forecast['temp_low']} / {forecast['temp_high']}" # Removed degree symbols
-                    temp_width = draw.textlength(temp_text, font=self.display_manager.extra_small_font)
-                    temp_y = self.display_manager.matrix.height - 8  # Position at bottom with small margin
-                    draw.text((center_x - temp_width // 2, temp_y),
-                             temp_text,
-                             font=self.display_manager.extra_small_font,
-                             fill=self.COLORS['text'])
+                    # Use MatrixLight6 font for temperature text
+                    if hasattr(self.display_manager, 'matrix_light6_font'):
+                        # For BDF fonts, we need to calculate width manually and use _draw_bdf_text
+                        temp_width = self.display_manager.get_text_width(temp_text, self.display_manager.matrix_light6_font)
+                        # Calculate y position for BDF font at bottom
+                        self.display_manager.matrix_light6_font.load_char('A')
+                        font_height = self.display_manager.matrix_light6_font.glyph.bitmap.rows
+                        temp_y = self.display_manager.matrix.height - font_height - 1  # Position at bottom with small margin
+                        self.display_manager._draw_bdf_text(temp_text, center_x - temp_width // 2, temp_y, self.COLORS['text'], self.display_manager.matrix_light6_font)
+                    else:
+                        # Fallback to extra_small font
+                        temp_width = draw.textlength(temp_text, font=self.display_manager.extra_small_font)
+                        temp_y = self.display_manager.matrix.height - 8  # Position at bottom with small margin
+                        draw.text((center_x - temp_width // 2, temp_y),
+                                 temp_text,
+                                 font=self.display_manager.extra_small_font,
+                                 fill=self.COLORS['text'])
             
             # Update the display
             self.display_manager.image = image
