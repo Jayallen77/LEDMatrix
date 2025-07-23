@@ -176,15 +176,15 @@ class OfTheDayManager:
             body_font = self.body_font
             
             # Get font heights
-            title_height = title_font.getsize('A')[1]
-            body_height = body_font.getsize('A')[1]
+            title_height = title_font.getbbox('A')[3]  # Bottom coordinate gives height
+            body_height = body_font.getbbox('A')[3]  # Bottom coordinate gives height
             
             # --- Draw Title (always at top, 5by7.regular.ttf) ---
             title_y = 0  # Start at top
             draw.text((1, title_y), title, font=title_font, fill=self.title_color)
             
             # Calculate title width for underline
-            title_width = title_font.getsize(title)[0]
+            title_width = title_font.getbbox(title)[2]  # Right coordinate gives width
             
             # Underline below title
             underline_y = title_height + 1  # Just below the title
@@ -222,7 +222,7 @@ class OfTheDayManager:
         words = text.split()
         for word in words:
             test_line = ' '.join(current_line + [word]) if current_line else word
-            text_width = font.getsize(test_line)[0]
+            text_width = font.getbbox(test_line)[2]  # Right coordinate gives width
             if text_width <= max_width:
                 current_line.append(word)
             else:
@@ -232,7 +232,7 @@ class OfTheDayManager:
                 else:
                     truncated = word
                     while len(truncated) > 0:
-                        test_width = font.getsize(truncated + "...")[0]
+                        test_width = font.getbbox(truncated + "...")[2]  # Right coordinate gives width
                         if test_width <= max_width:
                             lines.append(truncated + "...")
                             break
