@@ -25,7 +25,7 @@ class FontTestManager:
         # Font configurations
         self.font_configs = {
             'bdf': {
-                'path': "assets/fonts/5x7.bdf",
+                'path': "assets/fonts/ic8x8u.bdf",
                 'display_name': "5x7 BDF",
                 'description': "5x7 BDF font"
             },
