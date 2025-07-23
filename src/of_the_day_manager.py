@@ -171,15 +171,14 @@ class OfTheDayManager:
         for char in text:
             face.load_char(char)
             bitmap = face.glyph.bitmap
-            # Adjust y position to account for BDF baseline
-            baseline_offset = face.glyph.bitmap_top
+            # Use direct positioning without bitmap_top offset
             for i in range(bitmap.rows):
                 for j in range(bitmap.width):
                     byte_index = i * bitmap.pitch + (j // 8)
                     if byte_index < len(bitmap.buffer):
                         byte = bitmap.buffer[byte_index]
                         if byte & (1 << (7 - (j % 8))):
-                            draw.point((x + j, y + baseline_offset + i), fill=color)
+                            draw.point((x + j, y + i), fill=color)
             x += face.glyph.advance.x >> 6
         return x - orig_x
 
@@ -193,10 +192,11 @@ class OfTheDayManager:
             matrix_height = self.display_manager.matrix.height
             title_face = self.title_face
             body_face = self.body_face
-            # Get font heights for BDF (bitmap) fonts
+            
+            # Get font heights and set consistent positioning
             title_height = title_face.height
             body_height = body_face.height
-
+            
             # --- Draw Title (always at top, ic8x8u.bdf) ---
             title_y = 0  # Start at top
             self._draw_bdf_text(draw, title_face, title, 1, title_y, color=self.title_color)
@@ -209,12 +209,12 @@ class OfTheDayManager:
             title_width = title_width // 64
             
             # Underline below title
-            underline_y = title_height + 1  # Just below the title
+            underline_y = title_height  # Just below the title
             draw.line([(1, underline_y), (1 + title_width, underline_y)], fill=self.title_color, width=1)
 
             # --- Draw Subtitle or Description (rotating, cozette.bdf) ---
             # Start subtitle/description below the title with proper spacing
-            y_start = title_height + 3  # Leave space between title and subtitle
+            y_start = title_height + 2  # Leave space between title and subtitle
             available_height = matrix_height - y_start
             available_width = matrix_width - 2
             
