@@ -206,13 +206,15 @@ class OfTheDayManager:
             # Calculate title width and actual height for proper spacing
             title_width = 0
             max_title_height = 0
+            baseline_offset = title_face.size.height - title_face.size.ascender
             for c in title:
                 title_face.load_char(c)
                 title_width += title_face.glyph.advance.x
-                # Track the maximum height of any character in the title
+                # Track the maximum height including baseline offset
                 bitmap = title_face.glyph.bitmap
-                if bitmap.rows > max_title_height:
-                    max_title_height = bitmap.rows
+                actual_height = baseline_offset + bitmap.rows
+                if actual_height > max_title_height:
+                    max_title_height = actual_height
             title_width = title_width // 64
             
             # Underline below title using actual title height
