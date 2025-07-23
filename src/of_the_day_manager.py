@@ -234,7 +234,11 @@ class OfTheDayManager:
         words = text.split()
         for word in words:
             test_line = ' '.join(current_line + [word]) if current_line else word
-            text_width = sum([face.get_advance_width(ord(c)) for c in test_line]) // 64
+            text_width = 0
+            for c in test_line:
+                face.load_char(c)
+                text_width += face.glyph.advance.x
+            text_width = text_width // 64
             if text_width <= max_width:
                 current_line.append(word)
             else:
@@ -244,7 +248,11 @@ class OfTheDayManager:
                 else:
                     truncated = word
                     while len(truncated) > 0:
-                        test_width = sum([face.get_advance_width(ord(c)) for c in (truncated + "...")]) // 64
+                        test_width = 0
+                        for c in (truncated + "..."):
+                            face.load_char(c)
+                            test_width += face.glyph.advance.x
+                        test_width = test_width // 64
                         if test_width <= max_width:
                             lines.append(truncated + "...")
                             break
