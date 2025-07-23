@@ -305,8 +305,13 @@ class OfTheDayManager:
                 logger.info(f"Displaying {current_category}: {title}")
                 self.last_display_log = current_time
             
-            # Only clear if force_clear is True (following calendar_manager pattern)
-            if force_clear:
+            # Clear the display once to remove any previous content (like the "Initializing" screen)
+            if not hasattr(self, '_has_cleared_initial'):
+                logger.debug("Calling display_manager.clear() to remove initial screen")
+                self.display_manager.clear()
+                self._has_cleared_initial = True
+                logger.debug("display_manager.clear() completed")
+            elif force_clear:
                 logger.debug("Calling display_manager.clear() due to force_clear")
                 self.display_manager.clear()
                 logger.debug("display_manager.clear() completed")
