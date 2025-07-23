@@ -162,37 +162,24 @@ class OfTheDayManager:
                 logger.debug(f"Drawing item: title='{title}', subtitle='{subtitle}', description='{description}'")
                 self._last_draw_debug_log = current_time
             
-            # Draw title (Word) at the top with underline
+            # Draw title and subtitle on same line: "Title - Subtitle"
             # Throttle debug logging to once every 5 seconds
             if not hasattr(self, '_last_title_debug_log') or current_time - self._last_title_debug_log > 5:
-                logger.debug(f"Drawing title '{title}' at position (1, 0) with underline")
+                logger.debug(f"Drawing title-subtitle: '{title} - {subtitle}' at position (1, 0)")
                 self._last_title_debug_log = current_time
             
-            # Draw title
-            self.display_manager.draw_text(title, 1, 0, 
+            # Create combined title-subtitle text
+            title_subtitle_text = f"{title} - {subtitle}" if subtitle else title
+            
+            # Draw title-subtitle on same line
+            self.display_manager.draw_text(title_subtitle_text, 1, 0, 
                                         color=self.title_color,
                                         font=self.display_manager.calendar_font)
             
-            # Draw underline for title
-            title_width = self.display_manager.get_text_width(title, self.display_manager.calendar_font)
+            # Draw underline for title-subtitle
+            title_subtitle_width = self.display_manager.get_text_width(title_subtitle_text, self.display_manager.calendar_font)
             draw = ImageDraw.Draw(self.display_manager.image)
-            draw.line([(1, 6), (1 + title_width, 6)], fill=self.title_color, width=1)
-            
-            # Draw subtitle with word wrapping - aligned to top
-            if subtitle:
-                # Use full width minus 2 pixels for maximum text
-                available_width = self.display_manager.matrix.width - 2
-                wrapped_lines = self._wrap_text(subtitle, available_width, self.display_manager.calendar_font, max_lines=2)
-                
-                for i, line in enumerate(wrapped_lines):
-                    if line.strip():
-                        # Throttle debug logging to once every 5 seconds
-                        if not hasattr(self, '_last_subtitle_debug_log') or current_time - self._last_subtitle_debug_log > 5:
-                            logger.debug(f"Drawing subtitle line '{line}' at position (1, {8 + (i * 6)}) - left justified")
-                            self._last_subtitle_debug_log = current_time
-                        self.display_manager.draw_text(line, 1, 8 + (i * 6), 
-                                                    color=self.subtitle_color,
-                                                    font=self.display_manager.calendar_font)
+            draw.line([(1, 6), (1 + title_subtitle_width, 6)], fill=self.title_color, width=1)
             
             # Draw description with word wrapping - aligned to bottom
             if description:
