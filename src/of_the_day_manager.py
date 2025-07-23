@@ -42,22 +42,31 @@ class OfTheDayManager:
         
         # Load data files
         self.data_files = {}
+        logger.info("Loading data files for OfTheDayManager...")
         self._load_data_files()
+        logger.info(f"Loaded {len(self.data_files)} data files: {list(self.data_files.keys())}")
         
         logger.info(f"OfTheDayManager configuration: enabled={self.enabled}, categories={list(self.categories.keys())}")
         
         if self.enabled:
+            logger.info("OfTheDayManager is enabled, loading today's items...")
             self._load_todays_items()
+            logger.info(f"After loading, current_items has {len(self.current_items)} items: {list(self.current_items.keys())}")
         else:
             logger.warning("OfTheDayManager is disabled in configuration")
     
     def _load_data_files(self):
         """Load all data files for enabled categories."""
         if not self.enabled:
+            logger.debug("OfTheDayManager is disabled, skipping data file loading")
             return
             
+        logger.info(f"Loading data files for {len(self.categories)} categories")
+            
         for category_name, category_config in self.categories.items():
+            logger.debug(f"Processing category: {category_name}")
             if not category_config.get('enabled', True):
+                logger.debug(f"Skipping disabled category: {category_name}")
                 continue
                 
             data_file = category_config.get('data_file')
@@ -240,7 +249,11 @@ class OfTheDayManager:
             logger.warning("OfTheDayManager is disabled")
             return
         if not self.current_items:
-            logger.warning(f"OfTheDayManager has no current items. Available items: {list(self.current_items.keys())}")
+            # Throttle warning to once every 10 seconds
+            current_time = time.time()
+            if not hasattr(self, 'last_warning_time') or current_time - self.last_warning_time > 10:
+                logger.warning(f"OfTheDayManager has no current items. Available items: {list(self.current_items.keys())}")
+                self.last_warning_time = current_time
             return
             
         try:
