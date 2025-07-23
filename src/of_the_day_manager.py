@@ -41,6 +41,10 @@ class OfTheDayManager:
         font_dir = os.path.join(os.path.dirname(__file__), '..', 'assets', 'fonts')
         self.title_font = freetype.Face(os.path.join(font_dir, 'MatrixChunky8X.bdf'))
         self.body_font = freetype.Face(os.path.join(font_dir, 'MatrixLight6X.bdf'))
+        
+        # Log font properties for debugging
+        logger.debug(f"Title font properties: height={self.title_font.size.height}, ascender={self.title_font.size.ascender}, descender={self.title_font.size.descender}")
+        logger.debug(f"Body font properties: height={self.body_font.size.height}, ascender={self.body_font.size.ascender}, descender={self.body_font.size.descender}")
 
         # Load categories and their data
         self.categories = self.of_the_day_config.get('categories', {})
@@ -171,11 +175,10 @@ class OfTheDayManager:
         for char in text:
             face.load_char(char)
             bitmap = face.glyph.bitmap
-            # Calculate baseline position
-            # For BDF fonts, we need to account for the font's baseline
-            # bitmap_top is relative to the baseline, so we need to adjust
-            baseline_y = y + face.size.ascender
-            glyph_y = baseline_y + face.glyph.bitmap_top - bitmap.rows
+            # For LED matrix displays, we need pixel-perfect baseline rendering
+            # Use the glyph's bitmap_top to position relative to the baseline
+            # This ensures all characters align properly regardless of their height
+            glyph_y = y + face.glyph.bitmap_top - bitmap.rows
             for i in range(bitmap.rows):
                 for j in range(bitmap.width):
                     byte_index = i * bitmap.pitch + (j // 8)
