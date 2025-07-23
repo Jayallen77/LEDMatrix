@@ -155,51 +155,74 @@ class OfTheDayManager:
             title = item.get('title', 'No Title')
             subtitle = item.get('subtitle', '')
             description = item.get('description', '')
-            
-            # Throttle debug logging to once every 5 seconds
-            current_time = time.time()
-            if not hasattr(self, '_last_draw_debug_log') or current_time - self._last_draw_debug_log > 5:
-                logger.debug(f"Drawing item: title='{title}', subtitle='{subtitle}', description='{description}'")
-                self._last_draw_debug_log = current_time
-            
-            # Draw title and subtitle on same line: "Title - Subtitle"
-            # Throttle debug logging to once every 5 seconds
-            if not hasattr(self, '_last_title_debug_log') or current_time - self._last_title_debug_log > 5:
-                logger.debug(f"Drawing title-subtitle: '{title} - {subtitle}' at position (1, 0)")
-                self._last_title_debug_log = current_time
-            
-            # Create combined title-subtitle text
-            title_subtitle_text = f"{title} - {subtitle}" if subtitle else title
-            
-            # Draw title-subtitle on same line
-            self.display_manager.draw_text(title_subtitle_text, 1, 0, 
-                                        color=self.title_color,
-                                        font=self.display_manager.calendar_font)
-            
-            # Draw underline for title-subtitle
-            title_subtitle_width = self.display_manager.get_text_width(title_subtitle_text, self.display_manager.calendar_font)
+            font = self.display_manager.calendar_font
             draw = ImageDraw.Draw(self.display_manager.image)
-            draw.line([(1, 6), (1 + title_subtitle_width, 6)], fill=self.title_color, width=1)
-            
-            # Draw description with word wrapping - aligned to bottom
-            if description:
-                # Use full width minus 2 pixels for maximum text
-                available_width = self.display_manager.matrix.width - 2
-                wrapped_lines = self._wrap_text(description, available_width, self.display_manager.calendar_font, max_lines=3)
+            line_height = 8  # For 7px font
+
+            # --- Title and Subtitle Drawing (Top Aligned) ---
+
+            # 1. Draw Title
+            self.display_manager.draw_text(title, 1, 0, color=self.title_color, font=font)
+
+            # 2. Underline Title Only
+            title_width = self.display_manager.get_text_width(title, font)
+            underline_y = 7  # Just below the 7px high font
+            draw.line([(1, underline_y), (1 + title_width, underline_y)], fill=self.title_color, width=1)
+
+            # 3. Draw Subtitle, starting on the same line as the title
+            if subtitle:
+                current_x = 1 + title_width
+                separator = " - "
                 
-                # Calculate starting position to align at bottom
-                total_description_height = len([line for line in wrapped_lines if line.strip()]) * 6
+                # Draw separator if it fits
+                if current_x + self.display_manager.get_text_width(separator, font) < self.display_manager.matrix.width:
+                    self.display_manager.draw_text(separator, current_x, 0, color=self.subtitle_color, font=font)
+                    current_x += self.display_manager.get_text_width(separator, font)
+
+                    # Wrap the rest of the subtitle
+                    available_width_line1 = self.display_manager.matrix.width - current_x
+                    words = subtitle.split(' ')
+                    
+                    line1_words = []
+                    while words:
+                        word = words.pop(0)
+                        test_line = ' '.join(line1_words + [word])
+                        if self.display_manager.get_text_width(test_line, font) <= available_width_line1:
+                            line1_words.append(word)
+                        else:
+                            words.insert(0, word) # Put word back
+                            break
+                    
+                    if line1_words:
+                        self.display_manager.draw_text(' '.join(line1_words), current_x, 0, color=self.subtitle_color, font=font)
+
+                    # Draw remaining words on the next line
+                    if words:
+                        remaining_text = ' '.join(words)
+                        wrapped_line2 = self._wrap_text(remaining_text, self.display_manager.matrix.width - 2, font, max_lines=1)
+                        if wrapped_line2 and wrapped_line2[0]:
+                             self.display_manager.draw_text(wrapped_line2[0], 1, line_height, color=self.subtitle_color, font=font)
+                else:
+                    # If even the separator doesn't fit, wrap the whole subtitle on the next line
+                    wrapped_subtitle = self._wrap_text(subtitle, self.display_manager.matrix.width - 2, font, max_lines=2)
+                    for i, line in enumerate(wrapped_subtitle):
+                        if line.strip():
+                            self.display_manager.draw_text(line, 1, (i + 1) * line_height, color=self.subtitle_color, font=font)
+
+            # --- Description Drawing (Bottom Aligned) ---
+            if description:
+                available_width = self.display_manager.matrix.width - 2
+                wrapped_lines = self._wrap_text(description, available_width, font, max_lines=3)
+                
+                num_lines = len([line for line in wrapped_lines if line.strip()])
+                total_description_height = num_lines * line_height
                 start_y = self.display_manager.matrix.height - total_description_height
                 
                 for i, line in enumerate(wrapped_lines):
                     if line.strip():
-                        # Throttle debug logging to once every 5 seconds
-                        if not hasattr(self, '_last_description_debug_log') or current_time - self._last_description_debug_log > 5:
-                            logger.debug(f"Drawing description line '{line}' at position (1, {start_y + (i * 6)}) - bottom aligned")
-                            self._last_description_debug_log = current_time
-                        self.display_manager.draw_text(line, 1, start_y + (i * 6), 
+                        self.display_manager.draw_text(line, 1, start_y + (i * line_height), 
                                                     color=self.subtitle_color,
-                                                    font=self.display_manager.calendar_font)
+                                                    font=font)
             
             return True
         except Exception as e:
