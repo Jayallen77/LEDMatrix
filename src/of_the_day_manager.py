@@ -11,7 +11,7 @@ import time
 
 # Configure logger for this module
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 class OfTheDayManager:
     def __init__(self, display_manager, config):
@@ -156,12 +156,15 @@ class OfTheDayManager:
             subtitle = item.get('subtitle', '')
             description = item.get('description', '')
             
+            logger.debug(f"Drawing item: title='{title}', subtitle='{subtitle}', description='{description}'")
+            
             # Clear the display
             self.display_manager.clear()
             
             # Draw title in extra small font at the top for maximum text fitting
             title_width = self.display_manager.get_text_width(title, self.display_manager.extra_small_font)
             title_x = (self.display_manager.matrix.width - title_width) // 2
+            logger.debug(f"Drawing title '{title}' at position ({title_x}, 2) with width {title_width}")
             self.display_manager.draw_text(title, title_x, 2, 
                                         color=self.title_color,
                                         font=self.display_manager.extra_small_font)
@@ -170,6 +173,7 @@ class OfTheDayManager:
             if subtitle:
                 subtitle_width = self.display_manager.get_text_width(subtitle, self.display_manager.extra_small_font)
                 subtitle_x = (self.display_manager.matrix.width - subtitle_width) // 2
+                logger.debug(f"Drawing subtitle '{subtitle}' at position ({subtitle_x}, 12) with width {subtitle_width}")
                 self.display_manager.draw_text(subtitle, subtitle_x, 12, 
                                             color=self.subtitle_color,
                                             font=self.display_manager.extra_small_font)
@@ -287,6 +291,7 @@ class OfTheDayManager:
             self.draw_item(current_category, current_item)
             
             # Update the display
+            logger.debug("Calling display_manager.update_display()")
             self.display_manager.update_display()
             
         except Exception as e:
