@@ -175,10 +175,13 @@ class OfTheDayManager:
         for char in text:
             face.load_char(char)
             bitmap = face.glyph.bitmap
-            # For bottom baseline alignment, we need to position glyphs so their bottoms align
+            # Handle descenders properly - characters like y, g, p, q should extend below baseline
             # bitmap_top gives us the distance from baseline to top of bitmap
-            # For bottom alignment, we want the bottom of each glyph at the same y position
-            glyph_y = y - bitmap.rows
+            # For proper baseline alignment, we need to account for descenders
+            baseline_y = y
+            # Position glyph so its baseline is at the specified y position
+            # bitmap_top is the distance from baseline to top of bitmap
+            glyph_y = baseline_y + face.glyph.bitmap_top - bitmap.rows
             for i in range(bitmap.rows):
                 for j in range(bitmap.width):
                     byte_index = i * bitmap.pitch + (j // 8)
@@ -317,7 +320,7 @@ class OfTheDayManager:
             if self.current_category_index == original_index:
                 logger.warning("No categories have valid data, staying on current category")
             else:
-                logger.info(f"Rotating from category index {original_index} to {self.current_category_index}")
+                logger.info(f"Internal rotation: from category index {original_index} to {self.current_category_index}")
                 logger.info(f"Available categories with data: {list(self.current_items.keys())}")
             
             self.last_category_rotation_time = now
@@ -363,11 +366,28 @@ class OfTheDayManager:
             return
             
         # Only advance if internal rotation hasn't happened recently
+        # Add a buffer to prevent conflicts
+        if now - self.last_category_rotation_time < self.display_rotate_interval - 5:
+            logger.debug("Too close to internal rotation time, skipping external advance")
+            return
+            
         category_names = list(self.current_items.keys())
         if not category_names:
             return
             
-        self.current_category_index += 1
-        if self.current_category_index >= len(category_names):
-            self.current_category_index = 0
-        logger.debug(f"OfTheDayManager advanced to category index {self.current_category_index}") 
+        # Advance to next category
+        original_index = self.current_category_index
+        self.current_category_index = (self.current_category_index + 1) % len(category_names)
+        
+        # Update rotation time to prevent immediate internal rotation
+        self.last_category_rotation_time = now
+        
+        # Reset subtitle/description rotation when switching category
+        self.rotation_state = 0
+        self.last_rotation_time = now
+        
+        # Force redraw
+        self.last_drawn_category_index = -1
+        self.last_drawn_day = None
+        
+        logger.debug(f"OfTheDayManager externally advanced from category index {original_index} to {self.current_category_index}") 
