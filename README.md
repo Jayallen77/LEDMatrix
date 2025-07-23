@@ -395,6 +395,107 @@ This will:
 3. Display sample games
 4. Test the scrolling functionality
 
+## Stocks Configuration
+
+The stocks display shows real-time stock and crypto prices in a scrolling ticker format. To configure it:
+
+1. In `config/config.json`, add the following section:
+```json
+{
+    "stocks": {
+        "enabled": true,
+        "symbols": ["AAPL", "MSFT", "GOOGL", "TSLA"],
+        "update_interval": 600,
+        "scroll_speed": 1,
+        "scroll_delay": 0.01,
+        "toggle_chart": false
+    }
+}
+```
+
+### Configuration Options
+
+- **`enabled`**: Enable/disable the stocks display (default: false)
+- **`symbols`**: Array of stock symbols to display (e.g., ["AAPL", "MSFT", "GOOGL"])
+- **`update_interval`**: How often to fetch new stock data in seconds (default: 600)
+- **`scroll_speed`**: Pixels to scroll per update (default: 1)
+- **`scroll_delay`**: Delay between scroll updates in seconds (default: 0.01)
+- **`toggle_chart`**: Enable/disable mini charts in the scrolling ticker (default: false)
+
+### Display Format
+
+The stocks display shows information in this format:
+```
+[Logo] SYMBOL
+       $PRICE
+       +CHANGE (+PERCENT%)
+```
+
+Where:
+- `[Logo]` - Stock/crypto logo (if available)
+- `SYMBOL` - Stock symbol (e.g., AAPL, MSFT)
+- `$PRICE` - Current stock price
+- `+CHANGE` - Price change (green for positive, red for negative)
+- `+PERCENT%` - Percentage change
+
+### Chart Toggle Feature
+
+The `toggle_chart` setting controls whether mini price charts are displayed alongside each stock:
+
+- **`"toggle_chart": true`**: Shows mini line charts on the right side of each stock display
+- **`"toggle_chart": false`**: Shows only text information (symbol, price, change)
+
+When charts are disabled, the text is centered more prominently on the display.
+
+### Crypto Support
+
+The system also supports cryptocurrency symbols. Add crypto symbols to the `symbols` array:
+
+```json
+{
+    "stocks": {
+        "enabled": true,
+        "symbols": ["AAPL", "MSFT", "BTC-USD", "ETH-USD"],
+        "update_interval": 600,
+        "scroll_speed": 1,
+        "scroll_delay": 0.01,
+        "toggle_chart": false
+    }
+}
+```
+
+### Requirements
+
+- Yahoo Finance API access for stock data
+- Stock/crypto logo files in the appropriate directories:
+  - `assets/stocks/ticker_icons/` (for stocks)
+  - `assets/stocks/crypto_icons/` (for cryptocurrencies)
+
+### Troubleshooting
+
+**No Stock Data Displayed:**
+1. **Symbol Format**: Ensure stock symbols are correct (e.g., "AAPL" not "apple")
+2. **API Access**: Verify Yahoo Finance API is accessible
+3. **Market Hours**: Some data may be limited during off-hours
+4. **Symbol Validity**: Check that symbols exist and are actively traded
+
+**Performance Issues:**
+1. **Reduce scroll_speed**: Try setting it to 1 instead of higher values
+2. **Increase scroll_delay**: Try 0.05 instead of 0.01 for smoother scrolling
+3. **Reduce symbols**: Limit the number of symbols to improve performance
+
+### Testing
+
+You can test the stocks functionality using:
+```bash
+python test/test_stock_toggle_chart.py
+```
+
+This will:
+1. Test the toggle_chart functionality
+2. Verify configuration loading
+3. Test cache clearing behavior
+
 ## Football Game-Based Configuration (NFL & NCAA FB)
 
 For NFL and NCAA Football, the system now uses a game-based fetch approach instead of time-based windows. This is more practical for football since games are weekly and you want to show specific numbers of games rather than arbitrary time periods.

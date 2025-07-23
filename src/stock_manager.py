@@ -34,7 +34,10 @@ class StockManager:
         
         # Get scroll settings from config with faster defaults
         self.scroll_speed = self.stocks_config.get('scroll_speed', 1)
-        self.scroll_delay = self.stocks_config.get('scroll_delay', 0.001)
+        self.scroll_delay = self.stocks_config.get('scroll_delay', 0.01)
+        
+        # Get chart toggle setting from config
+        self.toggle_chart = self.stocks_config.get('toggle_chart', False)
         
         # Initialize frame rate tracking
         self.frame_count = 0
@@ -332,6 +335,16 @@ class StockManager:
             self.current_stock_index = 0
             self.last_update = 0  # Force immediate update
             logger.info(f"Stock symbols changed. New symbols: {new_symbols}")
+            
+        # Update scroll and chart settings
+        self.scroll_speed = self.stocks_config.get('scroll_speed', 1)
+        self.scroll_delay = self.stocks_config.get('scroll_delay', 0.01)
+        self.toggle_chart = self.stocks_config.get('toggle_chart', False)
+        
+        # Clear cached image if settings changed
+        if self.cached_text_image is not None:
+            self.cached_text_image = None
+            logger.info("Stock display settings changed, clearing cache")
 
     def update_stock_data(self):
         """Update stock and crypto data for all configured symbols."""
@@ -456,8 +469,14 @@ class StockManager:
         # Calculate starting y position to center all text
         start_y = (height - total_text_height) // 2
         
-        # Calculate center x position for the column
-        column_x = width // 2.85
+        # Calculate center x position for the column - adjust based on chart toggle
+        if self.toggle_chart:
+            # When chart is enabled, center text more to the left
+            column_x = width // 2.85
+        else:
+            # When chart is disabled, center text more to the right
+            column_x = width // 2.2
+        
         # Draw symbol
         symbol_width = symbol_bbox[2] - symbol_bbox[0]
         symbol_x = column_x - (symbol_width // 2)
@@ -476,8 +495,8 @@ class StockManager:
         change_color = (0, 255, 0) if change >= 0 else (255, 0, 0)
         draw.text((change_x, change_y), change_text, font=small_font, fill=change_color)
         
-        # Draw mini chart on the right
-        if symbol in self.stock_data and 'price_history' in self.stock_data[symbol]:
+        # Draw mini chart on the right only if toggle_chart is enabled
+        if self.toggle_chart and symbol in self.stock_data and 'price_history' in self.stock_data[symbol]:
             price_history = self.stock_data[symbol]['price_history']
             if len(price_history) >= 2:
                 # Extract prices from price history
@@ -675,4 +694,20 @@ class StockManager:
         if self.scroll_position == 0:
             return True
             
-        return False 
+        return False
+        
+    def set_toggle_chart(self, enabled: bool):
+        """Enable or disable chart display in the scrolling ticker."""
+        self.toggle_chart = enabled
+        self.cached_text_image = None  # Clear cache when switching modes
+        logger.info(f"Chart toggle set to: {enabled}")
+        
+    def set_scroll_speed(self, speed: int):
+        """Set the scroll speed for the ticker."""
+        self.scroll_speed = speed
+        logger.info(f"Scroll speed set to: {speed}")
+        
+    def set_scroll_delay(self, delay: float):
+        """Set the scroll delay for the ticker."""
+        self.scroll_delay = delay
+        logger.info(f"Scroll delay set to: {delay}") 

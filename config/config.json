@@ -91,7 +91,10 @@
         "symbols": [
             "ASTS", "SCHD", "INTC", "NVDA", "T", "VOO", "SMCI"
         ],
-        "display_format": "{symbol}: ${price} ({change}%)"
+        "display_format": "{symbol}: ${price} ({change}%)",
+        "scroll_speed": 1,
+        "scroll_delay": 0.01,
+        "toggle_chart": false
     },
     "crypto": {
         "enabled": true,
