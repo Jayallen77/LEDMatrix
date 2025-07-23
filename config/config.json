@@ -268,7 +268,7 @@
         "logo_dir": "assets/sports/mlb_logos",
         "show_records": true,
         "display_modes": {
-            "mlb_live": false,
+            "mlb_live": true,
             "mlb_recent": true,
             "mlb_upcoming": true
         }
@@ -287,7 +287,7 @@
         "show_records": true,
         "upcoming_fetch_days": 7,
         "display_modes": {
-            "milb_live": false,
+            "milb_live": true,
             "milb_recent": true,
             "milb_upcoming": true
         }
