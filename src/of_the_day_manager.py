@@ -194,7 +194,9 @@ class OfTheDayManager:
             
             # Get font heights
             title_height = title_font.height
-            body_height = body_font.height
+            # Calculate actual body height from the font
+            body_font.load_char('A')  # Load a character to get its height
+            body_height = body_font.glyph.bitmap.rows
             
             # --- Draw Title (always at top, 5x7.bdf) ---
             title_y = 0  # Start at top
