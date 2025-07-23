@@ -215,18 +215,23 @@ class OfTheDayManager:
             
             # --- Draw Title (always at top) ---
             title_y = title_height  # Position title so its bottom is at title_height
-            self._draw_bdf_text(draw, title_font, title, 1, title_y, color=self.title_color)
             
-            # Calculate title width for underline
+            # Calculate title width for centering
             title_width = 0
             for c in title:
                 title_font.load_char(c)
                 title_width += title_font.glyph.advance.x
             title_width = title_width // 64
             
-            # Underline below title
+            # Center the title
+            title_x = (matrix_width - title_width) // 2
+            self._draw_bdf_text(draw, title_font, title, title_x, title_y, color=self.title_color)
+            
+            # Underline below title (centered)
             underline_y = title_height + 1
-            draw.line([(1, underline_y), (1 + title_width, underline_y)], fill=self.title_color, width=1)
+            underline_x_start = title_x
+            underline_x_end = title_x + title_width
+            draw.line([(underline_x_start, underline_y), (underline_x_end, underline_y)], fill=self.title_color, width=1)
 
             # --- Draw Subtitle or Description (rotating) ---
             # Start subtitle/description below the title and underline
@@ -240,15 +245,27 @@ class OfTheDayManager:
                 wrapped = self._wrap_text(subtitle, available_width, body_font, max_lines=3, line_height=body_height, max_height=available_height)
                 for i, line in enumerate(wrapped):
                     if line.strip():  # Only draw non-empty lines
-                        # Account for bottom baseline alignment - position so bottom of text is at y_start
-                        self._draw_bdf_text(draw, body_font, line, 1, y_start + i * body_height, color=self.subtitle_color)
+                        # Center each line of body text
+                        line_width = 0
+                        for c in line:
+                            body_font.load_char(c)
+                            line_width += body_font.glyph.advance.x
+                        line_width = line_width // 64
+                        line_x = (matrix_width - line_width) // 2
+                        self._draw_bdf_text(draw, body_font, line, line_x, y_start + i * body_height, color=self.subtitle_color)
             elif self.rotation_state == 1 and description:
                 # Show description
                 wrapped = self._wrap_text(description, available_width, body_font, max_lines=3, line_height=body_height, max_height=available_height)
                 for i, line in enumerate(wrapped):
                     if line.strip():  # Only draw non-empty lines
-                        # Account for bottom baseline alignment - position so bottom of text is at y_start
-                        self._draw_bdf_text(draw, body_font, line, 1, y_start + i * body_height, color=self.subtitle_color)
+                        # Center each line of body text
+                        line_width = 0
+                        for c in line:
+                            body_font.load_char(c)
+                            line_width += body_font.glyph.advance.x
+                        line_width = line_width // 64
+                        line_x = (matrix_width - line_width) // 2
+                        self._draw_bdf_text(draw, body_font, line, line_x, y_start + i * body_height, color=self.subtitle_color)
             # else: nothing to show
             return True
         except Exception as e:
