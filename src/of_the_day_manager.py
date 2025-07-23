@@ -175,13 +175,10 @@ class OfTheDayManager:
         for char in text:
             face.load_char(char)
             bitmap = face.glyph.bitmap
-            # Handle descenders properly - characters like y, g, p, q should extend below baseline
-            # bitmap_top gives us the distance from baseline to top of bitmap
-            # For proper baseline alignment, we need to account for descenders
-            baseline_y = y
-            # Position glyph so its baseline is at the specified y position
+            # For proper baseline alignment, position glyphs so their baseline is at y
             # bitmap_top is the distance from baseline to top of bitmap
-            glyph_y = baseline_y + face.glyph.bitmap_top - bitmap.rows
+            # So we position the glyph so its baseline is at the specified y position
+            glyph_y = y + face.glyph.bitmap_top - bitmap.rows
             for i in range(bitmap.rows):
                 for j in range(bitmap.width):
                     byte_index = i * bitmap.pitch + (j // 8)
