@@ -170,13 +170,13 @@ class OfTheDayManager:
             
             self.display_manager.draw_text(title, 1, 0, 
                                         color=self.title_color,
-                                        font=self.display_manager.extra_small_font)
+                                        font=self.display_manager.calendar_font)
             
             # Draw subtitle right below title - left justified
             if subtitle:
                 # Use full width minus 2 pixels for maximum text
                 available_width = self.display_manager.matrix.width - 2
-                wrapped_lines = self._wrap_text(subtitle, available_width, self.display_manager.extra_small_font, max_lines=1)
+                wrapped_lines = self._wrap_text(subtitle, available_width, self.display_manager.calendar_font, max_lines=1)
                 
                 for i, line in enumerate(wrapped_lines):
                     if line.strip():
@@ -186,13 +186,13 @@ class OfTheDayManager:
                             self._last_subtitle_debug_log = current_time
                         self.display_manager.draw_text(line, 1, 6, 
                                                     color=self.subtitle_color,
-                                                    font=self.display_manager.extra_small_font)
+                                                    font=self.display_manager.calendar_font)
             
             # Draw description at the bottom - left justified
             if description:
                 # Use full width minus 2 pixels for maximum text
                 available_width = self.display_manager.matrix.width - 2
-                wrapped_lines = self._wrap_text(description, available_width, self.display_manager.extra_small_font, max_lines=2)
+                wrapped_lines = self._wrap_text(description, available_width, self.display_manager.calendar_font, max_lines=2)
                 
                 for i, line in enumerate(wrapped_lines):
                     if line.strip():
@@ -202,7 +202,7 @@ class OfTheDayManager:
                             self._last_description_debug_log = current_time
                         self.display_manager.draw_text(line, 1, 12 + (i * 6), 
                                                     color=self.subtitle_color,
-                                                    font=self.display_manager.extra_small_font)
+                                                    font=self.display_manager.calendar_font)
             
             return True
         except Exception as e:
