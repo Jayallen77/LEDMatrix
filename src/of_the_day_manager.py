@@ -78,7 +78,11 @@ class OfTheDayManager:
                 # Try relative path first, then absolute
                 file_path = data_file
                 if not os.path.isabs(file_path):
-                    file_path = os.path.join(os.path.dirname(__file__), '..', 'of_the_day', data_file)
+                    # If data_file already contains 'of_the_day/', use it as is
+                    if data_file.startswith('of_the_day/'):
+                        file_path = os.path.join(os.path.dirname(__file__), '..', data_file)
+                    else:
+                        file_path = os.path.join(os.path.dirname(__file__), '..', 'of_the_day', data_file)
                 
                 if os.path.exists(file_path):
                     with open(file_path, 'r', encoding='utf-8') as f:
