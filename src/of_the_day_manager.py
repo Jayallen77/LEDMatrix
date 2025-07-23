@@ -39,6 +39,8 @@ class OfTheDayManager:
         
         # State management
         self.force_clear = False
+        self.last_drawn_category_index = -1
+        self.last_drawn_day = None
         
         # Load data files
         self.data_files = {}
@@ -286,65 +288,50 @@ class OfTheDayManager:
         return lines[:max_lines]
     
     def display(self, force_clear=False):
-        """Display 'of the day' items on the LED matrix."""
+        """Display 'of the day' items on the LED matrix, only updating when content changes."""
         if not self.enabled:
-            logger.warning("OfTheDayManager is disabled")
-            return
+            return # Manager is disabled
         if not self.current_items:
             # Throttle warning to once every 10 seconds
             current_time = time.time()
             if not hasattr(self, 'last_warning_time') or current_time - self.last_warning_time > 10:
-                logger.warning(f"OfTheDayManager has no current items. Available items: {list(self.current_items.keys())}")
+                logger.warning(f"OfTheDayManager has no current items.")
                 self.last_warning_time = current_time
             return
-            
+
+        # Check if a redraw is necessary
+        content_has_changed = self.current_category_index != self.last_drawn_category_index or self.current_day != self.last_drawn_day
+        if not content_has_changed and not force_clear:
+            return # Nothing to update, so we exit early
+
         try:
-            if force_clear:
-                self.display_manager.clear()
-                self.force_clear = True
-            
             # Get current category and item
             category_names = list(self.current_items.keys())
-            if not category_names:
-                return
-                
-            if self.current_category_index >= len(category_names):
+            if not category_names or self.current_category_index >= len(category_names):
                 self.current_category_index = 0
-                
+                if not category_names: return
+
             current_category = category_names[self.current_category_index]
             current_item = self.current_items[current_category]
-            
-            # Log the item being displayed, but only every 5 seconds
+
+            # Log the new item being displayed (throttled)
             current_time = time.time()
             if current_time - self.last_display_log > 5:
-                title = current_item.get('title', 'No Title')
-                logger.info(f"Displaying {current_category}: {title}")
+                logger.info(f"Displaying {current_category}: {current_item.get('title', 'No Title')}")
                 self.last_display_log = current_time
             
-            # Clear the display once to remove any previous content (like the "Initializing" screen)
-            if not hasattr(self, '_has_cleared_initial'):
-                logger.debug("Calling display_manager.clear() to remove initial screen")
-                self.display_manager.clear()
-                self._has_cleared_initial = True
-                logger.debug("display_manager.clear() completed")
-            elif force_clear:
-                logger.debug("Calling display_manager.clear() due to force_clear")
-                self.display_manager.clear()
-                logger.debug("display_manager.clear() completed")
-            
+            # A redraw is needed, so first clear the canvas
+            self.display_manager.clear()
+
             # Draw the item
             self.draw_item(current_category, current_item)
             
-            # Update the display
-            # Throttle debug logging to once every 5 seconds
-            if not hasattr(self, '_last_update_debug_log') or current_time - self._last_update_debug_log > 5:
-                logger.debug("Calling display_manager.update_display()")
-                self._last_update_debug_log = current_time
-            try:
-                self.display_manager.update_display()
-                logger.debug("display_manager.update_display() completed successfully")
-            except Exception as e:
-                logger.error(f"Error in display_manager.update_display(): {e}", exc_info=True)
+            # Update the physical display
+            self.display_manager.update_display()
+
+            # Cache the state of what was just drawn
+            self.last_drawn_category_index = self.current_category_index
+            self.last_drawn_day = self.current_day
             
         except Exception as e:
             logger.error(f"Error displaying 'of the day' item: {e}", exc_info=True)
