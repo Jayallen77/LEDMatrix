@@ -426,7 +426,7 @@ class StockManager:
     def _create_stock_display(self, symbol: str, price: float, change: float, change_percent: float, is_crypto: bool = False) -> Image.Image:
         """Create a display image for a stock or crypto with logo, symbol, price, and change."""
         # Create a wider image for scrolling - adjust width based on chart toggle
-        width = self.display_manager.matrix.width * (2 if self.toggle_chart else 1.5)  # Reduced width when no chart
+        width = int(self.display_manager.matrix.width * (2 if self.toggle_chart else 1.5))  # Reduced width when no chart
         height = self.display_manager.matrix.height
         image = Image.new('RGB', (width, height), color=(0, 0, 0))
         draw = ImageDraw.Draw(image)
