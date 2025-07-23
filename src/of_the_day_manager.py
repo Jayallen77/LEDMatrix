@@ -171,8 +171,10 @@ class OfTheDayManager:
         for char in text:
             face.load_char(char)
             bitmap = face.glyph.bitmap
-            # Use bitmap_top to properly position the glyph relative to baseline
-            glyph_y = y + face.glyph.bitmap_top
+            # Calculate baseline position
+            # bitmap_top is the distance from baseline to top of bitmap
+            baseline_y = y
+            glyph_y = baseline_y + face.glyph.bitmap_top
             for i in range(bitmap.rows):
                 for j in range(bitmap.width):
                     byte_index = i * bitmap.pitch + (j // 8)
