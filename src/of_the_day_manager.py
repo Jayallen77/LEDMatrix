@@ -171,13 +171,15 @@ class OfTheDayManager:
         for char in text:
             face.load_char(char)
             bitmap = face.glyph.bitmap
+            # Adjust y position to account for BDF baseline
+            baseline_offset = face.glyph.bitmap_top
             for i in range(bitmap.rows):
                 for j in range(bitmap.width):
                     byte_index = i * bitmap.pitch + (j // 8)
                     if byte_index < len(bitmap.buffer):
                         byte = bitmap.buffer[byte_index]
                         if byte & (1 << (7 - (j % 8))):
-                            draw.point((x + j, y + i), fill=color)
+                            draw.point((x + j, y + baseline_offset + i), fill=color)
             x += face.glyph.advance.x >> 6
         return x - orig_x
 
@@ -196,30 +198,38 @@ class OfTheDayManager:
             body_height = body_face.height
 
             # --- Draw Title (always at top, ic8x8u.bdf) ---
-            self._draw_bdf_text(draw, title_face, title, 1, 0, color=self.title_color)
-            # Underline
+            title_y = 0  # Start at top
+            self._draw_bdf_text(draw, title_face, title, 1, title_y, color=self.title_color)
+            
+            # Calculate title width for underline
             title_width = 0
             for c in title:
                 title_face.load_char(c)
                 title_width += title_face.glyph.advance.x
             title_width = title_width // 64
-            underline_y = title_height  # Just below the title font
+            
+            # Underline below title
+            underline_y = title_height + 1  # Just below the title
             draw.line([(1, underline_y), (1 + title_width, underline_y)], fill=self.title_color, width=1)
 
             # --- Draw Subtitle or Description (rotating, cozette.bdf) ---
-            available_height = matrix_height - (title_height + 2)
-            y_start = title_height + 2
+            # Start subtitle/description below the title with proper spacing
+            y_start = title_height + 3  # Leave space between title and subtitle
+            available_height = matrix_height - y_start
             available_width = matrix_width - 2
+            
             if self.rotation_state == 0 and subtitle:
                 # Show subtitle
                 wrapped = self._wrap_text(subtitle, available_width, body_face, max_lines=3, line_height=body_height, max_height=available_height)
                 for i, line in enumerate(wrapped):
-                    self._draw_bdf_text(draw, body_face, line, 1, y_start + i * body_height, color=self.subtitle_color)
+                    if line.strip():  # Only draw non-empty lines
+                        self._draw_bdf_text(draw, body_face, line, 1, y_start + i * body_height, color=self.subtitle_color)
             elif self.rotation_state == 1 and description:
                 # Show description
                 wrapped = self._wrap_text(description, available_width, body_face, max_lines=3, line_height=body_height, max_height=available_height)
                 for i, line in enumerate(wrapped):
-                    self._draw_bdf_text(draw, body_face, line, 1, y_start + i * body_height, color=self.subtitle_color)
+                    if line.strip():  # Only draw non-empty lines
+                        self._draw_bdf_text(draw, body_face, line, 1, y_start + i * body_height, color=self.subtitle_color)
             # else: nothing to show
             return True
         except Exception as e:
