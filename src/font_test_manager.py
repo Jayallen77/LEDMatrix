@@ -25,14 +25,14 @@ class FontTestManager:
         # Font configurations
         self.font_configs = {
             'bdf': {
-                'path': "assets/fonts/ic8x8u.bdf",
-                'display_name': "5x7 BDF",
-                'description': "5x7 BDF font"
+                'path': "assets/fonts/cozette.bdf",
+                'display_name': "Cozette BTF",
+                'description': "BTF font Test"
             },
             'ttf': {
                 'path': "assets/fonts/5by7.regular.ttf",
-                'display_name': "5x7 Regular TTF",
-                'description': "5x7 regular TTF font"
+                'display_name': "5by7 TTF",
+                'description': "TTF font test"
             }
         }
         
