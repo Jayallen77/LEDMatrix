@@ -21,13 +21,26 @@ class OfTheDayManager:
         self.of_the_day_config = config.get('of_the_day', {})
         self.enabled = self.of_the_day_config.get('enabled', False)
         self.update_interval = self.of_the_day_config.get('update_interval', 3600)  # 1 hour default
+        self.subtitle_rotate_interval = self.of_the_day_config.get('subtitle_rotate_interval', 10)  # 10 seconds default
+        self.display_rotate_interval = self.of_the_day_config.get('display_rotate_interval', 30)  # 30 seconds default
         self.last_update = 0
         self.last_display_log = 0
         self.current_day = None
         self.current_items = {}
         self.current_item_index = 0
         self.current_category_index = 0
-        
+        self.last_drawn_category_index = -1
+        self.last_drawn_day = None
+        self.force_clear = False
+        self.rotation_state = 0  # 0 = subtitle, 1 = description
+        self.last_rotation_time = time.time()
+        self.last_category_rotation_time = time.time()
+
+        # Load fonts
+        font_dir = os.path.join(os.path.dirname(__file__), '..', 'assets', 'fonts')
+        self.title_font = ImageFont.load(os.path.join(font_dir, 'ic8x8u.bdf'))
+        self.body_font = ImageFont.load(os.path.join(font_dir, 'cozette.bdf'))
+
         # Load categories and their data
         self.categories = self.of_the_day_config.get('categories', {})
         self.category_order = self.of_the_day_config.get('category_order', [])
@@ -152,109 +165,60 @@ class OfTheDayManager:
             self.last_update = current_time
     
     def draw_item(self, category_name, item):
-        """Draw a single 'of the day' item."""
         try:
             title = item.get('title', 'No Title')
             subtitle = item.get('subtitle', '')
             description = item.get('description', '')
-            font = self.display_manager.calendar_font
             draw = ImageDraw.Draw(self.display_manager.image)
-            line_height = 8  # For 7px font
+            matrix_width = self.display_manager.matrix.width
+            matrix_height = self.display_manager.matrix.height
+            title_font = self.title_font
+            body_font = self.body_font
+            title_height = title_font.getsize('A')[1]
+            body_height = body_font.getsize('A')[1]
 
-            # --- Title and Subtitle Drawing (Top Aligned) ---
-
-            # 1. Draw Title
-            self.display_manager.draw_text(title, 1, 0, color=self.title_color, font=font)
-
-            # 2. Underline Title Only
-            title_width = self.display_manager.get_text_width(title, font)
-            underline_y = 7  # Just below the 7px high font
+            # --- Draw Title (always at top, ic8x8u.bdf) ---
+            self.display_manager.draw_text(title, 1, 0, color=self.title_color, font=title_font)
+            title_width = self.display_manager.get_text_width(title, title_font)
+            underline_y = title_height  # Just below the title font
             draw.line([(1, underline_y), (1 + title_width, underline_y)], fill=self.title_color, width=1)
 
-            # 3. Draw Subtitle, starting on the same line as the title
-            if subtitle:
-                current_x = 1 + title_width
-                separator = " - "
-                
-                # Draw separator if it fits
-                if current_x + self.display_manager.get_text_width(separator, font) < self.display_manager.matrix.width:
-                    self.display_manager.draw_text(separator, current_x, 0, color=self.subtitle_color, font=font)
-                    current_x += self.display_manager.get_text_width(separator, font)
-
-                    # Wrap the rest of the subtitle
-                    available_width_line1 = self.display_manager.matrix.width - current_x
-                    words = subtitle.split(' ')
-                    
-                    line1_words = []
-                    while words:
-                        word = words.pop(0)
-                        test_line = ' '.join(line1_words + [word])
-                        if self.display_manager.get_text_width(test_line, font) <= available_width_line1:
-                            line1_words.append(word)
-                        else:
-                            words.insert(0, word) # Put word back
-                            break
-                    
-                    if line1_words:
-                        self.display_manager.draw_text(' '.join(line1_words), current_x, 0, color=self.subtitle_color, font=font)
-
-                    # Draw remaining words on the next line
-                    if words:
-                        remaining_text = ' '.join(words)
-                        wrapped_line2 = self._wrap_text(remaining_text, self.display_manager.matrix.width - 2, font, max_lines=1)
-                        if wrapped_line2 and wrapped_line2[0]:
-                             self.display_manager.draw_text(wrapped_line2[0], 1, line_height, color=self.subtitle_color, font=font)
-                else:
-                    # If even the separator doesn't fit, wrap the whole subtitle on the next line
-                    wrapped_subtitle = self._wrap_text(subtitle, self.display_manager.matrix.width - 2, font, max_lines=2)
-                    for i, line in enumerate(wrapped_subtitle):
-                        if line.strip():
-                            self.display_manager.draw_text(line, 1, (i + 1) * line_height, color=self.subtitle_color, font=font)
-
-            # --- Description Drawing (Bottom Aligned) ---
-            if description:
-                available_width = self.display_manager.matrix.width - 2
-                wrapped_lines = self._wrap_text(description, available_width, font, max_lines=3)
-                
-                num_lines = len([line for line in wrapped_lines if line.strip()])
-                total_description_height = num_lines * line_height
-                start_y = self.display_manager.matrix.height - total_description_height
-                
-                for i, line in enumerate(wrapped_lines):
-                    if line.strip():
-                        self.display_manager.draw_text(line, 1, start_y + (i * line_height), 
-                                                    color=self.subtitle_color,
-                                                    font=font)
-            
+            # --- Draw Subtitle or Description (rotating, cozette.bdf) ---
+            available_height = matrix_height - (title_height + 2)
+            y_start = title_height + 2
+            available_width = matrix_width - 2
+            if self.rotation_state == 0 and subtitle:
+                # Show subtitle
+                wrapped = self._wrap_text(subtitle, available_width, body_font, max_lines=3, line_height=body_height, max_height=available_height)
+                for i, line in enumerate(wrapped):
+                    self.display_manager.draw_text(line, 1, y_start + i * body_height, color=self.subtitle_color, font=body_font)
+            elif self.rotation_state == 1 and description:
+                # Show description
+                wrapped = self._wrap_text(description, available_width, body_font, max_lines=3, line_height=body_height, max_height=available_height)
+                for i, line in enumerate(wrapped):
+                    self.display_manager.draw_text(line, 1, y_start + i * body_height, color=self.subtitle_color, font=body_font)
+            # else: nothing to show
             return True
         except Exception as e:
             logger.error(f"Error drawing 'of the day' item: {e}", exc_info=True)
             return False
-    
-    def _wrap_text(self, text, max_width, font, max_lines=2):
-        """Wrap text to fit within max_width using the provided font."""
+
+    def _wrap_text(self, text, max_width, font, max_lines=3, line_height=8, max_height=24):
         if not text:
             return [""]
-            
         lines = []
         current_line = []
         words = text.split()
-        
         for word in words:
-            # Try adding the word to the current line
             test_line = ' '.join(current_line + [word]) if current_line else word
             text_width = self.display_manager.get_text_width(test_line, font)
-            
             if text_width <= max_width:
-                # Word fits, add it to current line
                 current_line.append(word)
             else:
-                # Word doesn't fit, start a new line
                 if current_line:
                     lines.append(' '.join(current_line))
                     current_line = [word]
                 else:
-                    # Single word too long, truncate it
                     truncated = word
                     while len(truncated) > 0:
                         if self.display_manager.get_text_width(truncated + "...", font) <= max_width:
@@ -263,76 +227,60 @@ class OfTheDayManager:
                         truncated = truncated[:-1]
                     if not truncated:
                         lines.append(word[:10] + "...")
-            
-            # Check if we've filled all lines
-            if len(lines) >= max_lines:
+            if len(lines) * line_height >= max_height or len(lines) >= max_lines:
                 break
-        
-        # Handle any remaining text in current_line
-        if current_line and len(lines) < max_lines:
-            remaining_text = ' '.join(current_line)
-            if len(words) > len(current_line):  # More words remain
-                # Try to fit with ellipsis
-                while len(remaining_text) > 0:
-                    if self.display_manager.get_text_width(remaining_text + "...", font) <= max_width:
-                        lines.append(remaining_text + "...")
-                        break
-                    remaining_text = remaining_text[:-1]
-            else:
-                lines.append(remaining_text)
-        
-        # Ensure we have exactly max_lines
+        if current_line and (len(lines) * line_height < max_height and len(lines) < max_lines):
+            lines.append(' '.join(current_line))
         while len(lines) < max_lines:
             lines.append("")
-            
         return lines[:max_lines]
-    
+
     def display(self, force_clear=False):
-        """Display 'of the day' items on the LED matrix, only updating when content changes."""
         if not self.enabled:
-            return # Manager is disabled
+            return
         if not self.current_items:
-            # Throttle warning to once every 10 seconds
             current_time = time.time()
             if not hasattr(self, 'last_warning_time') or current_time - self.last_warning_time > 10:
                 logger.warning(f"OfTheDayManager has no current items.")
                 self.last_warning_time = current_time
             return
-
-        # Check if a redraw is necessary
+        now = time.time()
+        # Handle subtitle/description rotation
+        if now - self.last_rotation_time > self.subtitle_rotate_interval:
+            self.rotation_state = (self.rotation_state + 1) % 2
+            self.last_rotation_time = now
+            # Force redraw
+            self.last_drawn_category_index = -1
+            self.last_drawn_day = None
+        # Handle OTD category rotation
+        if now - self.last_category_rotation_time > self.display_rotate_interval:
+            self.current_category_index = (self.current_category_index + 1) % len(self.current_items)
+            self.last_category_rotation_time = now
+            # Reset subtitle/description rotation when switching category
+            self.rotation_state = 0
+            self.last_rotation_time = now
+            # Force redraw
+            self.last_drawn_category_index = -1
+            self.last_drawn_day = None
         content_has_changed = self.current_category_index != self.last_drawn_category_index or self.current_day != self.last_drawn_day
         if not content_has_changed and not force_clear:
-            return # Nothing to update, so we exit early
-
+            return
         try:
-            # Get current category and item
             category_names = list(self.current_items.keys())
             if not category_names or self.current_category_index >= len(category_names):
                 self.current_category_index = 0
                 if not category_names: return
-
             current_category = category_names[self.current_category_index]
             current_item = self.current_items[current_category]
-
-            # Log the new item being displayed (throttled)
             current_time = time.time()
             if current_time - self.last_display_log > 5:
                 logger.info(f"Displaying {current_category}: {current_item.get('title', 'No Title')}")
                 self.last_display_log = current_time
-            
-            # A redraw is needed, so first clear the canvas
             self.display_manager.clear()
-
-            # Draw the item
             self.draw_item(current_category, current_item)
-            
-            # Update the physical display
             self.display_manager.update_display()
-
-            # Cache the state of what was just drawn
             self.last_drawn_category_index = self.current_category_index
             self.last_drawn_day = self.current_day
-            
         except Exception as e:
             logger.error(f"Error displaying 'of the day' item: {e}", exc_info=True)
     

@@ -23,6 +23,8 @@ Add the following configuration to your `config/config.json`:
     "of_the_day": {
         "enabled": true,
         "update_interval": 3600,
+        "subtitle_rotate_interval": 10,         // Seconds to rotate subtitle/description
+        "display_rotate_interval": 30,          // Seconds to rotate between categories
         "category_order": ["word_of_the_day", "bible_verse", "spanish_word"],
         "categories": {
             "word_of_the_day": {
@@ -100,10 +102,10 @@ Each category uses a JSON file with the following structure:
 
 ### Step 1: Create a Data File
 
-Create a new JSON file in the `data/` directory:
+Create a new JSON file in the `of_the_day/` directory:
 
 ```bash
-touch data/my_custom_category.json
+touch of_the_day/my_custom_category.json
 ```
 
 ### Step 2: Add Content
@@ -148,13 +150,9 @@ Add your category to the config:
 
 ### Example: Word of the Day Generator
 
-You can use an LLM to generate a full year of content. Here's a Python script example:
+You can use an LLM to generate a full year of content. Here's a script example:
 
-```python
-import json
-import openai
 
-def generate_word_of_the_day():
     """Generate a full year of word of the day entries using AI."""
     
     words = {}
@@ -174,53 +172,7 @@ def generate_word_of_the_day():
             "description": "Full definition"
         }}
         """
-        
-        # Use your preferred AI service
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        
-        # Parse the response and add to words dict
-        # Implementation depends on your AI service
-        
-    # Save to file
-    with open('data/ai_generated_words.json', 'w') as f:
-        json.dump(words, f, indent=4)
 
-if __name__ == "__main__":
-    generate_word_of_the_day()
-```
-
-### Example: Bible Verse Generator
-
-```python
-def generate_bible_verses():
-    """Generate a full year of inspirational bible verses."""
-    
-    verses = {}
-    
-    for day in range(1, 367):
-        prompt = f"""
-        Generate an inspirational bible verse for day {day} of the year.
-        Include:
-        1. Bible reference (e.g., "JOHN 3:16")
-        2. Brief theme (e.g., "God's love")
-        3. The verse text
-        
-        Format as JSON:
-        {{
-            "title": "BIBLE REFERENCE",
-            "subtitle": "Brief theme",
-            "description": "Full verse text"
-        }}
-        """
-        
-        # Implementation with your AI service
-        
-    with open('data/ai_generated_verses.json', 'w') as f:
-        json.dump(verses, f, indent=4)
-```
 
 ## Category Ideas
 
@@ -263,6 +215,64 @@ The display uses a layout similar to the calendar manager:
 - **Title**: Bold white text at the top
 - **Subtitle**: Smaller gray text below the title
 - **Description**: Wrapped text if subtitle is empty
+
+## Rotation Logic (Subtitle/Description and Category)
+
+There are two types of rotation in the Of The Day display system:
+
+### 1. Subtitle/Description Rotation
+- **What:** Within a single "Of The Day" category, the display always shows the Title at the top. Below the title, it alternates between showing the Subtitle and the Description.
+- **How:** The Subtitle and Description rotate every `subtitle_rotate_interval` seconds (default: 10 seconds).
+- **Example:**
+  - 10s: Title + Subtitle
+  - 10s: Title + Description
+  - 10s: Title + Subtitle
+  - ...
+
+### 2. Category Rotation
+- **What:** The display can show multiple "Of The Day" categories (e.g., Word of the Day, Slovenian Word of the Day). It rotates between these categories.
+- **How:** The currently displayed category switches every `display_rotate_interval` seconds (default: 30 seconds).
+- **Example:**
+  - 30s: Word of the Day (with subtitle/description alternating every 10s)
+  - 30s: Slovenian Word of the Day (with subtitle/description alternating every 10s)
+  - ...
+
+### Configuration Example
+Add these settings to your `of_the_day` section in `config/config.json`:
+
+```json
+"of_the_day": {
+  "enabled": true,
+  "update_interval": 3600,
+  "subtitle_rotate_interval": 10,         // Seconds to rotate subtitle/description
+  "display_rotate_interval": 30,          // Seconds to rotate between categories
+  "category_order": ["word_of_the_day", "slovenian_word_of_the_day"],
+  "categories": {
+    "word_of_the_day": {
+      "enabled": true,
+      "data_file": "word_of_the_day.json"
+    },
+    "slovenian_word_of_the_day": {
+      "enabled": true,
+      "data_file": "slovenian_word_of_the_day.json"
+    }
+  }
+}
+```
+
+- **subtitle_rotate_interval**: How often (in seconds) to switch between subtitle and description for the current category.
+- **display_rotate_interval**: How often (in seconds) to switch to the next category in `category_order`.
+
+#### Example Display Flow
+```
+[0-10s]   Word of the Day: Title + Subtitle
+[10-20s]  Word of the Day: Title + Description
+[20-30s]  Word of the Day: Title + Subtitle
+[30-40s]  Slovenian Word of the Day: Title + Subtitle
+[40-50s]  Slovenian Word of the Day: Title + Description
+[50-60s]  Slovenian Word of the Day: Title + Subtitle
+...
+```
 
 ## Troubleshooting
 

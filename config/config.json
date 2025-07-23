@@ -332,7 +332,9 @@
     },
     "of_the_day": {
         "enabled": true,
+        "display_rotate_interval": 30,
         "update_interval": 3600,
+        "subtitle_rotate_interval": 10,
         "category_order": ["word_of_the_day", "slovenian_word_of_the_day"],
         "categories": {
             "word_of_the_day": {
