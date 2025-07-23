@@ -157,7 +157,9 @@ class CalendarManager:
             for i, line in enumerate(title_lines):
                 line_width = self.display_manager.get_text_width(line, self.display_manager.calendar_font)
                 line_x = (self.display_manager.matrix.width - line_width) // 2
-                self.display_manager.draw_text(line, line_x, y_position + 12 + (i * 8),
+                # Adjust Y position for BDF font - subtract 4 pixels to compensate for the 6-pixel adjustment in _draw_bdf_text
+                adjusted_y = y_position + 8 + (i * 8)
+                self.display_manager.draw_text(line, line_x, adjusted_y,
                                             color=self.text_color,
                                             font=self.display_manager.calendar_font)
             
