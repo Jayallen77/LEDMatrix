@@ -200,20 +200,25 @@ class OfTheDayManager:
             title_y = 0  # Start at top
             self._draw_bdf_text(draw, title_font, title, 1, title_y, color=self.title_color)
             
-            # Calculate title width for underline
+            # Calculate title width and actual height for proper spacing
             title_width = 0
+            max_title_height = 0
             for c in title:
                 title_font.load_char(c)
                 title_width += title_font.glyph.advance.x
+                # Track the maximum height of any character in the title
+                bitmap = title_font.glyph.bitmap
+                if bitmap.rows > max_title_height:
+                    max_title_height = bitmap.rows
             title_width = title_width // 64
             
-            # Underline below title
-            underline_y = title_height + 1  # Just below the title
+            # Underline below title using actual title height
+            underline_y = max_title_height + 1  # Just below the actual title
             draw.line([(1, underline_y), (1 + title_width, underline_y)], fill=self.title_color, width=1)
 
             # --- Draw Subtitle or Description (rotating, 5x7.bdf) ---
             # Start subtitle/description below the title with proper spacing
-            y_start = title_height + 3  # Leave space between title and subtitle
+            y_start = max_title_height + 3  # Leave space between title and subtitle
             available_height = matrix_height - y_start
             available_width = matrix_width - 2
             
