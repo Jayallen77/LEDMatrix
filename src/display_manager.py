@@ -150,6 +150,10 @@ class DisplayManager:
                 face.load_char(char)
                 bitmap = face.glyph.bitmap
                 
+                # Get glyph metrics
+                glyph_left = face.glyph.bitmap_left
+                glyph_top = face.glyph.bitmap_top
+                
                 # Draw the character
                 for i in range(bitmap.rows):
                     for j in range(bitmap.width):
@@ -157,7 +161,13 @@ class DisplayManager:
                         if byte_index < len(bitmap.buffer):
                             byte = bitmap.buffer[byte_index]
                             if byte & (1 << (7 - (j % 8))):
-                                self.draw.point((x + j, y + i), fill=color)
+                                # Calculate actual pixel position
+                                pixel_x = x + glyph_left + j
+                                pixel_y = y + glyph_top - i
+                                # Only draw if within bounds
+                                if (0 <= pixel_x < self.matrix.width and 
+                                    0 <= pixel_y < self.matrix.height):
+                                    self.draw.point((pixel_x, pixel_y), fill=color)
                 
                 # Move to next character
                 x += face.glyph.advance.x >> 6
