@@ -169,6 +169,10 @@ class OfTheDayManager:
             if not hasattr(self, '_last_title_debug_log') or current_time - self._last_title_debug_log > 5:
                 logger.debug(f"Drawing title '{title}' at position ({title_x}, 2) with width {title_width}")
                 self._last_title_debug_log = current_time
+            
+            # Test: Draw a simple red rectangle to verify drawing is working
+            self.display_manager.draw.rectangle([0, 0, 10, 10], fill=(255, 0, 0))
+            
             self.display_manager.draw_text(title, title_x, 2, 
                                         color=self.title_color,
                                         font=self.display_manager.extra_small_font)
