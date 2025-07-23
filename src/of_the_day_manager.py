@@ -252,7 +252,9 @@ class OfTheDayManager:
                             line_width += body_font.glyph.advance.x
                         line_width = line_width // 64
                         line_x = (matrix_width - line_width) // 2
-                        self._draw_bdf_text(draw, body_font, line, line_x, y_start + i * body_height, color=self.subtitle_color)
+                        # Add one pixel buffer between lines
+                        line_y = y_start + i * (body_height + 1)
+                        self._draw_bdf_text(draw, body_font, line, line_x, line_y, color=self.subtitle_color)
             elif self.rotation_state == 1 and description:
                 # Show description
                 wrapped = self._wrap_text(description, available_width, body_font, max_lines=3, line_height=body_height, max_height=available_height)
@@ -265,7 +267,9 @@ class OfTheDayManager:
                             line_width += body_font.glyph.advance.x
                         line_width = line_width // 64
                         line_x = (matrix_width - line_width) // 2
-                        self._draw_bdf_text(draw, body_font, line, line_x, y_start + i * body_height, color=self.subtitle_color)
+                        # Add one pixel buffer between lines
+                        line_y = y_start + i * (body_height + 1)
+                        self._draw_bdf_text(draw, body_font, line, line_x, line_y, color=self.subtitle_color)
             # else: nothing to show
             return True
         except Exception as e:
