@@ -476,8 +476,8 @@ class StockManager:
             # When chart is enabled, center text more to the left
             column_x = width // 2.85
         else:
-            # When chart is disabled, position text closer to logo
-            column_x = width // 3
+            # When chart is disabled, position text with more space from logo
+            column_x = width // 2.85
         
         # Draw symbol
         symbol_width = symbol_bbox[2] - symbol_bbox[0]
@@ -620,8 +620,8 @@ class StockManager:
             
             # Calculate total width needed for all stocks
             # Each stock needs width*2 for scrolling, plus consistent gaps between elements
-            stock_gap = width // 3  # Gap between stocks
-            element_gap = width // 6  # Gap between elements within a stock
+            stock_gap = width // 6  # Reduced gap between stocks
+            element_gap = width // 8  # Reduced gap between elements within a stock
             total_width = sum(width * 2 for _ in symbols) + stock_gap * (len(symbols) - 1) + element_gap * (len(symbols) * 2 - 1)
             
             # Create the full image
