@@ -69,7 +69,8 @@
             "ncaam_basketball_live": 30,
             "ncaam_basketball_recent": 30,
             "ncaam_basketball_upcoming": 30,
-            "music": 30
+            "music": 30,
+            "of_the_day": 20
         },
         "use_short_date_format": true
     },
@@ -328,5 +329,22 @@
         "preferred_source": "ytm",
         "YTM_COMPANION_URL": "http://192.168.86.12:9863",
         "POLLING_INTERVAL_SECONDS": 1
+    },
+    "of_the_day": {
+        "enabled": true,
+        "update_interval": 3600,
+        "category_order": ["word_of_the_day", "slovenian_word"],
+        "categories": {
+            "word_of_the_day": {
+                "enabled": true,
+                "data_file": "of_the_day/word_of_the_day.json",
+                "display_name": "Word of the Day"
+            },
+            "slovenian_word": {
+                "enabled": true,
+                "data_file": "of_the_day/slovenian_word_of_the_day.json",
+                "display_name": "Slovenian Word of the Day"
+            }
+        }
     }
 } 
