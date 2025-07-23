@@ -309,7 +309,9 @@ class OfTheDayManager:
                 self.last_display_log = current_time
             
             # Clear the display before drawing
+            logger.debug("Calling display_manager.clear()")
             self.display_manager.clear()
+            logger.debug("display_manager.clear() completed")
             
             # Draw the item
             self.draw_item(current_category, current_item)
@@ -319,7 +321,11 @@ class OfTheDayManager:
             if not hasattr(self, '_last_update_debug_log') or current_time - self._last_update_debug_log > 5:
                 logger.debug("Calling display_manager.update_display()")
                 self._last_update_debug_log = current_time
-            self.display_manager.update_display()
+            try:
+                self.display_manager.update_display()
+                logger.debug("display_manager.update_display() completed successfully")
+            except Exception as e:
+                logger.error(f"Error in display_manager.update_display(): {e}", exc_info=True)
             
         except Exception as e:
             logger.error(f"Error displaying 'of the day' item: {e}", exc_info=True)
