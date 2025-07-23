@@ -146,8 +146,8 @@ class DisplayManager:
             # Use the passed font or fall back to calendar_font
             face = font if font else self.calendar_font
             
-            # Add 5-pixel adjustment for vertical alignment
-            y += 5
+            # Add 6-pixel adjustment for vertical alignment
+            y += 6
             
             for char in text:
                 face.load_char(char)
