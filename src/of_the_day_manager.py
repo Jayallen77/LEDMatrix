@@ -171,17 +171,14 @@ class OfTheDayManager:
         for char in text:
             face.load_char(char)
             bitmap = face.glyph.bitmap
-            # Calculate baseline position
-            # bitmap_top is the distance from baseline to top of bitmap
-            baseline_y = y
-            glyph_y = baseline_y + face.glyph.bitmap_top
+            # Simple approach: draw each character at the specified y position
             for i in range(bitmap.rows):
                 for j in range(bitmap.width):
                     byte_index = i * bitmap.pitch + (j // 8)
                     if byte_index < len(bitmap.buffer):
                         byte = bitmap.buffer[byte_index]
                         if byte & (1 << (7 - (j % 8))):
-                            draw.point((x + j, glyph_y + i), fill=color)
+                            draw.point((x + j, y + i), fill=color)
             x += face.glyph.advance.x >> 6
         return x - orig_x
 
@@ -196,35 +193,30 @@ class OfTheDayManager:
             title_font = self.title_font
             body_font = self.body_font
             
-            # Get font heights
-            title_height = title_font.height
-            # Calculate actual body height from the font
-            body_font.load_char('A')  # Load a character to get its height
+            # Get font heights - simplified
+            title_font.load_char('A')
+            title_height = title_font.glyph.bitmap.rows
+            body_font.load_char('A')
             body_height = body_font.glyph.bitmap.rows
             
-            # --- Draw Title (always at top, 5x7.bdf) ---
+            # --- Draw Title (always at top) ---
             title_y = 0  # Start at top
             self._draw_bdf_text(draw, title_font, title, 1, title_y, color=self.title_color)
             
-            # Calculate title width and actual height for proper spacing
+            # Calculate title width for underline
             title_width = 0
-            max_title_height = 0
             for c in title:
                 title_font.load_char(c)
                 title_width += title_font.glyph.advance.x
-                # Track the maximum height of any character in the title
-                bitmap = title_font.glyph.bitmap
-                if bitmap.rows > max_title_height:
-                    max_title_height = bitmap.rows
             title_width = title_width // 64
             
-            # Underline below title using actual title height
-            underline_y = max_title_height + 1  # Just below the actual title
+            # Underline below title
+            underline_y = title_height + 1
             draw.line([(1, underline_y), (1 + title_width, underline_y)], fill=self.title_color, width=1)
 
-            # --- Draw Subtitle or Description (rotating, 5x7.bdf) ---
-            # Start subtitle/description below the title with proper spacing
-            y_start = max_title_height + 3  # Leave space between title and subtitle
+            # --- Draw Subtitle or Description (rotating) ---
+            # Start subtitle/description below the title
+            y_start = title_height + 3  # Leave space between title and subtitle
             available_height = matrix_height - y_start
             available_width = matrix_width - 2
             
