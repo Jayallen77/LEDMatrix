@@ -477,7 +477,7 @@ class StockManager:
             column_x = width // 2.85
         else:
             # When chart is disabled, position text with more space from logo
-            column_x = width // 2.85
+            column_x = width // 2.2
         
         # Draw symbol
         symbol_width = symbol_bbox[2] - symbol_bbox[0]
