@@ -227,13 +227,13 @@ class OfTheDayManager:
                 wrapped = self._wrap_text(subtitle, available_width, body_font, max_lines=3, line_height=body_height, max_height=available_height)
                 for i, line in enumerate(wrapped):
                     if line.strip():  # Only draw non-empty lines
-                        self._draw_bdf_text(draw, body_font, line, 1, y_start + i * body_height, color=self.subtitle_color)
+                        self._draw_bdf_text(draw, body_font, line, 1, y_start + i * (body_height + 1), color=self.subtitle_color)
             elif self.rotation_state == 1 and description:
                 # Show description
                 wrapped = self._wrap_text(description, available_width, body_font, max_lines=3, line_height=body_height, max_height=available_height)
                 for i, line in enumerate(wrapped):
                     if line.strip():  # Only draw non-empty lines
-                        self._draw_bdf_text(draw, body_font, line, 1, y_start + i * body_height, color=self.subtitle_color)
+                        self._draw_bdf_text(draw, body_font, line, 1, y_start + i * (body_height + 1), color=self.subtitle_color)
             # else: nothing to show
             return True
         except Exception as e:
@@ -273,9 +273,10 @@ class OfTheDayManager:
                         truncated = truncated[:-1]
                     if not truncated:
                         lines.append(word[:10] + "...")
-            if len(lines) * line_height >= max_height or len(lines) >= max_lines:
+            # Check if we've filled all lines (accounting for line spacing)
+            if len(lines) * (line_height + 1) >= max_height or len(lines) >= max_lines:
                 break
-        if current_line and (len(lines) * line_height < max_height and len(lines) < max_lines):
+        if current_line and (len(lines) * (line_height + 1) < max_height and len(lines) < max_lines):
             lines.append(' '.join(current_line))
         while len(lines) < max_lines:
             lines.append("")
