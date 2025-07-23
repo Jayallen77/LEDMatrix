@@ -39,8 +39,8 @@ class OfTheDayManager:
 
         # Load fonts using freetype
         font_dir = os.path.join(os.path.dirname(__file__), '..', 'assets', 'fonts')
-        self.title_font = freetype.Face(os.path.join(font_dir, 'MatrixChunky8X.bdf'))
-        self.body_font = freetype.Face(os.path.join(font_dir, 'MatrixLight6X.bdf'))
+        self.title_font = freetype.Face(os.path.join(font_dir, 'ic8x8u.bdf'))
+        self.body_font = freetype.Face(os.path.join(font_dir, 'MatrixLight6.bdf'))
         
         # Log font properties for debugging
         logger.debug(f"Title font properties: height={self.title_font.size.height}, ascender={self.title_font.size.ascender}, descender={self.title_font.size.descender}")
