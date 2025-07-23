@@ -175,10 +175,10 @@ class OfTheDayManager:
         for char in text:
             face.load_char(char)
             bitmap = face.glyph.bitmap
-            # For LED matrix displays, we need pixel-perfect baseline rendering
-            # Use the glyph's bitmap_top to position relative to the baseline
-            # This ensures all characters align properly regardless of their height
-            glyph_y = y + face.glyph.bitmap_top - bitmap.rows
+            # For bottom baseline alignment, we need to position glyphs so their bottoms align
+            # bitmap_top gives us the distance from baseline to top of bitmap
+            # For bottom alignment, we want the bottom of each glyph at the same y position
+            glyph_y = y - bitmap.rows
             for i in range(bitmap.rows):
                 for j in range(bitmap.width):
                     byte_index = i * bitmap.pitch + (j // 8)
