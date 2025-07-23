@@ -168,17 +168,19 @@ class OfTheDayManager:
     def _draw_bdf_text(self, draw, face, text, x, y, color=(255,255,255)):
         """Draw text using a BDF font loaded with freetype."""
         orig_x = x
+        # Calculate baseline offset for proper text alignment
+        baseline_offset = face.size.height - face.size.ascender
         for char in text:
             face.load_char(char)
             bitmap = face.glyph.bitmap
-            # Use direct positioning without bitmap_top offset
+            # Position text using baseline alignment
             for i in range(bitmap.rows):
                 for j in range(bitmap.width):
                     byte_index = i * bitmap.pitch + (j // 8)
                     if byte_index < len(bitmap.buffer):
                         byte = bitmap.buffer[byte_index]
                         if byte & (1 << (7 - (j % 8))):
-                            draw.point((x + j, y + i), fill=color)
+                            draw.point((x + j, y + baseline_offset + i), fill=color)
             x += face.glyph.advance.x >> 6
         return x - orig_x
 
