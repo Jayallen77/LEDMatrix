@@ -303,7 +303,17 @@ class OfTheDayManager:
             self.last_drawn_day = None
         # Handle OTD category rotation
         if now - self.last_category_rotation_time > self.display_rotate_interval:
+            # Find the next category with valid data
+            original_index = self.current_category_index
             self.current_category_index = (self.current_category_index + 1) % len(self.current_items)
+            
+            # If we've cycled through all categories and none have data, reset to first
+            if self.current_category_index == original_index:
+                logger.warning("No categories have valid data, staying on current category")
+            else:
+                logger.info(f"Rotating from category index {original_index} to {self.current_category_index}")
+                logger.info(f"Available categories with data: {list(self.current_items.keys())}")
+            
             self.last_category_rotation_time = now
             # Reset subtitle/description rotation when switching category
             self.rotation_state = 0

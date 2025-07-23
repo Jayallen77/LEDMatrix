@@ -70,7 +70,7 @@
             "ncaam_basketball_recent": 30,
             "ncaam_basketball_upcoming": 30,
             "music": 30,
-            "of_the_day": 30
+            "of_the_day": 60
         },
         "use_short_date_format": true
     },
