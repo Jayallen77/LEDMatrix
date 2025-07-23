@@ -25,7 +25,7 @@ class FontTestManager:
         
         # Load the TTF font with PIL
         try:
-            self.font = ImageFont.truetype(self.font_path, 7)  # Size 7 for 5x7 font
+            self.font = ImageFont.truetype(self.font_path, 5)  # Size 7 for 5x7 font
             self.logger.info(f"Successfully loaded 5x7 regular TTF font from {self.font_path}")
         except Exception as e:
             self.logger.error(f"Failed to load 5x7 TTF font: {e}")

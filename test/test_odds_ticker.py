@@ -8,8 +8,8 @@ import os
 import time
 import logging
 
-# Add the src directory to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+# Add the parent directory to the Python path so we can import from src
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.display_manager import DisplayManager
 from src.config_manager import ConfigManager
