@@ -162,45 +162,55 @@ class OfTheDayManager:
                 logger.debug(f"Drawing item: title='{title}', subtitle='{subtitle}', description='{description}'")
                 self._last_draw_debug_log = current_time
             
-            # Draw title (Word) at the very top - left justified
+            # Draw title (Word) at the top with underline
             # Throttle debug logging to once every 5 seconds
             if not hasattr(self, '_last_title_debug_log') or current_time - self._last_title_debug_log > 5:
-                logger.debug(f"Drawing title '{title}' at position (1, 0) - left justified")
+                logger.debug(f"Drawing title '{title}' at position (1, 0) with underline")
                 self._last_title_debug_log = current_time
             
+            # Draw title
             self.display_manager.draw_text(title, 1, 0, 
                                         color=self.title_color,
                                         font=self.display_manager.calendar_font)
             
-            # Draw subtitle right below title - left justified
+            # Draw underline for title
+            title_width = self.display_manager.get_text_width(title, self.display_manager.calendar_font)
+            draw = ImageDraw.Draw(self.display_manager.image)
+            draw.line([(1, 6), (1 + title_width, 6)], fill=self.title_color, width=1)
+            
+            # Draw subtitle with word wrapping - aligned to top
             if subtitle:
                 # Use full width minus 2 pixels for maximum text
                 available_width = self.display_manager.matrix.width - 2
-                wrapped_lines = self._wrap_text(subtitle, available_width, self.display_manager.calendar_font, max_lines=1)
+                wrapped_lines = self._wrap_text(subtitle, available_width, self.display_manager.calendar_font, max_lines=2)
                 
                 for i, line in enumerate(wrapped_lines):
                     if line.strip():
                         # Throttle debug logging to once every 5 seconds
                         if not hasattr(self, '_last_subtitle_debug_log') or current_time - self._last_subtitle_debug_log > 5:
-                            logger.debug(f"Drawing subtitle line '{line}' at position (1, 6) - left justified")
+                            logger.debug(f"Drawing subtitle line '{line}' at position (1, {8 + (i * 6)}) - left justified")
                             self._last_subtitle_debug_log = current_time
-                        self.display_manager.draw_text(line, 1, 6, 
+                        self.display_manager.draw_text(line, 1, 8 + (i * 6), 
                                                     color=self.subtitle_color,
                                                     font=self.display_manager.calendar_font)
             
-            # Draw description at the bottom - left justified
+            # Draw description with word wrapping - aligned to bottom
             if description:
                 # Use full width minus 2 pixels for maximum text
                 available_width = self.display_manager.matrix.width - 2
-                wrapped_lines = self._wrap_text(description, available_width, self.display_manager.calendar_font, max_lines=2)
+                wrapped_lines = self._wrap_text(description, available_width, self.display_manager.calendar_font, max_lines=3)
+                
+                # Calculate starting position to align at bottom
+                total_description_height = len([line for line in wrapped_lines if line.strip()]) * 6
+                start_y = self.display_manager.matrix.height - total_description_height
                 
                 for i, line in enumerate(wrapped_lines):
                     if line.strip():
                         # Throttle debug logging to once every 5 seconds
                         if not hasattr(self, '_last_description_debug_log') or current_time - self._last_description_debug_log > 5:
-                            logger.debug(f"Drawing description line '{line}' at position (1, {12 + (i * 6)}) - left justified")
+                            logger.debug(f"Drawing description line '{line}' at position (1, {start_y + (i * 6)}) - bottom aligned")
                             self._last_description_debug_log = current_time
-                        self.display_manager.draw_text(line, 1, 12 + (i * 6), 
+                        self.display_manager.draw_text(line, 1, start_y + (i * 6), 
                                                     color=self.subtitle_color,
                                                     font=self.display_manager.calendar_font)
             
