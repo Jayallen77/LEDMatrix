@@ -186,7 +186,9 @@ class OfTheDayManager:
                             byte = bitmap.buffer[byte_index]
                             # Check if the specific bit is set
                             if byte & (1 << (7 - (j % 8))):
-                                draw.point((x + j, y + i), fill=color)
+                                draw_y = y - face.glyph.bitmap_top + i
+                                draw_x = x + face.glyph.bitmap_left + j
+                                draw.point((draw_x, draw_y), fill=color)
                     except IndexError:
                         logger.warning(f"Index out of range for char '{char}' at position ({i}, {j})")
                         continue
