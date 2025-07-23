@@ -38,8 +38,8 @@ class OfTheDayManager:
 
         # Load fonts using PIL
         font_dir = os.path.join(os.path.dirname(__file__), '..', 'assets', 'fonts')
-        self.title_font = ImageFont.truetype(os.path.join(font_dir, '5by7.regular.ttf'), 7)
-        self.body_font = ImageFont.truetype(os.path.join(font_dir, 'dot_digital-7.ttf'), 7)
+        self.title_font = ImageFont.truetype(os.path.join(font_dir, '5by7.regular.ttf'), 12)
+        self.body_font = ImageFont.truetype(os.path.join(font_dir, 'dot_digital-7.ttf'), 10)
 
         # Load categories and their data
         self.categories = self.of_the_day_config.get('categories', {})
