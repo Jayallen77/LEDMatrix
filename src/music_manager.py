@@ -791,7 +791,7 @@ class MusicManager:
             
         # --- Album ---
         y_pos_album = y_pos_artist + line_height_artist_album + padding_between_lines
-        if (matrix_height - y_pos_album - 5) >= line_height_artist_album : 
+        if (matrix_height - y_pos_album) >= line_height_artist_album : 
             album_width = self.display_manager.get_text_width(album, font_artist_album)
             if album_width <= text_area_width: 
                  self.display_manager.draw_text(album, x=text_area_x_start, y=y_pos_album, color=(150, 150, 150), font=font_artist_album)
