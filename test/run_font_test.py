@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
+import sys
+import os
 import time
 import json
 import logging
+
+# Add the parent directory to the Python path so we can import from src
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 from src.display_manager import DisplayManager
 from src.font_test_manager import FontTestManager
 from src.config_manager import ConfigManager
