@@ -75,6 +75,7 @@ class OfTheDayManager:
                     with open(file_path, 'r', encoding='utf-8') as f:
                         self.data_files[category_name] = json.load(f)
                     logger.info(f"Loaded data file for {category_name}: {len(self.data_files[category_name])} items")
+                    logger.debug(f"Sample keys from {category_name}: {list(self.data_files[category_name].keys())[:5]}")
                 else:
                     logger.error(f"Data file not found for {category_name}: {file_path}")
                     self.data_files[category_name] = {}
@@ -89,17 +90,21 @@ class OfTheDayManager:
             
         today = date.today()
         day_of_year = today.timetuple().tm_yday
+        logger.info(f"Loading items for day {day_of_year} of the year")
         
         self.current_items = {}
         
         for category_name, category_config in self.categories.items():
             if not category_config.get('enabled', True):
+                logger.debug(f"Skipping disabled category: {category_name}")
                 continue
                 
             data = self.data_files.get(category_name, {})
             if not data:
+                logger.warning(f"No data loaded for category: {category_name}")
                 continue
                 
+            logger.debug(f"Checking category {category_name} for day {day_of_year}")
             # Get item for today (day of year)
             item = data.get(str(day_of_year))
             if item:
@@ -107,6 +112,7 @@ class OfTheDayManager:
                 logger.info(f"Loaded {category_name} item for day {day_of_year}: {item.get('title', 'No title')}")
             else:
                 logger.warning(f"No item found for {category_name} on day {day_of_year}")
+                logger.debug(f"Available days in {category_name}: {list(data.keys())[:10]}...")
         
         self.current_day = today
         self.current_category_index = 0
@@ -230,7 +236,11 @@ class OfTheDayManager:
     
     def display(self, force_clear=False):
         """Display 'of the day' items on the LED matrix."""
-        if not self.enabled or not self.current_items:
+        if not self.enabled:
+            logger.warning("OfTheDayManager is disabled")
+            return
+        if not self.current_items:
+            logger.warning(f"OfTheDayManager has no current items. Available items: {list(self.current_items.keys())}")
             return
             
         try:

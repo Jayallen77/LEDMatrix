@@ -333,14 +333,14 @@
     "of_the_day": {
         "enabled": true,
         "update_interval": 3600,
-        "category_order": ["word_of_the_day", "slovenian_word"],
+        "category_order": ["word_of_the_day", "slovenian_word_of_the_day"],
         "categories": {
             "word_of_the_day": {
                 "enabled": true,
                 "data_file": "of_the_day/word_of_the_day.json",
                 "display_name": "Word of the Day"
             },
-            "slovenian_word": {
+            "slovenian_word_of_the_day": {
                 "enabled": true,
                 "data_file": "of_the_day/slovenian_word_of_the_day.json",
                 "display_name": "Slovenian Word of the Day"
