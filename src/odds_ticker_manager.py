@@ -84,6 +84,8 @@ class OddsTickerManager:
         self.future_fetch_days = self.odds_ticker_config.get('future_fetch_days', 7)
         self.loop = self.odds_ticker_config.get('loop', True)
         self.show_channel_logos = self.odds_ticker_config.get('show_channel_logos', True)
+        self.broadcast_logo_height_ratio = self.odds_ticker_config.get('broadcast_logo_height_ratio', 0.6)
+        self.broadcast_logo_max_width_ratio = self.odds_ticker_config.get('broadcast_logo_max_width_ratio', 0.8)
         self.request_timeout = self.odds_ticker_config.get('request_timeout', 30)
         
         # Initialize managers
@@ -617,10 +619,20 @@ class OddsTickerManager:
         
         broadcast_logo_col_width = 0
         if broadcast_logo:
-            # Make the broadcast logo fit neatly within the display height
-            b_logo_h = height - 4  # 2px padding top and bottom
+            # Standardize broadcast logo size to be smaller and more consistent
+            # Use configurable height ratio that's smaller than the display height
+            b_logo_h = int(height * self.broadcast_logo_height_ratio)
+            # Maintain aspect ratio while fitting within the height constraint
             ratio = b_logo_h / broadcast_logo.height
             b_logo_w = int(broadcast_logo.width * ratio)
+            
+            # Ensure the width doesn't get too wide - cap it at configurable max width ratio
+            max_width = int(width * self.broadcast_logo_max_width_ratio)
+            if b_logo_w > max_width:
+                ratio = max_width / broadcast_logo.width
+                b_logo_w = max_width
+                b_logo_h = int(broadcast_logo.height * ratio)
+            
             broadcast_logo = broadcast_logo.resize((b_logo_w, b_logo_h), Image.Resampling.LANCZOS)
             broadcast_logo_col_width = b_logo_w
             logger.info(f"Game {game.get('id')}: Resized broadcast logo to {broadcast_logo.size}, column width: {broadcast_logo_col_width}")
