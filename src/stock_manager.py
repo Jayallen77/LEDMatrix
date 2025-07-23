@@ -425,8 +425,8 @@ class StockManager:
 
     def _create_stock_display(self, symbol: str, price: float, change: float, change_percent: float, is_crypto: bool = False) -> Image.Image:
         """Create a display image for a stock or crypto with logo, symbol, price, and change."""
-        # Create a wider image for scrolling
-        width = self.display_manager.matrix.width * 2
+        # Create a wider image for scrolling - adjust width based on chart toggle
+        width = self.display_manager.matrix.width * (2 if self.toggle_chart else 1.5)  # Reduced width when no chart
         height = self.display_manager.matrix.height
         image = Image.new('RGB', (width, height), color=(0, 0, 0))
         draw = ImageDraw.Draw(image)
@@ -461,10 +461,12 @@ class StockManager:
         price_bbox = draw.textbbox((0, 0), price_text, font=price_font)
         change_bbox = draw.textbbox((0, 0), change_text, font=small_font)
         
-        # Calculate total height needed
+        # Calculate total height needed - adjust gaps based on chart toggle
+        text_gap = 2 if self.toggle_chart else 1  # Reduced gap when no chart
         total_text_height = (symbol_bbox[3] - symbol_bbox[1]) + \
                            (price_bbox[3] - price_bbox[1]) + \
-                           (change_bbox[3] - change_bbox[1])
+                           (change_bbox[3] - change_bbox[1]) + \
+                           (text_gap * 2)  # Account for gaps between elements
         
         # Calculate starting y position to center all text
         start_y = (height - total_text_height) // 2
@@ -474,8 +476,8 @@ class StockManager:
             # When chart is enabled, center text more to the left
             column_x = width // 2.85
         else:
-            # When chart is disabled, center text more to the right
-            column_x = width // 2.2
+            # When chart is disabled, position text closer to logo
+            column_x = width // 3
         
         # Draw symbol
         symbol_width = symbol_bbox[2] - symbol_bbox[0]
@@ -485,13 +487,13 @@ class StockManager:
         # Draw price
         price_width = price_bbox[2] - price_bbox[0]
         price_x = column_x - (price_width // 2)
-        price_y = start_y + (symbol_bbox[3] - symbol_bbox[1]) + 2  # Small gap after symbol
+        price_y = start_y + (symbol_bbox[3] - symbol_bbox[1]) + text_gap  # Adjusted gap
         draw.text((price_x, price_y), price_text, font=price_font, fill=(255, 255, 255))
         
         # Draw change with color based on value
         change_width = change_bbox[2] - change_bbox[0]
         change_x = column_x - (change_width // 2)
-        change_y = price_y + (price_bbox[3] - price_bbox[1]) + 2  # Small gap after price
+        change_y = price_y + (price_bbox[3] - price_bbox[1]) + text_gap  # Adjusted gap
         change_color = (0, 255, 0) if change >= 0 else (255, 0, 0)
         draw.text((change_x, change_y), change_text, font=small_font, fill=change_color)
         
@@ -505,7 +507,7 @@ class StockManager:
                 # Calculate chart dimensions
                 chart_width = int(width // 2.5)  # Reduced from width//2.5 to prevent overlap
                 chart_height = height // 1.5
-                chart_x = width - chart_width # - 4  # 4px margin from right edge
+                chart_x = width - chart_width - 4  # 4px margin from right edge
                 chart_y = (height - chart_height) // 2
                 
                 # Find min and max prices for scaling
@@ -526,14 +528,10 @@ class StockManager:
                     y = chart_y + chart_height - int(((price - min_price) / price_range) * chart_height)
                     points.append((x, y))
                 
-                # Draw the line
-                if len(points) >= 2:
-                    draw.line(points, fill=change_color, width=1)
-                    
-                    # Draw dots at start and end points only
-                    for point in [points[0], points[-1]]:
-                        draw.ellipse([point[0]-1, point[1]-1, point[0]+1, point[1]+1], 
-                                   fill=change_color)
+                # Draw lines between points
+                color = self._get_stock_color(symbol)
+                for i in range(len(points) - 1):
+                    draw.line([points[i], points[i + 1]], fill=color, width=1)
         
         return image
 
