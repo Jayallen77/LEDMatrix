@@ -191,11 +191,9 @@ class OfTheDayManager:
             matrix_height = self.display_manager.matrix.height
             title_face = self.title_face
             body_face = self.body_face
-            # Get font heights
-            title_face.set_char_size(8*64)
-            body_face.set_char_size(8*64)
-            title_height = title_face.size.height // 64
-            body_height = body_face.size.height // 64
+            # Get font heights for BDF (bitmap) fonts
+            title_height = title_face.height
+            body_height = body_face.height
 
             # --- Draw Title (always at top, ic8x8u.bdf) ---
             self._draw_bdf_text(draw, title_face, title, 1, 0, color=self.title_color)
