@@ -39,8 +39,8 @@ class OfTheDayManager:
 
         # Load fonts using freetype
         font_dir = os.path.join(os.path.dirname(__file__), '..', 'assets', 'fonts')
-        self.title_font = freetype.Face(os.path.join(font_dir, 'MatrixChunky8.bdf'))
-        self.body_font = freetype.Face(os.path.join(font_dir, 'MatrixLight6.bdf'))
+        self.title_font = freetype.Face(os.path.join(font_dir, 'MatrixChunky8X.bdf'))
+        self.body_font = freetype.Face(os.path.join(font_dir, 'MatrixLight6X.bdf'))
 
         # Load categories and their data
         self.categories = self.of_the_day_config.get('categories', {})
