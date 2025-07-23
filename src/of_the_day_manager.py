@@ -349,6 +349,14 @@ class OfTheDayManager:
             logger.debug("OfTheDayManager is disabled, skipping item advance")
             return
             
+        # Check if internal rotation should happen first
+        now = time.time()
+        if now - self.last_category_rotation_time > self.display_rotate_interval:
+            # Let the internal rotation handle it
+            logger.debug("Internal rotation timer triggered, skipping external advance")
+            return
+            
+        # Only advance if internal rotation hasn't happened recently
         category_names = list(self.current_items.keys())
         if not category_names:
             return
