@@ -224,7 +224,7 @@ class OfTheDayManager:
             # --- Draw Subtitle or Description (rotating) ---
             # Start subtitle/description below the title and underline
             # Account for title height + underline + spacing
-            y_start = title_height + 2  # Space for underline
+            y_start = title_height + body_height + 3  # Space for underline
             available_height = matrix_height - y_start
             available_width = matrix_width - 2
             
