@@ -198,7 +198,11 @@ class OfTheDayManager:
             # --- Draw Title (always at top, ic8x8u.bdf) ---
             self._draw_bdf_text(draw, title_face, title, 1, 0, color=self.title_color)
             # Underline
-            title_width = sum([title_face.get_advance_width(ord(c)) for c in title]) // 64
+            title_width = 0
+            for c in title:
+                title_face.load_char(c)
+                title_width += title_face.glyph.advance.x
+            title_width = title_width // 64
             underline_y = title_height  # Just below the title font
             draw.line([(1, underline_y), (1 + title_width, underline_y)], fill=self.title_color, width=1)
 
