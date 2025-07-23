@@ -179,7 +179,7 @@ class OfTheDayManager:
                     if byte_index < len(bitmap.buffer):
                         byte = bitmap.buffer[byte_index]
                         if byte & (1 << (7 - (j % 8))):
-                            draw.point((x + j, glyph_y - i), fill=color)
+                            draw.point((x + j, glyph_y + i), fill=color)
             x += face.glyph.advance.x >> 6
         return x - orig_x
 
