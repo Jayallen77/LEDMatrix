@@ -171,13 +171,15 @@ class OfTheDayManager:
         for char in text:
             face.load_char(char)
             bitmap = face.glyph.bitmap
+            # Use bitmap_top to properly position the glyph relative to baseline
+            glyph_y = y + face.glyph.bitmap_top
             for i in range(bitmap.rows):
                 for j in range(bitmap.width):
                     byte_index = i * bitmap.pitch + (j // 8)
                     if byte_index < len(bitmap.buffer):
                         byte = bitmap.buffer[byte_index]
                         if byte & (1 << (7 - (j % 8))):
-                            draw.point((x + j, y + i), fill=color)
+                            draw.point((x + j, glyph_y - i), fill=color)
             x += face.glyph.advance.x >> 6
         return x - orig_x
 
