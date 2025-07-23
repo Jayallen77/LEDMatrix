@@ -84,7 +84,7 @@ class OddsTickerManager:
         self.future_fetch_days = self.odds_ticker_config.get('future_fetch_days', 7)
         self.loop = self.odds_ticker_config.get('loop', True)
         self.show_channel_logos = self.odds_ticker_config.get('show_channel_logos', True)
-        self.broadcast_logo_height_ratio = self.odds_ticker_config.get('broadcast_logo_height_ratio', 0.6)
+        self.broadcast_logo_height_ratio = self.odds_ticker_config.get('broadcast_logo_height_ratio', 0.8)
         self.broadcast_logo_max_width_ratio = self.odds_ticker_config.get('broadcast_logo_max_width_ratio', 0.8)
         self.request_timeout = self.odds_ticker_config.get('request_timeout', 30)
         
