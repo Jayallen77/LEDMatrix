@@ -163,7 +163,7 @@ class DisplayManager:
                             if byte & (1 << (7 - (j % 8))):
                                 # Calculate actual pixel position
                                 pixel_x = x + glyph_left + j
-                                pixel_y = y + glyph_top - i
+                                pixel_y = y - glyph_top + i
                                 # Only draw if within bounds
                                 if (0 <= pixel_x < self.matrix.width and 
                                     0 <= pixel_y < self.matrix.height):
