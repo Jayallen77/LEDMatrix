@@ -40,7 +40,7 @@ class OfTheDayManager:
         # Load fonts using freetype
         font_dir = os.path.join(os.path.dirname(__file__), '..', 'assets', 'fonts')
         self.title_font = freetype.Face(os.path.join(font_dir, '6x9.bdf'))
-        self.body_font = freetype.Face(os.path.join(font_dir, '5x7.bdf'))
+        self.body_font = freetype.Face(os.path.join(font_dir, 'cozette-8.bdf'))
 
         # Load categories and their data
         self.categories = self.of_the_day_config.get('categories', {})
