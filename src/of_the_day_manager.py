@@ -38,8 +38,8 @@ class OfTheDayManager:
 
         # Load fonts
         font_dir = os.path.join(os.path.dirname(__file__), '..', 'assets', 'fonts')
-        self.title_font = ImageFont.load(os.path.join(font_dir, 'ic8x8u.bdf'))
-        self.body_font = ImageFont.load(os.path.join(font_dir, 'cozette.bdf'))
+        self.title_font = ImageFont.load_bdf(os.path.join(font_dir, 'ic8x8u.bdf'))
+        self.body_font = ImageFont.load_bdf(os.path.join(font_dir, 'cozette.bdf'))
 
         # Load categories and their data
         self.categories = self.of_the_day_config.get('categories', {})
