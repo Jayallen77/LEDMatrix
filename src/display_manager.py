@@ -226,28 +226,7 @@ class DisplayManager:
                 logger.error(f"Failed to load 4x6 TTF font: {font_err}. Falling back.")
                 self.extra_small_font = self.small_font
 
-            # Load MatrixLight6 BDF font for weather forecasts
-            try:
-                script_dir = os.path.dirname(os.path.abspath(__file__))
-                relative_font_path = os.path.join(script_dir, "../assets/fonts/MatrixLight6.bdf")
-                self.matrix_light6_font_path = os.path.abspath(relative_font_path)
-                logger.info(f"Attempting to load MatrixLight6 font from: {self.matrix_light6_font_path}")
-                
-                if not os.path.exists(self.matrix_light6_font_path):
-                    raise FileNotFoundError(f"Font file not found at {self.matrix_light6_font_path}")
-                
-                # Load with freetype for proper BDF handling
-                face = freetype.Face(self.matrix_light6_font_path)
-                logger.info(f"MatrixLight6 font loaded successfully from {self.matrix_light6_font_path}")
-                logger.info(f"MatrixLight6 font size: {face.size.height >> 6} pixels")
-                
-                # Store the face for later use
-                self.matrix_light6_font = face
-                    
-            except Exception as font_err:
-                logger.error(f"Failed to load MatrixLight6 font: {str(font_err)}", exc_info=True)
-                logger.error("Falling back to small font")
-                self.matrix_light6_font = self.small_font
+
 
         except Exception as e:
             logger.error(f"Error in font loading: {e}", exc_info=True)
@@ -259,8 +238,7 @@ class DisplayManager:
                 self.extra_small_font = self.regular_font
             if not hasattr(self, 'bdf_5x7_font'): # Ensure bdf_5x7_font also gets a fallback
                 self.bdf_5x7_font = self.regular_font
-            if not hasattr(self, 'matrix_light6_font'): # Ensure matrix_light6_font also gets a fallback
-                self.matrix_light6_font = self.regular_font
+
 
     def get_text_width(self, text, font):
         """Get the width of text when rendered with the given font."""
