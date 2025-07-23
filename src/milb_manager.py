@@ -343,7 +343,9 @@ class BaseMiLBManager:
             sport_ids = self.milb_config.get('sport_ids', [10, 11, 12, 13, 14, 15]) # Mexican, AAA, AA, A+, A, Rookie
 
             now = datetime.now(timezone.utc)
-            dates = [(now + timedelta(days=d)).strftime("%Y-%m-%d") for d in range(-1, 2)]  # Yesterday, today, tomorrow
+            # Extend date range to look further into the future for upcoming games
+            # Look back 1 day and forward 7 days to catch more upcoming games
+            dates = [(now + timedelta(days=d)).strftime("%Y-%m-%d") for d in range(-1, 8)]
 
             all_games = {}
 
@@ -398,7 +400,7 @@ class BaseMiLBManager:
                         
                         if not self.favorite_teams or is_favorite_game:
                             status_obj = event['status']
-                            status_state = status_obj.get('abstractGameState', 'Final')
+                            status_state = status_obj.get('abstractGameState', 'Preview') # Changed default to 'Preview'
 
                             # Map status to a consistent format
                             status_map = {
@@ -1152,13 +1154,22 @@ class MiLBUpcomingManager(BaseMiLBManager):
                 if game_time.tzinfo is None:
                     game_time = game_time.replace(tzinfo=timezone.utc)
                 
+                current_time = datetime.now(timezone.utc)
                 is_upcoming = (
                     game['status_state'] not in ['post', 'final', 'completed'] and
-                    game_time > datetime.now(timezone.utc)
+                    game_time > current_time
                 )
+                
+                # Add debug logging for upcoming games logic
+                self.logger.debug(f"[MiLB] Game {game['away_team']} @ {game['home_team']}:")
+                self.logger.debug(f"[MiLB]   Game time: {game_time}")
+                self.logger.debug(f"[MiLB]   Current time: {current_time}")
+                self.logger.debug(f"[MiLB]   Status state: {game['status_state']}")
+                self.logger.debug(f"[MiLB]   Is upcoming: {is_upcoming}")
                 
                 if is_upcoming:
                     new_upcoming_games.append(game)
+                    self.logger.info(f"[MiLB] Added upcoming game: {game['away_team']} @ {game['home_team']} at {game_time}")
                 
             # Sort by game time (soonest first) and limit to upcoming_games_to_show
             new_upcoming_games.sort(key=lambda x: x['start_time'])
