@@ -171,23 +171,28 @@ class OfTheDayManager:
     
     def _draw_bdf_text(self, draw, face, text, x, y, color=(255,255,255)):
         """Draw text using a BDF font loaded with freetype."""
-        orig_x = x
         for char in text:
+            # Load the glyph
             face.load_char(char)
             bitmap = face.glyph.bitmap
-            # For proper baseline alignment, position glyphs so their baseline is at y
-            # bitmap_top is the distance from baseline to top of bitmap
-            # So we position the glyph so its baseline is at the specified y position
-            glyph_y = y + face.glyph.bitmap_top - bitmap.rows
+            
+            # Draw the glyph
             for i in range(bitmap.rows):
                 for j in range(bitmap.width):
-                    byte_index = i * bitmap.pitch + (j // 8)
-                    if byte_index < len(bitmap.buffer):
-                        byte = bitmap.buffer[byte_index]
-                        if byte & (1 << (7 - (j % 8))):
-                            draw.point((x + j, glyph_y + i), fill=color)
+                    try:
+                        # Get the byte containing the pixel
+                        byte_index = i * bitmap.pitch + (j // 8)
+                        if byte_index < len(bitmap.buffer):
+                            byte = bitmap.buffer[byte_index]
+                            # Check if the specific bit is set
+                            if byte & (1 << (7 - (j % 8))):
+                                draw.point((x + j, y + i), fill=color)
+                    except IndexError:
+                        logger.warning(f"Index out of range for char '{char}' at position ({i}, {j})")
+                        continue
+            
+            # Move to next character position
             x += face.glyph.advance.x >> 6
-        return x - orig_x
 
     def draw_item(self, category_name, item):
         try:
