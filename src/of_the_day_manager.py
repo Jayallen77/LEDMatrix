@@ -222,8 +222,9 @@ class OfTheDayManager:
             draw.line([(1, underline_y), (1 + title_width, underline_y)], fill=self.title_color, width=1)
 
             # --- Draw Subtitle or Description (rotating) ---
-            # Start subtitle/description below the title
-            y_start = title_height + 3  # Leave space between title and subtitle
+            # Start subtitle/description below the title and underline
+            # Account for title height + underline + spacing
+            y_start = title_height + 2  # Space for underline
             available_height = matrix_height - y_start
             available_width = matrix_width - 2
             
@@ -232,12 +233,14 @@ class OfTheDayManager:
                 wrapped = self._wrap_text(subtitle, available_width, body_font, max_lines=3, line_height=body_height, max_height=available_height)
                 for i, line in enumerate(wrapped):
                     if line.strip():  # Only draw non-empty lines
+                        # Account for bottom baseline alignment - position so bottom of text is at y_start
                         self._draw_bdf_text(draw, body_font, line, 1, y_start + i * body_height, color=self.subtitle_color)
             elif self.rotation_state == 1 and description:
                 # Show description
                 wrapped = self._wrap_text(description, available_width, body_font, max_lines=3, line_height=body_height, max_height=available_height)
                 for i, line in enumerate(wrapped):
                     if line.strip():  # Only draw non-empty lines
+                        # Account for bottom baseline alignment - position so bottom of text is at y_start
                         self._draw_bdf_text(draw, body_font, line, 1, y_start + i * body_height, color=self.subtitle_color)
             # else: nothing to show
             return True
