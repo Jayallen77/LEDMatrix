@@ -162,23 +162,23 @@ class OfTheDayManager:
                 logger.debug(f"Drawing item: title='{title}', subtitle='{subtitle}', description='{description}'")
                 self._last_draw_debug_log = current_time
             
-            # Draw title in extra small font at the top for maximum text fitting
+            # Draw title (Word) at the very top - condensed layout
             title_width = self.display_manager.get_text_width(title, self.display_manager.extra_small_font)
             title_x = (self.display_manager.matrix.width - title_width) // 2
             # Throttle debug logging to once every 5 seconds
             if not hasattr(self, '_last_title_debug_log') or current_time - self._last_title_debug_log > 5:
-                logger.debug(f"Drawing title '{title}' at position ({title_x}, 2) with width {title_width}")
+                logger.debug(f"Drawing title '{title}' at position ({title_x}, 0) with width {title_width}")
                 self._last_title_debug_log = current_time
             
-            self.display_manager.draw_text(title, title_x, 2, 
+            self.display_manager.draw_text(title, title_x, 0, 
                                         color=self.title_color,
                                         font=self.display_manager.extra_small_font)
             
-            # Draw subtitle/description in extra small font below
+            # Draw subtitle right below title - condensed layout
             if subtitle:
-                # Wrap subtitle text if it's too long
-                available_width = self.display_manager.matrix.width - 4
-                wrapped_lines = self._wrap_text(subtitle, available_width, self.display_manager.extra_small_font, max_lines=2)
+                # Use full width minus 2 pixels for maximum text
+                available_width = self.display_manager.matrix.width - 2
+                wrapped_lines = self._wrap_text(subtitle, available_width, self.display_manager.extra_small_font, max_lines=1)
                 
                 for i, line in enumerate(wrapped_lines):
                     if line.strip():
@@ -186,15 +186,17 @@ class OfTheDayManager:
                         line_x = (self.display_manager.matrix.width - line_width) // 2
                         # Throttle debug logging to once every 5 seconds
                         if not hasattr(self, '_last_subtitle_debug_log') or current_time - self._last_subtitle_debug_log > 5:
-                            logger.debug(f"Drawing subtitle line '{line}' at position ({line_x}, {12 + (i * 8)}) with width {line_width}")
+                            logger.debug(f"Drawing subtitle line '{line}' at position ({line_x}, 6) with width {line_width}")
                             self._last_subtitle_debug_log = current_time
-                        self.display_manager.draw_text(line, line_x, 12 + (i * 8), 
+                        self.display_manager.draw_text(line, line_x, 6, 
                                                     color=self.subtitle_color,
                                                     font=self.display_manager.extra_small_font)
-            elif description:
-                # Wrap description text if it's too long
-                available_width = self.display_manager.matrix.width - 4
-                wrapped_lines = self._wrap_text(description, available_width, self.display_manager.extra_small_font, max_lines=3)
+            
+            # Draw description at the bottom - condensed layout
+            if description:
+                # Use full width minus 2 pixels for maximum text
+                available_width = self.display_manager.matrix.width - 2
+                wrapped_lines = self._wrap_text(description, available_width, self.display_manager.extra_small_font, max_lines=2)
                 
                 for i, line in enumerate(wrapped_lines):
                     if line.strip():
@@ -202,9 +204,9 @@ class OfTheDayManager:
                         line_x = (self.display_manager.matrix.width - line_width) // 2
                         # Throttle debug logging to once every 5 seconds
                         if not hasattr(self, '_last_description_debug_log') or current_time - self._last_description_debug_log > 5:
-                            logger.debug(f"Drawing description line '{line}' at position ({line_x}, {12 + (i * 8)}) with width {line_width}")
+                            logger.debug(f"Drawing description line '{line}' at position ({line_x}, {12 + (i * 6)}) with width {line_width}")
                             self._last_description_debug_log = current_time
-                        self.display_manager.draw_text(line, line_x, 12 + (i * 8), 
+                        self.display_manager.draw_text(line, line_x, 12 + (i * 6), 
                                                     color=self.subtitle_color,
                                                     font=self.display_manager.extra_small_font)
             
