@@ -170,9 +170,6 @@ class OfTheDayManager:
                 logger.debug(f"Drawing title '{title}' at position ({title_x}, 2) with width {title_width}")
                 self._last_title_debug_log = current_time
             
-            # Test: Draw a simple red rectangle to verify drawing is working
-            self.display_manager.draw.rectangle([0, 0, 10, 10], fill=(255, 0, 0))
-            
             self.display_manager.draw_text(title, title_x, 2, 
                                         color=self.title_color,
                                         font=self.display_manager.extra_small_font)
@@ -308,10 +305,11 @@ class OfTheDayManager:
                 logger.info(f"Displaying {current_category}: {title}")
                 self.last_display_log = current_time
             
-            # Clear the display before drawing
-            logger.debug("Calling display_manager.clear()")
-            self.display_manager.clear()
-            logger.debug("display_manager.clear() completed")
+            # Only clear if force_clear is True (following calendar_manager pattern)
+            if force_clear:
+                logger.debug("Calling display_manager.clear() due to force_clear")
+                self.display_manager.clear()
+                logger.debug("display_manager.clear() completed")
             
             # Draw the item
             self.draw_item(current_category, current_item)
