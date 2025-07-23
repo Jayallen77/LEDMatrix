@@ -162,19 +162,17 @@ class OfTheDayManager:
                 logger.debug(f"Drawing item: title='{title}', subtitle='{subtitle}', description='{description}'")
                 self._last_draw_debug_log = current_time
             
-            # Draw title (Word) at the very top - condensed layout
-            title_width = self.display_manager.get_text_width(title, self.display_manager.extra_small_font)
-            title_x = (self.display_manager.matrix.width - title_width) // 2
+            # Draw title (Word) at the very top - left justified
             # Throttle debug logging to once every 5 seconds
             if not hasattr(self, '_last_title_debug_log') or current_time - self._last_title_debug_log > 5:
-                logger.debug(f"Drawing title '{title}' at position ({title_x}, 0) with width {title_width}")
+                logger.debug(f"Drawing title '{title}' at position (1, 0) - left justified")
                 self._last_title_debug_log = current_time
             
-            self.display_manager.draw_text(title, title_x, 0, 
+            self.display_manager.draw_text(title, 1, 0, 
                                         color=self.title_color,
                                         font=self.display_manager.extra_small_font)
             
-            # Draw subtitle right below title - condensed layout
+            # Draw subtitle right below title - left justified
             if subtitle:
                 # Use full width minus 2 pixels for maximum text
                 available_width = self.display_manager.matrix.width - 2
@@ -182,17 +180,15 @@ class OfTheDayManager:
                 
                 for i, line in enumerate(wrapped_lines):
                     if line.strip():
-                        line_width = self.display_manager.get_text_width(line, self.display_manager.extra_small_font)
-                        line_x = (self.display_manager.matrix.width - line_width) // 2
                         # Throttle debug logging to once every 5 seconds
                         if not hasattr(self, '_last_subtitle_debug_log') or current_time - self._last_subtitle_debug_log > 5:
-                            logger.debug(f"Drawing subtitle line '{line}' at position ({line_x}, 6) with width {line_width}")
+                            logger.debug(f"Drawing subtitle line '{line}' at position (1, 6) - left justified")
                             self._last_subtitle_debug_log = current_time
-                        self.display_manager.draw_text(line, line_x, 6, 
+                        self.display_manager.draw_text(line, 1, 6, 
                                                     color=self.subtitle_color,
                                                     font=self.display_manager.extra_small_font)
             
-            # Draw description at the bottom - condensed layout
+            # Draw description at the bottom - left justified
             if description:
                 # Use full width minus 2 pixels for maximum text
                 available_width = self.display_manager.matrix.width - 2
@@ -200,13 +196,11 @@ class OfTheDayManager:
                 
                 for i, line in enumerate(wrapped_lines):
                     if line.strip():
-                        line_width = self.display_manager.get_text_width(line, self.display_manager.extra_small_font)
-                        line_x = (self.display_manager.matrix.width - line_width) // 2
                         # Throttle debug logging to once every 5 seconds
                         if not hasattr(self, '_last_description_debug_log') or current_time - self._last_description_debug_log > 5:
-                            logger.debug(f"Drawing description line '{line}' at position ({line_x}, {12 + (i * 6)}) with width {line_width}")
+                            logger.debug(f"Drawing description line '{line}' at position (1, {12 + (i * 6)}) - left justified")
                             self._last_description_debug_log = current_time
-                        self.display_manager.draw_text(line, line_x, 12 + (i * 6), 
+                        self.display_manager.draw_text(line, 1, 12 + (i * 6), 
                                                     color=self.subtitle_color,
                                                     font=self.display_manager.extra_small_font)
             

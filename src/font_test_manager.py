@@ -1,7 +1,6 @@
 import os
 import time
-import freetype
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 import logging
 from typing import Dict, Any
 from src.display_manager import DisplayManager
@@ -11,12 +10,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class FontTestManager:
-    """Manager for testing tom-thumb font."""
+    """Manager for testing 5x7 regular TTF font."""
     
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
         self.display_manager = display_manager
         self.config = config
-        self.font_path = "assets/fonts/tom-thumb.bdf"
+        self.font_path = "assets/fonts/5by7.regular.ttf"
         self.logger = logging.getLogger('FontTest')
         
         # Verify font exists
@@ -24,10 +23,15 @@ class FontTestManager:
             self.logger.error(f"Font file not found: {self.font_path}")
             raise FileNotFoundError(f"Font file not found: {self.font_path}")
         
-        # Load the font
-        self.face = freetype.Face(self.font_path)
+        # Load the TTF font with PIL
+        try:
+            self.font = ImageFont.truetype(self.font_path, 7)  # Size 7 for 5x7 font
+            self.logger.info(f"Successfully loaded 5x7 regular TTF font from {self.font_path}")
+        except Exception as e:
+            self.logger.error(f"Failed to load 5x7 TTF font: {e}")
+            raise
         
-        self.logger.info("Initialized FontTestManager with tom-thumb font")
+        self.logger.info("Initialized FontTestManager with 5x7 regular TTF font")
     
     def update(self):
         """No update needed for static display."""
@@ -44,42 +48,18 @@ class FontTestManager:
             height = self.display_manager.matrix.height
             
             # Draw font name at the top
-            self.display_manager.draw_text("tom-thumb", y=2, color=(255, 255, 255))
+            self.display_manager.draw_text("5x7 Regular", y=2, color=(255, 255, 255))
             
-            # Draw sample text
+            # Draw sample text using TTF font
             draw = ImageDraw.Draw(self.display_manager.image)
             sample_text = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
             
             # Calculate starting position
             x = 10  # Start 10 pixels from the left
-            y = (height - self.face.size.height) // 2  # Center vertically using font's natural height
+            y = 10  # Start 10 pixels from the top
             
-            # Draw each character
-            for char in sample_text:
-                # Load the glyph
-                self.face.load_char(char)
-                bitmap = self.face.glyph.bitmap
-                
-                # Log bitmap details for debugging
-                self.logger.debug(f"Bitmap for '{char}': width={bitmap.width}, rows={bitmap.rows}, pitch={bitmap.pitch}")
-                
-                # Draw the glyph
-                for i in range(bitmap.rows):
-                    for j in range(bitmap.width):
-                        try:
-                            # Get the byte containing the pixel
-                            byte_index = i * bitmap.pitch + (j // 8)
-                            if byte_index < len(bitmap.buffer):
-                                byte = bitmap.buffer[byte_index]
-                                # Check if the specific bit is set
-                                if byte & (1 << (7 - (j % 8))):
-                                    draw.point((x + j, y + i), fill=(255, 255, 255))
-                        except IndexError:
-                            self.logger.warning(f"Index out of range for char '{char}' at position ({i}, {j})")
-                            continue
-                
-                # Move to next character position
-                x += self.face.glyph.advance.x >> 6
+            # Draw the sample text using PIL's text drawing
+            draw.text((x, y), sample_text, font=self.font, fill=(255, 255, 255))
             
             # Update the display once
             self.display_manager.update_display()
