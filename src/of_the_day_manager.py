@@ -207,7 +207,7 @@ class OfTheDayManager:
             body_height = body_font.glyph.bitmap.rows
             
             # --- Draw Title (always at top) ---
-            title_y = 0  # Start at top
+            title_y = title_height  # Position title so its bottom is at title_height
             self._draw_bdf_text(draw, title_font, title, 1, title_y, color=self.title_color)
             
             # Calculate title width for underline
