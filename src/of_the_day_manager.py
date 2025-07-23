@@ -8,6 +8,7 @@ from rgbmatrix import graphics
 import pytz
 from src.config_manager import ConfigManager
 import time
+import freetype
 
 # Configure logger for this module
 logger = logging.getLogger(__name__)
@@ -36,10 +37,10 @@ class OfTheDayManager:
         self.last_rotation_time = time.time()
         self.last_category_rotation_time = time.time()
 
-        # Load fonts using PIL
+        # Load fonts using freetype
         font_dir = os.path.join(os.path.dirname(__file__), '..', 'assets', 'fonts')
-        self.title_font = ImageFont.truetype(os.path.join(font_dir, '5by7.regular.ttf'), 12)
-        self.body_font = ImageFont.truetype(os.path.join(font_dir, 'dot_digital-7.ttf'), 10)
+        self.title_font = freetype.Face(os.path.join(font_dir, '5x7.bdf'))
+        self.body_font = freetype.Face(os.path.join(font_dir, '5x7.bdf'))
 
         # Load categories and their data
         self.categories = self.of_the_day_config.get('categories', {})
@@ -164,6 +165,22 @@ class OfTheDayManager:
             logger.debug("OfTheDayManager update interval reached")
             self.last_update = current_time
     
+    def _draw_bdf_text(self, draw, face, text, x, y, color=(255,255,255)):
+        """Draw text using a BDF font loaded with freetype."""
+        orig_x = x
+        for char in text:
+            face.load_char(char)
+            bitmap = face.glyph.bitmap
+            for i in range(bitmap.rows):
+                for j in range(bitmap.width):
+                    byte_index = i * bitmap.pitch + (j // 8)
+                    if byte_index < len(bitmap.buffer):
+                        byte = bitmap.buffer[byte_index]
+                        if byte & (1 << (7 - (j % 8))):
+                            draw.point((x + j, y + i), fill=color)
+            x += face.glyph.advance.x >> 6
+        return x - orig_x
+
     def draw_item(self, category_name, item):
         try:
             title = item.get('title', 'No Title')
@@ -176,21 +193,25 @@ class OfTheDayManager:
             body_font = self.body_font
             
             # Get font heights
-            title_height = title_font.getbbox('A')[3]  # Bottom coordinate gives height
-            body_height = body_font.getbbox('A')[3]  # Bottom coordinate gives height
+            title_height = title_font.height
+            body_height = body_font.height
             
-            # --- Draw Title (always at top, 5by7.regular.ttf) ---
+            # --- Draw Title (always at top, 5x7.bdf) ---
             title_y = 0  # Start at top
-            draw.text((1, title_y), title, font=title_font, fill=self.title_color)
+            self._draw_bdf_text(draw, title_font, title, 1, title_y, color=self.title_color)
             
             # Calculate title width for underline
-            title_width = title_font.getbbox(title)[2]  # Right coordinate gives width
+            title_width = 0
+            for c in title:
+                title_font.load_char(c)
+                title_width += title_font.glyph.advance.x
+            title_width = title_width // 64
             
             # Underline below title
             underline_y = title_height + 1  # Just below the title
             draw.line([(1, underline_y), (1 + title_width, underline_y)], fill=self.title_color, width=1)
 
-            # --- Draw Subtitle or Description (rotating, dot_digital-7.ttf) ---
+            # --- Draw Subtitle or Description (rotating, 5x7.bdf) ---
             # Start subtitle/description below the title with proper spacing
             y_start = title_height + 3  # Leave space between title and subtitle
             available_height = matrix_height - y_start
@@ -201,20 +222,20 @@ class OfTheDayManager:
                 wrapped = self._wrap_text(subtitle, available_width, body_font, max_lines=3, line_height=body_height, max_height=available_height)
                 for i, line in enumerate(wrapped):
                     if line.strip():  # Only draw non-empty lines
-                        draw.text((1, y_start + i * body_height), line, font=body_font, fill=self.subtitle_color)
+                        self._draw_bdf_text(draw, body_font, line, 1, y_start + i * body_height, color=self.subtitle_color)
             elif self.rotation_state == 1 and description:
                 # Show description
                 wrapped = self._wrap_text(description, available_width, body_font, max_lines=3, line_height=body_height, max_height=available_height)
                 for i, line in enumerate(wrapped):
                     if line.strip():  # Only draw non-empty lines
-                        draw.text((1, y_start + i * body_height), line, font=body_font, fill=self.subtitle_color)
+                        self._draw_bdf_text(draw, body_font, line, 1, y_start + i * body_height, color=self.subtitle_color)
             # else: nothing to show
             return True
         except Exception as e:
             logger.error(f"Error drawing 'of the day' item: {e}", exc_info=True)
             return False
 
-    def _wrap_text(self, text, max_width, font, max_lines=3, line_height=8, max_height=24):
+    def _wrap_text(self, text, max_width, face, max_lines=3, line_height=8, max_height=24):
         if not text:
             return [""]
         lines = []
@@ -222,7 +243,11 @@ class OfTheDayManager:
         words = text.split()
         for word in words:
             test_line = ' '.join(current_line + [word]) if current_line else word
-            text_width = font.getbbox(test_line)[2]  # Right coordinate gives width
+            text_width = 0
+            for c in test_line:
+                face.load_char(c)
+                text_width += face.glyph.advance.x
+            text_width = text_width // 64
             if text_width <= max_width:
                 current_line.append(word)
             else:
@@ -232,7 +257,11 @@ class OfTheDayManager:
                 else:
                     truncated = word
                     while len(truncated) > 0:
-                        test_width = font.getbbox(truncated + "...")[2]  # Right coordinate gives width
+                        test_width = 0
+                        for c in (truncated + "..."):
+                            face.load_char(c)
+                            test_width += face.glyph.advance.x
+                        test_width = test_width // 64
                         if test_width <= max_width:
                             lines.append(truncated + "...")
                             break
