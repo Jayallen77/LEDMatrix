@@ -8,6 +8,7 @@ from rgbmatrix import graphics
 import pytz
 from src.config_manager import ConfigManager
 import time
+import freetype
 
 # Configure logger for this module
 logger = logging.getLogger(__name__)
@@ -36,10 +37,10 @@ class OfTheDayManager:
         self.last_rotation_time = time.time()
         self.last_category_rotation_time = time.time()
 
-        # Load fonts
+        # Load fonts using freetype
         font_dir = os.path.join(os.path.dirname(__file__), '..', 'assets', 'fonts')
-        self.title_font = ImageFont.load_bdf(os.path.join(font_dir, 'ic8x8u.bdf'))
-        self.body_font = ImageFont.load_bdf(os.path.join(font_dir, 'cozette.bdf'))
+        self.title_face = freetype.Face(os.path.join(font_dir, 'ic8x8u.bdf'))
+        self.body_face = freetype.Face(os.path.join(font_dir, 'cozette.bdf'))
 
         # Load categories and their data
         self.categories = self.of_the_day_config.get('categories', {})
@@ -164,6 +165,22 @@ class OfTheDayManager:
             logger.debug("OfTheDayManager update interval reached")
             self.last_update = current_time
     
+    def _draw_bdf_text(self, draw, face, text, x, y, color=(255,255,255)):
+        """Draw text using a BDF font loaded with freetype."""
+        orig_x = x
+        for char in text:
+            face.load_char(char)
+            bitmap = face.glyph.bitmap
+            for i in range(bitmap.rows):
+                for j in range(bitmap.width):
+                    byte_index = i * bitmap.pitch + (j // 8)
+                    if byte_index < len(bitmap.buffer):
+                        byte = bitmap.buffer[byte_index]
+                        if byte & (1 << (7 - (j % 8))):
+                            draw.point((x + j, y + i), fill=color)
+            x += face.glyph.advance.x >> 6
+        return x - orig_x
+
     def draw_item(self, category_name, item):
         try:
             title = item.get('title', 'No Title')
@@ -172,14 +189,18 @@ class OfTheDayManager:
             draw = ImageDraw.Draw(self.display_manager.image)
             matrix_width = self.display_manager.matrix.width
             matrix_height = self.display_manager.matrix.height
-            title_font = self.title_font
-            body_font = self.body_font
-            title_height = title_font.getsize('A')[1]
-            body_height = body_font.getsize('A')[1]
+            title_face = self.title_face
+            body_face = self.body_face
+            # Get font heights
+            title_face.set_char_size(8*64)
+            body_face.set_char_size(8*64)
+            title_height = title_face.size.height // 64
+            body_height = body_face.size.height // 64
 
             # --- Draw Title (always at top, ic8x8u.bdf) ---
-            self.display_manager.draw_text(title, 1, 0, color=self.title_color, font=title_font)
-            title_width = self.display_manager.get_text_width(title, title_font)
+            self._draw_bdf_text(draw, title_face, title, 1, 0, color=self.title_color)
+            # Underline
+            title_width = sum([title_face.get_advance_width(ord(c)) for c in title]) // 64
             underline_y = title_height  # Just below the title font
             draw.line([(1, underline_y), (1 + title_width, underline_y)], fill=self.title_color, width=1)
 
@@ -189,21 +210,21 @@ class OfTheDayManager:
             available_width = matrix_width - 2
             if self.rotation_state == 0 and subtitle:
                 # Show subtitle
-                wrapped = self._wrap_text(subtitle, available_width, body_font, max_lines=3, line_height=body_height, max_height=available_height)
+                wrapped = self._wrap_text(subtitle, available_width, body_face, max_lines=3, line_height=body_height, max_height=available_height)
                 for i, line in enumerate(wrapped):
-                    self.display_manager.draw_text(line, 1, y_start + i * body_height, color=self.subtitle_color, font=body_font)
+                    self._draw_bdf_text(draw, body_face, line, 1, y_start + i * body_height, color=self.subtitle_color)
             elif self.rotation_state == 1 and description:
                 # Show description
-                wrapped = self._wrap_text(description, available_width, body_font, max_lines=3, line_height=body_height, max_height=available_height)
+                wrapped = self._wrap_text(description, available_width, body_face, max_lines=3, line_height=body_height, max_height=available_height)
                 for i, line in enumerate(wrapped):
-                    self.display_manager.draw_text(line, 1, y_start + i * body_height, color=self.subtitle_color, font=body_font)
+                    self._draw_bdf_text(draw, body_face, line, 1, y_start + i * body_height, color=self.subtitle_color)
             # else: nothing to show
             return True
         except Exception as e:
             logger.error(f"Error drawing 'of the day' item: {e}", exc_info=True)
             return False
 
-    def _wrap_text(self, text, max_width, font, max_lines=3, line_height=8, max_height=24):
+    def _wrap_text(self, text, max_width, face, max_lines=3, line_height=8, max_height=24):
         if not text:
             return [""]
         lines = []
@@ -211,7 +232,7 @@ class OfTheDayManager:
         words = text.split()
         for word in words:
             test_line = ' '.join(current_line + [word]) if current_line else word
-            text_width = self.display_manager.get_text_width(test_line, font)
+            text_width = sum([face.get_advance_width(ord(c)) for c in test_line]) // 64
             if text_width <= max_width:
                 current_line.append(word)
             else:
@@ -221,7 +242,8 @@ class OfTheDayManager:
                 else:
                     truncated = word
                     while len(truncated) > 0:
-                        if self.display_manager.get_text_width(truncated + "...", font) <= max_width:
+                        test_width = sum([face.get_advance_width(ord(c)) for c in (truncated + "...")]) // 64
+                        if test_width <= max_width:
                             lines.append(truncated + "...")
                             break
                         truncated = truncated[:-1]
