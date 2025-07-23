@@ -762,7 +762,7 @@ class OddsTickerManager:
         draw.text((current_x, odds_y_home), home_odds_text, font=odds_font, fill=odds_color)
         current_x += odds_width + h_padding
         
-        # Datetime (stacked, 3 rows)
+        # Datetime (stacked, 3 rows) - Center justified
         datetime_font_height = datetime_font.size if hasattr(datetime_font, 'size') else 6
         
         # Calculate available height for the three text lines
@@ -775,9 +775,18 @@ class OddsTickerManager:
         date_y = day_y + datetime_font_height + 2
         time_y = date_y + datetime_font_height + 2
 
-        draw.text((current_x, day_y), day_text, font=datetime_font, fill=(255, 255, 255))
-        draw.text((current_x, date_y), date_text, font=datetime_font, fill=(255, 255, 255))
-        draw.text((current_x, time_y), time_text, font=datetime_font, fill=(255, 255, 255))
+        # Center justify each line of text within the datetime column
+        day_text_width = int(temp_draw.textlength(day_text, font=datetime_font))
+        date_text_width = int(temp_draw.textlength(date_text, font=datetime_font))
+        time_text_width = int(temp_draw.textlength(time_text, font=datetime_font))
+
+        day_x = current_x + (datetime_col_width - day_text_width) // 2
+        date_x = current_x + (datetime_col_width - date_text_width) // 2
+        time_x = current_x + (datetime_col_width - time_text_width) // 2
+
+        draw.text((day_x, day_y), day_text, font=datetime_font, fill=(255, 255, 255))
+        draw.text((date_x, date_y), date_text, font=datetime_font, fill=(255, 255, 255))
+        draw.text((time_x, time_y), time_text, font=datetime_font, fill=(255, 255, 255))
         current_x += datetime_col_width + h_padding # Add padding after datetime
 
         if broadcast_logo:

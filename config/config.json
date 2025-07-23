@@ -70,7 +70,7 @@
             "ncaam_basketball_recent": 30,
             "ncaam_basketball_upcoming": 30,
             "music": 30,
-            "of_the_day": 60
+            "of_the_day": 40
         },
         "use_short_date_format": true
     },
@@ -332,7 +332,7 @@
     },
     "of_the_day": {
         "enabled": true,
-        "display_rotate_interval": 30,
+        "display_rotate_interval": 20,
         "update_interval": 3600,
         "subtitle_rotate_interval": 10,
         "category_order": ["word_of_the_day", "slovenian_word_of_the_day"],
