@@ -404,6 +404,7 @@
                     <button class="tab-link" onclick="openTab(event, 'secrets')">API Keys</button>
         <button class="tab-link" onclick="openTab(event, 'actions')">Actions</button>
         <button class="tab-link" onclick="openTab(event, 'raw-json')">Raw JSON</button>
+        <button class="tab-link" onclick="openTab(event, 'logs')">Logs</button>
         </div>
 
         <!-- Schedule Tab -->
@@ -2300,6 +2301,15 @@
                 </div>
             </div>
         </div>
+        <!-- Logs Tab -->
+        <div id="logs" class="tab-content">
+            <div class="form-section">
+                <h2>System Logs</h2>
+                <p>View logs for the LED matrix service. Useful for debugging.</p>
+                <button id="refresh-logs-btn">Refresh Logs</button>
+                <pre id="log-content" style="background-color: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 5px; max-height: 600px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;"></pre>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -2323,6 +2333,9 @@
                 validateJson('main-config-json', 'main-config-validation');
                 validateJson('secrets-config-json', 'secrets-config-validation');
             }, 100);
+        }
+        if (tabName === 'logs') {
+            fetchLogs();
         }
     }
 
@@ -3503,6 +3516,26 @@
             addJsonValidationListener(secretsConfigTextarea, 'secrets-config-validation');
         }
     });
+
+    document.getElementById('refresh-logs-btn').addEventListener('click', fetchLogs);
+
+    function fetchLogs() {
+        const logContent = document.getElementById('log-content');
+        logContent.textContent = 'Loading logs...';
+
+        fetch('/get_logs')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    logContent.textContent = data.logs;
+                } else {
+                    logContent.textContent = `Error loading logs: ${data.message}`;
+                }
+            })
+            .catch(error => {
+                logContent.textContent = `Error loading logs: ${error}`;
+            });
+    }
     </script>
 </body>
 </html> 

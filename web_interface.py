@@ -288,6 +288,24 @@ def run_action_route():
             'message': f'Error running action: {e}'
         }), 400
 
+@app.route('/get_logs', methods=['GET'])
+def get_logs():
+    try:
+        # Get logs from journalctl for the ledmatrix service
+        result = subprocess.run(
+            ['sudo', 'journalctl', '-u', 'ledmatrix.service', '-n', '500', '--no-pager'],
+            capture_output=True, text=True, check=True
+        )
+        logs = result.stdout
+        return jsonify({'status': 'success', 'logs': logs})
+    except subprocess.CalledProcessError as e:
+        # If the command fails, return the error
+        error_message = f"Error fetching logs: {e.stderr}"
+        return jsonify({'status': 'error', 'message': error_message}), 500
+    except Exception as e:
+        # Handle other potential exceptions
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/save_raw_json', methods=['POST'])
 def save_raw_json_route():
     try:
