@@ -1147,6 +1147,7 @@ class MiLBUpcomingManager(BaseMiLBManager):
             
             self.logger.info(f"[MiLB] Processing {len(games)} games for upcoming games...")
             
+            now_utc = datetime.now(timezone.utc)
             for game_id, game in games.items():
                 self.logger.debug(f"[MiLB] Processing game {game_id} for upcoming games...")
                 
@@ -1154,16 +1155,15 @@ class MiLBUpcomingManager(BaseMiLBManager):
                 if game_time.tzinfo is None:
                     game_time = game_time.replace(tzinfo=timezone.utc)
                 
-                current_time = datetime.now(timezone.utc)
                 is_upcoming = (
                     game['status_state'] not in ['post', 'final', 'completed'] and
-                    game_time > current_time
+                    game_time > now_utc
                 )
                 
                 # Add debug logging for upcoming games logic
                 self.logger.debug(f"[MiLB] Game {game['away_team']} @ {game['home_team']}:")
                 self.logger.debug(f"[MiLB]   Game time: {game_time}")
-                self.logger.debug(f"[MiLB]   Current time: {current_time}")
+                self.logger.debug(f"[MiLB]   Current time: {now_utc}")
                 self.logger.debug(f"[MiLB]   Status state: {game['status_state']}")
                 self.logger.debug(f"[MiLB]   Is upcoming: {is_upcoming}")
                 
