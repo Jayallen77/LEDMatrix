@@ -24,13 +24,17 @@ def index():
         schedule_config = {}
         main_config_json = "{}"
         secrets_config_json = "{}"
+        main_config_data = {}
+        secrets_config_data = {}
 
     return render_template('index.html', 
                            schedule_config=schedule_config,
                            main_config_json=main_config_json,
                            secrets_config_json=secrets_config_json,
                            main_config_path=config_manager.get_config_path(),
-                           secrets_config_path=config_manager.get_secrets_path())
+                           secrets_config_path=config_manager.get_secrets_path(),
+                           main_config=main_config_data,
+                           secrets_config=secrets_config_data)
 
 @app.route('/save_schedule', methods=['POST'])
 def save_schedule_route():
@@ -59,9 +63,109 @@ def save_config_route():
     config_data_str = request.form.get('config_data')
     
     try:
-        new_data = json.loads(config_data_str)
-        config_manager.save_raw_file_content(config_type, new_data)
-        flash(f"{config_type.capitalize()} configuration saved successfully!", "success")
+        if config_type == 'main':
+            # Handle form-based configuration updates
+            main_config = config_manager.load_config()
+            
+            # Update display settings
+            if 'rows' in request.form:
+                main_config['display']['hardware']['rows'] = int(request.form.get('rows', 32))
+                main_config['display']['hardware']['cols'] = int(request.form.get('cols', 64))
+                main_config['display']['hardware']['chain_length'] = int(request.form.get('chain_length', 2))
+                main_config['display']['hardware']['parallel'] = int(request.form.get('parallel', 1))
+                main_config['display']['hardware']['brightness'] = int(request.form.get('brightness', 95))
+                main_config['display']['hardware']['hardware_mapping'] = request.form.get('hardware_mapping', 'adafruit-hat-pwm')
+                main_config['display']['runtime']['gpio_slowdown'] = int(request.form.get('gpio_slowdown', 3))
+            
+            # Update weather settings
+            if 'weather_enabled' in request.form:
+                main_config['weather']['enabled'] = 'weather_enabled' in request.form
+                main_config['location']['city'] = request.form.get('weather_city', 'Dallas')
+                main_config['location']['state'] = request.form.get('weather_state', 'Texas')
+                main_config['weather']['units'] = request.form.get('weather_units', 'imperial')
+                main_config['weather']['update_interval'] = int(request.form.get('weather_update_interval', 1800))
+            
+            # Update stocks settings
+            if 'stocks_enabled' in request.form:
+                main_config['stocks']['enabled'] = 'stocks_enabled' in request.form
+                symbols = request.form.get('stocks_symbols', '').split(',')
+                main_config['stocks']['symbols'] = [s.strip() for s in symbols if s.strip()]
+                main_config['stocks']['update_interval'] = int(request.form.get('stocks_update_interval', 600))
+            
+            # Update crypto settings
+            if 'crypto_enabled' in request.form:
+                main_config['crypto']['enabled'] = 'crypto_enabled' in request.form
+                symbols = request.form.get('crypto_symbols', '').split(',')
+                main_config['crypto']['symbols'] = [s.strip() for s in symbols if s.strip()]
+                main_config['crypto']['update_interval'] = int(request.form.get('crypto_update_interval', 600))
+            
+            # Update music settings
+            if 'music_enabled' in request.form:
+                main_config['music']['enabled'] = 'music_enabled' in request.form
+                main_config['music']['preferred_source'] = request.form.get('music_preferred_source', 'ytm')
+                main_config['music']['YTM_COMPANION_URL'] = request.form.get('ytm_companion_url', 'http://192.168.86.12:9863')
+                main_config['music']['POLLING_INTERVAL_SECONDS'] = int(request.form.get('music_polling_interval', 1))
+            
+            # Update calendar settings
+            if 'calendar_enabled' in request.form:
+                main_config['calendar']['enabled'] = 'calendar_enabled' in request.form
+                main_config['calendar']['max_events'] = int(request.form.get('calendar_max_events', 3))
+                main_config['calendar']['update_interval'] = int(request.form.get('calendar_update_interval', 3600))
+                calendars = request.form.get('calendar_calendars', '').split(',')
+                main_config['calendar']['calendars'] = [c.strip() for c in calendars if c.strip()]
+            
+            # If config_data is provided as JSON, merge it
+            if config_data_str:
+                try:
+                    new_data = json.loads(config_data_str)
+                    # Merge the new data with existing config
+                    for key, value in new_data.items():
+                        if key in main_config:
+                            if isinstance(value, dict) and isinstance(main_config[key], dict):
+                                main_config[key].update(value)
+                            else:
+                                main_config[key] = value
+                        else:
+                            main_config[key] = value
+                except json.JSONDecodeError:
+                    flash("Error: Invalid JSON format in config data.", "error")
+                    return redirect(url_for('index'))
+            
+            config_manager.save_config(main_config)
+            flash("Main configuration saved successfully!", "success")
+            
+        elif config_type == 'secrets':
+            # Handle secrets configuration
+            secrets_config = config_manager.get_raw_file_content('secrets')
+            
+            # Update weather API key
+            if 'weather_api_key' in request.form:
+                secrets_config['weather']['api_key'] = request.form.get('weather_api_key', '')
+            
+            # Update YouTube API settings
+            if 'youtube_api_key' in request.form:
+                secrets_config['youtube']['api_key'] = request.form.get('youtube_api_key', '')
+                secrets_config['youtube']['channel_id'] = request.form.get('youtube_channel_id', '')
+            
+            # Update Spotify API settings
+            if 'spotify_client_id' in request.form:
+                secrets_config['music']['SPOTIFY_CLIENT_ID'] = request.form.get('spotify_client_id', '')
+                secrets_config['music']['SPOTIFY_CLIENT_SECRET'] = request.form.get('spotify_client_secret', '')
+                secrets_config['music']['SPOTIFY_REDIRECT_URI'] = request.form.get('spotify_redirect_uri', 'http://127.0.0.1:8888/callback')
+            
+            # If config_data is provided as JSON, use it
+            if config_data_str:
+                try:
+                    new_data = json.loads(config_data_str)
+                    config_manager.save_raw_file_content('secrets', new_data)
+                except json.JSONDecodeError:
+                    flash("Error: Invalid JSON format for secrets config.", "error")
+                    return redirect(url_for('index'))
+            else:
+                config_manager.save_raw_file_content('secrets', secrets_config)
+            
+            flash("Secrets configuration saved successfully!", "success")
+        
     except json.JSONDecodeError:
         flash(f"Error: Invalid JSON format for {config_type} config.", "error")
     except Exception as e:

@@ -4,34 +4,142 @@
     <meta charset="UTF-8">
     <title>LED Matrix Config</title>
     <style>
-        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
-        .container { max-width: 800px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 15px rgba(0,0,0,0.1); }
-        h1, h2 { text-align: center; color: #333; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 20px; 
+            background-color: #f4f4f4; 
+            color: #333; 
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: auto; 
+            background: #fff; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 0 15px rgba(0,0,0,0.1); 
+        }
+        h1, h2, h3 { 
+            text-align: center; 
+            color: #333; 
+            margin-bottom: 20px;
+        }
         .tabs {
             display: flex;
             border-bottom: 1px solid #ccc;
             margin-bottom: 20px;
+            flex-wrap: wrap;
         }
         .tab-link {
-            padding: 10px 20px;
+            padding: 12px 20px;
             cursor: pointer;
             border: none;
             background-color: transparent;
-            font-size: 16px;
+            font-size: 14px;
             border-bottom: 3px solid transparent;
-            transition: border-bottom 0.3s;
+            transition: all 0.3s;
+            white-space: nowrap;
         }
         .tab-link.active {
             border-bottom: 3px solid #4CAF50;
             font-weight: bold;
+            background-color: #f0f8f0;
         }
-        .tab-content { display: none; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input[type="time"], input[type="checkbox"] {
-            padding: 8px;
+        .tab-content { 
+            display: none; 
+            padding: 20px 0;
+        }
+        .form-section {
+            background: #f9f9f9;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #4CAF50;
+        }
+        .form-group { 
+            margin-bottom: 15px; 
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .form-group label { 
+            display: inline-block; 
+            margin-bottom: 5px; 
+            font-weight: bold;
+            min-width: 200px;
+        }
+        .form-group input[type="text"], 
+        .form-group input[type="number"],
+        .form-group input[type="time"],
+        .form-group select { 
+            padding: 8px 12px;
             border-radius: 4px;
             border: 1px solid #ccc;
+            font-size: 14px;
+            min-width: 150px;
+        }
+        .form-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin: 0;
+        }
+        .form-group textarea {
+            width: 100%;
+            min-height: 80px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .description {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+            font-style: italic;
+        }
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #4CAF50;
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
         }
         button {
             background-color: #4CAF50; 
@@ -42,23 +150,100 @@
             cursor: pointer; 
             margin-top: 10px;
             font-size: 16px;
+            transition: background-color 0.3s;
         }
-        button:hover { background-color: #45a049; }
-        .flash-messages { list-style: none; padding: 0; margin-bottom: 15px; }
-        .flash-messages li { padding: 10px; margin-bottom: 10px; border-radius: 4px; }
-        .flash-messages .success { background-color: #d4edda; color: #155724; }
-        .flash-messages .error { background-color: #f8d7da; color: #721c24; }
-        textarea { 
-            width: 100%; 
+        button:hover { 
+            background-color: #45a049; 
+        }
+        .flash-messages { 
+            list-style: none; 
+            padding: 0; 
+            margin-bottom: 15px; 
+        }
+        .flash-messages li { 
             padding: 10px; 
-            margin-top: 5px; 
+            margin-bottom: 10px; 
             border-radius: 4px; 
-            border: 1px solid #ccc; 
-            box-sizing: border-box; 
-            font-family: monospace;
-            min-height: 300px;
         }
-        .filepath { font-family: monospace; background-color: #eee; padding: 2px 5px; border-radius: 3px; font-size: 0.9em;}
+        .flash-messages .success { 
+            background-color: #d4edda; 
+            color: #155724; 
+        }
+        .flash-messages .error { 
+            background-color: #f8d7da; 
+            color: #721c24; 
+        }
+        .filepath { 
+            font-family: monospace; 
+            background-color: #eee; 
+            padding: 2px 5px; 
+            border-radius: 3px; 
+            font-size: 0.9em;
+        }
+        .action-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .action-button {
+            padding: 15px;
+            font-size: 14px;
+        }
+        .config-section {
+            margin-bottom: 30px;
+        }
+        .config-section h3 {
+            color: #4CAF50;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+        .array-input {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        .array-input input {
+            flex: 1;
+            min-width: 120px;
+        }
+        .add-item-btn {
+            background-color: #2196F3;
+            padding: 8px 15px;
+            font-size: 12px;
+        }
+        .remove-item-btn {
+            background-color: #f44336;
+            padding: 8px 15px;
+            font-size: 12px;
+        }
+        .array-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+        .json-editor {
+            display: none;
+        }
+        .toggle-json-btn {
+            background-color: #ff9800;
+            margin-bottom: 10px;
+        }
+        .toggle-json-btn:hover {
+            background-color: #e68900;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .form-col {
+            display: flex;
+            flex-direction: column;
+        }
     </style>
 </head>
 <body>
@@ -77,71 +262,486 @@
 
         <div class="tabs">
             <button class="tab-link active" onclick="openTab(event, 'schedule')">Schedule</button>
-            <button class="tab-link" onclick="openTab(event, 'main')">Main Config</button>
-            <button class="tab-link" onclick="openTab(event, 'secrets')">Secrets Config</button>
+            <button class="tab-link" onclick="openTab(event, 'display')">Display Settings</button>
+            <button class="tab-link" onclick="openTab(event, 'sports')">Sports</button>
+            <button class="tab-link" onclick="openTab(event, 'weather')">Weather</button>
+            <button class="tab-link" onclick="openTab(event, 'stocks')">Stocks & Crypto</button>
+            <button class="tab-link" onclick="openTab(event, 'music')">Music</button>
+            <button class="tab-link" onclick="openTab(event, 'calendar')">Calendar</button>
+            <button class="tab-link" onclick="openTab(event, 'secrets')">API Keys</button>
             <button class="tab-link" onclick="openTab(event, 'actions')">Actions</button>
         </div>
 
         <!-- Schedule Tab -->
         <div id="schedule" class="tab-content" style="display: block;">
-            <h2>Display Schedule</h2>
-            <p>Set the time for the display to be active. A restart is needed for changes to take effect.</p>
-            <form action="{{ url_for('save_schedule_route') }}" method="POST">
-                <div class="form-group">
-                    <label for="schedule_enabled">Enable Schedule:</label>
-                    <input type="checkbox" id="schedule_enabled" name="schedule_enabled" {% if schedule_config.enabled %}checked{% endif %}>
-                </div>
-                <div class="form-group">
-                    <label for="start_time">Display On Time:</label>
-                    <input type="time" id="start_time" name="start_time" value="{{ schedule_config.start_time }}">
-                </div>
-                <div class="form-group">
-                    <label for="end_time">Display Off Time:</label>
-                    <input type="time" id="end_time" name="end_time" value="{{ schedule_config.end_time }}">
-                </div>
-                <button type="submit">Save Schedule</button>
-            </form>
+            <div class="form-section">
+                <h2>Display Schedule</h2>
+                <p>Set the time for the display to be active. A restart is needed for changes to take effect.</p>
+                <form action="{{ url_for('save_schedule_route') }}" method="POST">
+                    <div class="form-group">
+                        <label for="schedule_enabled">Enable Schedule:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="schedule_enabled" name="schedule_enabled" {% if schedule_config.enabled %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                            <span>Turn display on/off automatically</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="start_time">Display On Time:</label>
+                        <input type="time" id="start_time" name="start_time" value="{{ schedule_config.start_time }}">
+                        <div class="description">Time when the display should turn on</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="end_time">Display Off Time:</label>
+                        <input type="time" id="end_time" name="end_time" value="{{ schedule_config.end_time }}">
+                        <div class="description">Time when the display should turn off</div>
+                    </div>
+                    <button type="submit">Save Schedule</button>
+                </form>
+            </div>
         </div>
 
-        <!-- Main Config Tab -->
-        <div id="main" class="tab-content">
-             <form action="{{ url_for('save_config_route') }}" method="POST">
-                <input type="hidden" name="config_type" value="main">
-                <h2>Main Configuration (<span class="filepath">{{ main_config_path }}</span>)</h2>
-                <textarea name="config_data">{{ main_config_json }}</textarea>
-                <button type="submit">Save Main Config</button>
-            </form>
+        <!-- Display Settings Tab -->
+        <div id="display" class="tab-content">
+            <div class="form-section">
+                <h2>Display Hardware Settings</h2>
+                <form action="{{ url_for('save_config_route') }}" method="POST" id="display-form">
+                    <input type="hidden" name="config_type" value="main">
+                    <input type="hidden" name="config_data" id="display-config-data">
+                    
+                    <div class="form-row">
+                        <div class="form-col">
+                            <div class="form-group">
+                                <label for="rows">Rows:</label>
+                                <input type="number" id="rows" name="rows" value="{{ main_config.display.hardware.rows }}" min="1" max="64">
+                                <div class="description">Number of LED rows</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="cols">Columns:</label>
+                                <input type="number" id="cols" name="cols" value="{{ main_config.display.hardware.cols }}" min="1" max="128">
+                                <div class="description">Number of LED columns</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="chain_length">Chain Length:</label>
+                                <input type="number" id="chain_length" name="chain_length" value="{{ main_config.display.hardware.chain_length }}" min="1" max="8">
+                                <div class="description">Number of LED panels chained together</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="parallel">Parallel:</label>
+                                <input type="number" id="parallel" name="parallel" value="{{ main_config.display.hardware.parallel }}" min="1" max="4">
+                                <div class="description">Number of parallel chains</div>
+                            </div>
+                        </div>
+                        <div class="form-col">
+                            <div class="form-group">
+                                <label for="brightness">Brightness:</label>
+                                <input type="number" id="brightness" name="brightness" value="{{ main_config.display.hardware.brightness }}" min="1" max="100">
+                                <div class="description">LED brightness (1-100)</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="hardware_mapping">Hardware Mapping:</label>
+                                <select id="hardware_mapping" name="hardware_mapping">
+                                    <option value="adafruit-hat-pwm" {% if main_config.display.hardware.hardware_mapping == "adafruit-hat-pwm" %}selected{% endif %}>Adafruit HAT PWM</option>
+                                    <option value="adafruit-hat" {% if main_config.display.hardware.hardware_mapping == "adafruit-hat" %}selected{% endif %}>Adafruit HAT</option>
+                                    <option value="regular" {% if main_config.display.hardware.hardware_mapping == "regular" %}selected{% endif %}>Regular</option>
+                                    <option value="regular-pi1" {% if main_config.display.hardware.hardware_mapping == "regular-pi1" %}selected{% endif %}>Regular Pi1</option>
+                                </select>
+                                <div class="description">Hardware mapping type</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="gpio_slowdown">GPIO Slowdown:</label>
+                                <input type="number" id="gpio_slowdown" name="gpio_slowdown" value="{{ main_config.display.runtime.gpio_slowdown }}" min="0" max="5">
+                                <div class="description">GPIO slowdown factor (0-5)</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit">Save Display Settings</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Sports Tab -->
+        <div id="sports" class="tab-content">
+            <div class="form-section">
+                <h2>Sports Configuration</h2>
+                <p>Configure which sports leagues to display and their settings.</p>
+                
+                <div class="config-section">
+                    <h3>MLB (Baseball)</h3>
+                    <div class="form-group">
+                        <label for="mlb_enabled">Enable MLB:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="mlb_enabled" name="mlb_enabled" {% if main_config.mlb.enabled %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="mlb_favorites">Favorite Teams:</label>
+                        <div class="array-input">
+                            <input type="text" id="mlb_favorites" name="mlb_favorites" value="{{ main_config.mlb.favorite_teams|join(', ') }}" placeholder="TB, TEX">
+                            <button type="button" class="add-item-btn" onclick="addArrayItem('mlb_favorites')">Add</button>
+                        </div>
+                        <div class="description">Comma-separated team abbreviations (e.g., TB, TEX)</div>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h3>NFL (Football)</h3>
+                    <div class="form-group">
+                        <label for="nfl_enabled">Enable NFL:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="nfl_enabled" name="nfl_enabled" {% if main_config.nfl_scoreboard.enabled %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="nfl_favorites">Favorite Teams:</label>
+                        <div class="array-input">
+                            <input type="text" id="nfl_favorites" name="nfl_favorites" value="{{ main_config.nfl_scoreboard.favorite_teams|join(', ') }}" placeholder="TB, DAL">
+                            <button type="button" class="add-item-btn" onclick="addArrayItem('nfl_favorites')">Add</button>
+                        </div>
+                        <div class="description">Comma-separated team abbreviations</div>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h3>NBA (Basketball)</h3>
+                    <div class="form-group">
+                        <label for="nba_enabled">Enable NBA:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="nba_enabled" name="nba_enabled" {% if main_config.nba_scoreboard.enabled %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="nba_favorites">Favorite Teams:</label>
+                        <div class="array-input">
+                            <input type="text" id="nba_favorites" name="nba_favorites" value="{{ main_config.nba_scoreboard.favorite_teams|join(', ') }}" placeholder="DAL">
+                            <button type="button" class="add-item-btn" onclick="addArrayItem('nba_favorites')">Add</button>
+                        </div>
+                        <div class="description">Comma-separated team abbreviations</div>
+                    </div>
+                </div>
+
+                <button type="button" onclick="saveSportsConfig()">Save Sports Settings</button>
+            </div>
+        </div>
+
+        <!-- Weather Tab -->
+        <div id="weather" class="tab-content">
+            <div class="form-section">
+                <h2>Weather Configuration</h2>
+                <form action="{{ url_for('save_config_route') }}" method="POST" id="weather-form">
+                    <input type="hidden" name="config_type" value="main">
+                    <input type="hidden" name="config_data" id="weather-config-data">
+                    
+                    <div class="form-group">
+                        <label for="weather_enabled">Enable Weather:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="weather_enabled" name="weather_enabled" {% if main_config.weather.enabled %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="weather_city">City:</label>
+                        <input type="text" id="weather_city" name="weather_city" value="{{ main_config.location.city }}">
+                        <div class="description">City name for weather data</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="weather_state">State:</label>
+                        <input type="text" id="weather_state" name="weather_state" value="{{ main_config.location.state }}">
+                        <div class="description">State/province name</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="weather_units">Units:</label>
+                        <select id="weather_units" name="weather_units">
+                            <option value="imperial" {% if main_config.weather.units == "imperial" %}selected{% endif %}>Fahrenheit</option>
+                            <option value="metric" {% if main_config.weather.units == "metric" %}selected{% endif %}>Celsius</option>
+                        </select>
+                        <div class="description">Temperature units</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="weather_update_interval">Update Interval (seconds):</label>
+                        <input type="number" id="weather_update_interval" name="weather_update_interval" value="{{ main_config.weather.update_interval }}" min="300" max="3600">
+                        <div class="description">How often to update weather data (300-3600 seconds)</div>
+                    </div>
+                    
+                    <button type="submit">Save Weather Settings</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Stocks Tab -->
+        <div id="stocks" class="tab-content">
+            <div class="form-section">
+                <h2>Stocks & Crypto Configuration</h2>
+                
+                <div class="config-section">
+                    <h3>Stocks</h3>
+                    <form action="{{ url_for('save_config_route') }}" method="POST" id="stocks-form">
+                        <input type="hidden" name="config_type" value="main">
+                        <input type="hidden" name="config_data" id="stocks-config-data">
+                        
+                        <div class="form-group">
+                            <label for="stocks_enabled">Enable Stocks:</label>
+                            <div class="toggle-container">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="stocks_enabled" name="stocks_enabled" {% if main_config.stocks.enabled %}checked{% endif %}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="stocks_symbols">Stock Symbols:</label>
+                            <div class="array-input">
+                                <input type="text" id="stocks_symbols" name="stocks_symbols" value="{{ main_config.stocks.symbols|join(', ') }}" placeholder="AAPL, GOOGL, MSFT">
+                                <button type="button" class="add-item-btn" onclick="addArrayItem('stocks_symbols')">Add</button>
+                            </div>
+                            <div class="description">Comma-separated stock symbols</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="stocks_update_interval">Update Interval (seconds):</label>
+                            <input type="number" id="stocks_update_interval" name="stocks_update_interval" value="{{ main_config.stocks.update_interval }}" min="60" max="3600">
+                            <div class="description">How often to update stock data</div>
+                        </div>
+                        
+                        <button type="submit">Save Stocks Settings</button>
+                    </form>
+                </div>
+
+                <div class="config-section">
+                    <h3>Cryptocurrency</h3>
+                    <form action="{{ url_for('save_config_route') }}" method="POST" id="crypto-form">
+                        <input type="hidden" name="config_type" value="main">
+                        <input type="hidden" name="config_data" id="crypto-config-data">
+                        
+                        <div class="form-group">
+                            <label for="crypto_enabled">Enable Crypto:</label>
+                            <div class="toggle-container">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="crypto_enabled" name="crypto_enabled" {% if main_config.crypto.enabled %}checked{% endif %}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="crypto_symbols">Crypto Symbols:</label>
+                            <div class="array-input">
+                                <input type="text" id="crypto_symbols" name="crypto_symbols" value="{{ main_config.crypto.symbols|join(', ') }}" placeholder="BTC-USD, ETH-USD">
+                                <button type="button" class="add-item-btn" onclick="addArrayItem('crypto_symbols')">Add</button>
+                            </div>
+                            <div class="description">Comma-separated crypto symbols (e.g., BTC-USD, ETH-USD)</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="crypto_update_interval">Update Interval (seconds):</label>
+                            <input type="number" id="crypto_update_interval" name="crypto_update_interval" value="{{ main_config.crypto.update_interval }}" min="60" max="3600">
+                            <div class="description">How often to update crypto data</div>
+                        </div>
+                        
+                        <button type="submit">Save Crypto Settings</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Music Tab -->
+        <div id="music" class="tab-content">
+            <div class="form-section">
+                <h2>Music Configuration</h2>
+                <form action="{{ url_for('save_config_route') }}" method="POST" id="music-form">
+                    <input type="hidden" name="config_type" value="main">
+                    <input type="hidden" name="config_data" id="music-config-data">
+                    
+                    <div class="form-group">
+                        <label for="music_enabled">Enable Music Display:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="music_enabled" name="music_enabled" {% if main_config.music.enabled %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="music_preferred_source">Preferred Source:</label>
+                        <select id="music_preferred_source" name="music_preferred_source">
+                            <option value="ytm" {% if main_config.music.preferred_source == "ytm" %}selected{% endif %}>YouTube Music</option>
+                            <option value="spotify" {% if main_config.music.preferred_source == "spotify" %}selected{% endif %}>Spotify</option>
+                        </select>
+                        <div class="description">Primary music source to display</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="ytm_companion_url">YouTube Music Companion URL:</label>
+                        <input type="text" id="ytm_companion_url" name="ytm_companion_url" value="{{ main_config.music.YTM_COMPANION_URL }}">
+                        <div class="description">URL for YouTube Music companion app</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="music_polling_interval">Polling Interval (seconds):</label>
+                        <input type="number" id="music_polling_interval" name="music_polling_interval" value="{{ main_config.music.POLLING_INTERVAL_SECONDS }}" min="1" max="60">
+                        <div class="description">How often to check for music updates</div>
+                    </div>
+                    
+                    <button type="submit">Save Music Settings</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Calendar Tab -->
+        <div id="calendar" class="tab-content">
+            <div class="form-section">
+                <h2>Calendar Configuration</h2>
+                <form action="{{ url_for('save_config_route') }}" method="POST" id="calendar-form">
+                    <input type="hidden" name="config_type" value="main">
+                    <input type="hidden" name="config_data" id="calendar-config-data">
+                    
+                    <div class="form-group">
+                        <label for="calendar_enabled">Enable Calendar:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="calendar_enabled" name="calendar_enabled" {% if main_config.calendar.enabled %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="calendar_max_events">Max Events to Show:</label>
+                        <input type="number" id="calendar_max_events" name="calendar_max_events" value="{{ main_config.calendar.max_events }}" min="1" max="10">
+                        <div class="description">Maximum number of events to display</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="calendar_update_interval">Update Interval (seconds):</label>
+                        <input type="number" id="calendar_update_interval" name="calendar_update_interval" value="{{ main_config.calendar.update_interval }}" min="300" max="3600">
+                        <div class="description">How often to update calendar data</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="calendar_calendars">Calendars:</label>
+                        <div class="array-input">
+                            <input type="text" id="calendar_calendars" name="calendar_calendars" value="{{ main_config.calendar.calendars|join(', ') }}" placeholder="birthdays, work">
+                            <button type="button" class="add-item-btn" onclick="addArrayItem('calendar_calendars')">Add</button>
+                        </div>
+                        <div class="description">Comma-separated calendar names</div>
+                    </div>
+                    
+                    <button type="submit">Save Calendar Settings</button>
+                </form>
+            </div>
         </div>
 
         <!-- Secrets Tab -->
         <div id="secrets" class="tab-content">
-            <form action="{{ url_for('save_config_route') }}" method="POST">
-                <input type="hidden" name="config_type" value="secrets">
-                <h2>Secrets Configuration (<span class="filepath">{{ secrets_config_path }}</span>)</h2>
-                <textarea name="config_data">{{ secrets_config_json }}</textarea>
-                <button type="submit">Save Secrets</button>
-            </form>
+            <div class="form-section">
+                <h2>API Keys Configuration</h2>
+                <p>Enter your API keys for various services. These are stored securely and not shared.</p>
+                
+                <button type="button" class="toggle-json-btn" onclick="toggleJsonEditor('secrets')">Toggle JSON Editor</button>
+                
+                <div id="secrets-form" class="form-editor">
+                    <form action="{{ url_for('save_config_route') }}" method="POST" id="secrets-form-content">
+                        <input type="hidden" name="config_type" value="secrets">
+                        <input type="hidden" name="config_data" id="secrets-config-data">
+                        
+                        <div class="config-section">
+                            <h3>Weather API</h3>
+                            <div class="form-group">
+                                <label for="weather_api_key">OpenWeatherMap API Key:</label>
+                                <input type="password" id="weather_api_key" name="weather_api_key" value="{{ secrets_config.weather.api_key if secrets_config.weather.api_key != 'YOUR_OPENWEATHERMAP_API_KEY' else '' }}" placeholder="Enter your OpenWeatherMap API key">
+                                <div class="description">Get your free API key from <a href="https://openweathermap.org/api" target="_blank">OpenWeatherMap</a></div>
+                            </div>
+                        </div>
+
+                        <div class="config-section">
+                            <h3>YouTube API</h3>
+                            <div class="form-group">
+                                <label for="youtube_api_key">YouTube API Key:</label>
+                                <input type="password" id="youtube_api_key" name="youtube_api_key" value="{{ secrets_config.youtube.api_key if secrets_config.youtube.api_key != 'YOUR_YOUTUBE_API_KEY' else '' }}" placeholder="Enter your YouTube API key">
+                                <div class="description">Get your API key from <a href="https://console.developers.google.com/" target="_blank">Google Cloud Console</a></div>
+                            </div>
+                            <div class="form-group">
+                                <label for="youtube_channel_id">YouTube Channel ID:</label>
+                                <input type="text" id="youtube_channel_id" name="youtube_channel_id" value="{{ secrets_config.youtube.channel_id if secrets_config.youtube.channel_id != 'YOUR_YOUTUBE_CHANNEL_ID' else '' }}" placeholder="Enter your YouTube channel ID">
+                                <div class="description">Your YouTube channel ID (found in channel settings)</div>
+                            </div>
+                        </div>
+
+                        <div class="config-section">
+                            <h3>Spotify API</h3>
+                            <div class="form-group">
+                                <label for="spotify_client_id">Spotify Client ID:</label>
+                                <input type="password" id="spotify_client_id" name="spotify_client_id" value="{{ secrets_config.music.SPOTIFY_CLIENT_ID if secrets_config.music.SPOTIFY_CLIENT_ID != 'YOUR_SPOTIFY_CLIENT_ID_HERE' else '' }}" placeholder="Enter your Spotify Client ID">
+                                <div class="description">Get from <a href="https://developer.spotify.com/dashboard" target="_blank">Spotify Developer Dashboard</a></div>
+                            </div>
+                            <div class="form-group">
+                                <label for="spotify_client_secret">Spotify Client Secret:</label>
+                                <input type="password" id="spotify_client_secret" name="spotify_client_secret" value="{{ secrets_config.music.SPOTIFY_CLIENT_SECRET if secrets_config.music.SPOTIFY_CLIENT_SECRET != 'YOUR_SPOTIFY_CLIENT_SECRET_HERE' else '' }}" placeholder="Enter your Spotify Client Secret">
+                                <div class="description">Your Spotify Client Secret</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="spotify_redirect_uri">Spotify Redirect URI:</label>
+                                <input type="text" id="spotify_redirect_uri" name="spotify_redirect_uri" value="{{ secrets_config.music.SPOTIFY_REDIRECT_URI }}" placeholder="http://127.0.0.1:8888/callback">
+                                <div class="description">Redirect URI for Spotify authentication</div>
+                            </div>
+                        </div>
+                        
+                        <button type="submit">Save API Keys</button>
+                    </form>
+                </div>
+                
+                <div id="secrets-json" class="json-editor">
+                    <form action="{{ url_for('save_config_route') }}" method="POST">
+                        <input type="hidden" name="config_type" value="secrets">
+                        <h2>Secrets Configuration (<span class="filepath">{{ secrets_config_path }}</span>)</h2>
+                        <textarea name="config_data">{{ secrets_config_json }}</textarea>
+                        <button type="submit">Save Secrets</button>
+                    </form>
+                </div>
+            </div>
         </div>
 
         <!-- Actions Tab -->
         <div id="actions" class="tab-content">
-            <h2>System Actions</h2>
-            <p>Control the display service and system.</p>
-            <div class="action-buttons">
-                 <button type="button" class="action-button" onclick="runAction('start_display')">Start Display</button>
-                 <button type="button" class="action-button" onclick="runAction('stop_display')">Stop Display</button>
-                 <hr>
-                 <button type="button" class="action-button" onclick="runAction('enable_autostart')">Enable Auto-Start</button>
-                 <button type="button" class="action-button" onclick="runAction('disable_autostart')">Disable Auto-Start</button>
-                 <hr>
-                 <button type="button" class="action-button" onclick="runAction('reboot_system')">Reboot System</button>
-                 <hr>
-                 <button type="button" class="action-button" onclick="runAction('git_pull')">Download Latest Update</button>
-             </div>
-             <div id="action_output_container" style="margin-top: 20px;">
-                 <h3>Action Output:</h3>
-                 <pre id="action_output">No action run yet.</pre>
-             </div>
+            <div class="form-section">
+                <h2>System Actions</h2>
+                <p>Control the display service and system.</p>
+                <div class="action-buttons">
+                     <button type="button" class="action-button" onclick="runAction('start_display')">Start Display</button>
+                     <button type="button" class="action-button" onclick="runAction('stop_display')">Stop Display</button>
+                     <hr>
+                     <button type="button" class="action-button" onclick="runAction('enable_autostart')">Enable Auto-Start</button>
+                     <button type="button" class="action-button" onclick="runAction('disable_autostart')">Disable Auto-Start</button>
+                     <hr>
+                     <button type="button" class="action-button" onclick="runAction('reboot_system')">Reboot System</button>
+                     <hr>
+                     <button type="button" class="action-button" onclick="runAction('git_pull')">Download Latest Update</button>
+                 </div>
+                 <div id="action_output_container" style="margin-top: 20px;">
+                     <h3>Action Output:</h3>
+                     <pre id="action_output">No action run yet.</pre>
+                 </div>
+            </div>
         </div>
     </div>
 
@@ -159,6 +759,329 @@
         document.getElementById(tabName).style.display = "block";
         evt.currentTarget.className += " active";
     }
+
+    function toggleJsonEditor(section) {
+        const formEditor = document.getElementById(section + '-form');
+        const jsonEditor = document.getElementById(section + '-json');
+        
+        if (formEditor.style.display === 'none') {
+            formEditor.style.display = 'block';
+            jsonEditor.style.display = 'none';
+        } else {
+            formEditor.style.display = 'none';
+            jsonEditor.style.display = 'block';
+        }
+    }
+
+    function addArrayItem(inputId) {
+        const input = document.getElementById(inputId);
+        const currentValue = input.value.trim();
+        if (currentValue && !currentValue.endsWith(',')) {
+            input.value = currentValue + ', ';
+        }
+        input.focus();
+    }
+
+    function saveSportsConfig() {
+        // Collect all sports configuration and save
+        const config = {
+            mlb: {
+                enabled: document.getElementById('mlb_enabled').checked,
+                favorite_teams: document.getElementById('mlb_favorites').value.split(',').map(s => s.trim()).filter(s => s)
+            },
+            nfl_scoreboard: {
+                enabled: document.getElementById('nfl_enabled').checked,
+                favorite_teams: document.getElementById('nfl_favorites').value.split(',').map(s => s.trim()).filter(s => s)
+            },
+            nba_scoreboard: {
+                enabled: document.getElementById('nba_enabled').checked,
+                favorite_teams: document.getElementById('nba_favorites').value.split(',').map(s => s.trim()).filter(s => s)
+            }
+        };
+
+        // Send to server
+        fetch("{{ url_for('save_config_route') }}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                'config_type': 'main',
+                'config_data': JSON.stringify(config)
+            })
+        })
+        .then(response => {
+            if (response.redirected) {
+                window.location.href = response.url;
+            } else {
+                return response.text();
+            }
+        })
+        .then(data => {
+            if (data) {
+                alert('Sports configuration saved successfully!');
+            }
+        })
+        .catch(error => {
+            alert('Error: ' + error);
+        });
+    }
+
+    // Add form submission handlers for better UX
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle display form submission
+        const displayForm = document.getElementById('display-form');
+        if (displayForm) {
+            displayForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(displayForm);
+                const config = {
+                    display: {
+                        hardware: {
+                            rows: parseInt(formData.get('rows')),
+                            cols: parseInt(formData.get('cols')),
+                            chain_length: parseInt(formData.get('chain_length')),
+                            parallel: parseInt(formData.get('parallel')),
+                            brightness: parseInt(formData.get('brightness')),
+                            hardware_mapping: formData.get('hardware_mapping')
+                        },
+                        runtime: {
+                            gpio_slowdown: parseInt(formData.get('gpio_slowdown'))
+                        }
+                    }
+                };
+                
+                fetch("{{ url_for('save_config_route') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        'config_type': 'main',
+                        'config_data': JSON.stringify(config)
+                    })
+                })
+                .then(response => {
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                    }
+                })
+                .catch(error => {
+                    alert('Error saving display settings: ' + error);
+                });
+            });
+        }
+
+        // Handle weather form submission
+        const weatherForm = document.getElementById('weather-form');
+        if (weatherForm) {
+            weatherForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(weatherForm);
+                const config = {
+                    weather: {
+                        enabled: formData.get('weather_enabled') === 'on',
+                        units: formData.get('weather_units'),
+                        update_interval: parseInt(formData.get('weather_update_interval'))
+                    },
+                    location: {
+                        city: formData.get('weather_city'),
+                        state: formData.get('weather_state')
+                    }
+                };
+                
+                fetch("{{ url_for('save_config_route') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        'config_type': 'main',
+                        'config_data': JSON.stringify(config)
+                    })
+                })
+                .then(response => {
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                    }
+                })
+                .catch(error => {
+                    alert('Error saving weather settings: ' + error);
+                });
+            });
+        }
+
+        // Handle stocks form submission
+        const stocksForm = document.getElementById('stocks-form');
+        if (stocksForm) {
+            stocksForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(stocksForm);
+                const symbols = formData.get('stocks_symbols').split(',').map(s => s.trim()).filter(s => s);
+                const config = {
+                    stocks: {
+                        enabled: formData.get('stocks_enabled') === 'on',
+                        symbols: symbols,
+                        update_interval: parseInt(formData.get('stocks_update_interval'))
+                    }
+                };
+                
+                fetch("{{ url_for('save_config_route') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        'config_type': 'main',
+                        'config_data': JSON.stringify(config)
+                    })
+                })
+                .then(response => {
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                    }
+                })
+                .catch(error => {
+                    alert('Error saving stocks settings: ' + error);
+                });
+            });
+        }
+
+        // Handle crypto form submission
+        const cryptoForm = document.getElementById('crypto-form');
+        if (cryptoForm) {
+            cryptoForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(cryptoForm);
+                const symbols = formData.get('crypto_symbols').split(',').map(s => s.trim()).filter(s => s);
+                const config = {
+                    crypto: {
+                        enabled: formData.get('crypto_enabled') === 'on',
+                        symbols: symbols,
+                        update_interval: parseInt(formData.get('crypto_update_interval'))
+                    }
+                };
+                
+                fetch("{{ url_for('save_config_route') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        'config_type': 'main',
+                        'config_data': JSON.stringify(config)
+                    })
+                })
+                .then(response => {
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                    }
+                })
+                .catch(error => {
+                    alert('Error saving crypto settings: ' + error);
+                });
+            });
+        }
+
+        // Handle music form submission
+        const musicForm = document.getElementById('music-form');
+        if (musicForm) {
+            musicForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(musicForm);
+                const config = {
+                    music: {
+                        enabled: formData.get('music_enabled') === 'on',
+                        preferred_source: formData.get('music_preferred_source'),
+                        YTM_COMPANION_URL: formData.get('ytm_companion_url'),
+                        POLLING_INTERVAL_SECONDS: parseInt(formData.get('music_polling_interval'))
+                    }
+                };
+                
+                fetch("{{ url_for('save_config_route') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        'config_type': 'main',
+                        'config_data': JSON.stringify(config)
+                    })
+                })
+                .then(response => {
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                    }
+                })
+                .catch(error => {
+                    alert('Error saving music settings: ' + error);
+                });
+            });
+        }
+
+        // Handle calendar form submission
+        const calendarForm = document.getElementById('calendar-form');
+        if (calendarForm) {
+            calendarForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(calendarForm);
+                const calendars = formData.get('calendar_calendars').split(',').map(c => c.trim()).filter(c => c);
+                const config = {
+                    calendar: {
+                        enabled: formData.get('calendar_enabled') === 'on',
+                        max_events: parseInt(formData.get('calendar_max_events')),
+                        update_interval: parseInt(formData.get('calendar_update_interval')),
+                        calendars: calendars
+                    }
+                };
+                
+                fetch("{{ url_for('save_config_route') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        'config_type': 'main',
+                        'config_data': JSON.stringify(config)
+                    })
+                })
+                .then(response => {
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                    }
+                })
+                .catch(error => {
+                    alert('Error saving calendar settings: ' + error);
+                });
+            });
+        }
+
+        // Handle secrets form submission
+        const secretsForm = document.getElementById('secrets-form-content');
+        if (secretsForm) {
+            secretsForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(secretsForm);
+                const config = {
+                    weather: {
+                        api_key: formData.get('weather_api_key')
+                    },
+                    youtube: {
+                        api_key: formData.get('youtube_api_key'),
+                        channel_id: formData.get('youtube_channel_id')
+                    },
+                    music: {
+                        SPOTIFY_CLIENT_ID: formData.get('spotify_client_id'),
+                        SPOTIFY_CLIENT_SECRET: formData.get('spotify_client_secret'),
+                        SPOTIFY_REDIRECT_URI: formData.get('spotify_redirect_uri')
+                    }
+                };
+                
+                fetch("{{ url_for('save_config_route') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        'config_type': 'secrets',
+                        'config_data': JSON.stringify(config)
+                    })
+                })
+                .then(response => {
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                    }
+                })
+                .catch(error => {
+                    alert('Error saving API keys: ' + error);
+                });
+            });
+        }
+    });
 
     function runAction(actionName) {
         const outputElement = document.getElementById('action_output');
@@ -180,6 +1103,7 @@
             outputElement.textContent = `Error: ${error}`;
         });
     }
+
     // Set default active tab
     document.addEventListener("DOMContentLoaded", function() {
         document.querySelector('.tab-link').click();
