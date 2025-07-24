@@ -763,7 +763,7 @@ class MusicManager:
         y_pos_album_top = y_pos_artist_top + line_height_artist_album + padding_between_lines
         
         # Local offset to counteract the hardcoded `y+=6` in _draw_bdf_text
-        bdf_y_offset = -4
+        bdf_y_offset = 0
 
         TEXT_SCROLL_DIVISOR = 5 
 
