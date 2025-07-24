@@ -244,6 +244,60 @@
             display: flex;
             flex-direction: column;
         }
+        
+        .json-container {
+            position: relative;
+        }
+        
+        .json-validation {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            display: none;
+        }
+        
+        .json-validation.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .json-validation.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .json-validation.warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .json-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .json-error-line {
+            background-color: #ffebee;
+            border-left: 3px solid #f44336;
+            padding: 2px 5px;
+            margin: 2px 0;
+        }
+        
+        .json-error-message {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .json-error-details {
+            font-size: 11px;
+            opacity: 0.8;
+        }
     </style>
 </head>
 <body>
@@ -269,8 +323,9 @@
             <button class="tab-link" onclick="openTab(event, 'features')">Additional Features</button>
             <button class="tab-link" onclick="openTab(event, 'music')">Music</button>
             <button class="tab-link" onclick="openTab(event, 'calendar')">Calendar</button>
-            <button class="tab-link" onclick="openTab(event, 'secrets')">API Keys</button>
-            <button class="tab-link" onclick="openTab(event, 'actions')">Actions</button>
+                    <button class="tab-link" onclick="openTab(event, 'secrets')">API Keys</button>
+        <button class="tab-link" onclick="openTab(event, 'actions')">Actions</button>
+        <button class="tab-link" onclick="openTab(event, 'raw-json')">Raw JSON</button>
         </div>
 
         <!-- Schedule Tab -->
@@ -1501,6 +1556,52 @@
                 </div>
             </div>
         </div>
+
+        <!-- Raw JSON Tab -->
+        <div id="raw-json" class="tab-content">
+            <div class="form-section">
+                <h2>Raw Configuration JSON</h2>
+                <p>View and copy the complete configuration files. Use these for backup or manual editing.</p>
+                
+                <div class="config-section">
+                    <h3>Main Configuration (config.json)</h3>
+                    <div class="form-group">
+                        <label>Configuration Path:</label>
+                        <span>{{ main_config_path }}</span>
+                    </div>
+                    <div class="form-group">
+                        <label>Raw JSON:</label>
+                        <div class="json-container">
+                            <textarea id="main-config-json" readonly style="height: 400px; font-family: monospace; font-size: 12px;">{{ main_config_json }}</textarea>
+                            <div id="main-config-validation" class="json-validation"></div>
+                        </div>
+                    </div>
+                    <div class="json-actions">
+                        <button type="button" onclick="copyToClipboard('main-config-json')" style="margin-right: 10px;">Copy Main Config</button>
+                        <button type="button" onclick="validateJson('main-config-json', 'main-config-validation')" style="background-color: #2196F3;">Validate JSON</button>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h3>Secrets Configuration (config_secrets.json)</h3>
+                    <div class="form-group">
+                        <label>Configuration Path:</label>
+                        <span>{{ secrets_config_path }}</span>
+                    </div>
+                    <div class="form-group">
+                        <label>Raw JSON:</label>
+                        <div class="json-container">
+                            <textarea id="secrets-config-json" readonly style="height: 400px; font-family: monospace; font-size: 12px;">{{ secrets_config_json }}</textarea>
+                            <div id="secrets-config-validation" class="json-validation"></div>
+                        </div>
+                    </div>
+                    <div class="json-actions">
+                        <button type="button" onclick="copyToClipboard('secrets-config-json')" style="margin-right: 10px;">Copy Secrets Config</button>
+                        <button type="button" onclick="validateJson('secrets-config-json', 'secrets-config-validation')" style="background-color: #2196F3;">Validate JSON</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -1516,6 +1617,15 @@
         }
         document.getElementById(tabName).style.display = "block";
         evt.currentTarget.className += " active";
+        
+        // Auto-validate JSON when raw-json tab is opened
+        if (tabName === 'raw-json') {
+            // Small delay to ensure the tab content is rendered
+            setTimeout(() => {
+                validateJson('main-config-json', 'main-config-validation');
+                validateJson('secrets-config-json', 'secrets-config-validation');
+            }, 100);
+        }
     }
 
     function toggleJsonEditor(section) {
@@ -1538,6 +1648,131 @@
             input.value = currentValue + ', ';
         }
         input.focus();
+    }
+
+    function copyToClipboard(elementId) {
+        const textarea = document.getElementById(elementId);
+        textarea.select();
+        textarea.setSelectionRange(0, 99999); // For mobile devices
+        
+        try {
+            document.execCommand('copy');
+            alert('Configuration copied to clipboard!');
+        } catch (err) {
+            // Fallback for modern browsers
+            navigator.clipboard.writeText(textarea.value).then(function() {
+                alert('Configuration copied to clipboard!');
+            }).catch(function(err) {
+                alert('Failed to copy: ' + err);
+            });
+        }
+    }
+
+    function validateJson(textareaId, validationId) {
+        const textarea = document.getElementById(textareaId);
+        const validationDiv = document.getElementById(validationId);
+        const jsonText = textarea.value;
+        
+        // Clear previous validation
+        validationDiv.innerHTML = '';
+        validationDiv.className = 'json-validation';
+        validationDiv.style.display = 'block';
+        
+        try {
+            // Try to parse the JSON
+            const parsed = JSON.parse(jsonText);
+            
+            // Check for common issues
+            const warnings = [];
+            const issues = [];
+            
+            // Check if it's an empty object
+            if (Object.keys(parsed).length === 0) {
+                warnings.push('JSON is an empty object');
+            }
+            
+            // Check for potential issues in nested objects
+            function checkObject(obj, path = '') {
+                for (const [key, value] of Object.entries(obj)) {
+                    const currentPath = path ? `${path}.${key}` : key;
+                    
+                    // Check for empty strings in important fields
+                    if (typeof value === 'string' && value.trim() === '' && 
+                        (key.includes('api_key') || key.includes('client_id') || key.includes('secret'))) {
+                        warnings.push(`Empty value in sensitive field: ${currentPath}`);
+                    }
+                    
+                    // Check for nested objects
+                    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                        checkObject(value, currentPath);
+                    }
+                }
+            }
+            
+            checkObject(parsed);
+            
+            // Display results
+            if (warnings.length > 0) {
+                validationDiv.className = 'json-validation warning';
+                validationDiv.innerHTML = `
+                    <div class="json-error-message">✅ JSON is valid but has warnings:</div>
+                    <div class="json-error-details">
+                        ${warnings.map(warning => `<div>⚠️ ${warning}</div>`).join('')}
+                    </div>
+                `;
+            } else {
+                validationDiv.className = 'json-validation success';
+                validationDiv.innerHTML = `
+                    <div class="json-error-message">✅ JSON is valid!</div>
+                    <div class="json-error-details">
+                        ✓ Valid JSON syntax<br>
+                        ✓ Proper structure<br>
+                        ✓ No obvious issues detected
+                    </div>
+                `;
+            }
+            
+        } catch (error) {
+            // JSON parsing failed
+            validationDiv.className = 'json-validation error';
+            
+            let errorMessage = '❌ Invalid JSON syntax';
+            let errorDetails = error.message;
+            
+            // Try to provide more helpful error messages
+            if (error.message.includes('Unexpected token')) {
+                errorMessage = '❌ JSON syntax error';
+                errorDetails = 'Check for missing commas, brackets, or quotes';
+            } else if (error.message.includes('Unexpected end')) {
+                errorMessage = '❌ Incomplete JSON';
+                errorDetails = 'JSON appears to be cut off or missing closing brackets/braces';
+            } else if (error.message.includes('Unexpected number')) {
+                errorMessage = '❌ Invalid number format';
+                errorDetails = 'Check for invalid number values';
+            }
+            
+            // Try to find the line number
+            const lines = jsonText.split('\n');
+            let lineNumber = 1;
+            let charCount = 0;
+            
+            for (let i = 0; i < lines.length; i++) {
+                charCount += lines[i].length + 1; // +1 for newline
+                if (charCount >= error.message.match(/position (\d+)/)?.[1]) {
+                    lineNumber = i + 1;
+                    break;
+                }
+            }
+            
+            validationDiv.innerHTML = `
+                <div class="json-error-message">${errorMessage}</div>
+                <div class="json-error-details">
+                    <strong>Error:</strong> ${errorDetails}<br>
+                    <strong>Line:</strong> ${lineNumber}<br>
+                    <strong>Details:</strong> ${error.message}
+                </div>
+            `;
+        }
     }
 
     function saveSportsConfig() {
