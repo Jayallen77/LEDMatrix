@@ -261,6 +261,24 @@ class DisplayManager:
             logger.error(f"Error getting text width: {e}")
             return 0  # Return 0 as fallback
 
+    def get_font_height(self, font):
+        """Get the height of the given font for line spacing purposes."""
+        try:
+            if isinstance(font, freetype.Face):
+                # For FreeType faces (BDF), the 'height' metric gives the recommended line spacing.
+                return font.size.height >> 6
+            else:
+                # For PIL TTF fonts, getmetrics() provides ascent and descent.
+                # The line height is the sum of ascent and descent.
+                ascent, descent = font.getmetrics()
+                return ascent + descent
+        except Exception as e:
+            logger.error(f"Error getting font height for font type {type(font).__name__}: {e}")
+            # Fallback for TTF font if getmetrics() fails, or for other font types.
+            if hasattr(font, 'size'):
+                return font.size
+            return 8 # A reasonable default for an 8px font.
+
     def draw_text(self, text: str, x: int = None, y: int = None, color: tuple = (255, 255, 255), 
                  small_font: bool = False, font: ImageFont = None):
         """Draw text on the canvas with optional font selection."""

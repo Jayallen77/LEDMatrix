@@ -748,14 +748,28 @@ class MusicManager:
 
         font_title = self.display_manager.small_font
         font_artist_album = self.display_manager.bdf_5x7_font
-        line_height_title = 8 
-        line_height_artist_album = 7 
-        padding_between_lines = 1 
+        
+        # Dynamically calculate line heights and positions
+        line_height_title = self.display_manager.get_font_height(font_title)
+        line_height_artist_album = self.display_manager.get_font_height(font_artist_album)
+        padding_between_lines = 1
 
         TEXT_SCROLL_DIVISOR = 5 
 
         # --- Title --- 
-        y_pos_title = 2 
+        # Start title's baseline y_pos slightly lower to give it padding from the top.
+        # The ascender gives the distance from the baseline to the top of the glyphs.
+        try:
+            # For TTF fonts, getbbox gives a tight bounding box.
+            # We use it to find the height of the actual rendered pixels for the letter 'A'
+            # and position the text based on that.
+            title_ascent, _ = font_title.getmetrics()
+            y_pos_title = title_ascent + 1 # Start 1 pixel below the top
+        except AttributeError:
+             # Fallback for BDF/other fonts that don't have getmetrics()
+            y_pos_title = line_height_title 
+
+
         title_width = self.display_manager.get_text_width(title, font_title)
         current_title_display_text = title
         if title_width > text_area_width:
@@ -764,7 +778,7 @@ class MusicManager:
             current_title_display_text = title[self.scroll_position_title:] + "   " + title[:self.scroll_position_title]
         
         self.display_manager.draw_text(current_title_display_text, 
-                                     x=text_area_x_start, y=y_pos_title, color=(255, 255, 255), font=font_title)
+                                     x=text_area_x_start, y=y_pos_title - title_ascent, color=(255, 255, 255), font=font_title) # Adjust y for baseline
         if title_width > text_area_width:
             self.title_scroll_tick += 1
             if self.title_scroll_tick % TEXT_SCROLL_DIVISOR == 0:
