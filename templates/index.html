@@ -333,7 +333,7 @@
             <div class="form-section">
                 <h2>Display Schedule</h2>
                 <p>Set the time for the display to be active. A restart is needed for changes to take effect.</p>
-                <form action="{{ url_for('save_schedule_route') }}" method="POST">
+                <form id="schedule-form" action="{{ url_for('save_schedule_route') }}" method="POST">
                     <div class="form-group">
                         <label for="schedule_enabled">Enable Schedule:</label>
                         <div class="toggle-container">
@@ -1864,25 +1864,85 @@
                 'config_data': JSON.stringify(config)
             })
         })
-        .then(response => {
-            if (response.redirected) {
-                window.location.href = response.url;
-            } else {
-                return response.text();
-            }
-        })
+        .then(response => response.json())
         .then(data => {
-            if (data) {
-                alert('Sports configuration saved successfully!');
+            if (data.status === 'success') {
+                showMessage(data.message, 'success');
+            } else {
+                showMessage(data.message, 'error');
             }
         })
         .catch(error => {
-            alert('Error: ' + error);
+            showMessage('Error saving sports configuration: ' + error, 'error');
         });
+    }
+
+    function showMessage(message, type) {
+        // Create a temporary message element
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `flash-message ${type}`;
+        messageDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 5px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            max-width: 400px;
+            word-wrap: break-word;
+        `;
+        
+        if (type === 'success') {
+            messageDiv.style.backgroundColor = '#4CAF50';
+        } else {
+            messageDiv.style.backgroundColor = '#f44336';
+        }
+        
+        messageDiv.textContent = message;
+        document.body.appendChild(messageDiv);
+        
+        // Remove the message after 3 seconds
+        setTimeout(() => {
+            if (messageDiv.parentNode) {
+                messageDiv.parentNode.removeChild(messageDiv);
+            }
+        }, 3000);
     }
 
     // Add form submission handlers for better UX
     document.addEventListener('DOMContentLoaded', function() {
+        // Handle schedule form submission
+        const scheduleForm = document.getElementById('schedule-form');
+        if (scheduleForm) {
+            scheduleForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(scheduleForm);
+                
+                fetch("{{ url_for('save_schedule_route') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        'schedule_enabled': formData.get('schedule_enabled') ? 'on' : '',
+                        'start_time': formData.get('start_time'),
+                        'end_time': formData.get('end_time')
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage(data.message, 'success');
+                    } else {
+                        showMessage(data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    showMessage('Error saving schedule: ' + error, 'error');
+                });
+            });
+        }
+
         // Handle display form submission
         const displayForm = document.getElementById('display-form');
         if (displayForm) {
@@ -1913,13 +1973,16 @@
                         'config_data': JSON.stringify(config)
                     })
                 })
-                .then(response => {
-                    if (response.redirected) {
-                        window.location.href = response.url;
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage(data.message, 'success');
+                    } else {
+                        showMessage(data.message, 'error');
                     }
                 })
                 .catch(error => {
-                    alert('Error saving display settings: ' + error);
+                    showMessage('Error saving display settings: ' + error, 'error');
                 });
             });
         }
@@ -1950,13 +2013,16 @@
                         'config_data': JSON.stringify(config)
                     })
                 })
-                .then(response => {
-                    if (response.redirected) {
-                        window.location.href = response.url;
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage(data.message, 'success');
+                    } else {
+                        showMessage(data.message, 'error');
                     }
                 })
                 .catch(error => {
-                    alert('Error saving weather settings: ' + error);
+                    showMessage('Error saving weather settings: ' + error, 'error');
                 });
             });
         }
@@ -1984,13 +2050,16 @@
                         'config_data': JSON.stringify(config)
                     })
                 })
-                .then(response => {
-                    if (response.redirected) {
-                        window.location.href = response.url;
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage(data.message, 'success');
+                    } else {
+                        showMessage(data.message, 'error');
                     }
                 })
                 .catch(error => {
-                    alert('Error saving stocks settings: ' + error);
+                    showMessage('Error saving stocks settings: ' + error, 'error');
                 });
             });
         }
@@ -2018,13 +2087,16 @@
                         'config_data': JSON.stringify(config)
                     })
                 })
-                .then(response => {
-                    if (response.redirected) {
-                        window.location.href = response.url;
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage(data.message, 'success');
+                    } else {
+                        showMessage(data.message, 'error');
                     }
                 })
                 .catch(error => {
-                    alert('Error saving crypto settings: ' + error);
+                    showMessage('Error saving crypto settings: ' + error, 'error');
                 });
             });
         }
@@ -2052,13 +2124,16 @@
                         'config_data': JSON.stringify(config)
                     })
                 })
-                .then(response => {
-                    if (response.redirected) {
-                        window.location.href = response.url;
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage(data.message, 'success');
+                    } else {
+                        showMessage(data.message, 'error');
                     }
                 })
                 .catch(error => {
-                    alert('Error saving music settings: ' + error);
+                    showMessage('Error saving music settings: ' + error, 'error');
                 });
             });
         }
@@ -2087,13 +2162,16 @@
                         'config_data': JSON.stringify(config)
                     })
                 })
-                .then(response => {
-                    if (response.redirected) {
-                        window.location.href = response.url;
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage(data.message, 'success');
+                    } else {
+                        showMessage(data.message, 'error');
                     }
                 })
                 .catch(error => {
-                    alert('Error saving calendar settings: ' + error);
+                    showMessage('Error saving calendar settings: ' + error, 'error');
                 });
             });
         }
@@ -2127,13 +2205,16 @@
                         'config_data': JSON.stringify(config)
                     })
                 })
-                .then(response => {
-                    if (response.redirected) {
-                        window.location.href = response.url;
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage(data.message, 'success');
+                    } else {
+                        showMessage(data.message, 'error');
                     }
                 })
                 .catch(error => {
-                    alert('Error saving API keys: ' + error);
+                    showMessage('Error saving API keys: ' + error, 'error');
                 });
             });
         }
@@ -2167,13 +2248,16 @@
                         'config_data': JSON.stringify(config)
                     })
                 })
-                .then(response => {
-                    if (response.redirected) {
-                        window.location.href = response.url;
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage(data.message, 'success');
+                    } else {
+                        showMessage(data.message, 'error');
                     }
                 })
                 .catch(error => {
-                    alert('Error saving display durations: ' + error);
+                    showMessage('Error saving display durations: ' + error, 'error');
                 });
             });
         }
@@ -2200,13 +2284,16 @@
                         'config_data': JSON.stringify(config)
                     })
                 })
-                .then(response => {
-                    if (response.redirected) {
-                        window.location.href = response.url;
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage(data.message, 'success');
+                    } else {
+                        showMessage(data.message, 'error');
                     }
                 })
                 .catch(error => {
-                    alert('Error saving general settings: ' + error);
+                    showMessage('Error saving general settings: ' + error, 'error');
                 });
             });
         }
@@ -2234,13 +2321,16 @@
                         'config_data': JSON.stringify(config)
                     })
                 })
-                .then(response => {
-                    if (response.redirected) {
-                        window.location.href = response.url;
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage(data.message, 'success');
+                    } else {
+                        showMessage(data.message, 'error');
                     }
                 })
                 .catch(error => {
-                    alert('Error saving clock settings: ' + error);
+                    showMessage('Error saving clock settings: ' + error, 'error');
                 });
             });
         }
@@ -2266,13 +2356,16 @@
                         'config_data': JSON.stringify(config)
                     })
                 })
-                .then(response => {
-                    if (response.redirected) {
-                        window.location.href = response.url;
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage(data.message, 'success');
+                    } else {
+                        showMessage(data.message, 'error');
                     }
                 })
                 .catch(error => {
-                    alert('Error saving stock news settings: ' + error);
+                    showMessage('Error saving stock news settings: ' + error, 'error');
                 });
             });
         }
@@ -2298,13 +2391,16 @@
                         'config_data': JSON.stringify(config)
                     })
                 })
-                .then(response => {
-                    if (response.redirected) {
-                        window.location.href = response.url;
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage(data.message, 'success');
+                    } else {
+                        showMessage(data.message, 'error');
                     }
                 })
                 .catch(error => {
-                    alert('Error saving odds ticker settings: ' + error);
+                    showMessage('Error saving odds ticker settings: ' + error, 'error');
                 });
             });
         }
@@ -2331,13 +2427,16 @@
                         'config_data': JSON.stringify(config)
                     })
                 })
-                .then(response => {
-                    if (response.redirected) {
-                        window.location.href = response.url;
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage(data.message, 'success');
+                    } else {
+                        showMessage(data.message, 'error');
                     }
                 })
                 .catch(error => {
-                    alert('Error saving YouTube settings: ' + error);
+                    showMessage('Error saving YouTube settings: ' + error, 'error');
                 });
             });
         }
@@ -2368,13 +2467,16 @@
                         'config_data': JSON.stringify(config)
                     })
                 })
-                .then(response => {
-                    if (response.redirected) {
-                        window.location.href = response.url;
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage(data.message, 'success');
+                    } else {
+                        showMessage(data.message, 'error');
                     }
                 })
                 .catch(error => {
-                    alert('Error saving text display settings: ' + error);
+                    showMessage('Error saving text display settings: ' + error, 'error');
                 });
             });
         }
@@ -2400,13 +2502,16 @@
                         'config_data': JSON.stringify(config)
                     })
                 })
-                .then(response => {
-                    if (response.redirected) {
-                        window.location.href = response.url;
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage(data.message, 'success');
+                    } else {
+                        showMessage(data.message, 'error');
                     }
                 })
                 .catch(error => {
-                    alert('Error saving of the day settings: ' + error);
+                    showMessage('Error saving of the day settings: ' + error, 'error');
                 });
             });
         }

@@ -50,12 +50,16 @@ def save_schedule_route():
         main_config['schedule'] = schedule_data
         config_manager.save_config(main_config)
         
-        flash("Schedule updated successfully! Restart the display for changes to take effect.", "success")
+        return jsonify({
+            'status': 'success',
+            'message': 'Schedule updated successfully! Restart the display for changes to take effect.'
+        })
 
     except Exception as e:
-        flash(f"Error saving schedule: {e}", "error")
-
-    return redirect(url_for('index'))
+        return jsonify({
+            'status': 'error',
+            'message': f'Error saving schedule: {e}'
+        }), 400
 
 @app.route('/save_config', methods=['POST'])
 def save_config_route():
@@ -180,11 +184,16 @@ def save_config_route():
                         else:
                             main_config[key] = value
                 except json.JSONDecodeError:
-                    flash("Error: Invalid JSON format in config data.", "error")
-                    return redirect(url_for('index'))
+                    return jsonify({
+                        'status': 'error',
+                        'message': 'Error: Invalid JSON format in config data.'
+                    }), 400
             
             config_manager.save_config(main_config)
-            flash("Main configuration saved successfully!", "success")
+            return jsonify({
+                'status': 'success',
+                'message': 'Main configuration saved successfully!'
+            })
             
         elif config_type == 'secrets':
             # Handle secrets configuration
@@ -211,54 +220,71 @@ def save_config_route():
                     new_data = json.loads(config_data_str)
                     config_manager.save_raw_file_content('secrets', new_data)
                 except json.JSONDecodeError:
-                    flash("Error: Invalid JSON format for secrets config.", "error")
-                    return redirect(url_for('index'))
+                    return jsonify({
+                        'status': 'error',
+                        'message': 'Error: Invalid JSON format for secrets config.'
+                    }), 400
             else:
                 config_manager.save_raw_file_content('secrets', secrets_config)
             
-            flash("Secrets configuration saved successfully!", "success")
+            return jsonify({
+                'status': 'success',
+                'message': 'Secrets configuration saved successfully!'
+            })
         
     except json.JSONDecodeError:
-        flash(f"Error: Invalid JSON format for {config_type} config.", "error")
+        return jsonify({
+            'status': 'error',
+            'message': f'Error: Invalid JSON format for {config_type} config.'
+        }), 400
     except Exception as e:
-        flash(f"Error saving {config_type} configuration: {e}", "error")
-
-    return redirect(url_for('index'))
+        return jsonify({
+            'status': 'error',
+            'message': f'Error saving {config_type} configuration: {e}'
+        }), 400
 
 @app.route('/run_action', methods=['POST'])
 def run_action_route():
-    data = request.get_json()
-    action = data.get('action')
-    
-    commands = {
-        'start_display': ["sudo", "python3", "display_controller.py"],
-        'stop_display': ["sudo", "pkill", "-f", "display_controller.py"],
-        'enable_autostart': ["sudo", "systemctl", "enable", "ledmatrix.service"],
-        'disable_autostart': ["sudo", "systemctl", "disable", "ledmatrix.service"],
-        'reboot_system': ["sudo", "reboot"],
-        'git_pull': ["git", "pull"]
-    }
-
-    command_parts = commands.get(action)
-
-    if not command_parts:
-        return jsonify({"status": "error", "message": "Invalid action."}), 400
-
     try:
-        result = subprocess.run(command_parts, capture_output=True, text=True, check=False)
+        data = request.get_json()
+        action = data.get('action')
         
-        status = "success" if result.returncode == 0 else "error"
-        message = f"Action '{action}' completed."
+        if action == 'start_display':
+            result = subprocess.run(['sudo', 'systemctl', 'start', 'ledmatrix'], 
+                                 capture_output=True, text=True)
+        elif action == 'stop_display':
+            result = subprocess.run(['sudo', 'systemctl', 'stop', 'ledmatrix'], 
+                                 capture_output=True, text=True)
+        elif action == 'enable_autostart':
+            result = subprocess.run(['sudo', 'systemctl', 'enable', 'ledmatrix'], 
+                                 capture_output=True, text=True)
+        elif action == 'disable_autostart':
+            result = subprocess.run(['sudo', 'systemctl', 'disable', 'ledmatrix'], 
+                                 capture_output=True, text=True)
+        elif action == 'reboot_system':
+            result = subprocess.run(['sudo', 'reboot'], 
+                                 capture_output=True, text=True)
+        elif action == 'git_pull':
+            result = subprocess.run(['git', 'pull'], 
+                                 capture_output=True, text=True, cwd='/home/pi/LEDMatrix')
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': f'Unknown action: {action}'
+            }), 400
         
         return jsonify({
-            "status": status,
-            "message": message,
-            "stdout": result.stdout,
-            "stderr": result.stderr
+            'status': 'success' if result.returncode == 0 else 'error',
+            'message': f'Action {action} completed with return code {result.returncode}',
+            'stdout': result.stdout,
+            'stderr': result.stderr
         })
-
+        
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({
+            'status': 'error',
+            'message': f'Error running action: {e}'
+        }), 400
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000) 
+    app.run(host='0.0.0.0', port=5000, debug=True) 
