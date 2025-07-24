@@ -201,7 +201,7 @@
         }
     },
     "ncaa_fb_scoreboard": {
-        "enabled": true,
+        "enabled": false,
         "live_priority": true,
         "live_game_duration": 20,
         "show_odds": true,
@@ -268,7 +268,7 @@
         "update_interval": 3600
     },
     "mlb": {
-        "enabled":  false,
+        "enabled":  true,
         "live_priority": true,
         "live_game_duration": 30,
         "show_odds": true,
