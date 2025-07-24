@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 import json
 import os
 import subprocess
+from pathlib import Path
 from src.config_manager import ConfigManager
 
 app = Flask(__name__)
@@ -267,8 +268,10 @@ def run_action_route():
             result = subprocess.run(['sudo', 'reboot'], 
                                  capture_output=True, text=True)
         elif action == 'git_pull':
+            home_dir = str(Path.home())
+            project_dir = os.path.join(home_dir, 'LEDMatrix')
             result = subprocess.run(['git', 'pull'], 
-                                 capture_output=True, text=True, cwd='/home/pi/LEDMatrix')
+                                 capture_output=True, text=True, cwd=project_dir, check=True)
         else:
             return jsonify({
                 'status': 'error',
