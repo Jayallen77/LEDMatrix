@@ -775,7 +775,7 @@ class MusicManager:
             self.title_scroll_tick = 0
 
         # --- Artist --- 
-        y_pos_artist = y_pos_title + line_height_title + padding_between_lines - 5
+        y_pos_artist = y_pos_title + line_height_title + padding_between_lines
         artist_width = self.display_manager.get_text_width(artist, font_artist_album)
         current_artist_display_text = artist
         if artist_width > text_area_width:

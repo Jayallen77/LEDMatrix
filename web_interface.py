@@ -95,6 +95,7 @@ def save_config_route():
                 symbols = request.form.get('stocks_symbols', '').split(',')
                 main_config['stocks']['symbols'] = [s.strip() for s in symbols if s.strip()]
                 main_config['stocks']['update_interval'] = int(request.form.get('stocks_update_interval', 600))
+                main_config['stocks']['toggle_chart'] = 'stocks_toggle_chart' in request.form
             
             # Update crypto settings
             if 'crypto_enabled' in request.form:
@@ -102,6 +103,7 @@ def save_config_route():
                 symbols = request.form.get('crypto_symbols', '').split(',')
                 main_config['crypto']['symbols'] = [s.strip() for s in symbols if s.strip()]
                 main_config['crypto']['update_interval'] = int(request.form.get('crypto_update_interval', 600))
+                main_config['crypto']['toggle_chart'] = 'crypto_toggle_chart' in request.form
             
             # Update music settings
             if 'music_enabled' in request.form:

@@ -489,6 +489,71 @@
                                 <input type="number" id="gpio_slowdown" name="gpio_slowdown" value="{{ main_config.display.runtime.gpio_slowdown }}" min="0" max="5">
                                 <div class="description">GPIO slowdown factor (0-5)</div>
                             </div>
+                            <div class="form-group">
+                                <label for="scan_mode">Scan Mode:</label>
+                                <input type="number" id="scan_mode" name="scan_mode" value="{{ main_config.display.hardware.scan_mode }}" min="0" max="1">
+                                <div class="description">Scan mode for LED matrix (0-1)</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="pwm_bits">PWM Bits:</label>
+                                <input type="number" id="pwm_bits" name="pwm_bits" value="{{ main_config.display.hardware.pwm_bits }}" min="1" max="11">
+                                <div class="description">PWM bits for brightness control (1-11)</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="pwm_dither_bits">PWM Dither Bits:</label>
+                                <input type="number" id="pwm_dither_bits" name="pwm_dither_bits" value="{{ main_config.display.hardware.pwm_dither_bits }}" min="0" max="4">
+                                <div class="description">PWM dither bits (0-4)</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="pwm_lsb_nanoseconds">PWM LSB Nanoseconds:</label>
+                                <input type="number" id="pwm_lsb_nanoseconds" name="pwm_lsb_nanoseconds" value="{{ main_config.display.hardware.pwm_lsb_nanoseconds }}" min="50" max="500">
+                                <div class="description">PWM LSB nanoseconds (50-500)</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="disable_hardware_pulsing">Disable Hardware Pulsing:</label>
+                                <div class="toggle-container">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="disable_hardware_pulsing" name="disable_hardware_pulsing" {% if main_config.display.hardware.disable_hardware_pulsing %}checked{% endif %}>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="description">Disable hardware pulsing</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="inverse_colors">Inverse Colors:</label>
+                                <div class="toggle-container">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="inverse_colors" name="inverse_colors" {% if main_config.display.hardware.inverse_colors %}checked{% endif %}>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="description">Inverse color display</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="show_refresh_rate">Show Refresh Rate:</label>
+                                <div class="toggle-container">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="show_refresh_rate" name="show_refresh_rate" {% if main_config.display.hardware.show_refresh_rate %}checked{% endif %}>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="description">Show refresh rate on display</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="limit_refresh_rate_hz">Limit Refresh Rate (Hz):</label>
+                                <input type="number" id="limit_refresh_rate_hz" name="limit_refresh_rate_hz" value="{{ main_config.display.hardware.limit_refresh_rate_hz }}" min="1" max="1000">
+                                <div class="description">Limit refresh rate in Hz (1-1000)</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="use_short_date_format">Use Short Date Format:</label>
+                                <div class="toggle-container">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="use_short_date_format" name="use_short_date_format" {% if main_config.display.use_short_date_format %}checked{% endif %}>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="description">Use short date format for display</div>
+                            </div>
                         </div>
                     </div>
                     
@@ -546,6 +611,170 @@
                                 <label for="of_the_day_duration">Of The Day Duration (seconds):</label>
                                 <input type="number" id="of_the_day_duration" name="of_the_day_duration" value="{{ main_config.display.display_durations.of_the_day }}" min="5" max="120">
                                 <div class="description">How long to show word of the day</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="hourly_forecast_duration">Hourly Forecast Duration (seconds):</label>
+                                <input type="number" id="hourly_forecast_duration" name="hourly_forecast_duration" value="{{ main_config.display.display_durations.hourly_forecast }}" min="5" max="120">
+                                <div class="description">How long to show hourly forecast</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="daily_forecast_duration">Daily Forecast Duration (seconds):</label>
+                                <input type="number" id="daily_forecast_duration" name="daily_forecast_duration" value="{{ main_config.display.display_durations.daily_forecast }}" min="5" max="120">
+                                <div class="description">How long to show daily forecast</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="stock_news_duration">Stock News Duration (seconds):</label>
+                                <input type="number" id="stock_news_duration" name="stock_news_duration" value="{{ main_config.display.display_durations.stock_news }}" min="5" max="120">
+                                <div class="description">How long to show stock news</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="odds_ticker_duration">Odds Ticker Duration (seconds):</label>
+                                <input type="number" id="odds_ticker_duration" name="odds_ticker_duration" value="{{ main_config.display.display_durations.odds_ticker }}" min="5" max="120">
+                                <div class="description">How long to show odds ticker</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-col">
+                            <h4>Sports Durations</h4>
+                            <div class="form-group">
+                                <label for="nhl_live_duration">NHL Live Duration (seconds):</label>
+                                <input type="number" id="nhl_live_duration" name="nhl_live_duration" value="{{ main_config.display.display_durations.nhl_live }}" min="5" max="120">
+                                <div class="description">How long to show NHL live games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="nhl_recent_duration">NHL Recent Duration (seconds):</label>
+                                <input type="number" id="nhl_recent_duration" name="nhl_recent_duration" value="{{ main_config.display.display_durations.nhl_recent }}" min="5" max="120">
+                                <div class="description">How long to show NHL recent games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="nhl_upcoming_duration">NHL Upcoming Duration (seconds):</label>
+                                <input type="number" id="nhl_upcoming_duration" name="nhl_upcoming_duration" value="{{ main_config.display.display_durations.nhl_upcoming }}" min="5" max="120">
+                                <div class="description">How long to show NHL upcoming games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="nba_live_duration">NBA Live Duration (seconds):</label>
+                                <input type="number" id="nba_live_duration" name="nba_live_duration" value="{{ main_config.display.display_durations.nba_live }}" min="5" max="120">
+                                <div class="description">How long to show NBA live games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="nba_recent_duration">NBA Recent Duration (seconds):</label>
+                                <input type="number" id="nba_recent_duration" name="nba_recent_duration" value="{{ main_config.display.display_durations.nba_recent }}" min="5" max="120">
+                                <div class="description">How long to show NBA recent games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="nba_upcoming_duration">NBA Upcoming Duration (seconds):</label>
+                                <input type="number" id="nba_upcoming_duration" name="nba_upcoming_duration" value="{{ main_config.display.display_durations.nba_upcoming }}" min="5" max="120">
+                                <div class="description">How long to show NBA upcoming games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="nfl_live_duration">NFL Live Duration (seconds):</label>
+                                <input type="number" id="nfl_live_duration" name="nfl_live_duration" value="{{ main_config.display.display_durations.nfl_live }}" min="5" max="120">
+                                <div class="description">How long to show NFL live games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="nfl_recent_duration">NFL Recent Duration (seconds):</label>
+                                <input type="number" id="nfl_recent_duration" name="nfl_recent_duration" value="{{ main_config.display.display_durations.nfl_recent }}" min="5" max="120">
+                                <div class="description">How long to show NFL recent games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="nfl_upcoming_duration">NFL Upcoming Duration (seconds):</label>
+                                <input type="number" id="nfl_upcoming_duration" name="nfl_upcoming_duration" value="{{ main_config.display.display_durations.nfl_upcoming }}" min="5" max="120">
+                                <div class="description">How long to show NFL upcoming games</div>
+                            </div>
+                        </div>
+                        <div class="form-col">
+                            <h4>More Sports Durations</h4>
+                            <div class="form-group">
+                                <label for="ncaa_fb_live_duration">NCAA FB Live Duration (seconds):</label>
+                                <input type="number" id="ncaa_fb_live_duration" name="ncaa_fb_live_duration" value="{{ main_config.display.display_durations.ncaa_fb_live }}" min="5" max="120">
+                                <div class="description">How long to show NCAA FB live games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="ncaa_fb_recent_duration">NCAA FB Recent Duration (seconds):</label>
+                                <input type="number" id="ncaa_fb_recent_duration" name="ncaa_fb_recent_duration" value="{{ main_config.display.display_durations.ncaa_fb_recent }}" min="5" max="120">
+                                <div class="description">How long to show NCAA FB recent games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="ncaa_fb_upcoming_duration">NCAA FB Upcoming Duration (seconds):</label>
+                                <input type="number" id="ncaa_fb_upcoming_duration" name="ncaa_fb_upcoming_duration" value="{{ main_config.display.display_durations.ncaa_fb_upcoming }}" min="5" max="120">
+                                <div class="description">How long to show NCAA FB upcoming games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="ncaa_baseball_live_duration">NCAA Baseball Live Duration (seconds):</label>
+                                <input type="number" id="ncaa_baseball_live_duration" name="ncaa_baseball_live_duration" value="{{ main_config.display.display_durations.ncaa_baseball_live }}" min="5" max="120">
+                                <div class="description">How long to show NCAA Baseball live games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="ncaa_baseball_recent_duration">NCAA Baseball Recent Duration (seconds):</label>
+                                <input type="number" id="ncaa_baseball_recent_duration" name="ncaa_baseball_recent_duration" value="{{ main_config.display.display_durations.ncaa_baseball_recent }}" min="5" max="120">
+                                <div class="description">How long to show NCAA Baseball recent games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="ncaa_baseball_upcoming_duration">NCAA Baseball Upcoming Duration (seconds):</label>
+                                <input type="number" id="ncaa_baseball_upcoming_duration" name="ncaa_baseball_upcoming_duration" value="{{ main_config.display.display_durations.ncaa_baseball_upcoming }}" min="5" max="120">
+                                <div class="description">How long to show NCAA Baseball upcoming games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="mlb_live_duration">MLB Live Duration (seconds):</label>
+                                <input type="number" id="mlb_live_duration" name="mlb_live_duration" value="{{ main_config.display.display_durations.mlb_live }}" min="5" max="120">
+                                <div class="description">How long to show MLB live games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="mlb_recent_duration">MLB Recent Duration (seconds):</label>
+                                <input type="number" id="mlb_recent_duration" name="mlb_recent_duration" value="{{ main_config.display.display_durations.mlb_recent }}" min="5" max="120">
+                                <div class="description">How long to show MLB recent games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="mlb_upcoming_duration">MLB Upcoming Duration (seconds):</label>
+                                <input type="number" id="mlb_upcoming_duration" name="mlb_upcoming_duration" value="{{ main_config.display.display_durations.mlb_upcoming }}" min="5" max="120">
+                                <div class="description">How long to show MLB upcoming games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="milb_live_duration">MiLB Live Duration (seconds):</label>
+                                <input type="number" id="milb_live_duration" name="milb_live_duration" value="{{ main_config.display.display_durations.milb_live }}" min="5" max="120">
+                                <div class="description">How long to show MiLB live games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="milb_recent_duration">MiLB Recent Duration (seconds):</label>
+                                <input type="number" id="milb_recent_duration" name="milb_recent_duration" value="{{ main_config.display.display_durations.milb_recent }}" min="5" max="120">
+                                <div class="description">How long to show MiLB recent games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="milb_upcoming_duration">MiLB Upcoming Duration (seconds):</label>
+                                <input type="number" id="milb_upcoming_duration" name="milb_upcoming_duration" value="{{ main_config.display.display_durations.milb_upcoming }}" min="5" max="120">
+                                <div class="description">How long to show MiLB upcoming games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="soccer_live_duration">Soccer Live Duration (seconds):</label>
+                                <input type="number" id="soccer_live_duration" name="soccer_live_duration" value="{{ main_config.display.display_durations.soccer_live }}" min="5" max="120">
+                                <div class="description">How long to show Soccer live games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="soccer_recent_duration">Soccer Recent Duration (seconds):</label>
+                                <input type="number" id="soccer_recent_duration" name="soccer_recent_duration" value="{{ main_config.display.display_durations.soccer_recent }}" min="5" max="120">
+                                <div class="description">How long to show Soccer recent games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="soccer_upcoming_duration">Soccer Upcoming Duration (seconds):</label>
+                                <input type="number" id="soccer_upcoming_duration" name="soccer_upcoming_duration" value="{{ main_config.display.display_durations.soccer_upcoming }}" min="5" max="120">
+                                <div class="description">How long to show Soccer upcoming games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="ncaam_basketball_live_duration">NCAA Basketball Live Duration (seconds):</label>
+                                <input type="number" id="ncaam_basketball_live_duration" name="ncaam_basketball_live_duration" value="{{ main_config.display.display_durations.ncaam_basketball_live }}" min="5" max="120">
+                                <div class="description">How long to show NCAA Basketball live games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="ncaam_basketball_recent_duration">NCAA Basketball Recent Duration (seconds):</label>
+                                <input type="number" id="ncaam_basketball_recent_duration" name="ncaam_basketball_recent_duration" value="{{ main_config.display.display_durations.ncaam_basketball_recent }}" min="5" max="120">
+                                <div class="description">How long to show NCAA Basketball recent games</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="ncaam_basketball_upcoming_duration">NCAA Basketball Upcoming Duration (seconds):</label>
+                                <input type="number" id="ncaam_basketball_upcoming_duration" name="ncaam_basketball_upcoming_duration" value="{{ main_config.display.display_durations.ncaam_basketball_upcoming }}" min="5" max="120">
+                                <div class="description">How long to show NCAA Basketball upcoming games</div>
                             </div>
                         </div>
                     </div>
@@ -653,6 +882,76 @@
                             </label>
                         </div>
                         <div class="description">Only display games involving your favorite teams</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="mlb_test_mode">Test Mode:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="mlb_test_mode" name="mlb_test_mode" {% if main_config.mlb.test_mode %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Enable test mode for MLB</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="mlb_update_interval_seconds">Update Interval (seconds):</label>
+                        <input type="number" id="mlb_update_interval_seconds" name="mlb_update_interval_seconds" value="{{ main_config.mlb.update_interval_seconds }}" min="60" max="7200">
+                        <div class="description">How often to update MLB data</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="mlb_live_update_interval">Live Update Interval (seconds):</label>
+                        <input type="number" id="mlb_live_update_interval" name="mlb_live_update_interval" value="{{ main_config.mlb.live_update_interval }}" min="10" max="300">
+                        <div class="description">How often to update live MLB games</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="mlb_live_odds_update_interval">Live Odds Update Interval (seconds):</label>
+                        <input type="number" id="mlb_live_odds_update_interval" name="mlb_live_odds_update_interval" value="{{ main_config.mlb.live_odds_update_interval }}" min="60" max="3600">
+                        <div class="description">How often to update live odds for MLB</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="mlb_odds_update_interval">Odds Update Interval (seconds):</label>
+                        <input type="number" id="mlb_odds_update_interval" name="mlb_odds_update_interval" value="{{ main_config.mlb.odds_update_interval }}" min="60" max="3600">
+                        <div class="description">How often to update odds for MLB</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="mlb_recent_update_interval">Recent Update Interval (seconds):</label>
+                        <input type="number" id="mlb_recent_update_interval" name="mlb_recent_update_interval" value="{{ main_config.mlb.recent_update_interval }}" min="60" max="7200">
+                        <div class="description">How often to update recent MLB games</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="mlb_upcoming_update_interval">Upcoming Update Interval (seconds):</label>
+                        <input type="number" id="mlb_upcoming_update_interval" name="mlb_upcoming_update_interval" value="{{ main_config.mlb.upcoming_update_interval }}" min="60" max="7200">
+                        <div class="description">How often to update upcoming MLB games</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="mlb_recent_games_to_show">Recent Games to Show:</label>
+                        <input type="number" id="mlb_recent_games_to_show" name="mlb_recent_games_to_show" value="{{ main_config.mlb.recent_games_to_show }}" min="0" max="10">
+                        <div class="description">Number of recent games to display</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="mlb_upcoming_games_to_show">Upcoming Games to Show:</label>
+                        <input type="number" id="mlb_upcoming_games_to_show" name="mlb_upcoming_games_to_show" value="{{ main_config.mlb.upcoming_games_to_show }}" min="0" max="10">
+                        <div class="description">Number of upcoming games to display</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="mlb_show_records">Show Records:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="mlb_show_records" name="mlb_show_records" {% if main_config.mlb.show_records %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Show team records</div>
                     </div>
                 </div>
 
@@ -1041,6 +1340,70 @@
                         <input type="number" id="milb_live_game_duration" name="milb_live_game_duration" value="{{ main_config.milb.live_game_duration }}" min="5" max="300">
                         <div class="description">How long to display each live game</div>
                     </div>
+                    
+                    <div class="form-group">
+                        <label for="milb_test_mode">Test Mode:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="milb_test_mode" name="milb_test_mode" {% if main_config.milb.test_mode %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Enable test mode for MiLB</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="milb_update_interval_seconds">Update Interval (seconds):</label>
+                        <input type="number" id="milb_update_interval_seconds" name="milb_update_interval_seconds" value="{{ main_config.milb.update_interval_seconds }}" min="60" max="7200">
+                        <div class="description">How often to update MiLB data</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="milb_live_update_interval">Live Update Interval (seconds):</label>
+                        <input type="number" id="milb_live_update_interval" name="milb_live_update_interval" value="{{ main_config.milb.live_update_interval }}" min="10" max="300">
+                        <div class="description">How often to update live MiLB games</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="milb_recent_update_interval">Recent Update Interval (seconds):</label>
+                        <input type="number" id="milb_recent_update_interval" name="milb_recent_update_interval" value="{{ main_config.milb.recent_update_interval }}" min="60" max="7200">
+                        <div class="description">How often to update recent MiLB games</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="milb_upcoming_update_interval">Upcoming Update Interval (seconds):</label>
+                        <input type="number" id="milb_upcoming_update_interval" name="milb_upcoming_update_interval" value="{{ main_config.milb.upcoming_update_interval }}" min="60" max="7200">
+                        <div class="description">How often to update upcoming MiLB games</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="milb_recent_games_to_show">Recent Games to Show:</label>
+                        <input type="number" id="milb_recent_games_to_show" name="milb_recent_games_to_show" value="{{ main_config.milb.recent_games_to_show }}" min="0" max="10">
+                        <div class="description">Number of recent games to display</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="milb_upcoming_games_to_show">Upcoming Games to Show:</label>
+                        <input type="number" id="milb_upcoming_games_to_show" name="milb_upcoming_games_to_show" value="{{ main_config.milb.upcoming_games_to_show }}" min="0" max="10">
+                        <div class="description">Number of upcoming games to display</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="milb_show_records">Show Records:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="milb_show_records" name="milb_show_records" {% if main_config.milb.show_records %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Show team records</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="milb_upcoming_fetch_days">Upcoming Fetch Days:</label>
+                        <input type="number" id="milb_upcoming_fetch_days" name="milb_upcoming_fetch_days" value="{{ main_config.milb.upcoming_fetch_days }}" min="1" max="30">
+                        <div class="description">Number of days ahead to fetch upcoming games</div>
+                    </div>
                 </div>
 
                 <div class="config-section">
@@ -1161,6 +1524,12 @@
                         <div class="description">How often to update weather data (300-3600 seconds)</div>
                     </div>
                     
+                    <div class="form-group">
+                        <label for="weather_display_format">Display Format:</label>
+                        <input type="text" id="weather_display_format" name="weather_display_format" value="{{ main_config.weather.display_format }}" placeholder="{temp}°F\n{condition}">
+                        <div class="description">Weather display format (use {temp}, {condition}, {humidity}, etc.)</div>
+                    </div>
+                    
                     <button type="submit">Save Weather Settings</button>
                 </form>
             </div>
@@ -1202,6 +1571,35 @@
                             <div class="description">How often to update stock data</div>
                         </div>
                         
+                        <div class="form-group">
+                            <label for="stocks_scroll_speed">Scroll Speed:</label>
+                            <input type="number" id="stocks_scroll_speed" name="stocks_scroll_speed" value="{{ main_config.stocks.scroll_speed }}" min="1" max="10">
+                            <div class="description">Scroll speed for stock ticker (1-10)</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="stocks_scroll_delay">Scroll Delay:</label>
+                            <input type="number" id="stocks_scroll_delay" name="stocks_scroll_delay" value="{{ main_config.stocks.scroll_delay }}" min="0.01" max="1.0" step="0.01">
+                            <div class="description">Scroll delay for stock ticker (0.01-1.0 seconds)</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="stocks_toggle_chart">Show Charts:</label>
+                            <div class="toggle-container">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="stocks_toggle_chart" name="stocks_toggle_chart" {% if main_config.stocks.toggle_chart %}checked{% endif %}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="description">Display mini charts alongside stock ticker data</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="stocks_display_format">Display Format:</label>
+                            <input type="text" id="stocks_display_format" name="stocks_display_format" value="{{ main_config.stocks.display_format }}" placeholder="{symbol}: ${price} ({change}%)">
+                            <div class="description">Stock display format (use {symbol}, {price}, {change}, etc.)</div>
+                        </div>
+                        
                         <button type="submit">Save Stocks Settings</button>
                     </form>
                 </div>
@@ -1235,6 +1633,23 @@
                             <label for="crypto_update_interval">Update Interval (seconds):</label>
                             <input type="number" id="crypto_update_interval" name="crypto_update_interval" value="{{ main_config.crypto.update_interval }}" min="60" max="3600">
                             <div class="description">How often to update crypto data</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="crypto_display_format">Display Format:</label>
+                            <input type="text" id="crypto_display_format" name="crypto_display_format" value="{{ main_config.crypto.display_format }}" placeholder="{symbol}: ${price} ({change}%)">
+                            <div class="description">Crypto display format (use {symbol}, {price}, {change}, etc.)</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="crypto_toggle_chart">Show Charts:</label>
+                            <div class="toggle-container">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="crypto_toggle_chart" name="crypto_toggle_chart" {% if main_config.crypto.toggle_chart %}checked{% endif %}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="description">Display mini charts alongside crypto ticker data</div>
                         </div>
                         
                         <button type="submit">Save Crypto Settings</button>
@@ -1316,6 +1731,30 @@
                             <div class="description">How often to update stock news</div>
                         </div>
                         
+                        <div class="form-group">
+                            <label for="stock_news_scroll_speed">Scroll Speed:</label>
+                            <input type="number" id="stock_news_scroll_speed" name="stock_news_scroll_speed" value="{{ main_config.stock_news.scroll_speed }}" min="1" max="10">
+                            <div class="description">Scroll speed for stock news (1-10)</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="stock_news_scroll_delay">Scroll Delay:</label>
+                            <input type="number" id="stock_news_scroll_delay" name="stock_news_scroll_delay" value="{{ main_config.stock_news.scroll_delay }}" min="0.01" max="1.0" step="0.01">
+                            <div class="description">Scroll delay for stock news (0.01-1.0 seconds)</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="stock_news_max_headlines_per_symbol">Max Headlines Per Symbol:</label>
+                            <input type="number" id="stock_news_max_headlines_per_symbol" name="stock_news_max_headlines_per_symbol" value="{{ main_config.stock_news.max_headlines_per_symbol }}" min="1" max="10">
+                            <div class="description">Maximum headlines to show per stock symbol</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="stock_news_headlines_per_rotation">Headlines Per Rotation:</label>
+                            <input type="number" id="stock_news_headlines_per_rotation" name="stock_news_headlines_per_rotation" value="{{ main_config.stock_news.headlines_per_rotation }}" min="1" max="20">
+                            <div class="description">Number of headlines to show per rotation</div>
+                        </div>
+                        
                         <button type="submit">Save Stock News Settings</button>
                     </form>
                 </div>
@@ -1340,6 +1779,99 @@
                             <label for="odds_ticker_update_interval">Update Interval (seconds):</label>
                             <input type="number" id="odds_ticker_update_interval" name="odds_ticker_update_interval" value="{{ main_config.odds_ticker.update_interval }}" min="60" max="3600">
                             <div class="description">How often to update odds</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="odds_ticker_show_favorite_teams_only">Show Favorite Teams Only:</label>
+                            <div class="toggle-container">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="odds_ticker_show_favorite_teams_only" name="odds_ticker_show_favorite_teams_only" {% if main_config.odds_ticker.show_favorite_teams_only %}checked{% endif %}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="description">Only show odds for favorite teams</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="odds_ticker_games_per_favorite_team">Games Per Favorite Team:</label>
+                            <input type="number" id="odds_ticker_games_per_favorite_team" name="odds_ticker_games_per_favorite_team" value="{{ main_config.odds_ticker.games_per_favorite_team }}" min="1" max="10">
+                            <div class="description">Number of games to show per favorite team</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="odds_ticker_max_games_per_league">Max Games Per League:</label>
+                            <input type="number" id="odds_ticker_max_games_per_league" name="odds_ticker_max_games_per_league" value="{{ main_config.odds_ticker.max_games_per_league }}" min="1" max="20">
+                            <div class="description">Maximum games to show per league</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="odds_ticker_show_odds_only">Show Odds Only:</label>
+                            <div class="toggle-container">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="odds_ticker_show_odds_only" name="odds_ticker_show_odds_only" {% if main_config.odds_ticker.show_odds_only %}checked{% endif %}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="description">Show only odds without game details</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="odds_ticker_sort_order">Sort Order:</label>
+                            <select id="odds_ticker_sort_order" name="odds_ticker_sort_order">
+                                <option value="soonest" {% if main_config.odds_ticker.sort_order == "soonest" %}selected{% endif %}>Soonest</option>
+                                <option value="latest" {% if main_config.odds_ticker.sort_order == "latest" %}selected{% endif %}>Latest</option>
+                                <option value="alphabetical" {% if main_config.odds_ticker.sort_order == "alphabetical" %}selected{% endif %}>Alphabetical</option>
+                            </select>
+                            <div class="description">How to sort the odds ticker</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="odds_ticker_enabled_leagues">Enabled Leagues:</label>
+                            <div class="array-input">
+                                <input type="text" id="odds_ticker_enabled_leagues" name="odds_ticker_enabled_leagues" value="{{ main_config.odds_ticker.enabled_leagues|join(', ') }}" placeholder="nfl, mlb, ncaa_fb, milb">
+                                <button type="button" class="add-item-btn" onclick="addArrayItem('odds_ticker_enabled_leagues')">Add</button>
+                            </div>
+                            <div class="description">Comma-separated list of enabled leagues</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="odds_ticker_scroll_speed">Scroll Speed:</label>
+                            <input type="number" id="odds_ticker_scroll_speed" name="odds_ticker_scroll_speed" value="{{ main_config.odds_ticker.scroll_speed }}" min="1" max="10">
+                            <div class="description">Scroll speed for odds ticker (1-10)</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="odds_ticker_scroll_delay">Scroll Delay:</label>
+                            <input type="number" id="odds_ticker_scroll_delay" name="odds_ticker_scroll_delay" value="{{ main_config.odds_ticker.scroll_delay }}" min="0.01" max="1.0" step="0.01">
+                            <div class="description">Scroll delay for odds ticker (0.01-1.0 seconds)</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="odds_ticker_loop">Loop:</label>
+                            <div class="toggle-container">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="odds_ticker_loop" name="odds_ticker_loop" {% if main_config.odds_ticker.loop %}checked{% endif %}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="description">Loop the odds ticker continuously</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="odds_ticker_future_fetch_days">Future Fetch Days:</label>
+                            <input type="number" id="odds_ticker_future_fetch_days" name="odds_ticker_future_fetch_days" value="{{ main_config.odds_ticker.future_fetch_days }}" min="1" max="365">
+                            <div class="description">Number of days ahead to fetch odds for</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="odds_ticker_show_channel_logos">Show Channel Logos:</label>
+                            <div class="toggle-container">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="odds_ticker_show_channel_logos" name="odds_ticker_show_channel_logos" {% if main_config.odds_ticker.show_channel_logos %}checked{% endif %}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="description">Show broadcast channel logos</div>
                         </div>
                         
                         <button type="submit">Save Odds Ticker Settings</button>
@@ -1401,6 +1933,53 @@
                         </div>
                         
                         <div class="form-group">
+                            <label for="text_display_font_path">Font Path:</label>
+                            <input type="text" id="text_display_font_path" name="text_display_font_path" value="{{ main_config.text_display.font_path }}" placeholder="assets/fonts/press-start-2p.ttf">
+                            <div class="description">Path to the font file for text display</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="text_display_font_size">Font Size:</label>
+                            <input type="number" id="text_display_font_size" name="text_display_font_size" value="{{ main_config.text_display.font_size }}" min="1" max="20">
+                            <div class="description">Font size for text display (1-20)</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="text_display_scroll">Scroll Text:</label>
+                            <div class="toggle-container">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="text_display_scroll" name="text_display_scroll" {% if main_config.text_display.scroll %}checked{% endif %}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="description">Enable text scrolling</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="text_display_scroll_speed">Scroll Speed:</label>
+                            <input type="number" id="text_display_scroll_speed" name="text_display_scroll_speed" value="{{ main_config.text_display.scroll_speed }}" min="1" max="100">
+                            <div class="description">Scroll speed for text (1-100)</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="text_display_text_color">Text Color (RGB):</label>
+                            <input type="text" id="text_display_text_color" name="text_display_text_color" value="{{ main_config.text_display.text_color|join(', ') }}" placeholder="255, 0, 0">
+                            <div class="description">Text color as RGB values (0-255, comma-separated)</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="text_display_background_color">Background Color (RGB):</label>
+                            <input type="text" id="text_display_background_color" name="text_display_background_color" value="{{ main_config.text_display.background_color|join(', ') }}" placeholder="0, 0, 0">
+                            <div class="description">Background color as RGB values (0-255, comma-separated)</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="text_display_scroll_gap_width">Scroll Gap Width:</label>
+                            <input type="number" id="text_display_scroll_gap_width" name="text_display_scroll_gap_width" value="{{ main_config.text_display.scroll_gap_width }}" min="0" max="100">
+                            <div class="description">Gap width for scrolling text (0-100 pixels)</div>
+                        </div>
+                        
+                        <div class="form-group">
                             <label for="text_display_duration">Text Display Duration (seconds):</label>
                             <input type="number" id="text_display_duration" name="text_display_duration" value="{{ main_config.display.display_durations.text_display }}" min="5" max="120">
                             <div class="description">How long to show custom text</div>
@@ -1430,6 +2009,27 @@
                             <label for="of_the_day_update_interval">Update Interval (seconds):</label>
                             <input type="number" id="of_the_day_update_interval" name="of_the_day_update_interval" value="{{ main_config.of_the_day.update_interval }}" min="300" max="3600">
                             <div class="description">How often to update word of the day</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="of_the_day_display_rotate_interval">Display Rotate Interval (seconds):</label>
+                            <input type="number" id="of_the_day_display_rotate_interval" name="of_the_day_display_rotate_interval" value="{{ main_config.of_the_day.display_rotate_interval }}" min="5" max="120">
+                            <div class="description">How often to rotate between different 'of the day' items</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="of_the_day_subtitle_rotate_interval">Subtitle Rotate Interval (seconds):</label>
+                            <input type="number" id="of_the_day_subtitle_rotate_interval" name="of_the_day_subtitle_rotate_interval" value="{{ main_config.of_the_day.subtitle_rotate_interval }}" min="1" max="60">
+                            <div class="description">How often to rotate subtitles</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="of_the_day_category_order">Category Order:</label>
+                            <div class="array-input">
+                                <input type="text" id="of_the_day_category_order" name="of_the_day_category_order" value="{{ main_config.of_the_day.category_order|join(', ') }}" placeholder="word_of_the_day, slovenian_word_of_the_day">
+                                <button type="button" class="add-item-btn" onclick="addArrayItem('of_the_day_category_order')">Add</button>
+                            </div>
+                            <div class="description">Order of categories to display</div>
                         </div>
                         
                         <button type="submit">Save Of The Day Settings</button>
@@ -1519,6 +2119,18 @@
                             <button type="button" class="add-item-btn" onclick="addArrayItem('calendar_calendars')">Add</button>
                         </div>
                         <div class="description">Comma-separated calendar names</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="calendar_credentials_file">Credentials File:</label>
+                        <input type="text" id="calendar_credentials_file" name="calendar_credentials_file" value="{{ main_config.calendar.credentials_file }}" placeholder="credentials.json">
+                        <div class="description">Path to Google Calendar credentials file</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="calendar_token_file">Token File:</label>
+                        <input type="text" id="calendar_token_file" name="calendar_token_file" value="{{ main_config.calendar.token_file }}" placeholder="token.pickle">
+                        <div class="description">Path to Google Calendar token file</div>
                     </div>
                     
                     <button type="submit">Save Calendar Settings</button>
@@ -2187,11 +2799,20 @@
                             chain_length: parseInt(formData.get('chain_length')),
                             parallel: parseInt(formData.get('parallel')),
                             brightness: parseInt(formData.get('brightness')),
-                            hardware_mapping: formData.get('hardware_mapping')
+                            hardware_mapping: formData.get('hardware_mapping'),
+                            scan_mode: parseInt(formData.get('scan_mode')),
+                            pwm_bits: parseInt(formData.get('pwm_bits')),
+                            pwm_dither_bits: parseInt(formData.get('pwm_dither_bits')),
+                            pwm_lsb_nanoseconds: parseInt(formData.get('pwm_lsb_nanoseconds')),
+                            disable_hardware_pulsing: formData.get('disable_hardware_pulsing') === 'on',
+                            inverse_colors: formData.get('inverse_colors') === 'on',
+                            show_refresh_rate: formData.get('show_refresh_rate') === 'on',
+                            limit_refresh_rate_hz: parseInt(formData.get('limit_refresh_rate_hz'))
                         },
                         runtime: {
                             gpio_slowdown: parseInt(formData.get('gpio_slowdown'))
-                        }
+                        },
+                        use_short_date_format: formData.get('use_short_date_format') === 'on'
                     }
                 };
                 
@@ -2227,7 +2848,8 @@
                     weather: {
                         enabled: formData.get('weather_enabled') === 'on',
                         units: formData.get('weather_units'),
-                        update_interval: parseInt(formData.get('weather_update_interval'))
+                        update_interval: parseInt(formData.get('weather_update_interval')),
+                        display_format: formData.get('weather_display_format')
                     },
                     location: {
                         city: formData.get('weather_city'),
@@ -2268,7 +2890,11 @@
                     stocks: {
                         enabled: formData.get('stocks_enabled') === 'on',
                         symbols: symbols,
-                        update_interval: parseInt(formData.get('stocks_update_interval'))
+                        update_interval: parseInt(formData.get('stocks_update_interval')),
+                        scroll_speed: parseInt(formData.get('stocks_scroll_speed')),
+                        scroll_delay: parseFloat(formData.get('stocks_scroll_delay')),
+                        toggle_chart: formData.get('stocks_toggle_chart') === 'on',
+                        display_format: formData.get('stocks_display_format')
                     }
                 };
                 
@@ -2305,7 +2931,9 @@
                     crypto: {
                         enabled: formData.get('crypto_enabled') === 'on',
                         symbols: symbols,
-                        update_interval: parseInt(formData.get('crypto_update_interval'))
+                        update_interval: parseInt(formData.get('crypto_update_interval')),
+                        display_format: formData.get('crypto_display_format'),
+                        toggle_chart: formData.get('crypto_toggle_chart') === 'on'
                     }
                 };
                 
@@ -2380,7 +3008,9 @@
                         enabled: formData.get('calendar_enabled') === 'on',
                         max_events: parseInt(formData.get('calendar_max_events')),
                         update_interval: parseInt(formData.get('calendar_update_interval')),
-                        calendars: calendars
+                        calendars: calendars,
+                        credentials_file: formData.get('calendar_credentials_file'),
+                        token_file: formData.get('calendar_token_file')
                     }
                 };
                 
@@ -2465,7 +3095,38 @@
                             calendar: parseInt(formData.get('calendar_duration')),
                             youtube: parseInt(formData.get('youtube_duration')),
                             text_display: parseInt(formData.get('text_display_duration')),
-                            of_the_day: parseInt(formData.get('of_the_day_duration'))
+                            of_the_day: parseInt(formData.get('of_the_day_duration')),
+                            hourly_forecast: parseInt(formData.get('hourly_forecast_duration')),
+                            daily_forecast: parseInt(formData.get('daily_forecast_duration')),
+                            stock_news: parseInt(formData.get('stock_news_duration')),
+                            odds_ticker: parseInt(formData.get('odds_ticker_duration')),
+                            nhl_live: parseInt(formData.get('nhl_live_duration')),
+                            nhl_recent: parseInt(formData.get('nhl_recent_duration')),
+                            nhl_upcoming: parseInt(formData.get('nhl_upcoming_duration')),
+                            nba_live: parseInt(formData.get('nba_live_duration')),
+                            nba_recent: parseInt(formData.get('nba_recent_duration')),
+                            nba_upcoming: parseInt(formData.get('nba_upcoming_duration')),
+                            nfl_live: parseInt(formData.get('nfl_live_duration')),
+                            nfl_recent: parseInt(formData.get('nfl_recent_duration')),
+                            nfl_upcoming: parseInt(formData.get('nfl_upcoming_duration')),
+                            ncaa_fb_live: parseInt(formData.get('ncaa_fb_live_duration')),
+                            ncaa_fb_recent: parseInt(formData.get('ncaa_fb_recent_duration')),
+                            ncaa_fb_upcoming: parseInt(formData.get('ncaa_fb_upcoming_duration')),
+                            ncaa_baseball_live: parseInt(formData.get('ncaa_baseball_live_duration')),
+                            ncaa_baseball_recent: parseInt(formData.get('ncaa_baseball_recent_duration')),
+                            ncaa_baseball_upcoming: parseInt(formData.get('ncaa_baseball_upcoming_duration')),
+                            mlb_live: parseInt(formData.get('mlb_live_duration')),
+                            mlb_recent: parseInt(formData.get('mlb_recent_duration')),
+                            mlb_upcoming: parseInt(formData.get('mlb_upcoming_duration')),
+                            milb_live: parseInt(formData.get('milb_live_duration')),
+                            milb_recent: parseInt(formData.get('milb_recent_duration')),
+                            milb_upcoming: parseInt(formData.get('milb_upcoming_duration')),
+                            soccer_live: parseInt(formData.get('soccer_live_duration')),
+                            soccer_recent: parseInt(formData.get('soccer_recent_duration')),
+                            soccer_upcoming: parseInt(formData.get('soccer_upcoming_duration')),
+                            ncaam_basketball_live: parseInt(formData.get('ncaam_basketball_live_duration')),
+                            ncaam_basketball_recent: parseInt(formData.get('ncaam_basketball_recent_duration')),
+                            ncaam_basketball_upcoming: parseInt(formData.get('ncaam_basketball_upcoming_duration'))
                         }
                     }
                 };
@@ -2574,7 +3235,11 @@
                 const config = {
                     stock_news: {
                         enabled: formData.get('stock_news_enabled') === 'on',
-                        update_interval: parseInt(formData.get('stock_news_update_interval'))
+                        update_interval: parseInt(formData.get('stock_news_update_interval')),
+                        scroll_speed: parseInt(formData.get('stock_news_scroll_speed')),
+                        scroll_delay: parseFloat(formData.get('stock_news_scroll_delay')),
+                        max_headlines_per_symbol: parseInt(formData.get('stock_news_max_headlines_per_symbol')),
+                        headlines_per_rotation: parseInt(formData.get('stock_news_headlines_per_rotation'))
                     }
                 };
                 
@@ -2609,7 +3274,18 @@
                 const config = {
                     odds_ticker: {
                         enabled: formData.get('odds_ticker_enabled') === 'on',
-                        update_interval: parseInt(formData.get('odds_ticker_update_interval'))
+                        update_interval: parseInt(formData.get('odds_ticker_update_interval')),
+                        show_favorite_teams_only: formData.get('odds_ticker_show_favorite_teams_only') === 'on',
+                        games_per_favorite_team: parseInt(formData.get('odds_ticker_games_per_favorite_team')),
+                        max_games_per_league: parseInt(formData.get('odds_ticker_max_games_per_league')),
+                        show_odds_only: formData.get('odds_ticker_show_odds_only') === 'on',
+                        sort_order: formData.get('odds_ticker_sort_order'),
+                        enabled_leagues: formData.get('odds_ticker_enabled_leagues').split(',').map(s => s.trim()).filter(s => s),
+                        scroll_speed: parseInt(formData.get('odds_ticker_scroll_speed')),
+                        scroll_delay: parseFloat(formData.get('odds_ticker_scroll_delay')),
+                        loop: formData.get('odds_ticker_loop') === 'on',
+                        future_fetch_days: parseInt(formData.get('odds_ticker_future_fetch_days')),
+                        show_channel_logos: formData.get('odds_ticker_show_channel_logos') === 'on'
                     }
                 };
                 
@@ -2680,7 +3356,14 @@
                 const config = {
                     text_display: {
                         enabled: formData.get('text_display_enabled') === 'on',
-                        text: formData.get('text_display_text')
+                        text: formData.get('text_display_text'),
+                        font_path: formData.get('text_display_font_path'),
+                        font_size: parseInt(formData.get('text_display_font_size')),
+                        scroll: formData.get('text_display_scroll') === 'on',
+                        scroll_speed: parseInt(formData.get('text_display_scroll_speed')),
+                        text_color: formData.get('text_display_text_color').split(',').map(s => parseInt(s.trim())),
+                        background_color: formData.get('text_display_background_color').split(',').map(s => parseInt(s.trim())),
+                        scroll_gap_width: parseInt(formData.get('text_display_scroll_gap_width'))
                     },
                     display: {
                         display_durations: {
@@ -2720,7 +3403,10 @@
                 const config = {
                     of_the_day: {
                         enabled: formData.get('of_the_day_enabled') === 'on',
-                        update_interval: parseInt(formData.get('of_the_day_update_interval'))
+                        update_interval: parseInt(formData.get('of_the_day_update_interval')),
+                        display_rotate_interval: parseInt(formData.get('of_the_day_display_rotate_interval')),
+                        subtitle_rotate_interval: parseInt(formData.get('of_the_day_subtitle_rotate_interval')),
+                        category_order: formData.get('of_the_day_category_order').split(',').map(s => s.trim()).filter(s => s)
                     }
                 };
                 
