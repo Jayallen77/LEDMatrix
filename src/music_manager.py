@@ -798,7 +798,7 @@ class MusicManager:
 
         # --- Progress Bar --- 
         progress_bar_height = 3
-        progress_bar_y = matrix_height - progress_bar_height
+        progress_bar_y = matrix_height - progress_bar_height - 1
         duration_ms = current_track_info_snapshot.get('duration_ms', 0)
         progress_ms = current_track_info_snapshot.get('progress_ms', 0)
 
