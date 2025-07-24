@@ -256,7 +256,7 @@
         "update_interval": 3600
     },
     "mlb": {
-        "enabled":  true,
+        "enabled":  false,
         "show_odds": true,
         "test_mode": false,
         "update_interval_seconds": 3600,
@@ -278,7 +278,7 @@
         }
     },
     "milb": {
-        "enabled":  true,
+        "enabled":  false,
         "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 30,
@@ -334,7 +334,7 @@
         "POLLING_INTERVAL_SECONDS": 1
     },
     "of_the_day": {
-        "enabled": true,
+        "enabled": false,
         "display_rotate_interval": 20,
         "update_interval": 3600,
         "subtitle_rotate_interval": 10,
