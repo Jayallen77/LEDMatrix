@@ -752,23 +752,12 @@ class MusicManager:
         # Dynamically calculate line heights and positions
         line_height_title = self.display_manager.get_font_height(font_title)
         line_height_artist_album = self.display_manager.get_font_height(font_artist_album)
-        padding_between_lines = 1
+        padding_between_lines = 2 # User requested 2 pixels between lines
 
         TEXT_SCROLL_DIVISOR = 5 
 
         # --- Title --- 
-        # Start title's baseline y_pos slightly lower to give it padding from the top.
-        # The ascender gives the distance from the baseline to the top of the glyphs.
-        try:
-            # For TTF fonts, getbbox gives a tight bounding box.
-            # We use it to find the height of the actual rendered pixels for the letter 'A'
-            # and position the text based on that.
-            title_ascent, _ = font_title.getmetrics()
-            y_pos_title = title_ascent + 1 # Start 1 pixel below the top
-        except AttributeError:
-             # Fallback for BDF/other fonts that don't have getmetrics()
-            y_pos_title = line_height_title 
-
+        y_pos_title_top = 1 # Position title 1px from the top
 
         title_width = self.display_manager.get_text_width(title, font_title)
         current_title_display_text = title
@@ -778,7 +767,7 @@ class MusicManager:
             current_title_display_text = title[self.scroll_position_title:] + "   " + title[:self.scroll_position_title]
         
         self.display_manager.draw_text(current_title_display_text, 
-                                     x=text_area_x_start, y=y_pos_title - title_ascent, color=(255, 255, 255), font=font_title) # Adjust y for baseline
+                                     x=text_area_x_start, y=y_pos_title_top, color=(255, 255, 255), font=font_title)
         if title_width > text_area_width:
             self.title_scroll_tick += 1
             if self.title_scroll_tick % TEXT_SCROLL_DIVISOR == 0:
@@ -789,7 +778,7 @@ class MusicManager:
             self.title_scroll_tick = 0
 
         # --- Artist --- 
-        y_pos_artist = y_pos_title + line_height_title + padding_between_lines
+        y_pos_artist = y_pos_title_top + line_height_title + padding_between_lines
         artist_width = self.display_manager.get_text_width(artist, font_artist_album)
         current_artist_display_text = artist
         if artist_width > text_area_width:
