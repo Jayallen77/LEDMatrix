@@ -268,7 +268,7 @@
         "update_interval": 3600
     },
     "mlb": {
-        "enabled":  true,
+        "enabled":  false,
         "live_priority": true,
         "live_game_duration": 30,
         "show_odds": true,
