@@ -384,8 +384,22 @@ class BaseMLBManager:
             logger.error(f"Error formatting game time: {e}")
             return "TBD"
 
-    def _fetch_mlb_api_data(self) -> Dict[str, Any]:
+    def _fetch_mlb_api_data(self, use_cache: bool = True) -> Dict[str, Any]:
         """Fetch MLB game data from the ESPN API."""
+        # Define cache key based on dates
+        now = datetime.now(timezone.utc)
+        yesterday = now - timedelta(days=1)
+        tomorrow = now + timedelta(days=1)
+        dates_str = f"{yesterday.strftime('%Y%m%d')}-{now.strftime('%Y%m%d')}-{tomorrow.strftime('%Y%m%d')}"
+        cache_key = f"mlb_api_data_{dates_str}"
+
+        # If using cache, try to load from cache first
+        if use_cache:
+            cached_data = self.cache_manager.get_with_auto_strategy(cache_key)
+            if cached_data:
+                self.logger.info("Using cached MLB API data.")
+                return cached_data
+
         try:
             # Check if test mode is enabled
             if self.mlb_config.get('test_mode', False):
@@ -486,7 +500,7 @@ class BaseMLBManager:
                         # Handle end of inning: next inning is top
                         if 'end' in status_detail or 'end' in status_short:
                             inning_half = 'top'
-                            inning += 1
+                            inning = event['status'].get('period', 1) + 1 # Use period and increment for next inning
                             if is_favorite_game:
                                 self.logger.debug(f"[MLB] Detected end of inning. Setting to Top {inning}")
                         # Handle middle of inning: next is bottom of current inning
@@ -597,6 +611,10 @@ class BaseMLBManager:
                 self.logger.info(f"Found {len(favorite_games)} games for favorite teams: {self.favorite_teams}")
                 for game in favorite_games:
                     self.logger.info(f"Favorite team game: {game['away_team']} @ {game['home_team']} (Status: {game['status']}, State: {game['status_state']})")
+            
+            # Save to cache if caching is enabled
+            if use_cache:
+                self.cache_manager.set(cache_key, all_games)
             
             return all_games
             
@@ -767,8 +785,8 @@ class MLBLiveManager(BaseMLBManager):
                     else:
                         self.current_game["away_score"] = str(int(self.current_game["away_score"]) + 1)
             else:
-                # Fetch live game data from MLB API
-                games = self._fetch_mlb_api_data()
+                # Fetch live game data from MLB API, bypassing the cache
+                games = self._fetch_mlb_api_data(use_cache=False)
                 if games:
                     
                     # --- Optimization: Filter for favorite teams before processing ---
