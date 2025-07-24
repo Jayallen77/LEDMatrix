@@ -345,21 +345,6 @@ class BaseNHLManager:
                 else:
                     game_date = self.display_manager.format_date_with_ordinal(local_time)
 
-            # Calculate if game is within recent window
-            is_within_window = False
-            if start_time_utc:
-                # For upcoming games, check if the game is within the next 48 hours
-                if status["type"]["state"] == "pre":
-                    cutoff_time = datetime.now(pytz.utc) + timedelta(hours=self.recent_hours)
-                    is_within_window = start_time_utc <= cutoff_time
-                    self.logger.info(f"[NHL] Game time: {start_time_utc}, Cutoff time: {cutoff_time}, Within window: {is_within_window}")
-                    self.logger.info(f"[NHL] Game status: {status['type']['state']}, Home: {home_team['team']['abbreviation']}, Away: {away_team['team']['abbreviation']}")
-                else:
-                    # For recent games, check if the game is within the last 48 hours
-                    cutoff_time = datetime.now(pytz.utc) - timedelta(hours=self.recent_hours)
-                    is_within_window = start_time_utc > cutoff_time
-                self.logger.debug(f"[NHL] Game time: {start_time_utc}, Cutoff time: {cutoff_time}, Within window: {is_within_window}")
-
             details = {
                 "start_time_utc": start_time_utc,
                 "status_text": status["type"]["shortDetail"],
@@ -368,7 +353,6 @@ class BaseNHLManager:
                 "is_live": status["type"]["state"] in ("in", "halftime"),
                 "is_final": status["type"]["state"] == "post",
                 "is_upcoming": status["type"]["state"] == "pre",
-                "is_within_window": is_within_window,
                 "home_abbr": home_team["team"]["abbreviation"],
                 "home_score": home_team.get("score", "0"),
                 "home_record": home_record,
@@ -735,31 +719,40 @@ class NHLRecentManager(BaseNHLManager):
             self.logger.info(f"[NHL] Successfully fetched {len(events)} events from ESPN API")
             
             # Process games
-            self.recent_games = []
+            processed_games = []
             for event in events:
                 game = self._extract_game_details(event)
-                if game:
+                if game and game['is_final']:
                     # Fetch odds if enabled
                     self._fetch_odds(game)
-                    self.recent_games.append(game)
-                    self.logger.debug(f"Processing game: {game['away_abbr']} vs {game['home_abbr']} - Final: {game['is_final']}, Within window: {game['is_within_window']}")
+                    processed_games.append(game)
             
             # Filter for favorite teams only if the config is set
-            if self.nhl_config.get("show_favorite_teams_only", False):
-                team_games = [game for game in self.recent_games 
+            if self.nhl_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+                team_games = [game for game in processed_games
                          if game['home_abbr'] in self.favorite_teams or 
                             game['away_abbr'] in self.favorite_teams]
             else:
-                team_games = self.recent_games
+                team_games = processed_games
             
+            team_games.sort(key=lambda x: x.get('start_time_utc') or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+
             self.logger.info(f"[NHL] Found {len(team_games)} recent games for favorite teams")
-            if not team_games:
-                self.logger.info("[NHL] No recent games found for favorite teams")
-                return
-                
-            self.games_list = team_games
-            self.current_game = team_games[0]
             
+            new_game_ids = {g['id'] for g in team_games}
+            current_game_ids = {g['id'] for g in getattr(self, 'games_list', [])}
+
+            if new_game_ids != current_game_ids:
+                self.games_list = team_games
+                self.current_game_index = 0
+                self.current_game = self.games_list[0] if self.games_list else None
+                self.last_game_switch = current_time
+            elif self.games_list:
+                self.current_game = self.games_list[self.current_game_index]
+
+            if not self.games_list:
+                self.current_game = None
+
         except Exception as e:
             self.logger.error(f"[NHL] Error updating recent games: {e}", exc_info=True)
 
@@ -827,58 +820,50 @@ class NHLUpcomingManager(BaseNHLManager):
             new_upcoming_games = []
             for event in events:
                 game = self._extract_game_details(event)
-                if game:
-                    self.logger.debug(f"[NHL] Processing game: {game['away_abbr']} vs {game['home_abbr']}")
-                    self.logger.debug(f"[NHL] Game status: is_final={game['is_final']}, is_upcoming={game['is_upcoming']}, is_within_window={game['is_within_window']}")
-                    self.logger.debug(f"[NHL] Game time: {game['start_time_utc']}")
+                if game and game['is_upcoming']:
                     # Only fetch odds for games that will be displayed
                     if self.nhl_config.get("show_favorite_teams_only", False):
-                        if not self.favorite_teams:
+                        if not self.favorite_teams or (game['home_abbr'] not in self.favorite_teams and game['away_abbr'] not in self.favorite_teams):
                             continue
-                        if game['home_abbr'] not in self.favorite_teams and game['away_abbr'] not in self.favorite_teams:
-                            continue
-                    if not game['is_final'] and game['is_within_window']:
-                        self._fetch_odds(game)
-                        new_upcoming_games.append(game)
-                        self.logger.debug(f"[NHL] Added to upcoming games: {game['away_abbr']} vs {game['home_abbr']}")
+                    
+                    self._fetch_odds(game)
+                    new_upcoming_games.append(game)
             
             # Filter for favorite teams only if the config is set
-            if self.nhl_config.get("show_favorite_teams_only", False):
-                new_team_games = [game for game in new_upcoming_games 
+            if self.nhl_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+                team_games = [game for game in new_upcoming_games 
                          if game['home_abbr'] in self.favorite_teams or 
                             game['away_abbr'] in self.favorite_teams]
             else:
-                new_team_games = new_upcoming_games
+                team_games = new_upcoming_games
             
-            # Log all upcoming games found *before* filtering by favorite teams
-            if new_upcoming_games:
-                self.logger.info(f"[NHL] Found {len(new_upcoming_games)} total upcoming games within window before team filtering:")
-                for game in new_upcoming_games:
-                    self.logger.info(f"  - {game['away_abbr']} vs {game['home_abbr']} at {game['game_date']} {game['game_time']}")
-            else:
-                self.logger.info("[NHL] No upcoming games found within window (before team filtering).")
+            team_games.sort(key=lambda x: x.get('start_time_utc') or datetime.max.replace(tzinfo=timezone.utc))
 
             # Only log if there's a change in games or enough time has passed
             should_log = (
                 current_time - self.last_log_time >= self.log_interval or
-                len(new_team_games) != len(self.upcoming_games) or
+                len(team_games) != len(self.upcoming_games) or
                 not self.upcoming_games  # Log if we had no games before
             )
             
             if should_log:
-                if new_team_games:
-                    self.logger.info(f"[NHL] Found {len(new_team_games)} upcoming games for favorite teams")
-                    for game in new_team_games:
+                if team_games:
+                    self.logger.info(f"[NHL] Found {len(team_games)} upcoming games for favorite teams")
+                    for game in team_games:
                         self.logger.info(f"[NHL] Upcoming game: {game['away_abbr']} vs {game['home_abbr']} - {game['game_date']} {game['game_time']}")
                 else:
                     self.logger.info("[NHL] No upcoming games found for favorite teams")
                     self.logger.debug(f"[NHL] Favorite teams: {self.favorite_teams}")
-                    self.logger.debug(f"[NHL] Total upcoming games before filtering: {len(new_upcoming_games)}")
                 self.last_log_time = current_time
             
-            self.upcoming_games = new_team_games
+            self.upcoming_games = team_games
             if self.upcoming_games:
-                self.current_game = self.upcoming_games[0]
+                if not self.current_game or self.current_game['id'] not in {g['id'] for g in self.upcoming_games}:
+                    self.current_game_index = 0
+                    self.current_game = self.upcoming_games[0]
+                    self.last_game_switch = current_time
+            else:
+                self.current_game = None
             
         except Exception as e:
             self.logger.error(f"[NHL] Error updating upcoming games: {e}", exc_info=True)

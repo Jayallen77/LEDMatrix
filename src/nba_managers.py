@@ -385,13 +385,6 @@ class BaseNBAManager:
                 else:
                     game_date = self.display_manager.format_date_with_ordinal(local_time)
 
-            # Calculate if game is within recent window
-            is_within_window = False
-            if start_time_utc:
-                cutoff_time = datetime.now(self._get_timezone()) - timedelta(hours=self.recent_hours)
-                is_within_window = start_time_utc > cutoff_time
-                self.logger.debug(f"[NBA] Game time: {start_time_utc}, Cutoff time: {cutoff_time}, Within window: {is_within_window}")
-
             details = {
                 "start_time_utc": start_time_utc,
                 "status_text": status["type"]["shortDetail"],
@@ -400,7 +393,6 @@ class BaseNBAManager:
                 "is_live": status["type"]["state"] in ("in", "halftime"),
                 "is_final": status["type"]["state"] == "post",
                 "is_upcoming": status["type"]["state"] == "pre",
-                "is_within_window": is_within_window,
                 "home_abbr": home_team["team"]["abbreviation"],
                 "home_score": home_team.get("score", "0"),
                 "home_record": home_record,
@@ -746,21 +738,29 @@ class NBARecentManager(BaseNBAManager):
             new_recent_games = []
             for event in events:
                 game = self._extract_game_details(event)
-                if game and game['is_final'] and game['is_within_window']:
+                if game and game['is_final']:
                     self._fetch_odds(game)
                     new_recent_games.append(game)
 
             # Filter for favorite teams only if the config is set
-            if self.nba_config.get("show_favorite_teams_only", False):
+            if self.nba_config.get("show_favorite_teams_only", False) and self.favorite_teams:
                 team_games = [game for game in new_recent_games 
                              if game['home_abbr'] in self.favorite_teams or 
                                 game['away_abbr'] in self.favorite_teams]
             else:
                 team_games = new_recent_games
 
+            team_games.sort(key=lambda x: x.get('start_time_utc') or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
             self.recent_games = team_games
+
             if self.recent_games:
-                self.current_game = self.recent_games[0]
+                if not self.current_game or self.current_game['id'] not in {g['id'] for g in self.recent_games}:
+                    self.current_game_index = 0
+                    self.current_game = self.recent_games[0]
+                    self.last_game_switch = current_time
+            else:
+                self.current_game = None
+
             self.last_update = current_time
 
         except Exception as e:
@@ -809,23 +809,31 @@ class NBAUpcomingManager(BaseNBAManager):
                 return
 
             events = data['events']
-            self.upcoming_games = []
+            new_upcoming_games = []
             for event in events:
                 game = self._extract_game_details(event)
                 if game and game['is_upcoming']:
                     self._fetch_odds(game)
-                    self.upcoming_games.append(game)
+                    new_upcoming_games.append(game)
 
             # Filter for favorite teams only if the config is set
-            if self.nba_config.get("show_favorite_teams_only", False):
-                team_games = [game for game in self.upcoming_games 
+            if self.nba_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+                team_games = [game for game in new_upcoming_games 
                              if game['home_abbr'] in self.favorite_teams or 
                                 game['away_abbr'] in self.favorite_teams]
             else:
-                team_games = self.upcoming_games
+                team_games = new_upcoming_games
 
-            if team_games:
-                self.current_game = team_games[0]
+            team_games.sort(key=lambda x: x.get('start_time_utc') or datetime.max.replace(tzinfo=timezone.utc))
+            self.upcoming_games = team_games
+
+            if self.upcoming_games:
+                if not self.current_game or self.current_game['id'] not in {g['id'] for g in self.upcoming_games}:
+                    self.current_game_index = 0
+                    self.current_game = self.upcoming_games[0]
+            else:
+                self.current_game = None
+            
             self.last_update = current_time
 
         except Exception as e:

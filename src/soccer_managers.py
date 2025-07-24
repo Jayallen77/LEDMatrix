@@ -495,17 +495,6 @@ class BaseSoccerManager:
             is_upcoming = status_type == "STATUS_SCHEDULED"
             is_halftime = status_type == "STATUS_HALFTIME"
 
-            # Calculate if game is within recent/upcoming window
-            is_within_window = False
-            if start_time_utc:
-                now_utc = datetime.now(pytz.utc)
-                if is_upcoming:
-                    cutoff_time = now_utc + timedelta(hours=self.recent_hours)
-                    is_within_window = start_time_utc <= cutoff_time
-                else: # Recent or live
-                    cutoff_time = now_utc - timedelta(hours=self.recent_hours)
-                    is_within_window = start_time_utc >= cutoff_time
-
             details = {
                 "id": game_event["id"],
                 "start_time_utc": start_time_utc,
@@ -515,7 +504,6 @@ class BaseSoccerManager:
                 "is_live": is_live or is_halftime, # Treat halftime as live for display purposes
                 "is_final": is_final,
                 "is_upcoming": is_upcoming,
-                "is_within_window": is_within_window,
                 "home_abbr": home_team["team"]["abbreviation"],
                 "home_score": home_team.get("score", "0"),
                 "home_record": home_record,
@@ -902,12 +890,12 @@ class SoccerRecentManager(BaseSoccerManager):
 
             for event in data['events']:
                 game = self._extract_game_details(event)
-                if game and game['is_final'] and game['start_time_utc'] and game['start_time_utc'] >= cutoff_time:
+                if game and game['is_final'] and game.get('start_time_utc') and game['start_time_utc'] >= cutoff_time:
                     self._fetch_odds(game)
                     new_recent_games.append(game)
 
             # Filter for favorite teams only if the config is set
-            if self.soccer_config.get("show_favorite_teams_only", False):
+            if self.soccer_config.get("show_favorite_teams_only", False) and self.favorite_teams:
                 team_games = [game for game in new_recent_games if game['home_abbr'] in self.favorite_teams or game['away_abbr'] in self.favorite_teams]
             else:
                 team_games = new_recent_games
@@ -1008,13 +996,13 @@ class SoccerUpcomingManager(BaseSoccerManager):
             for event in data['events']:
                 game = self._extract_game_details(event)
                 # Must be upcoming, have a start time, and be within the window
-                if game and game['is_upcoming'] and game['start_time_utc'] and \
+                if game and game['is_upcoming'] and game.get('start_time_utc') and \
                    game['start_time_utc'] >= now_utc and game['start_time_utc'] <= cutoff_time:
                     self._fetch_odds(game)
                     new_upcoming_games.append(game)
             
             # Filter for favorite teams only if the config is set
-            if self.soccer_config.get("show_favorite_teams_only", False):
+            if self.soccer_config.get("show_favorite_teams_only", False) and self.favorite_teams:
                 team_games = [game for game in new_upcoming_games if game['home_abbr'] in self.favorite_teams or game['away_abbr'] in self.favorite_teams]
             else:
                 team_games = new_upcoming_games
