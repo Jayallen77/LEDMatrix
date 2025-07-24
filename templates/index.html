@@ -266,6 +266,7 @@
             <button class="tab-link" onclick="openTab(event, 'sports')">Sports</button>
             <button class="tab-link" onclick="openTab(event, 'weather')">Weather</button>
             <button class="tab-link" onclick="openTab(event, 'stocks')">Stocks & Crypto</button>
+            <button class="tab-link" onclick="openTab(event, 'features')">Additional Features</button>
             <button class="tab-link" onclick="openTab(event, 'music')">Music</button>
             <button class="tab-link" onclick="openTab(event, 'calendar')">Calendar</button>
             <button class="tab-link" onclick="openTab(event, 'secrets')">API Keys</button>
@@ -361,6 +362,103 @@
                     <button type="submit">Save Display Settings</button>
                 </form>
             </div>
+
+            <div class="form-section">
+                <h2>Display Durations</h2>
+                <p>Set how long each content type displays on the LED matrix.</p>
+                <form action="{{ url_for('save_config_route') }}" method="POST" id="durations-form">
+                    <input type="hidden" name="config_type" value="main">
+                    <input type="hidden" name="config_data" id="durations-config-data">
+                    
+                    <div class="form-row">
+                        <div class="form-col">
+                            <div class="form-group">
+                                <label for="clock_duration">Clock Duration (seconds):</label>
+                                <input type="number" id="clock_duration" name="clock_duration" value="{{ main_config.display.display_durations.clock }}" min="5" max="120">
+                                <div class="description">How long to show clock</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="weather_duration">Weather Duration (seconds):</label>
+                                <input type="number" id="weather_duration" name="weather_duration" value="{{ main_config.display.display_durations.weather }}" min="5" max="120">
+                                <div class="description">How long to show weather</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="stocks_duration">Stocks Duration (seconds):</label>
+                                <input type="number" id="stocks_duration" name="stocks_duration" value="{{ main_config.display.display_durations.stocks }}" min="5" max="120">
+                                <div class="description">How long to show stocks</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="music_duration">Music Duration (seconds):</label>
+                                <input type="number" id="music_duration" name="music_duration" value="{{ main_config.display.display_durations.music }}" min="5" max="120">
+                                <div class="description">How long to show music info</div>
+                            </div>
+                        </div>
+                        <div class="form-col">
+                            <div class="form-group">
+                                <label for="calendar_duration">Calendar Duration (seconds):</label>
+                                <input type="number" id="calendar_duration" name="calendar_duration" value="{{ main_config.display.display_durations.calendar }}" min="5" max="120">
+                                <div class="description">How long to show calendar events</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="youtube_duration">YouTube Duration (seconds):</label>
+                                <input type="number" id="youtube_duration" name="youtube_duration" value="{{ main_config.display.display_durations.youtube }}" min="5" max="120">
+                                <div class="description">How long to show YouTube info</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="text_display_duration">Text Display Duration (seconds):</label>
+                                <input type="number" id="text_display_duration" name="text_display_duration" value="{{ main_config.display.display_durations.text_display }}" min="5" max="120">
+                                <div class="description">How long to show custom text</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="of_the_day_duration">Of The Day Duration (seconds):</label>
+                                <input type="number" id="of_the_day_duration" name="of_the_day_duration" value="{{ main_config.display.display_durations.of_the_day }}" min="5" max="120">
+                                <div class="description">How long to show word of the day</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit">Save Display Durations</button>
+                </form>
+            </div>
+
+            <div class="form-section">
+                <h2>General Settings</h2>
+                <form action="{{ url_for('save_config_route') }}" method="POST" id="general-form">
+                    <input type="hidden" name="config_type" value="main">
+                    <input type="hidden" name="config_data" id="general-config-data">
+                    
+                    <div class="form-group">
+                        <label for="web_display_autostart">Auto-start Display:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="web_display_autostart" name="web_display_autostart" {% if main_config.web_display_autostart %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                            <span>Automatically start display on boot</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="timezone">Timezone:</label>
+                        <select id="timezone" name="timezone">
+                            <option value="America/Chicago" {% if main_config.timezone == "America/Chicago" %}selected{% endif %}>Central Time</option>
+                            <option value="America/New_York" {% if main_config.timezone == "America/New_York" %}selected{% endif %}>Eastern Time</option>
+                            <option value="America/Denver" {% if main_config.timezone == "America/Denver" %}selected{% endif %}>Mountain Time</option>
+                            <option value="America/Los_Angeles" {% if main_config.timezone == "America/Los_Angeles" %}selected{% endif %}>Pacific Time</option>
+                            <option value="UTC" {% if main_config.timezone == "UTC" %}selected{% endif %}>UTC</option>
+                        </select>
+                        <div class="description">System timezone</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="location_country">Country:</label>
+                        <input type="text" id="location_country" name="location_country" value="{{ main_config.location.country }}" placeholder="US">
+                        <div class="description">Country code for location</div>
+                    </div>
+                    
+                    <button type="submit">Save General Settings</button>
+                </form>
+            </div>
         </div>
 
         <!-- Sports Tab -->
@@ -388,6 +486,41 @@
                         </div>
                         <div class="description">Comma-separated team abbreviations (e.g., TB, TEX)</div>
                     </div>
+                    <div class="form-group">
+                        <label for="mlb_live_priority">Live Priority:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="mlb_live_priority" name="mlb_live_priority" {% if main_config.mlb.live_priority %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Prioritize live/in-progress games over finished/upcoming games</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="mlb_live_game_duration">Live Game Duration (minutes):</label>
+                        <input type="number" id="mlb_live_game_duration" name="mlb_live_game_duration" value="{{ main_config.mlb.live_game_duration }}" min="5" max="300">
+                        <div class="description">How long to display each live game</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="mlb_show_odds">Show Odds:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="mlb_show_odds" name="mlb_show_odds" {% if main_config.mlb.show_odds %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Display betting odds for games</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="mlb_show_favorite_teams_only">Show Favorite Teams Only:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="mlb_show_favorite_teams_only" name="mlb_show_favorite_teams_only" {% if main_config.mlb.show_favorite_teams_only %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Only display games involving your favorite teams</div>
+                    </div>
                 </div>
 
                 <div class="config-section">
@@ -409,6 +542,41 @@
                         </div>
                         <div class="description">Comma-separated team abbreviations</div>
                     </div>
+                    <div class="form-group">
+                        <label for="nfl_live_priority">Live Priority:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="nfl_live_priority" name="nfl_live_priority" {% if main_config.nfl_scoreboard.live_priority %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Prioritize live/in-progress games over finished/upcoming games</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="nfl_live_game_duration">Live Game Duration (minutes):</label>
+                        <input type="number" id="nfl_live_game_duration" name="nfl_live_game_duration" value="{{ main_config.nfl_scoreboard.live_game_duration }}" min="5" max="300">
+                        <div class="description">How long to display each live game</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="nfl_show_odds">Show Odds:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="nfl_show_odds" name="nfl_show_odds" {% if main_config.nfl_scoreboard.show_odds %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Display betting odds for games</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="nfl_show_favorite_teams_only">Show Favorite Teams Only:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="nfl_show_favorite_teams_only" name="nfl_show_favorite_teams_only" {% if main_config.nfl_scoreboard.show_favorite_teams_only %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Only display games involving your favorite teams</div>
+                    </div>
                 </div>
 
                 <div class="config-section">
@@ -429,6 +597,385 @@
                             <button type="button" class="add-item-btn" onclick="addArrayItem('nba_favorites')">Add</button>
                         </div>
                         <div class="description">Comma-separated team abbreviations</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="nba_live_priority">Live Priority:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="nba_live_priority" name="nba_live_priority" {% if main_config.nba_scoreboard.live_priority %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Prioritize live/in-progress games over finished/upcoming games</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="nba_live_game_duration">Live Game Duration (minutes):</label>
+                        <input type="number" id="nba_live_game_duration" name="nba_live_game_duration" value="{{ main_config.nba_scoreboard.live_game_duration }}" min="5" max="300">
+                        <div class="description">How long to display each live game</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="nba_show_odds">Show Odds:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="nba_show_odds" name="nba_show_odds" {% if main_config.nba_scoreboard.show_odds %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Display betting odds for games</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="nba_recent_game_hours">Recent Game Hours:</label>
+                        <input type="number" id="nba_recent_game_hours" name="nba_recent_game_hours" value="{{ main_config.nba_scoreboard.recent_game_hours }}" min="1" max="168">
+                        <div class="description">How many hours back to show recent games (default: 72)</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="nba_show_favorite_teams_only">Show Favorite Teams Only:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="nba_show_favorite_teams_only" name="nba_show_favorite_teams_only" {% if main_config.nba_scoreboard.show_favorite_teams_only %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Only display games involving your favorite teams</div>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h3>NHL (Hockey)</h3>
+                    <div class="form-group">
+                        <label for="nhl_enabled">Enable NHL:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="nhl_enabled" name="nhl_enabled" {% if main_config.nhl_scoreboard.enabled %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="nhl_favorites">Favorite Teams:</label>
+                        <div class="array-input">
+                            <input type="text" id="nhl_favorites" name="nhl_favorites" value="{{ main_config.nhl_scoreboard.favorite_teams|join(', ') }}" placeholder="TB">
+                            <button type="button" class="add-item-btn" onclick="addArrayItem('nhl_favorites')">Add</button>
+                        </div>
+                        <div class="description">Comma-separated team abbreviations</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="nhl_live_priority">Live Priority:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="nhl_live_priority" name="nhl_live_priority" {% if main_config.nhl_scoreboard.live_priority %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Prioritize live/in-progress games over finished/upcoming games</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="nhl_live_game_duration">Live Game Duration (minutes):</label>
+                        <input type="number" id="nhl_live_game_duration" name="nhl_live_game_duration" value="{{ main_config.nhl_scoreboard.live_game_duration }}" min="5" max="300">
+                        <div class="description">How long to display each live game</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="nhl_show_odds">Show Odds:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="nhl_show_odds" name="nhl_show_odds" {% if main_config.nhl_scoreboard.show_odds %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Display betting odds for games</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="nhl_show_favorite_teams_only">Show Favorite Teams Only:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="nhl_show_favorite_teams_only" name="nhl_show_favorite_teams_only" {% if main_config.nhl_scoreboard.show_favorite_teams_only %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Only display games involving your favorite teams</div>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h3>NCAA Football</h3>
+                    <div class="form-group">
+                        <label for="ncaa_fb_enabled">Enable NCAA Football:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="ncaa_fb_enabled" name="ncaa_fb_enabled" {% if main_config.ncaa_fb_scoreboard.enabled %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="ncaa_fb_favorites">Favorite Teams:</label>
+                        <div class="array-input">
+                            <input type="text" id="ncaa_fb_favorites" name="ncaa_fb_favorites" value="{{ main_config.ncaa_fb_scoreboard.favorite_teams|join(', ') }}" placeholder="UGA, AUB">
+                            <button type="button" class="add-item-btn" onclick="addArrayItem('ncaa_fb_favorites')">Add</button>
+                        </div>
+                        <div class="description">Comma-separated team abbreviations</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="ncaa_fb_live_priority">Live Priority:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="ncaa_fb_live_priority" name="ncaa_fb_live_priority" {% if main_config.ncaa_fb_scoreboard.live_priority %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Prioritize live/in-progress games over finished/upcoming games</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="ncaa_fb_live_game_duration">Live Game Duration (minutes):</label>
+                        <input type="number" id="ncaa_fb_live_game_duration" name="ncaa_fb_live_game_duration" value="{{ main_config.ncaa_fb_scoreboard.live_game_duration }}" min="5" max="300">
+                        <div class="description">How long to display each live game</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="ncaa_fb_show_odds">Show Odds:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="ncaa_fb_show_odds" name="ncaa_fb_show_odds" {% if main_config.ncaa_fb_scoreboard.show_odds %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Display betting odds for games</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="ncaa_fb_show_favorite_teams_only">Show Favorite Teams Only:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="ncaa_fb_show_favorite_teams_only" name="ncaa_fb_show_favorite_teams_only" {% if main_config.ncaa_fb_scoreboard.show_favorite_teams_only %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Only display games involving your favorite teams</div>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h3>NCAA Baseball</h3>
+                    <div class="form-group">
+                        <label for="ncaa_baseball_enabled">Enable NCAA Baseball:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="ncaa_baseball_enabled" name="ncaa_baseball_enabled" {% if main_config.ncaa_baseball_scoreboard.enabled %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="ncaa_baseball_favorites">Favorite Teams:</label>
+                        <div class="array-input">
+                            <input type="text" id="ncaa_baseball_favorites" name="ncaa_baseball_favorites" value="{{ main_config.ncaa_baseball_scoreboard.favorite_teams|join(', ') }}" placeholder="UGA, AUB">
+                            <button type="button" class="add-item-btn" onclick="addArrayItem('ncaa_baseball_favorites')">Add</button>
+                        </div>
+                        <div class="description">Comma-separated team abbreviations</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="ncaa_baseball_live_priority">Live Priority:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="ncaa_baseball_live_priority" name="ncaa_baseball_live_priority" {% if main_config.ncaa_baseball_scoreboard.live_priority %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Prioritize live/in-progress games over finished/upcoming games</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="ncaa_baseball_live_game_duration">Live Game Duration (minutes):</label>
+                        <input type="number" id="ncaa_baseball_live_game_duration" name="ncaa_baseball_live_game_duration" value="{{ main_config.ncaa_baseball_scoreboard.live_game_duration }}" min="5" max="300">
+                        <div class="description">How long to display each live game</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="ncaa_baseball_show_odds">Show Odds:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="ncaa_baseball_show_odds" name="ncaa_baseball_show_odds" {% if main_config.ncaa_baseball_scoreboard.show_odds %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Display betting odds for games</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="ncaa_baseball_recent_game_hours">Recent Game Hours:</label>
+                        <input type="number" id="ncaa_baseball_recent_game_hours" name="ncaa_baseball_recent_game_hours" value="{{ main_config.ncaa_baseball_scoreboard.recent_game_hours }}" min="1" max="168">
+                        <div class="description">How many hours back to show recent games (default: 72)</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="ncaa_baseball_show_favorite_teams_only">Show Favorite Teams Only:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="ncaa_baseball_show_favorite_teams_only" name="ncaa_baseball_show_favorite_teams_only" {% if main_config.ncaa_baseball_scoreboard.show_favorite_teams_only %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Only display games involving your favorite teams</div>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h3>NCAA Basketball</h3>
+                    <div class="form-group">
+                        <label for="ncaam_basketball_enabled">Enable NCAA Basketball:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="ncaam_basketball_enabled" name="ncaam_basketball_enabled" {% if main_config.ncaam_basketball_scoreboard.enabled %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="ncaam_basketball_favorites">Favorite Teams:</label>
+                        <div class="array-input">
+                            <input type="text" id="ncaam_basketball_favorites" name="ncaam_basketball_favorites" value="{{ main_config.ncaam_basketball_scoreboard.favorite_teams|join(', ') }}" placeholder="UGA, AUB">
+                            <button type="button" class="add-item-btn" onclick="addArrayItem('ncaam_basketball_favorites')">Add</button>
+                        </div>
+                        <div class="description">Comma-separated team abbreviations</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="ncaam_basketball_live_priority">Live Priority:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="ncaam_basketball_live_priority" name="ncaam_basketball_live_priority" {% if main_config.ncaam_basketball_scoreboard.live_priority %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Prioritize live/in-progress games over finished/upcoming games</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="ncaam_basketball_live_game_duration">Live Game Duration (minutes):</label>
+                        <input type="number" id="ncaam_basketball_live_game_duration" name="ncaam_basketball_live_game_duration" value="{{ main_config.ncaam_basketball_scoreboard.live_game_duration }}" min="5" max="300">
+                        <div class="description">How long to display each live game</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="ncaam_basketball_show_odds">Show Odds:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="ncaam_basketball_show_odds" name="ncaam_basketball_show_odds" {% if main_config.ncaam_basketball_scoreboard.show_odds %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Display betting odds for games</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="ncaam_basketball_recent_game_hours">Recent Game Hours:</label>
+                        <input type="number" id="ncaam_basketball_recent_game_hours" name="ncaam_basketball_recent_game_hours" value="{{ main_config.ncaam_basketball_scoreboard.recent_game_hours }}" min="1" max="168">
+                        <div class="description">How many hours back to show recent games (default: 72)</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="ncaam_basketball_show_favorite_teams_only">Show Favorite Teams Only:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="ncaam_basketball_show_favorite_teams_only" name="ncaam_basketball_show_favorite_teams_only" {% if main_config.ncaam_basketball_scoreboard.show_favorite_teams_only %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Only display games involving your favorite teams</div>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h3>MiLB (Minor League Baseball)</h3>
+                    <div class="form-group">
+                        <label for="milb_enabled">Enable MiLB:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="milb_enabled" name="milb_enabled" {% if main_config.milb.enabled %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="milb_favorites">Favorite Teams:</label>
+                        <div class="array-input">
+                            <input type="text" id="milb_favorites" name="milb_favorites" value="{{ main_config.milb.favorite_teams|join(', ') }}" placeholder="TAM">
+                            <button type="button" class="add-item-btn" onclick="addArrayItem('milb_favorites')">Add</button>
+                        </div>
+                        <div class="description">Comma-separated team abbreviations</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="milb_live_priority">Live Priority:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="milb_live_priority" name="milb_live_priority" {% if main_config.milb.live_priority %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Prioritize live/in-progress games over finished/upcoming games</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="milb_live_game_duration">Live Game Duration (minutes):</label>
+                        <input type="number" id="milb_live_game_duration" name="milb_live_game_duration" value="{{ main_config.milb.live_game_duration }}" min="5" max="300">
+                        <div class="description">How long to display each live game</div>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h3>Soccer</h3>
+                    <div class="form-group">
+                        <label for="soccer_enabled">Enable Soccer:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="soccer_enabled" name="soccer_enabled" {% if main_config.soccer_scoreboard.enabled %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="soccer_favorites">Favorite Teams:</label>
+                        <div class="array-input">
+                            <input type="text" id="soccer_favorites" name="soccer_favorites" value="{{ main_config.soccer_scoreboard.favorite_teams|join(', ') }}" placeholder="LIV">
+                            <button type="button" class="add-item-btn" onclick="addArrayItem('soccer_favorites')">Add</button>
+                        </div>
+                        <div class="description">Comma-separated team abbreviations</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="soccer_leagues">Soccer Leagues:</label>
+                        <div class="array-input">
+                            <input type="text" id="soccer_leagues" name="soccer_leagues" value="{{ main_config.soccer_scoreboard.leagues|join(', ') }}" placeholder="eng.1, esp.1, ger.1">
+                            <button type="button" class="add-item-btn" onclick="addArrayItem('soccer_leagues')">Add</button>
+                        </div>
+                        <div class="description">Comma-separated league codes (e.g., eng.1 for Premier League)</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="soccer_live_priority">Live Priority:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="soccer_live_priority" name="soccer_live_priority" {% if main_config.soccer_scoreboard.live_priority %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Prioritize live/in-progress games over finished/upcoming games</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="soccer_live_game_duration">Live Game Duration (minutes):</label>
+                        <input type="number" id="soccer_live_game_duration" name="soccer_live_game_duration" value="{{ main_config.soccer_scoreboard.live_game_duration }}" min="5" max="300">
+                        <div class="description">How long to display each live game</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="soccer_show_odds">Show Odds:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="soccer_show_odds" name="soccer_show_odds" {% if main_config.soccer_scoreboard.show_odds %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Display betting odds for games</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="soccer_recent_game_hours">Recent Game Hours:</label>
+                        <input type="number" id="soccer_recent_game_hours" name="soccer_recent_game_hours" value="{{ main_config.soccer_scoreboard.recent_game_hours }}" min="1" max="336">
+                        <div class="description">How many hours back to show recent games (default: 168)</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="soccer_show_favorite_teams_only">Show Favorite Teams Only:</label>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="soccer_show_favorite_teams_only" name="soccer_show_favorite_teams_only" {% if main_config.soccer_scoreboard.show_favorite_teams_only %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="description">Only display games involving your favorite teams</div>
                     </div>
                 </div>
 
@@ -558,6 +1105,201 @@
                         </div>
                         
                         <button type="submit">Save Crypto Settings</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Additional Features Tab -->
+        <div id="features" class="tab-content">
+            <div class="form-section">
+                <h2>Additional Features</h2>
+                <p>Configure additional features like clock, stock news, odds ticker, YouTube, text display, and of the day.</p>
+                
+                <div class="config-section">
+                    <h3>Clock</h3>
+                    <form action="{{ url_for('save_config_route') }}" method="POST" id="clock-form">
+                        <input type="hidden" name="config_type" value="main">
+                        <input type="hidden" name="config_data" id="clock-config-data">
+                        
+                        <div class="form-group">
+                            <label for="clock_enabled">Enable Clock:</label>
+                            <div class="toggle-container">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="clock_enabled" name="clock_enabled" {% if main_config.clock.enabled %}checked{% endif %}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="clock_format">Clock Format:</label>
+                            <select id="clock_format" name="clock_format">
+                                <option value="%I:%M %p" {% if main_config.clock.format == "%I:%M %p" %}selected{% endif %}>12-hour (AM/PM)</option>
+                                <option value="%H:%M" {% if main_config.clock.format == "%H:%M" %}selected{% endif %}>24-hour</option>
+                            </select>
+                            <div class="description">Time format for the clock display</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="clock_update_interval">Update Interval (seconds):</label>
+                            <input type="number" id="clock_update_interval" name="clock_update_interval" value="{{ main_config.clock.update_interval }}" min="1" max="60">
+                            <div class="description">How often to update the clock display</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="clock_date_format">Date Format:</label>
+                            <select id="clock_date_format" name="clock_date_format">
+                                <option value="MM/DD/YYYY" {% if main_config.clock.date_format == "MM/DD/YYYY" %}selected{% endif %}>MM/DD/YYYY</option>
+                                <option value="DD/MM/YYYY" {% if main_config.clock.date_format == "DD/MM/YYYY" %}selected{% endif %}>DD/MM/YYYY</option>
+                                <option value="YYYY/MM/DD" {% if main_config.clock.date_format == "YYYY/MM/DD" %}selected{% endif %}>YYYY/MM/DD</option>
+                            </select>
+                            <div class="description">Date format for the clock display</div>
+                        </div>
+                        
+                        <button type="submit">Save Clock Settings</button>
+                    </form>
+                </div>
+
+                <div class="config-section">
+                    <h3>Stock News</h3>
+                    <form action="{{ url_for('save_config_route') }}" method="POST" id="stock-news-form">
+                        <input type="hidden" name="config_type" value="main">
+                        <input type="hidden" name="config_data" id="stock-news-config-data">
+                        
+                        <div class="form-group">
+                            <label for="stock_news_enabled">Enable Stock News:</label>
+                            <div class="toggle-container">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="stock_news_enabled" name="stock_news_enabled" {% if main_config.stock_news.enabled %}checked{% endif %}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="stock_news_update_interval">Update Interval (seconds):</label>
+                            <input type="number" id="stock_news_update_interval" name="stock_news_update_interval" value="{{ main_config.stock_news.update_interval }}" min="60" max="3600">
+                            <div class="description">How often to update stock news</div>
+                        </div>
+                        
+                        <button type="submit">Save Stock News Settings</button>
+                    </form>
+                </div>
+
+                <div class="config-section">
+                    <h3>Odds Ticker</h3>
+                    <form action="{{ url_for('save_config_route') }}" method="POST" id="odds-ticker-form">
+                        <input type="hidden" name="config_type" value="main">
+                        <input type="hidden" name="config_data" id="odds-ticker-config-data">
+                        
+                        <div class="form-group">
+                            <label for="odds_ticker_enabled">Enable Odds Ticker:</label>
+                            <div class="toggle-container">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="odds_ticker_enabled" name="odds_ticker_enabled" {% if main_config.odds_ticker.enabled %}checked{% endif %}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="odds_ticker_update_interval">Update Interval (seconds):</label>
+                            <input type="number" id="odds_ticker_update_interval" name="odds_ticker_update_interval" value="{{ main_config.odds_ticker.update_interval }}" min="60" max="3600">
+                            <div class="description">How often to update odds</div>
+                        </div>
+                        
+                        <button type="submit">Save Odds Ticker Settings</button>
+                    </form>
+                </div>
+
+                <div class="config-section">
+                    <h3>YouTube</h3>
+                    <form action="{{ url_for('save_config_route') }}" method="POST" id="youtube-form">
+                        <input type="hidden" name="config_type" value="main">
+                        <input type="hidden" name="config_data" id="youtube-config-data">
+                        
+                        <div class="form-group">
+                            <label for="youtube_enabled">Enable YouTube:</label>
+                            <div class="toggle-container">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="youtube_enabled" name="youtube_enabled" {% if main_config.youtube.enabled %}checked{% endif %}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="youtube_channel_id">YouTube Channel ID:</label>
+                            <input type="text" id="youtube_channel_id" name="youtube_channel_id" value="{{ main_config.youtube.channel_id if main_config.youtube.channel_id else '' }}" placeholder="Enter your YouTube channel ID">
+                            <div class="description">Your YouTube channel ID (found in channel settings)</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="youtube_update_interval">Update Interval (seconds):</label>
+                            <input type="number" id="youtube_update_interval" name="youtube_update_interval" value="{{ main_config.youtube.update_interval }}" min="60" max="3600">
+                            <div class="description">How often to update YouTube info</div>
+                        </div>
+                        
+                        <button type="submit">Save YouTube Settings</button>
+                    </form>
+                </div>
+
+                <div class="config-section">
+                    <h3>Text Display</h3>
+                    <form action="{{ url_for('save_config_route') }}" method="POST" id="text-display-form">
+                        <input type="hidden" name="config_type" value="main">
+                        <input type="hidden" name="config_data" id="text-display-config-data">
+                        
+                        <div class="form-group">
+                            <label for="text_display_enabled">Enable Custom Text Display:</label>
+                            <div class="toggle-container">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="text_display_enabled" name="text_display_enabled" {% if main_config.text_display.enabled %}checked{% endif %}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="text_display_text">Custom Text:</label>
+                            <textarea id="text_display_text" name="text_display_text" rows="5" cols="50">{{ main_config.text_display.text }}</textarea>
+                            <div class="description">Custom text to display on the LED matrix</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="text_display_duration">Text Display Duration (seconds):</label>
+                            <input type="number" id="text_display_duration" name="text_display_duration" value="{{ main_config.display.display_durations.text_display }}" min="5" max="120">
+                            <div class="description">How long to show custom text</div>
+                        </div>
+                        
+                        <button type="submit">Save Text Display Settings</button>
+                    </form>
+                </div>
+
+                <div class="config-section">
+                    <h3>Of The Day</h3>
+                    <form action="{{ url_for('save_config_route') }}" method="POST" id="of_the_day-form">
+                        <input type="hidden" name="config_type" value="main">
+                        <input type="hidden" name="config_data" id="of_the_day-config-data">
+                        
+                        <div class="form-group">
+                            <label for="of_the_day_enabled">Enable Of The Day:</label>
+                            <div class="toggle-container">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="of_the_day_enabled" name="of_the_day_enabled" {% if main_config.of_the_day.enabled %}checked{% endif %}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="of_the_day_update_interval">Update Interval (seconds):</label>
+                            <input type="number" id="of_the_day_update_interval" name="of_the_day_update_interval" value="{{ main_config.of_the_day.update_interval }}" min="300" max="3600">
+                            <div class="description">How often to update word of the day</div>
+                        </div>
+                        
+                        <button type="submit">Save Of The Day Settings</button>
                     </form>
                 </div>
             </div>
@@ -725,22 +1467,38 @@
         <div id="actions" class="tab-content">
             <div class="form-section">
                 <h2>System Actions</h2>
-                <p>Control the display service and system.</p>
-                <div class="action-buttons">
-                     <button type="button" class="action-button" onclick="runAction('start_display')">Start Display</button>
-                     <button type="button" class="action-button" onclick="runAction('stop_display')">Stop Display</button>
-                     <hr>
-                     <button type="button" class="action-button" onclick="runAction('enable_autostart')">Enable Auto-Start</button>
-                     <button type="button" class="action-button" onclick="runAction('disable_autostart')">Disable Auto-Start</button>
-                     <hr>
-                     <button type="button" class="action-button" onclick="runAction('reboot_system')">Reboot System</button>
-                     <hr>
-                     <button type="button" class="action-button" onclick="runAction('git_pull')">Download Latest Update</button>
-                 </div>
-                 <div id="action_output_container" style="margin-top: 20px;">
-                     <h3>Action Output:</h3>
-                     <pre id="action_output">No action run yet.</pre>
-                 </div>
+                <p>Control the display service and system operations.</p>
+                
+                <div class="config-section">
+                    <h3>Display Control</h3>
+                    <div class="action-buttons">
+                        <button type="button" class="action-button" onclick="runAction('start_display')">Start Display</button>
+                        <button type="button" class="action-button" onclick="runAction('stop_display')">Stop Display</button>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h3>Auto-Start Settings</h3>
+                    <div class="action-buttons">
+                        <button type="button" class="action-button" onclick="runAction('enable_autostart')">Enable Auto-Start</button>
+                        <button type="button" class="action-button" onclick="runAction('disable_autostart')">Disable Auto-Start</button>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h3>System Operations</h3>
+                    <div class="action-buttons">
+                        <button type="button" class="action-button" onclick="runAction('reboot_system')">Reboot System</button>
+                        <button type="button" class="action-button" onclick="runAction('git_pull')">Download Latest Update</button>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h3>Action Output</h3>
+                    <div id="action_output_container" style="margin-top: 20px;">
+                        <pre id="action_output">No action run yet.</pre>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -787,15 +1545,78 @@
         const config = {
             mlb: {
                 enabled: document.getElementById('mlb_enabled').checked,
-                favorite_teams: document.getElementById('mlb_favorites').value.split(',').map(s => s.trim()).filter(s => s)
+                favorite_teams: document.getElementById('mlb_favorites').value.split(',').map(s => s.trim()).filter(s => s),
+                live_priority: document.getElementById('mlb_live_priority').checked,
+                live_game_duration: parseInt(document.getElementById('mlb_live_game_duration').value),
+                show_odds: document.getElementById('mlb_show_odds').checked,
+                show_favorite_teams_only: document.getElementById('mlb_show_favorite_teams_only').checked
             },
             nfl_scoreboard: {
                 enabled: document.getElementById('nfl_enabled').checked,
-                favorite_teams: document.getElementById('nfl_favorites').value.split(',').map(s => s.trim()).filter(s => s)
+                favorite_teams: document.getElementById('nfl_favorites').value.split(',').map(s => s.trim()).filter(s => s),
+                live_priority: document.getElementById('nfl_live_priority').checked,
+                live_game_duration: parseInt(document.getElementById('nfl_live_game_duration').value),
+                show_odds: document.getElementById('nfl_show_odds').checked,
+                show_favorite_teams_only: document.getElementById('nfl_show_favorite_teams_only').checked
             },
             nba_scoreboard: {
                 enabled: document.getElementById('nba_enabled').checked,
-                favorite_teams: document.getElementById('nba_favorites').value.split(',').map(s => s.trim()).filter(s => s)
+                favorite_teams: document.getElementById('nba_favorites').value.split(',').map(s => s.trim()).filter(s => s),
+                live_priority: document.getElementById('nba_live_priority').checked,
+                live_game_duration: parseInt(document.getElementById('nba_live_game_duration').value),
+                show_odds: document.getElementById('nba_show_odds').checked,
+                recent_game_hours: parseInt(document.getElementById('nba_recent_game_hours').value),
+                show_favorite_teams_only: document.getElementById('nba_show_favorite_teams_only').checked
+            },
+            nhl_scoreboard: {
+                enabled: document.getElementById('nhl_enabled').checked,
+                favorite_teams: document.getElementById('nhl_favorites').value.split(',').map(s => s.trim()).filter(s => s),
+                live_priority: document.getElementById('nhl_live_priority').checked,
+                live_game_duration: parseInt(document.getElementById('nhl_live_game_duration').value),
+                show_odds: document.getElementById('nhl_show_odds').checked,
+                show_favorite_teams_only: document.getElementById('nhl_show_favorite_teams_only').checked
+            },
+            ncaa_fb_scoreboard: {
+                enabled: document.getElementById('ncaa_fb_enabled').checked,
+                favorite_teams: document.getElementById('ncaa_fb_favorites').value.split(',').map(s => s.trim()).filter(s => s),
+                live_priority: document.getElementById('ncaa_fb_live_priority').checked,
+                live_game_duration: parseInt(document.getElementById('ncaa_fb_live_game_duration').value),
+                show_odds: document.getElementById('ncaa_fb_show_odds').checked,
+                show_favorite_teams_only: document.getElementById('ncaa_fb_show_favorite_teams_only').checked
+            },
+            ncaa_baseball_scoreboard: {
+                enabled: document.getElementById('ncaa_baseball_enabled').checked,
+                favorite_teams: document.getElementById('ncaa_baseball_favorites').value.split(',').map(s => s.trim()).filter(s => s),
+                live_priority: document.getElementById('ncaa_baseball_live_priority').checked,
+                live_game_duration: parseInt(document.getElementById('ncaa_baseball_live_game_duration').value),
+                show_odds: document.getElementById('ncaa_baseball_show_odds').checked,
+                recent_game_hours: parseInt(document.getElementById('ncaa_baseball_recent_game_hours').value),
+                show_favorite_teams_only: document.getElementById('ncaa_baseball_show_favorite_teams_only').checked
+            },
+            ncaam_basketball_scoreboard: {
+                enabled: document.getElementById('ncaam_basketball_enabled').checked,
+                favorite_teams: document.getElementById('ncaam_basketball_favorites').value.split(',').map(s => s.trim()).filter(s => s),
+                live_priority: document.getElementById('ncaam_basketball_live_priority').checked,
+                live_game_duration: parseInt(document.getElementById('ncaam_basketball_live_game_duration').value),
+                show_odds: document.getElementById('ncaam_basketball_show_odds').checked,
+                recent_game_hours: parseInt(document.getElementById('ncaam_basketball_recent_game_hours').value),
+                show_favorite_teams_only: document.getElementById('ncaam_basketball_show_favorite_teams_only').checked
+            },
+            milb: {
+                enabled: document.getElementById('milb_enabled').checked,
+                favorite_teams: document.getElementById('milb_favorites').value.split(',').map(s => s.trim()).filter(s => s),
+                live_priority: document.getElementById('milb_live_priority').checked,
+                live_game_duration: parseInt(document.getElementById('milb_live_game_duration').value)
+            },
+            soccer_scoreboard: {
+                enabled: document.getElementById('soccer_enabled').checked,
+                favorite_teams: document.getElementById('soccer_favorites').value.split(',').map(s => s.trim()).filter(s => s),
+                leagues: document.getElementById('soccer_leagues').value.split(',').map(s => s.trim()).filter(s => s),
+                live_priority: document.getElementById('soccer_live_priority').checked,
+                live_game_duration: parseInt(document.getElementById('soccer_live_game_duration').value),
+                show_odds: document.getElementById('soccer_show_odds').checked,
+                recent_game_hours: parseInt(document.getElementById('soccer_recent_game_hours').value),
+                show_favorite_teams_only: document.getElementById('soccer_show_favorite_teams_only').checked
             }
         };
 
@@ -1078,6 +1899,279 @@
                 })
                 .catch(error => {
                     alert('Error saving API keys: ' + error);
+                });
+            });
+        }
+
+        // Handle durations form submission
+        const durationsForm = document.getElementById('durations-form');
+        if (durationsForm) {
+            durationsForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(durationsForm);
+                const config = {
+                    display: {
+                        display_durations: {
+                            clock: parseInt(formData.get('clock_duration')),
+                            weather: parseInt(formData.get('weather_duration')),
+                            stocks: parseInt(formData.get('stocks_duration')),
+                            music: parseInt(formData.get('music_duration')),
+                            calendar: parseInt(formData.get('calendar_duration')),
+                            youtube: parseInt(formData.get('youtube_duration')),
+                            text_display: parseInt(formData.get('text_display_duration')),
+                            of_the_day: parseInt(formData.get('of_the_day_duration'))
+                        }
+                    }
+                };
+                
+                fetch("{{ url_for('save_config_route') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        'config_type': 'main',
+                        'config_data': JSON.stringify(config)
+                    })
+                })
+                .then(response => {
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                    }
+                })
+                .catch(error => {
+                    alert('Error saving display durations: ' + error);
+                });
+            });
+        }
+
+        // Handle general form submission
+        const generalForm = document.getElementById('general-form');
+        if (generalForm) {
+            generalForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(generalForm);
+                const config = {
+                    web_display_autostart: formData.get('web_display_autostart') === 'on',
+                    timezone: formData.get('timezone'),
+                    location: {
+                        country: formData.get('location_country')
+                    }
+                };
+                
+                fetch("{{ url_for('save_config_route') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        'config_type': 'main',
+                        'config_data': JSON.stringify(config)
+                    })
+                })
+                .then(response => {
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                    }
+                })
+                .catch(error => {
+                    alert('Error saving general settings: ' + error);
+                });
+            });
+        }
+
+        // Handle clock form submission
+        const clockForm = document.getElementById('clock-form');
+        if (clockForm) {
+            clockForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(clockForm);
+                const config = {
+                    clock: {
+                        enabled: formData.get('clock_enabled') === 'on',
+                        format: formData.get('clock_format'),
+                        date_format: formData.get('clock_date_format'),
+                        update_interval: parseInt(formData.get('clock_update_interval'))
+                    }
+                };
+                
+                fetch("{{ url_for('save_config_route') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        'config_type': 'main',
+                        'config_data': JSON.stringify(config)
+                    })
+                })
+                .then(response => {
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                    }
+                })
+                .catch(error => {
+                    alert('Error saving clock settings: ' + error);
+                });
+            });
+        }
+
+        // Handle stock news form submission
+        const stockNewsForm = document.getElementById('stock-news-form');
+        if (stockNewsForm) {
+            stockNewsForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(stockNewsForm);
+                const config = {
+                    stock_news: {
+                        enabled: formData.get('stock_news_enabled') === 'on',
+                        update_interval: parseInt(formData.get('stock_news_update_interval'))
+                    }
+                };
+                
+                fetch("{{ url_for('save_config_route') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        'config_type': 'main',
+                        'config_data': JSON.stringify(config)
+                    })
+                })
+                .then(response => {
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                    }
+                })
+                .catch(error => {
+                    alert('Error saving stock news settings: ' + error);
+                });
+            });
+        }
+
+        // Handle odds ticker form submission
+        const oddsTickerForm = document.getElementById('odds-ticker-form');
+        if (oddsTickerForm) {
+            oddsTickerForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(oddsTickerForm);
+                const config = {
+                    odds_ticker: {
+                        enabled: formData.get('odds_ticker_enabled') === 'on',
+                        update_interval: parseInt(formData.get('odds_ticker_update_interval'))
+                    }
+                };
+                
+                fetch("{{ url_for('save_config_route') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        'config_type': 'main',
+                        'config_data': JSON.stringify(config)
+                    })
+                })
+                .then(response => {
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                    }
+                })
+                .catch(error => {
+                    alert('Error saving odds ticker settings: ' + error);
+                });
+            });
+        }
+
+        // Handle YouTube form submission
+        const youtubeForm = document.getElementById('youtube-form');
+        if (youtubeForm) {
+            youtubeForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(youtubeForm);
+                const config = {
+                    youtube: {
+                        enabled: formData.get('youtube_enabled') === 'on',
+                        channel_id: formData.get('youtube_channel_id'),
+                        update_interval: parseInt(formData.get('youtube_update_interval'))
+                    }
+                };
+                
+                fetch("{{ url_for('save_config_route') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        'config_type': 'main',
+                        'config_data': JSON.stringify(config)
+                    })
+                })
+                .then(response => {
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                    }
+                })
+                .catch(error => {
+                    alert('Error saving YouTube settings: ' + error);
+                });
+            });
+        }
+
+        // Handle text display form submission
+        const textDisplayForm = document.getElementById('text-display-form');
+        if (textDisplayForm) {
+            textDisplayForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(textDisplayForm);
+                const config = {
+                    text_display: {
+                        enabled: formData.get('text_display_enabled') === 'on',
+                        text: formData.get('text_display_text')
+                    },
+                    display: {
+                        display_durations: {
+                            text_display: parseInt(formData.get('text_display_duration'))
+                        }
+                    }
+                };
+                
+                fetch("{{ url_for('save_config_route') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        'config_type': 'main',
+                        'config_data': JSON.stringify(config)
+                    })
+                })
+                .then(response => {
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                    }
+                })
+                .catch(error => {
+                    alert('Error saving text display settings: ' + error);
+                });
+            });
+        }
+
+        // Handle of the day form submission
+        const ofTheDayForm = document.getElementById('of_the_day-form');
+        if (ofTheDayForm) {
+            ofTheDayForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(ofTheDayForm);
+                const config = {
+                    of_the_day: {
+                        enabled: formData.get('of_the_day_enabled') === 'on',
+                        update_interval: parseInt(formData.get('of_the_day_update_interval'))
+                    }
+                };
+                
+                fetch("{{ url_for('save_config_route') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        'config_type': 'main',
+                        'config_data': JSON.stringify(config)
+                    })
+                })
+                .then(response => {
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                    }
+                })
+                .catch(error => {
+                    alert('Error saving of the day settings: ' + error);
                 });
             });
         }

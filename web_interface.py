@@ -114,6 +114,58 @@ def save_config_route():
                 calendars = request.form.get('calendar_calendars', '').split(',')
                 main_config['calendar']['calendars'] = [c.strip() for c in calendars if c.strip()]
             
+            # Update display durations
+            if 'clock_duration' in request.form:
+                main_config['display']['display_durations']['clock'] = int(request.form.get('clock_duration', 15))
+                main_config['display']['display_durations']['weather'] = int(request.form.get('weather_duration', 30))
+                main_config['display']['display_durations']['stocks'] = int(request.form.get('stocks_duration', 30))
+                main_config['display']['display_durations']['music'] = int(request.form.get('music_duration', 30))
+                main_config['display']['display_durations']['calendar'] = int(request.form.get('calendar_duration', 30))
+                main_config['display']['display_durations']['youtube'] = int(request.form.get('youtube_duration', 30))
+                main_config['display']['display_durations']['text_display'] = int(request.form.get('text_display_duration', 10))
+                main_config['display']['display_durations']['of_the_day'] = int(request.form.get('of_the_day_duration', 40))
+            
+            # Update general settings
+            if 'web_display_autostart' in request.form:
+                main_config['web_display_autostart'] = 'web_display_autostart' in request.form
+                main_config['timezone'] = request.form.get('timezone', 'America/Chicago')
+                main_config['location']['country'] = request.form.get('location_country', 'US')
+            
+            # Update clock settings
+            if 'clock_enabled' in request.form:
+                main_config['clock']['enabled'] = 'clock_enabled' in request.form
+                main_config['clock']['format'] = request.form.get('clock_format', '%I:%M %p')
+                main_config['clock']['update_interval'] = int(request.form.get('clock_update_interval', 1))
+                main_config['clock']['date_format'] = request.form.get('clock_date_format', 'MM/DD/YYYY')
+            
+            # Update stock news settings
+            if 'stock_news_enabled' in request.form:
+                main_config['stock_news']['enabled'] = 'stock_news_enabled' in request.form
+                main_config['stock_news']['update_interval'] = int(request.form.get('stock_news_update_interval', 3600))
+            
+            # Update odds ticker settings
+            if 'odds_ticker_enabled' in request.form:
+                main_config['odds_ticker']['enabled'] = 'odds_ticker_enabled' in request.form
+                main_config['odds_ticker']['update_interval'] = int(request.form.get('odds_ticker_update_interval', 3600))
+            
+            # Update YouTube settings
+            if 'youtube_enabled' in request.form:
+                main_config['youtube']['enabled'] = 'youtube_enabled' in request.form
+                main_config['youtube']['channel_id'] = request.form.get('youtube_channel_id', '')
+                main_config['youtube']['update_interval'] = int(request.form.get('youtube_update_interval', 3600))
+            
+            # Update text display settings
+            if 'text_display_enabled' in request.form:
+                main_config['text_display']['enabled'] = 'text_display_enabled' in request.form
+                main_config['text_display']['text'] = request.form.get('text_display_text', '')
+                if 'text_display_duration' in request.form:
+                    main_config['display']['display_durations']['text_display'] = int(request.form.get('text_display_duration', 10))
+            
+            # Update of the day settings
+            if 'of_the_day_enabled' in request.form:
+                main_config['of_the_day']['enabled'] = 'of_the_day_enabled' in request.form
+                main_config['of_the_day']['update_interval'] = int(request.form.get('of_the_day_update_interval', 3600))
+            
             # If config_data is provided as JSON, merge it
             if config_data_str:
                 try:
