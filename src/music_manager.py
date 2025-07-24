@@ -48,8 +48,10 @@ class MusicManager:
         self.last_album_art_url = None
         self.scroll_position_title = 0
         self.scroll_position_artist = 0
+        self.scroll_position_album = 0
         self.title_scroll_tick = 0
         self.artist_scroll_tick = 0
+        self.album_scroll_tick = 0
         self.is_music_display_active = False # New state variable
         self.is_currently_showing_nothing_playing = False # To prevent flashing
         self._needs_immediate_full_refresh = False # Flag for forcing refresh from YTM updates
@@ -657,8 +659,10 @@ class MusicManager:
             with self.track_info_lock: 
                 self.scroll_position_title = 0
                 self.scroll_position_artist = 0
+                self.scroll_position_album = 0
                 self.title_scroll_tick = 0
                 self.artist_scroll_tick = 0
+                self.album_scroll_tick = 0
                 if self.album_art_image is not None or self.last_album_art_url is not None:
                     logger.debug("Clearing album art cache as 'Nothing Playing' is displayed.")
                     self.album_art_image = None
@@ -672,6 +676,7 @@ class MusicManager:
             logger.debug(f"MusicManager: Resetting scroll positions for track '{title_being_displayed}' due to full refresh signal (periodic or event-driven).")
             self.scroll_position_title = 0
             self.scroll_position_artist = 0
+            self.scroll_position_album = 0
 
         if not self.is_music_display_active and not perform_full_refresh_this_cycle : 
              # If display wasn't active, and this isn't a full refresh cycle that would activate it,
@@ -793,8 +798,22 @@ class MusicManager:
         y_pos_album = y_pos_artist + line_height_artist_album + padding_between_lines
         if (matrix_height - y_pos_album) >= line_height_artist_album : 
             album_width = self.display_manager.get_text_width(album, font_artist_album)
-            if album_width <= text_area_width: 
-                 self.display_manager.draw_text(album, x=text_area_x_start, y=y_pos_album, color=(150, 150, 150), font=font_artist_album)
+            current_album_display_text = album
+            if album_width > text_area_width:
+                if self.scroll_position_album >= len(album):
+                    self.scroll_position_album = 0
+                current_album_display_text = album[self.scroll_position_album:] + "   " + album[:self.scroll_position_album]
+            
+            self.display_manager.draw_text(current_album_display_text, 
+                                         x=text_area_x_start, y=y_pos_album, color=(150, 150, 150), font=font_artist_album)
+            if album_width > text_area_width:
+                self.album_scroll_tick += 1
+                if self.album_scroll_tick % TEXT_SCROLL_DIVISOR == 0:
+                    self.scroll_position_album = (self.scroll_position_album + 1) % len(album)
+                    self.album_scroll_tick = 0
+            else:
+                self.scroll_position_album = 0
+                self.album_scroll_tick = 0
 
         # --- Progress Bar --- 
         progress_bar_height = 3
