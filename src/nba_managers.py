@@ -265,106 +265,40 @@ class BaseNBAManager:
             self.logger.error(f"Error loading logo for {team_abbrev}: {e}", exc_info=True)
             return None
 
-    @classmethod
-    def _fetch_shared_data(cls, date_str: str = None) -> Optional[Dict]:
+    def _fetch_nba_api_data(self, use_cache: bool = True) -> Optional[Dict]:
         """Fetch and cache data for all managers to share."""
-        current_time = time.time()
-        
-        # If we have recent data, use it
-        if cls._shared_data and (current_time - cls._last_shared_update) < 300:  # 5 minutes
-            return cls._shared_data
-            
-        try:
-            # Check cache first
-            cache_key = date_str if date_str else 'today'
-            cached_data = cls.cache_manager.get(cache_key)
+        now = datetime.now(pytz.utc)
+        date_str = now.strftime('%Y%m%d')
+        cache_key = f"nba_api_data_{date_str}"
+
+        if use_cache:
+            cached_data = self.cache_manager.get(cache_key)
             if cached_data:
-                cls.logger.info(f"[NBA] Using cached data for {cache_key}")
-                cls._shared_data = cached_data
-                cls._last_shared_update = current_time
+                self.logger.info(f"[NBA] Using cached data for {date_str}")
                 return cached_data
-                
-            # If not in cache or stale, fetch from API
+        
+        try:
             url = ESPN_NBA_SCOREBOARD_URL
-            params = {}
-            if date_str:
-                params['dates'] = date_str
-                
+            params = {'dates': date_str}
             response = requests.get(url, params=params)
             response.raise_for_status()
             data = response.json()
-            cls.logger.info(f"[NBA] Successfully fetched data from ESPN API")
             
-            # Cache the response
-            cls.cache_manager.update_cache(cache_key, data)
-            cls._shared_data = data
-            cls._last_shared_update = current_time
-            
-            # If no date specified, fetch data from multiple days
-            if not date_str:
-                # Get today's date in YYYYMMDD format
-                today = datetime.now(timezone.utc).date()
-                dates_to_fetch = [
-                    (today - timedelta(days=2)).strftime('%Y%m%d'),
-                    (today - timedelta(days=1)).strftime('%Y%m%d'),
-                    today.strftime('%Y%m%d')
-                ]
+            if use_cache:
+                self.cache_manager.set(cache_key, data)
                 
-                # Fetch data for each date
-                all_events = []
-                for fetch_date in dates_to_fetch:
-                    if fetch_date != today.strftime('%Y%m%d'):  # Skip today as we already have it
-                        # Check cache for this date
-                        cached_date_data = cls.cache_manager.get(fetch_date)
-                        if cached_date_data:
-                            cls.logger.info(f"[NBA] Using cached data for date {fetch_date}")
-                            if "events" in cached_date_data:
-                                all_events.extend(cached_date_data["events"])
-                            continue
-                            
-                        params['dates'] = fetch_date
-                        response = requests.get(url, params=params)
-                        response.raise_for_status()
-                        date_data = response.json()
-                        if date_data and "events" in date_data:
-                            all_events.extend(date_data["events"])
-                            cls.logger.info(f"[NBA] Fetched {len(date_data['events'])} events for date {fetch_date}")
-                            # Cache the response
-                            cls.cache_manager.update_cache(fetch_date, date_data)
-                
-                # Combine events from all dates
-                if all_events:
-                    data["events"].extend(all_events)
-                    cls.logger.info(f"[NBA] Combined {len(data['events'])} total events from all dates")
-                    cls._shared_data = data
-                    cls._last_shared_update = current_time
-            
+            self.logger.info(f"[NBA] Successfully fetched data from ESPN API for {date_str}")
             return data
         except requests.exceptions.RequestException as e:
-            cls.logger.error(f"[NBA] Error fetching data from ESPN: {e}")
+            self.logger.error(f"[NBA] Error fetching data from ESPN: {e}")
             return None
 
     def _fetch_data(self, date_str: str = None) -> Optional[Dict]:
         """Fetch data using shared data mechanism."""
-        # For live games, bypass the shared cache to ensure fresh data
         if isinstance(self, NBALiveManager):
-            try:
-                url = ESPN_NBA_SCOREBOARD_URL
-                params = {}
-                if date_str:
-                    params['dates'] = date_str
-                    
-                response = requests.get(url, params=params)
-                response.raise_for_status()
-                data = response.json()
-                self.logger.info(f"[NBA] Successfully fetched live game data from ESPN API")
-                return data
-            except requests.exceptions.RequestException as e:
-                self.logger.error(f"[NBA] Error fetching live game data from ESPN: {e}")
-                return None
+            return self._fetch_nba_api_data(use_cache=False)
         else:
-            # For non-live games, use the shared cache
-            return self._fetch_shared_data(date_str)
+            return self._fetch_nba_api_data(use_cache=True)
 
     def _fetch_odds(self, game: Dict) -> None:
         """Fetch odds for a specific game if conditions are met."""

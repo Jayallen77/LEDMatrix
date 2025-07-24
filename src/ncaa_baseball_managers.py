@@ -373,8 +373,15 @@ class BaseNCAABaseballManager:
             logger.error(f"[NCAABaseball] Error formatting game time: {e}")
             return "TBD"
 
-    def _fetch_ncaa_baseball_api_data(self) -> Dict[str, Any]:
+    def _fetch_ncaa_baseball_api_data(self, use_cache: bool = True) -> Dict[str, Any]:
         """Fetch NCAA Baseball game data from the ESPN API."""
+        cache_key = "ncaa_baseball_api_data"
+        if use_cache:
+            cached_data = self.cache_manager.get_with_auto_strategy(cache_key)
+            if cached_data:
+                self.logger.info("Using cached NCAA Baseball API data.")
+                return cached_data
+
         try:
             # Check if test mode is enabled
             if self.ncaa_baseball_config.get('test_mode', False):
@@ -525,6 +532,8 @@ class BaseNCAABaseballManager:
                 for game in favorite_games:
                     self.logger.info(f"[NCAABaseball] Favorite team game: {game['away_team']} @ {game['home_team']} (Status: {game['status']}, State: {game['status_state']})")
             
+            if use_cache:
+                self.cache_manager.set(cache_key, all_games)
             return all_games
             
         except Exception as e:
@@ -593,7 +602,7 @@ class NCAABaseballLiveManager(BaseNCAABaseballManager):
                     if self.current_game["inning"] % 2 == 0: self.current_game["home_score"] = str(int(self.current_game["home_score"]) + 1)
                     else: self.current_game["away_score"] = str(int(self.current_game["away_score"]) + 1)
             else:
-                games = self._fetch_ncaa_baseball_api_data()
+                games = self._fetch_ncaa_baseball_api_data(use_cache=False)
                 if games:
                     new_live_games = []
                     for game in games.values():
@@ -849,7 +858,7 @@ class NCAABaseballRecentManager(BaseNCAABaseballManager):
             return
         self.last_update = current_time
         try:
-            games = self._fetch_ncaa_baseball_api_data()
+            games = self._fetch_ncaa_baseball_api_data(use_cache=True)
             if not games:
                 logger.warning("[NCAABaseball] No games returned from API")
                 self.recent_games = []
@@ -955,7 +964,7 @@ class NCAABaseballUpcomingManager(BaseNCAABaseballManager):
             return
         self.last_update = current_time
         try:
-            games = self._fetch_ncaa_baseball_api_data()
+            games = self._fetch_ncaa_baseball_api_data(use_cache=True)
             if games:
                 new_upcoming_games = []
                 now = datetime.now(timezone.utc)

@@ -139,7 +139,7 @@ class BaseNFLManager: # Renamed class
         except Exception as e:
             self.logger.error(f"Error fetching odds for game {game.get('id', 'N/A')}: {e}")
             
-    def _fetch_shared_data(self) -> Optional[Dict]:
+    def _fetch_nfl_api_data(self, use_cache: bool = True) -> Optional[Dict]:
         """
         Fetches the full season schedule for NFL, caches it, and then filters
         for relevant games based on the current configuration.
@@ -147,89 +147,36 @@ class BaseNFLManager: # Renamed class
         now = datetime.now(pytz.utc)
         current_year = now.year
         cache_key = f"nfl_schedule_{current_year}"
+
+        if use_cache:
+            cached_data = self.cache_manager.get(cache_key)
+            if cached_data:
+                self.logger.info(f"[NFL] Using cached schedule for {current_year}")
+                return {'events': cached_data}
         
-        # Try to get the full schedule from cache
-        cached_data = BaseNFLManager.cache_manager.get(cache_key)
-        
-        if cached_data:
-            self.logger.info(f"[NFL] Using cached schedule for {current_year}")
-            events = cached_data
-        else:
-            self.logger.info(f"[NFL] Fetching full {current_year} season schedule from ESPN API...")
-            try:
-                url = f"https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates={current_year}"
-                response = self.session.get(url, headers=self.headers, timeout=15)
-                response.raise_for_status()
-                data = response.json()
-                events = data.get('events', [])
-                BaseNFLManager.cache_manager.set(cache_key, events) # Cache for 24 hours
-                self.logger.info(f"[NFL] Successfully fetched and cached {len(events)} events for the {current_year} season.")
-            except requests.exceptions.RequestException as e:
-                self.logger.error(f"[NFL] API error fetching full schedule: {e}")
-                return None
-        
-        if not events:
-            self.logger.warning("[NFL] No events found in the schedule data.")
+        self.logger.info(f"[NFL] Fetching full {current_year} season schedule from ESPN API (cache_enabled={use_cache})...")
+        try:
+            url = f"https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates={current_year}"
+            response = self.session.get(url, headers=self.headers, timeout=15)
+            response.raise_for_status()
+            data = response.json()
+            events = data.get('events', [])
+            
+            if use_cache:
+                self.cache_manager.set(cache_key, events)
+            
+            self.logger.info(f"[NFL] Successfully fetched {len(events)} events for the {current_year} season.")
+            return {'events': events}
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"[NFL] API error fetching full schedule: {e}")
             return None
-
-        # Filter the events for live, upcoming, and recent games
-        live_events = []
-        upcoming_events = []
-        past_events = []
-
-        for event in events:
-            status = event.get('status', {}).get('type', {}).get('name', 'unknown').lower()
-            is_live = status in ('status_in_progress', 'status_halftime')
-            is_upcoming = status in ('status_scheduled', 'status_pre_game')
-            is_final = status == 'status_final'
-
-            if is_live:
-                live_events.append(event)
-            elif is_upcoming:
-                upcoming_events.append(event)
-            elif is_final:
-                past_events.append(event)
-        
-        # Sort games by date
-        upcoming_events.sort(key=lambda x: x['date'])
-        past_events.sort(key=lambda x: x['date'], reverse=True)
-
-        # Include all games in shared data - let individual managers filter by count
-        selected_upcoming = upcoming_events
-        selected_past = past_events
-
-        # Combine all relevant events into a single list
-        BaseNFLManager.all_events = live_events + selected_upcoming + selected_past
-        self.logger.info(f"[NFL] Processed schedule: {len(live_events)} live, {len(selected_upcoming)} upcoming, {len(selected_past)} recent games.")
-        
-        # Return the data in the expected format
-        return {'events': BaseNFLManager.all_events}
 
     def _fetch_data(self, date_str: str = None) -> Optional[Dict]:
         """Fetch data using shared data mechanism or direct fetch for live."""
-        # Check if the instance is NFLLiveManager
         if isinstance(self, NFLLiveManager):
-            try:
-                url = ESPN_NFL_SCOREBOARD_URL # Use NFL URL
-                params = {}
-                if date_str:
-                    params['dates'] = date_str
-
-                response = requests.get(url, params=params)
-                response.raise_for_status()
-                data = response.json()
-                self.logger.info(f"[NFL] Successfully fetched live game data from ESPN API")
-                return data
-            except requests.exceptions.RequestException as e:
-                self.logger.error(f"[NFL] Error fetching live game data from ESPN: {e}")
-                return None
+            return self._fetch_nfl_api_data(use_cache=False)
         else:
-            # For non-live games, use the shared cache
-            shared_data = self._fetch_shared_data()
-            if shared_data is None:
-                self.logger.warning("[NFL] No shared data available")
-                return None
-            return shared_data
+            return self._fetch_nfl_api_data(use_cache=True)
 
     def _load_fonts(self):
         """Load fonts used by the scoreboard."""

@@ -158,141 +158,54 @@ class BaseNCAAFBManager: # Renamed class
         except Exception as e:
             self.logger.error(f"Error fetching odds for game {game.get('id', 'N/A')}: {e}")
 
-    def _fetch_shared_data(self) -> Optional[Dict]:
+    def _fetch_ncaa_fb_api_data(self, use_cache: bool = True) -> Optional[Dict]:
         """
         Fetches the full season schedule for NCAAFB, caches it, and then filters
         for relevant games based on the current configuration.
-        
-        Caching Strategy:
-        - Season schedules: Cached for 24 hours (configurable) - schedules rarely change
-        - Live games: Cached for 60 seconds - scores update frequently
-        - Processed data: Cached for 5 minutes - avoids re-processing
-        - Recent/Upcoming: Use shared season data + local processing cache
         """
         now = datetime.now(pytz.utc)
         current_year = now.year
-        # NCAAFB season spans years, so we might need to check last year too if it's early in the current year
         years_to_check = [current_year]
-        if now.month < 8: # If it's before August, check previous year's schedule too
+        if now.month < 8:
             years_to_check.append(current_year - 1)
 
         all_events = []
         for year in years_to_check:
             cache_key = f"ncaafb_schedule_{year}"
-            # Use much longer cache duration for season schedules (configurable, default 24 hours)
-            # Season schedules rarely change and can be cached for days
-            cached_data = BaseNCAAFBManager.cache_manager.get(cache_key, max_age=self.season_cache_duration)
-
-            if cached_data:
-                self.logger.info(f"[NCAAFB] Using cached schedule for {year}")
-                all_events.extend(cached_data)
-            else:
-                self.logger.info(f"[NCAAFB] Fetching full {year} season schedule from ESPN API...")
-                try:
-                    # Fetching only regular season type for now. Can be expanded.
-                    url = f"https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates={year}&seasontype=2"
-                    response = self.session.get(url, headers=self.headers, timeout=15)
-                    response.raise_for_status()
-                    data = response.json()
-                    events = data.get('events', [])
-                    BaseNCAAFBManager.cache_manager.update_cache(cache_key, events)
-                    self.logger.info(f"[NCAAFB] Successfully fetched and cached {len(events)} events for the {year} season.")
-                    all_events.extend(events)
-                except requests.exceptions.RequestException as e:
-                    self.logger.error(f"[NCAAFB] API error fetching full schedule for {year}: {e}")
+            if use_cache:
+                cached_data = self.cache_manager.get(cache_key, max_age=self.season_cache_duration)
+                if cached_data:
+                    self.logger.info(f"[NCAAFB] Using cached schedule for {year}")
+                    all_events.extend(cached_data)
                     continue
+            
+            self.logger.info(f"[NCAAFB] Fetching full {year} season schedule from ESPN API...")
+            try:
+                url = f"https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates={year}&seasontype=2"
+                response = self.session.get(url, headers=self.headers, timeout=15)
+                response.raise_for_status()
+                data = response.json()
+                events = data.get('events', [])
+                if use_cache:
+                    self.cache_manager.set(cache_key, events)
+                self.logger.info(f"[NCAAFB] Successfully fetched and cached {len(events)} events for {year} season.")
+                all_events.extend(events)
+            except requests.exceptions.RequestException as e:
+                self.logger.error(f"[NCAAFB] API error fetching full schedule for {year}: {e}")
+                continue
         
         if not all_events:
-            self.logger.warning("[NCAAFB] No events found in the schedule data for checked years.")
+            self.logger.warning("[NCAAFB] No events found in schedule data.")
             return None
 
-        # Filter the events for live, upcoming, and recent games
-        live_events = []
-        upcoming_events = []
-        past_events = []
-
-        for event in all_events:
-            status = event.get('status', {}).get('type', {}).get('name', 'unknown').lower()
-            is_live = status in ('status_in_progress', 'status_halftime')
-            is_upcoming = status in ('status_scheduled', 'status_pre_game')
-            is_final = status == 'status_final'
-
-            if is_live:
-                live_events.append(event)
-            elif is_upcoming:
-                upcoming_events.append(event)
-            elif is_final:
-                past_events.append(event)
-        
-        # Sort games by date
-        upcoming_events.sort(key=lambda x: x['date'])
-        past_events.sort(key=lambda x: x['date'], reverse=True)
-
-        # Include all games in shared data - let individual managers filter by count
-        selected_upcoming = upcoming_events
-        selected_past = past_events
-
-        # Combine all relevant events into a single list
-        BaseNCAAFBManager.all_events = live_events + selected_upcoming + selected_past
-        self.logger.info(f"[NCAAFB] Processed schedule: {len(live_events)} live, {len(selected_upcoming)} upcoming, {len(selected_past)} recent games.")
-        
-        # Return the data in the expected format
-        return {'events': BaseNCAAFBManager.all_events}
-    
-    def _get_cached_processed_games(self, manager_type: str) -> Optional[List[Dict]]:
-        """Get cached processed games for a specific manager type."""
-        current_time = time.time()
-        cache_key = f"processed_games_{manager_type}"
-        
-        # Cache processed games for 5 minutes
-        if (current_time - BaseNCAAFBManager._processed_games_timestamp < 300 and 
-            cache_key in BaseNCAAFBManager._processed_games_cache):
-            return BaseNCAAFBManager._processed_games_cache[cache_key]
-        
-        return None
-    
-    def _cache_processed_games(self, manager_type: str, games: List[Dict]) -> None:
-        """Cache processed games for a specific manager type."""
-        cache_key = f"processed_games_{manager_type}"
-        BaseNCAAFBManager._processed_games_cache[cache_key] = games
-        BaseNCAAFBManager._processed_games_timestamp = time.time()
+        return {'events': all_events}
 
     def _fetch_data(self, date_str: str = None) -> Optional[Dict]:
         """Fetch data using shared data mechanism or direct fetch for live."""
-        # Check if the instance is NCAAFBLiveManager
-        if isinstance(self, NCAAFBLiveManager): # Changed class name
-            # For live games, use shorter cache duration (60 seconds)
-            # Live scores can be fetched more frequently if needed
-            cache_key = f"ncaafb_live_{date_str or 'current'}"
-            cached_data = self.cache_manager.get(cache_key, max_age=60)
-            
-            if cached_data:
-                self.logger.debug(f"[NCAAFB] Using cached live data")
-                return cached_data
-            
-            try:
-                url = ESPN_NCAAFB_SCOREBOARD_URL # Use NCAA FB URL
-                params = {}
-                if date_str:
-                    params['dates'] = date_str
-
-                response = requests.get(url, params=params)
-                response.raise_for_status()
-                data = response.json()
-                # Cache live data for 60 seconds
-                self.cache_manager.update_cache(cache_key, data)
-                self.logger.info(f"[NCAAFB] Successfully fetched live game data from ESPN API")
-                return data
-            except requests.exceptions.RequestException as e:
-                self.logger.error(f"[NCAAFB] Error fetching live game data from ESPN: {e}")
-                return None
+        if isinstance(self, NCAAFBLiveManager):
+            return self._fetch_ncaa_fb_api_data(use_cache=False)
         else:
-            # For non-live games, use the shared cache
-            shared_data = self._fetch_shared_data()
-            if shared_data is None:
-                self.logger.warning("[NCAAFB] No shared data available")
-                return None
-            return shared_data
+            return self._fetch_ncaa_fb_api_data(use_cache=True)
 
     def _load_fonts(self):
         """Load fonts used by the scoreboard."""

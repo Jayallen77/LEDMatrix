@@ -269,114 +269,54 @@ class BaseSoccerManager:
         else:
             cls.logger.info(f"[Soccer] Team-league map is up-to-date (last updated: {datetime.fromtimestamp(cls._map_last_updated).strftime('%Y-%m-%d %H:%M:%S')}).")
 
-    # --- End Team League Map Management ---
-
-    @classmethod
-    def _fetch_shared_data(cls, date_str: str = None) -> Optional[Dict]:
+    def _fetch_soccer_api_data(self, use_cache: bool = True) -> Optional[Dict]:
         """Fetch and cache data for all managers to share, iterating through target leagues."""
         current_time = time.time()
         all_data = {"events": []}
-        # Access shared config through the class attribute
-        favorite_teams = cls._soccer_config_shared.get("favorite_teams", [])
-        target_leagues_config = cls._soccer_config_shared.get("leagues", list(LEAGUE_SLUGS.keys()))
-        upcoming_fetch_days = cls._soccer_config_shared.get("upcoming_fetch_days", 1) # Fetch days
+        favorite_teams = self.soccer_config.get("favorite_teams", [])
+        target_leagues_config = self.soccer_config.get("leagues", list(LEAGUE_SLUGS.keys()))
+        upcoming_fetch_days = self.soccer_config.get("upcoming_fetch_days", 1)
 
-        # Determine which leagues to actually fetch
-        leagues_to_fetch = set()
-        if favorite_teams and cls._team_league_map:
-            for team in favorite_teams:
-                league = cls._team_league_map.get(team)
-                if league:
-                    leagues_to_fetch.add(league)
-                else:
-                    cls.logger.warning(f"[Soccer] Favorite team '{team}' not found in team-league map. Cannot filter by its league.")
-            # If no leagues were found for favorites, should we fetch configured leagues or nothing?
-            # Current approach: fetch configured leagues as fallback if map lookups fail for all favs.
-            if not leagues_to_fetch:
-                 cls.logger.warning("[Soccer] No leagues found for any favorite teams in map. Falling back to configured leagues.")
-                 leagues_to_fetch = set(target_leagues_config)
-        else:
-            # No favorite teams specified, or map not loaded, use configured leagues
-            leagues_to_fetch = set(target_leagues_config)
-
-        cls.logger.debug(f"[Soccer] Determined leagues to fetch for shared data: {leagues_to_fetch}")
-
-        today = datetime.now(pytz.utc).date()
-        # Generate dates from yesterday up to 'upcoming_fetch_days' in the future
-        dates_to_fetch = [
-            (today + timedelta(days=i)).strftime('%Y%m%d') 
-            for i in range(-1, upcoming_fetch_days + 1) # -1 (yesterday) to upcoming_fetch_days
-        ]
+        leagues_to_fetch = set(target_leagues_config)
         
-        # Add specific date if provided and not already included (e.g., for testing/debugging)
-        if date_str and date_str not in dates_to_fetch:
-            dates_to_fetch.append(date_str)
-            
-        cls.logger.debug(f"[Soccer] Fetching shared data for dates: {dates_to_fetch}")
+        today = datetime.now(pytz.utc).date()
+        dates_to_fetch = [(today + timedelta(days=i)).strftime('%Y%m%d') for i in range(-1, upcoming_fetch_days + 1)]
 
-        # Fetch data only for the determined leagues
         for league_slug in leagues_to_fetch:
             for fetch_date in dates_to_fetch:
                 cache_key = f"soccer_{league_slug}_{fetch_date}"
                 
-                # Check cache first
-                cached_data = cls.cache_manager.get(cache_key, max_age=300)
-                if cached_data:
-                    cls.logger.debug(f"[Soccer] Using cached data for {league_slug} on {fetch_date}")
-                    if "events" in cached_data:
-                        all_data["events"].extend(cached_data["events"])
-                    continue
-
+                if use_cache:
+                    cached_data = self.cache_manager.get(cache_key, max_age=300)
+                    if cached_data:
+                        self.logger.debug(f"[Soccer] Using cached data for {league_slug} on {fetch_date}")
+                        if "events" in cached_data:
+                            all_data["events"].extend(cached_data["events"])
+                        continue
+                
                 try:
                     url = ESPN_SOCCER_LEAGUE_SCOREBOARD_URL_FORMAT.format(league_slug)
-                    params = {'dates': fetch_date, 'limit': 100} # Limit per league/date call
-
+                    params = {'dates': fetch_date, 'limit': 100}
                     response = requests.get(url, params=params)
                     response.raise_for_status()
                     data = response.json()
-                    cls.logger.info(f"[Soccer] Fetched data from ESPN API for {league_slug} on {fetch_date}")
-
-                    cls.cache_manager.set(cache_key, data)
+                    self.logger.info(f"[Soccer] Fetched data from ESPN API for {league_slug} on {fetch_date}")
+                    
+                    if use_cache:
+                        self.cache_manager.set(cache_key, data)
+                        
                     if "events" in data:
                         all_data["events"].extend(data["events"])
 
                 except requests.exceptions.RequestException as e:
-                    # Log specific error but continue trying other leagues/dates
                     if response is not None and response.status_code == 404:
-                         cls.logger.debug(f"[Soccer] No data found (404) for {league_slug} on {fetch_date}. URL: {url}")
+                         self.logger.debug(f"[Soccer] No data found (404) for {league_slug} on {fetch_date}. URL: {url}")
+                         if use_cache:
+                             self.cache_manager.set(cache_key, {"events": []})
                     else:
-                         cls.logger.error(f"[Soccer] Error fetching data from ESPN for {league_slug} on {fetch_date}: {e}")
-                    # Cache an empty result for 404s to avoid retrying immediately
-                    if response is not None and response.status_code == 404:
-                         cls.cache_manager.set(cache_key, {"events": []})
+                         self.logger.error(f"[Soccer] Error fetching data for {league_slug} on {fetch_date}: {e}")
 
-        # Filter events based on favorite teams, if specified
-        if favorite_teams:
-            leagues_with_favorites = set()
-            for event in all_data.get("events", []):
-                league_slug = event.get("league", {}).get("slug")
-                competitors = event.get("competitions", [{}])[0].get("competitors", [])
-                for competitor in competitors:
-                    team_abbr = competitor.get("team", {}).get("abbreviation")
-                    if team_abbr in favorite_teams and league_slug:
-                        leagues_with_favorites.add(league_slug)
-                        break # No need to check other competitor in this event
-
-            if leagues_with_favorites:
-                cls.logger.debug(f"[Soccer] Filtering shared data for leagues with favorite teams: {leagues_with_favorites}")
-                filtered_events = [
-                    event for event in all_data.get("events", [])
-                    if event.get("league", {}).get("slug") in leagues_with_favorites
-                ]
-                all_data["events"] = filtered_events
-            else:
-                 cls.logger.debug("[Soccer] No favorite teams found in any fetched events. Shared data will be empty.")
-                 all_data["events"] = [] # No relevant leagues found
-
-        cls._shared_data = all_data # Store combined (and potentially filtered) data
-        cls._last_shared_update = current_time # Update timestamp
-
-        return cls._shared_data
+        return all_data
 
     def _get_live_leagues_to_fetch(self) -> set:
         """Determine which leagues to fetch for live data based on favorites and map."""
@@ -400,47 +340,9 @@ class BaseSoccerManager:
     def _fetch_data(self, date_str: str = None) -> Optional[Dict]:
         """Fetch data using shared data mechanism or live fetching per league."""
         if isinstance(self, SoccerLiveManager) and not self.test_mode:
-            # Live manager bypasses shared cache; fetches today's data per league
-            live_data = {"events": []}
-            today_date_str = datetime.now(pytz.utc).strftime('%Y%m%d')
-            
-            # Determine leagues to fetch based on favorites and map
-            leagues_to_fetch = self._get_live_leagues_to_fetch()
-            self.logger.debug(f"[Soccer Live] Determined leagues to fetch: {leagues_to_fetch}")
-
-            for league_slug in leagues_to_fetch:
-                try:
-                    # Check cache first for live data (shorter expiry?)
-                    cache_key = f"soccer_live_{league_slug}_{today_date_str}"
-                    cached_league_data = self.cache_manager.get(cache_key, max_age=15) # Short cache for live
-                    if cached_league_data:
-                         self.logger.debug(f"[Soccer] Using cached live data for {league_slug}")
-                         if "events" in cached_league_data: live_data["events"].extend(cached_league_data["events"])
-                         continue 
-
-                    url = ESPN_SOCCER_LEAGUE_SCOREBOARD_URL_FORMAT.format(league_slug)
-                    params = {'dates': today_date_str, 'limit': 100}
-
-                    response = requests.get(url, params=params)
-                    response.raise_for_status()
-                    league_data = response.json()
-                    self.logger.info(f"[Soccer] Fetched live game data from ESPN API for {league_slug} on {today_date_str}")
-                    
-                    if "events" in league_data:
-                        live_data["events"].extend(league_data["events"])
-                    self.cache_manager.set(cache_key, league_data) # Cache the result
-
-                except requests.exceptions.RequestException as e:
-                     if response is not None and response.status_code == 404:
-                         self.logger.debug(f"[Soccer] No live data found (404) for {league_slug} today. URL: {url}")
-                     else:
-                         self.logger.error(f"[Soccer] Error fetching live game data for {league_slug}: {e}")
-                     # Cache empty result on 404? Maybe not for live?
-            return live_data
+            return self._fetch_soccer_api_data(use_cache=False)
         else:
-            # Non-live or test mode: use the shared data fetch (which now iterates leagues)
-            # The filtering by target_leagues is inherently done within _fetch_shared_data now.
-            return self._fetch_shared_data(date_str)
+            return self._fetch_soccer_api_data(use_cache=True)
 
     def _load_fonts(self):
         """Load fonts used by the scoreboard."""

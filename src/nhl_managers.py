@@ -153,104 +153,48 @@ class BaseNHLManager:
         except pytz.UnknownTimeZoneError:
             return pytz.utc
 
-    def _fetch_shared_data(self, date_str: str = None) -> Optional[Dict]:
-        """Fetch and cache data for all managers to share."""
+    def _fetch_nhl_api_data(self, use_cache: bool = True) -> Optional[Dict]:
+        """Fetch and cache data from the NHL API."""
         current_time = time.time()
         
-        # If we have recent data, use it
-        if BaseNHLManager._shared_data and (current_time - BaseNHLManager._last_shared_update) < 300:  # 5 minutes
-            return BaseNHLManager._shared_data
-            
-        try:
-            # Check cache first
-            cache_key = date_str if date_str else 'today'
-            cached_data = BaseNHLManager.cache_manager.get(cache_key, max_age=300)  # 5 minutes cache
+        # Use today's date for the request
+        date_str = datetime.now(self._get_timezone()).strftime('%Y-%m-%d')
+        cache_key = f"nhl_api_data_{date_str}"
+
+        # If using cache, try to load from cache first
+        if use_cache:
+            cached_data = self.cache_manager.get(cache_key, max_age=300)
             if cached_data:
-                BaseNHLManager.logger.info(f"[NHL] Using cached data for {cache_key}")
-                BaseNHLManager._shared_data = cached_data
-                BaseNHLManager._last_shared_update = current_time
+                self.logger.info(f"[NHL] Using cached data for {date_str}")
                 return cached_data
                 
-            # If not in cache or stale, fetch from API
-            if not date_str:
-                # Get today's date in YYYY-MM-DD format
-                today = datetime.now(self._get_timezone()).date()
-                date_str = today.strftime('%Y-%m-%d')
-                
+        try:
+            # If not in cache or stale, or if cache is disabled, fetch from API
             url = f"{NHL_API_BASE_URL}{date_str}"
-            BaseNHLManager.logger.info(f"Fetching data from URL: {url}")
+            self.logger.info(f"Fetching data from URL: {url}")
             
             response = requests.get(url)
             response.raise_for_status()
             data = response.json()
-            BaseNHLManager.logger.info(f"[NHL] Successfully fetched data from NHL API")
+            self.logger.info(f"[NHL] Successfully fetched data from NHL API for {date_str}")
             
-            # Cache the response
-            BaseNHLManager.cache_manager.set(cache_key, data)
-            BaseNHLManager._shared_data = data
-            BaseNHLManager._last_shared_update = current_time
-            
-            # If no date specified, fetch data from multiple days
-            if not date_str:
-                # Get today's date in YYYYMMDD format
-                today = datetime.now(self._get_timezone()).date()
-                dates_to_fetch = [
-                    (today - timedelta(days=2)).strftime('%Y-%m-%d'),
-                    (today - timedelta(days=1)).strftime('%Y-%m-%d'),
-                    today.strftime('%Y-%m-%d')
-                ]
-                
-                # Fetch data for each date
-                all_events = []
-                for fetch_date in dates_to_fetch:
-                    if fetch_date != today.strftime('%Y-%m-%d'):  # Skip today as we already have it
-                        # Check cache for this date
-                        cached_date_data = BaseNHLManager.cache_manager.get(fetch_date, max_age=300)
-                        if cached_date_data:
-                            BaseNHLManager.logger.info(f"[NHL] Using cached data for date {fetch_date}")
-                            if "events" in cached_date_data:
-                                all_events.extend(cached_date_data["events"])
-                            continue
-                            
-                        url = f"{NHL_API_BASE_URL}{fetch_date}"
-                        response = requests.get(url)
-                        response.raise_for_status()
-                        date_data = response.json()
-                        if date_data and "events" in date_data:
-                            all_events.extend(date_data["events"])
-                            BaseNHLManager.logger.info(f"[NHL] Fetched {len(date_data['events'])} events for date {fetch_date}")
-                            # Cache the response
-                            BaseNHLManager.cache_manager.set(fetch_date, date_data)
-                
-                # Combine events from all dates
-                if all_events:
-                    data["events"].extend(all_events)
-                    BaseNHLManager.logger.info(f"[NHL] Combined {len(data['events'])} total events from all dates")
-                    BaseNHLManager._shared_data = data
-                    BaseNHLManager._last_shared_update = current_time
+            # Save to cache if caching is enabled
+            if use_cache:
+                self.cache_manager.set(cache_key, data)
             
             return data
         except requests.exceptions.RequestException as e:
-            BaseNHLManager.logger.error(f"[NHL] Error fetching data from NHL: {e}")
+            self.logger.error(f"[NHL] Error fetching data from NHL API: {e}")
             return None
 
     def _fetch_data(self, date_str: str = None) -> Optional[Dict]:
-        """Fetch data using shared data mechanism."""
+        """Fetch data using the new centralized method."""
         # For live games, bypass the shared cache to ensure fresh data
         if isinstance(self, NHLLiveManager):
-            try:
-                url = f"{NHL_API_BASE_URL}{date_str}" if date_str else f"{NHL_API_BASE_URL}{datetime.now(self._get_timezone()).strftime('%Y-%m-%d')}"
-                response = requests.get(url)
-                response.raise_for_status()
-                data = response.json()
-                self.logger.info(f"[NHL] Successfully fetched live game data from NHL API")
-                return data
-            except requests.exceptions.RequestException as e:
-                self.logger.error(f"[NHL] Error fetching live game data from NHL: {e}")
-                return None
+            return self._fetch_nhl_api_data(use_cache=False)
         else:
             # For non-live games, use the shared cache
-            return self._fetch_shared_data(date_str)
+            return self._fetch_nhl_api_data(use_cache=True)
 
     def _load_fonts(self):
         """Load fonts used by the scoreboard."""

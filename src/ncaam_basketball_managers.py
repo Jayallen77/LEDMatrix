@@ -311,107 +311,40 @@ class BaseNCAAMBasketballManager:
         # Draw the text in the specified color
         draw.text((x, y), text, font=font, fill=fill)
 
-    @classmethod
-    def _fetch_shared_data(cls, date_str: str = None) -> Optional[Dict]:
+    def _fetch_ncaam_basketball_api_data(self, use_cache: bool = True) -> Optional[Dict]:
         """Fetch and cache data for all managers to share."""
-        current_time = time.time()
-        
-        # If we have recent data, use it
-        if cls._shared_data and (current_time - cls._last_shared_update) < 300:  # 5 minutes
-            return cls._shared_data
-            
-        try:
-            # Check cache first
-            cache_key = f"ncaam_basketball_{date_str}" if date_str else 'ncaam_basketball_today' # Prefix cache key
-            cached_data = cls.cache_manager.get(cache_key)
+        now = datetime.now(pytz.utc)
+        date_str = now.strftime('%Y%m%d')
+        cache_key = f"ncaam_basketball_{date_str}"
+
+        if use_cache:
+            cached_data = self.cache_manager.get(cache_key)
             if cached_data:
-                cls.logger.info(f"[NCAAMBasketball] Using cached data for {cache_key}")
-                cls._shared_data = cached_data
-                cls._last_shared_update = current_time
+                self.logger.info(f"[NCAAMBasketball] Using cached data for {date_str}")
                 return cached_data
-                
-            # If not in cache or stale, fetch from API
+        
+        try:
             url = ESPN_NCAAMB_SCOREBOARD_URL
-            params = {}
-            if date_str:
-                params['dates'] = date_str
-                
+            params = {'dates': date_str}
             response = requests.get(url, params=params)
             response.raise_for_status()
             data = response.json()
-            cls.logger.info(f"[NCAAMBasketball] Successfully fetched data from ESPN API")
             
-            # Cache the response
-            cls.cache_manager.update_cache(cache_key, data)
-            cls._shared_data = data
-            cls._last_shared_update = current_time
-            
-            # If no date specified, fetch data from multiple days
-            if not date_str:
-                # Get today's date in YYYYMMDD format
-                today = datetime.now(pytz.utc).date()
-                dates_to_fetch = [
-                    (today - timedelta(days=2)).strftime('%Y%m%d'),
-                    (today - timedelta(days=1)).strftime('%Y%m%d'),
-                    today.strftime('%Y%m%d')
-                ]
+            if use_cache:
+                self.cache_manager.set(cache_key, data)
                 
-                # Fetch data for each date
-                all_events = []
-                for fetch_date in dates_to_fetch:
-                    if fetch_date != today.strftime('%Y%m%d'):  # Skip today as we already have it
-                        date_cache_key = f"ncaam_basketball_{fetch_date}" # Prefix cache key
-                        # Check cache for this date
-                        cached_date_data = cls.cache_manager.get(date_cache_key)
-                        if cached_date_data:
-                            cls.logger.info(f"[NCAAMBasketball] Using cached data for date {fetch_date}")
-                            if "events" in cached_date_data:
-                                all_events.extend(cached_date_data["events"])
-                            continue
-                            
-                        params['dates'] = fetch_date
-                        response = requests.get(url, params=params)
-                        response.raise_for_status()
-                        date_data = response.json()
-                        if date_data and "events" in date_data:
-                            all_events.extend(date_data["events"])
-                            cls.logger.info(f"[NCAAMBasketball] Fetched {len(date_data['events'])} events for date {fetch_date}")
-                            # Cache the response
-                            cls.cache_manager.update_cache(date_cache_key, date_data)
-                
-                # Combine events from all dates
-                if all_events:
-                    data["events"].extend(all_events)
-                    cls.logger.info(f"[NCAAMBasketball] Combined {len(data['events'])} total events from all dates")
-                    cls._shared_data = data
-                    cls._last_shared_update = current_time
-            
+            self.logger.info(f"[NCAAMBasketball] Successfully fetched data from ESPN API for {date_str}")
             return data
         except requests.exceptions.RequestException as e:
-            cls.logger.error(f"[NCAAMBasketball] Error fetching data from ESPN: {e}")
+            self.logger.error(f"[NCAAMBasketball] Error fetching data from ESPN: {e}")
             return None
 
     def _fetch_data(self, date_str: str = None) -> Optional[Dict]:
         """Fetch data using shared data mechanism."""
-        # For live games, bypass the shared cache to ensure fresh data
         if isinstance(self, NCAAMBasketballLiveManager):
-            try:
-                url = ESPN_NCAAMB_SCOREBOARD_URL
-                params = {}
-                if date_str:
-                    params['dates'] = date_str
-                    
-                response = requests.get(url, params=params)
-                response.raise_for_status()
-                data = response.json()
-                self.logger.info(f"[NCAAMBasketball] Successfully fetched live game data from ESPN API")
-                return data
-            except requests.exceptions.RequestException as e:
-                self.logger.error(f"[NCAAMBasketball] Error fetching live game data from ESPN: {e}")
-                return None
+            return self._fetch_ncaam_basketball_api_data(use_cache=False)
         else:
-            # For non-live games, use the shared cache
-            return self._fetch_shared_data(date_str)
+            return self._fetch_ncaam_basketball_api_data(use_cache=True)
 
     def _extract_game_details(self, game_event: Dict) -> Optional[Dict]:
         """Extract relevant game details from ESPN API response."""

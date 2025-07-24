@@ -315,8 +315,15 @@ class BaseMiLBManager:
             logger.error(f"Error formatting game time: {e}")
             return "TBD"
 
-    def _fetch_milb_api_data(self) -> Dict[str, Any]:
+    def _fetch_milb_api_data(self, use_cache: bool = True) -> Dict[str, Any]:
         """Fetch MiLB game data from the MLB Stats API."""
+        cache_key = "milb_api_data"
+        if use_cache:
+            cached_data = self.cache_manager.get_with_auto_strategy(cache_key)
+            if cached_data:
+                self.logger.info("Using cached MiLB API data.")
+                return cached_data
+
         try:
             # Check if test mode is enabled
             if self.milb_config.get('test_mode', False):
@@ -444,6 +451,8 @@ class BaseMiLBManager:
                             
                             all_games[game_pk] = game_data
 
+            if use_cache:
+                self.cache_manager.set(cache_key, all_games)
             return all_games
             
         except Exception as e:
@@ -632,7 +641,7 @@ class MiLBLiveManager(BaseMiLBManager):
                         self.current_game["away_score"] = str(int(self.current_game["away_score"]) + 1)
             else:
                 # Fetch live game data from MiLB API
-                games = self._fetch_milb_api_data()
+                games = self._fetch_milb_api_data(use_cache=False)
                 if games:
                     # Find all live games involving favorite teams
                     new_live_games = []
@@ -975,7 +984,7 @@ class MiLBRecentManager(BaseMiLBManager):
             
         try:
             # Fetch data from MiLB API
-            games = self._fetch_milb_api_data()
+            games = self._fetch_milb_api_data(use_cache=True)
             if not games:
                 logger.warning("[MiLB] No games returned from API")
                 return
@@ -1129,7 +1138,7 @@ class MiLBUpcomingManager(BaseMiLBManager):
             
         try:
             # Fetch data from MiLB API
-            games = self._fetch_milb_api_data()
+            games = self._fetch_milb_api_data(use_cache=True)
             if not games:
                 self.logger.warning("[MiLB] No games returned from API for upcoming games update.")
                 return
