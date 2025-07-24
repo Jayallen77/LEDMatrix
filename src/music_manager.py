@@ -798,22 +798,26 @@ class MusicManager:
         y_pos_album = y_pos_artist + line_height_artist_album + padding_between_lines
         if (matrix_height - y_pos_album) >= line_height_artist_album : 
             album_width = self.display_manager.get_text_width(album, font_artist_album)
-            current_album_display_text = album
-            if album_width > text_area_width:
+            # Display album if it fits or can be scrolled (maintains original behavior but adds scrolling)
+            if album_width <= text_area_width:
+                # Album fits without scrolling - display normally
+                self.display_manager.draw_text(album, 
+                                             x=text_area_x_start, y=y_pos_album, color=(150, 150, 150), font=font_artist_album)
+                self.scroll_position_album = 0
+                self.album_scroll_tick = 0
+            elif album_width > text_area_width:
+                # Album is too wide - scroll it
+                current_album_display_text = album
                 if self.scroll_position_album >= len(album):
                     self.scroll_position_album = 0
                 current_album_display_text = album[self.scroll_position_album:] + "   " + album[:self.scroll_position_album]
-            
-            self.display_manager.draw_text(current_album_display_text, 
-                                         x=text_area_x_start, y=y_pos_album, color=(150, 150, 150), font=font_artist_album)
-            if album_width > text_area_width:
+                
+                self.display_manager.draw_text(current_album_display_text, 
+                                             x=text_area_x_start, y=y_pos_album, color=(150, 150, 150), font=font_artist_album)
                 self.album_scroll_tick += 1
                 if self.album_scroll_tick % TEXT_SCROLL_DIVISOR == 0:
                     self.scroll_position_album = (self.scroll_position_album + 1) % len(album)
                     self.album_scroll_tick = 0
-            else:
-                self.scroll_position_album = 0
-                self.album_scroll_tick = 0
 
         # --- Progress Bar --- 
         progress_bar_height = 3
