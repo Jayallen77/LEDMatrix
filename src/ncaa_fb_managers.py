@@ -883,88 +883,79 @@ class NCAAFBRecentManager(BaseNCAAFBManager): # Renamed class
 
         self.last_update = current_time # Update time even if fetch fails
         
-        # Check for cached processed games first
-        cached_games = self._get_cached_processed_games('recent')
-        if cached_games:
-            self.logger.debug("[NCAAFB Recent] Using cached processed games")
-            team_games = cached_games
-        else:
-            try:
-                data = self._fetch_data() # Uses shared cache
-                if not data or 'events' not in data:
-                    self.logger.warning("[NCAAFB Recent] No events found in shared data.") # Changed log prefix
-                    if not self.games_list: self.current_game = None # Clear display if no games were showing
-                    return
+        try:
+            data = self._fetch_data() # Uses shared cache
+            if not data or 'events' not in data:
+                self.logger.warning("[NCAAFB Recent] No events found in shared data.") # Changed log prefix
+                if not self.games_list: self.current_game = None # Clear display if no games were showing
+                return
 
-                events = data['events']
-                # self.logger.info(f"[NCAAFB Recent] Processing {len(events)} events from shared data.") # Changed log prefix
+            events = data['events']
+            # self.logger.info(f"[NCAAFB Recent] Processing {len(events)} events from shared data.") # Changed log prefix
 
-                # Process games and filter for final games & favorite teams
-                processed_games = []
-                favorite_games_found = 0
-                for event in events:
-                    game = self._extract_game_details(event)
-                    # Filter criteria: must be final
-                    if game and game['is_final']:
-                        processed_games.append(game)
-                        # Count favorite team games for logging
-                        if (game['home_abbr'] in self.favorite_teams or 
-                            game['away_abbr'] in self.favorite_teams):
-                            favorite_games_found += 1
+            # Process games and filter for final games & favorite teams
+            processed_games = []
+            favorite_games_found = 0
+            for event in events:
+                game = self._extract_game_details(event)
+                # Filter criteria: must be final
+                if game and game['is_final']:
+                    processed_games.append(game)
+                    # Count favorite team games for logging
+                    if (game['home_abbr'] in self.favorite_teams or 
+                        game['away_abbr'] in self.favorite_teams):
+                        favorite_games_found += 1
 
-                # Filter for favorite teams
-                if self.favorite_teams:
-                    team_games = [game for game in processed_games
-                                  if game['home_abbr'] in self.favorite_teams or
-                                     game['away_abbr'] in self.favorite_teams]
-                    self.logger.info(f"[NCAAFB Recent] Found {favorite_games_found} favorite team games out of {len(processed_games)} total final games")
+            # Filter for favorite teams
+            if self.favorite_teams:
+                team_games = [game for game in processed_games
+                              if game['home_abbr'] in self.favorite_teams or
+                                 game['away_abbr'] in self.favorite_teams]
+                self.logger.info(f"[NCAAFB Recent] Found {favorite_games_found} favorite team games out of {len(processed_games)} total final games")
+            else:
+                 team_games = processed_games # Show all recent games if no favorites defined
+                 self.logger.info(f"[NCAAFB Recent] Found {len(processed_games)} total final games (no favorite teams configured)")
+
+            # Sort by game time, most recent first
+            team_games.sort(key=lambda g: g.get('start_time_utc') or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+            
+            # Limit to the specified number of recent games
+            team_games = team_games[:self.recent_games_to_show]
+
+            # Check if the list of games to display has changed
+            new_game_ids = {g['id'] for g in team_games}
+            current_game_ids = {g['id'] for g in self.games_list}
+
+            if new_game_ids != current_game_ids:
+                self.logger.info(f"[NCAAFB Recent] Found {len(team_games)} final games within window for display.") # Changed log prefix
+                self.games_list = team_games
+                # Reset index if list changed or current game removed
+                if not self.current_game or not self.games_list or self.current_game['id'] not in new_game_ids:
+                     self.current_game_index = 0
+                     self.current_game = self.games_list[0] if self.games_list else None
+                     self.last_game_switch = current_time # Reset switch timer
                 else:
-                     team_games = processed_games # Show all recent games if no favorites defined
-                     self.logger.info(f"[NCAAFB Recent] Found {len(processed_games)} total final games (no favorite teams configured)")
+                     # Try to maintain position if possible
+                     try:
+                          self.current_game_index = next(i for i, g in enumerate(self.games_list) if g['id'] == self.current_game['id'])
+                          self.current_game = self.games_list[self.current_game_index] # Update data just in case
+                     except StopIteration:
+                          self.current_game_index = 0
+                          self.current_game = self.games_list[0]
+                          self.last_game_switch = current_time
 
-                # Sort by game time, most recent first
-                team_games.sort(key=lambda g: g.get('start_time_utc') or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
-                
-                # Limit to the specified number of recent games
-                team_games = team_games[:self.recent_games_to_show]
+            elif self.games_list:
+                 # List content is same, just update data for current game
+                 self.current_game = self.games_list[self.current_game_index]
 
-                # Cache the processed games
-                self._cache_processed_games('recent', team_games)
+            if not self.games_list:
+                 self.logger.info("[NCAAFB Recent] No relevant recent games found to display.") # Changed log prefix
+                 self.current_game = None # Ensure display clears if no games
 
-                # Check if the list of games to display has changed
-                new_game_ids = {g['id'] for g in team_games}
-                current_game_ids = {g['id'] for g in self.games_list}
-
-                if new_game_ids != current_game_ids:
-                    self.logger.info(f"[NCAAFB Recent] Found {len(team_games)} final games within window for display.") # Changed log prefix
-                    self.games_list = team_games
-                    # Reset index if list changed or current game removed
-                    if not self.current_game or not self.games_list or self.current_game['id'] not in new_game_ids:
-                         self.current_game_index = 0
-                         self.current_game = self.games_list[0] if self.games_list else None
-                         self.last_game_switch = current_time # Reset switch timer
-                    else:
-                         # Try to maintain position if possible
-                         try:
-                              self.current_game_index = next(i for i, g in enumerate(self.games_list) if g['id'] == self.current_game['id'])
-                              self.current_game = self.games_list[self.current_game_index] # Update data just in case
-                         except StopIteration:
-                              self.current_game_index = 0
-                              self.current_game = self.games_list[0]
-                              self.last_game_switch = current_time
-
-                elif self.games_list:
-                     # List content is same, just update data for current game
-                     self.current_game = self.games_list[self.current_game_index]
-
-                if not self.games_list:
-                     self.logger.info("[NCAAFB Recent] No relevant recent games found to display.") # Changed log prefix
-                     self.current_game = None # Ensure display clears if no games
-
-            except Exception as e:
-                self.logger.error(f"[NCAAFB Recent] Error updating recent games: {e}", exc_info=True) # Changed log prefix
-                # Don't clear current game on error, keep showing last known state
-                # self.current_game = None # Decide if we want to clear display on error
+        except Exception as e:
+            self.logger.error(f"[NCAAFB Recent] Error updating recent games: {e}", exc_info=True) # Changed log prefix
+            # Don't clear current game on error, keep showing last known state
+            # self.current_game = None # Decide if we want to clear display on error
 
     def _draw_scorebug_layout(self, game: Dict, force_clear: bool = False) -> None:
         """Draw the layout for a recently completed NCAA FB game.""" # Updated docstring
@@ -1103,108 +1094,99 @@ class NCAAFBUpcomingManager(BaseNCAAFBManager): # Renamed class
 
         self.last_update = current_time
         
-        # Check for cached processed games first
-        cached_games = self._get_cached_processed_games('upcoming')
-        if cached_games:
-            self.logger.debug("[NCAAFB Upcoming] Using cached processed games")
-            team_games = cached_games
-        else:
-            try:
-                data = self._fetch_data() # Uses shared cache
-                if not data or 'events' not in data:
-                    self.logger.warning("[NCAAFB Upcoming] No events found in shared data.") # Changed log prefix
-                    if not self.games_list: self.current_game = None
-                    return
+        try:
+            data = self._fetch_data() # Uses shared cache
+            if not data or 'events' not in data:
+                self.logger.warning("[NCAAFB Upcoming] No events found in shared data.") # Changed log prefix
+                if not self.games_list: self.current_game = None
+                return
 
-                events = data['events']
-                # self.logger.info(f"[NCAAFB Upcoming] Processing {len(events)} events from shared data.") # Changed log prefix
+            events = data['events']
+            # self.logger.info(f"[NCAAFB Upcoming] Processing {len(events)} events from shared data.") # Changed log prefix
 
-                processed_games = []
-                favorite_games_found = 0
-                for event in events:
-                    game = self._extract_game_details(event)
-                    # Filter criteria: must be upcoming ('pre' state)
-                    if game and game['is_upcoming']:
-                        # Only fetch odds for games that will be displayed
-                        if self.ncaa_fb_config.get("show_favorite_teams_only", False):
-                            if not self.favorite_teams:
-                                continue
-                            if game['home_abbr'] not in self.favorite_teams and game['away_abbr'] not in self.favorite_teams:
-                                continue
-                        processed_games.append(game)
-                        # Count favorite team games for logging
-                        if (game['home_abbr'] in self.favorite_teams or 
-                            game['away_abbr'] in self.favorite_teams):
-                            favorite_games_found += 1
-                        if self.show_odds:
-                            self._fetch_odds(game)
+            processed_games = []
+            favorite_games_found = 0
+            for event in events:
+                game = self._extract_game_details(event)
+                # Filter criteria: must be upcoming ('pre' state)
+                if game and game['is_upcoming']:
+                    # Only fetch odds for games that will be displayed
+                    if self.ncaa_fb_config.get("show_favorite_teams_only", False):
+                        if not self.favorite_teams:
+                            continue
+                        if game['home_abbr'] not in self.favorite_teams and game['away_abbr'] not in self.favorite_teams:
+                            continue
+                    processed_games.append(game)
+                    # Count favorite team games for logging
+                    if (game['home_abbr'] in self.favorite_teams or 
+                        game['away_abbr'] in self.favorite_teams):
+                        favorite_games_found += 1
+                    if self.show_odds:
+                        self._fetch_odds(game)
 
-                # Summary logging instead of verbose debug
-                self.logger.info(f"[NCAAFB Upcoming] Found {len(processed_games)} total upcoming games")
+            # Summary logging instead of verbose debug
+            self.logger.info(f"[NCAAFB Upcoming] Found {len(processed_games)} total upcoming games")
 
-                # Filter for favorite teams only if the config is set
-                if self.ncaa_fb_config.get("show_favorite_teams_only", False):
-                    team_games = [game for game in processed_games
-                                  if game['home_abbr'] in self.favorite_teams or
-                                     game['away_abbr'] in self.favorite_teams]
-                else:
-                    team_games = processed_games # Show all upcoming if no favorites
+            # Filter for favorite teams only if the config is set
+            if self.ncaa_fb_config.get("show_favorite_teams_only", False):
+                team_games = [game for game in processed_games
+                              if game['home_abbr'] in self.favorite_teams or
+                                 game['away_abbr'] in self.favorite_teams]
+            else:
+                team_games = processed_games # Show all upcoming if no favorites
 
-                # Sort by game time, earliest first
-                team_games.sort(key=lambda g: g.get('start_time_utc') or datetime.max.replace(tzinfo=timezone.utc))
-                
-                # Limit to the specified number of upcoming games
-                team_games = team_games[:self.upcoming_games_to_show]
+            # Sort by game time, earliest first
+            team_games.sort(key=lambda g: g.get('start_time_utc') or datetime.max.replace(tzinfo=timezone.utc))
+            
+            # Limit to the specified number of upcoming games
+            team_games = team_games[:self.upcoming_games_to_show]
 
-                # Cache the processed games
-                self._cache_processed_games('upcoming', team_games)
+            # Log changes or periodically
+            should_log = (
+                 current_time - self.last_log_time >= self.log_interval or
+                 len(team_games) != len(self.games_list) or
+                 any(g1['id'] != g2.get('id') for g1, g2 in zip(self.games_list, team_games)) or
+                 (not self.games_list and team_games)
+             )
 
-                # Log changes or periodically
-                should_log = (
-                     current_time - self.last_log_time >= self.log_interval or
-                     len(team_games) != len(self.games_list) or
-                     any(g1['id'] != g2.get('id') for g1, g2 in zip(self.games_list, team_games)) or
-                     (not self.games_list and team_games)
-                 )
+            # Check if the list of games to display has changed
+            new_game_ids = {g['id'] for g in team_games}
+            current_game_ids = {g['id'] for g in self.games_list}
 
-                # Check if the list of games to display has changed
-                new_game_ids = {g['id'] for g in team_games}
-                current_game_ids = {g['id'] for g in self.games_list}
+            if new_game_ids != current_game_ids:
+                 self.logger.info(f"[NCAAFB Upcoming] Found {len(team_games)} upcoming games within window for display.") # Changed log prefix
+                 self.games_list = team_games
+                 if not self.current_game or not self.games_list or self.current_game['id'] not in new_game_ids:
+                      self.current_game_index = 0
+                      self.current_game = self.games_list[0] if self.games_list else None
+                      self.last_game_switch = current_time
+                 else:
+                      try:
+                           self.current_game_index = next(i for i, g in enumerate(self.games_list) if g['id'] == self.current_game['id'])
+                           self.current_game = self.games_list[self.current_game_index]
+                      except StopIteration:
+                           self.current_game_index = 0
+                           self.current_game = self.games_list[0]
+                           self.last_game_switch = current_time
 
-                if new_game_ids != current_game_ids:
-                     self.logger.info(f"[NCAAFB Upcoming] Found {len(team_games)} upcoming games within window for display.") # Changed log prefix
-                     self.games_list = team_games
-                     if not self.current_game or not self.games_list or self.current_game['id'] not in new_game_ids:
-                          self.current_game_index = 0
-                          self.current_game = self.games_list[0] if self.games_list else None
-                          self.last_game_switch = current_time
-                     else:
-                          try:
-                               self.current_game_index = next(i for i, g in enumerate(self.games_list) if g['id'] == self.current_game['id'])
-                               self.current_game = self.games_list[self.current_game_index]
-                          except StopIteration:
-                               self.current_game_index = 0
-                               self.current_game = self.games_list[0]
-                               self.last_game_switch = current_time
+            elif self.games_list:
+                 self.current_game = self.games_list[self.current_game_index] # Update data
 
-                elif self.games_list:
-                     self.current_game = self.games_list[self.current_game_index] # Update data
+            if not self.games_list:
+                 self.logger.info("[NCAAFB Upcoming] No relevant upcoming games found to display.") # Changed log prefix
+                 self.current_game = None
 
-                if not self.games_list:
-                     self.logger.info("[NCAAFB Upcoming] No relevant upcoming games found to display.") # Changed log prefix
-                     self.current_game = None
+            if should_log and not self.games_list:
+                 # Log favorite teams only if no games are found and logging is needed
+                 self.logger.debug(f"[NCAAFB Upcoming] Favorite teams: {self.favorite_teams}") # Changed log prefix
+                 self.logger.debug(f"[NCAAFB Upcoming] Total upcoming games before filtering: {len(processed_games)}") # Changed log prefix
+                 self.last_log_time = current_time
+            elif should_log:
+                self.last_log_time = current_time
 
-                if should_log and not self.games_list:
-                     # Log favorite teams only if no games are found and logging is needed
-                     self.logger.debug(f"[NCAAFB Upcoming] Favorite teams: {self.favorite_teams}") # Changed log prefix
-                     self.logger.debug(f"[NCAAFB Upcoming] Total upcoming games before filtering: {len(processed_games)}") # Changed log prefix
-                     self.last_log_time = current_time
-                elif should_log:
-                    self.last_log_time = current_time
-
-            except Exception as e:
-                self.logger.error(f"[NCAAFB Upcoming] Error updating upcoming games: {e}", exc_info=True) # Changed log prefix
-                # self.current_game = None # Decide if clear on error
+        except Exception as e:
+            self.logger.error(f"[NCAAFB Upcoming] Error updating upcoming games: {e}", exc_info=True) # Changed log prefix
+            # self.current_game = None # Decide if clear on error
 
     def _draw_scorebug_layout(self, game: Dict, force_clear: bool = False) -> None:
         """Draw the layout for an upcoming NCAA FB game.""" # Updated docstring
