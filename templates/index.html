@@ -298,6 +298,84 @@
             font-size: 11px;
             opacity: 0.8;
         }
+        
+        .json-container textarea {
+            border: 2px solid #ddd;
+            transition: border-color 0.3s;
+        }
+        
+        .json-container textarea:focus {
+            border-color: #4CAF50;
+            outline: none;
+        }
+        
+        .json-container textarea.error {
+            border-color: #f44336;
+        }
+        
+        .json-container textarea.valid {
+            border-color: #4CAF50;
+        }
+        
+        .save-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        
+        .save-button:hover {
+            background-color: #45a049;
+        }
+        
+        .save-button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .json-actions {
+            margin-top: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .json-actions button {
+            flex-shrink: 0;
+        }
+        
+        .json-container {
+            position: relative;
+            margin-bottom: 15px;
+        }
+        
+        .json-status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .json-status.valid {
+            background-color: #4CAF50;
+        }
+        
+        .json-status.error {
+            background-color: #f44336;
+        }
+        
+        .json-status.warning {
+            background-color: #ff9800;
+        }
     </style>
 </head>
 <body>
@@ -1561,7 +1639,7 @@
         <div id="raw-json" class="tab-content">
             <div class="form-section">
                 <h2>Raw Configuration JSON</h2>
-                <p>View and copy the complete configuration files. Use these for backup or manual editing.</p>
+                <p>View, edit, and save the complete configuration files directly. <strong>⚠️ Warning:</strong> Be careful when editing raw JSON - invalid syntax will prevent saving. Use the "Validate JSON" button to check your changes before saving.</p>
                 
                 <div class="config-section">
                     <h3>Main Configuration (config.json)</h3>
@@ -1572,13 +1650,17 @@
                     <div class="form-group">
                         <label>Raw JSON:</label>
                         <div class="json-container">
-                            <textarea id="main-config-json" readonly style="height: 400px; font-family: monospace; font-size: 12px;">{{ main_config_json }}</textarea>
+                            <textarea id="main-config-json" style="height: 400px; font-family: monospace; font-size: 12px;">{{ main_config_json }}</textarea>
+                            <div id="main-config-status" class="json-status valid">VALID</div>
                             <div id="main-config-validation" class="json-validation"></div>
                         </div>
                     </div>
                     <div class="json-actions">
                         <button type="button" onclick="copyToClipboard('main-config-json')" style="margin-right: 10px;">Copy Main Config</button>
+                        <button type="button" onclick="formatJson('main-config-json')" style="background-color: #FF9800; margin-right: 10px;">Format JSON</button>
                         <button type="button" onclick="validateJson('main-config-json', 'main-config-validation')" style="background-color: #2196F3;">Validate JSON</button>
+                        <button type="button" onclick="previewChanges('main')" style="background-color: #9C27B0; margin-right: 10px;">Preview Changes</button>
+                        <button type="button" onclick="saveRawJson('main')" class="save-button" style="margin-left: 10px;">Save Main Config</button>
                     </div>
                 </div>
 
@@ -1591,13 +1673,17 @@
                     <div class="form-group">
                         <label>Raw JSON:</label>
                         <div class="json-container">
-                            <textarea id="secrets-config-json" readonly style="height: 400px; font-family: monospace; font-size: 12px;">{{ secrets_config_json }}</textarea>
+                            <textarea id="secrets-config-json" style="height: 400px; font-family: monospace; font-size: 12px;">{{ secrets_config_json }}</textarea>
+                            <div id="secrets-config-status" class="json-status valid">VALID</div>
                             <div id="secrets-config-validation" class="json-validation"></div>
                         </div>
                     </div>
                     <div class="json-actions">
                         <button type="button" onclick="copyToClipboard('secrets-config-json')" style="margin-right: 10px;">Copy Secrets Config</button>
+                        <button type="button" onclick="formatJson('secrets-config-json')" style="background-color: #FF9800; margin-right: 10px;">Format JSON</button>
                         <button type="button" onclick="validateJson('secrets-config-json', 'secrets-config-validation')" style="background-color: #2196F3;">Validate JSON</button>
+                        <button type="button" onclick="previewChanges('secrets')" style="background-color: #9C27B0; margin-right: 10px;">Preview Changes</button>
+                        <button type="button" onclick="saveRawJson('secrets')" class="save-button" style="margin-left: 10px;">Save Secrets Config</button>
                     </div>
                 </div>
             </div>
@@ -1668,6 +1754,50 @@
         }
     }
 
+    function formatJson(elementId) {
+        const textarea = document.getElementById(elementId);
+        const jsonText = textarea.value;
+        
+        try {
+            // Parse and re-stringify with proper formatting
+            const parsed = JSON.parse(jsonText);
+            const formatted = JSON.stringify(parsed, null, 4);
+            textarea.value = formatted;
+            
+            // Update visual state
+            textarea.classList.remove('error');
+            textarea.classList.add('valid');
+            
+            showMessage('JSON formatted successfully!', 'success');
+        } catch (error) {
+            showMessage(`Cannot format invalid JSON: ${error.message}`, 'error');
+            textarea.classList.remove('valid');
+            textarea.classList.add('error');
+        }
+    }
+
+    function previewChanges(configType) {
+        const textareaId = configType === 'main' ? 'main-config-json' : 'secrets-config-json';
+        const textarea = document.getElementById(textareaId);
+        const jsonText = textarea.value;
+        
+        try {
+            // Validate JSON first
+            const parsed = JSON.parse(jsonText);
+            
+            // Show a simple preview of the structure
+            const configName = configType === 'main' ? 'Main Configuration' : 'Secrets Configuration';
+            const previewText = `Preview of ${configName}:\n\n` +
+                              `Top-level keys: ${Object.keys(parsed).join(', ')}\n\n` +
+                              `Total size: ${JSON.stringify(parsed).length} characters\n\n` +
+                              `This will overwrite the current ${configType === 'main' ? 'config.json' : 'config_secrets.json'} file.`;
+            
+            alert(previewText);
+        } catch (error) {
+            showMessage(`Cannot preview invalid JSON: ${error.message}`, 'error');
+        }
+    }
+
     function validateJson(textareaId, validationId) {
         const textarea = document.getElementById(textareaId);
         const validationDiv = document.getElementById(validationId);
@@ -1677,6 +1807,10 @@
         validationDiv.innerHTML = '';
         validationDiv.className = 'json-validation';
         validationDiv.style.display = 'block';
+        
+        // Update status indicator
+        const statusId = validationId.replace('-validation', '-status');
+        const statusElement = document.getElementById(statusId);
         
         try {
             // Try to parse the JSON
@@ -1714,6 +1848,10 @@
             // Display results
             if (warnings.length > 0) {
                 validationDiv.className = 'json-validation warning';
+                if (statusElement) {
+                    statusElement.textContent = 'WARNING';
+                    statusElement.className = 'json-status warning';
+                }
                 validationDiv.innerHTML = `
                     <div class="json-error-message">✅ JSON is valid but has warnings:</div>
                     <div class="json-error-details">
@@ -1722,6 +1860,10 @@
                 `;
             } else {
                 validationDiv.className = 'json-validation success';
+                if (statusElement) {
+                    statusElement.textContent = 'VALID';
+                    statusElement.className = 'json-status valid';
+                }
                 validationDiv.innerHTML = `
                     <div class="json-error-message">✅ JSON is valid!</div>
                     <div class="json-error-details">
@@ -1735,6 +1877,10 @@
         } catch (error) {
             // JSON parsing failed
             validationDiv.className = 'json-validation error';
+            if (statusElement) {
+                statusElement.textContent = 'INVALID';
+                statusElement.className = 'json-status error';
+            }
             
             let errorMessage = '❌ Invalid JSON syntax';
             let errorDetails = error.message;
@@ -1773,6 +1919,90 @@
                 </div>
             `;
         }
+    }
+
+    function saveRawJson(configType) {
+        const textareaId = configType === 'main' ? 'main-config-json' : 'secrets-config-json';
+        const validationId = configType === 'main' ? 'main-config-validation' : 'secrets-config-validation';
+        const textarea = document.getElementById(textareaId);
+        const validationDiv = document.getElementById(validationId);
+        const jsonText = textarea.value;
+        
+        // First validate the JSON
+        try {
+            JSON.parse(jsonText);
+        } catch (error) {
+            showMessage(`Invalid JSON format: ${error.message}`, 'error');
+            validateJson(textareaId, validationId);
+            return;
+        }
+        
+        // Show confirmation dialog
+        const configName = configType === 'main' ? 'Main Configuration' : 'Secrets Configuration';
+        if (!confirm(`Are you sure you want to save changes to the ${configName}? This will overwrite the current configuration file.`)) {
+            return;
+        }
+        
+        // Show loading state
+        const saveButton = event.target;
+        const originalText = saveButton.textContent;
+        saveButton.textContent = 'Saving...';
+        saveButton.disabled = true;
+        
+        // Send to server
+        fetch("{{ url_for('save_raw_json_route') }}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                config_type: configType,
+                config_data: jsonText
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                showMessage(data.message, 'success');
+                // Update validation to show success
+                validationDiv.className = 'json-validation success';
+                validationDiv.innerHTML = `
+                    <div class="json-error-message">✅ Configuration saved successfully!</div>
+                    <div class="json-error-details">
+                        ✓ JSON is valid<br>
+                        ✓ File saved successfully<br>
+                        ✓ Configuration updated
+                    </div>
+                `;
+                validationDiv.style.display = 'block';
+            } else {
+                showMessage(data.message, 'error');
+                // Show error in validation area
+                validationDiv.className = 'json-validation error';
+                validationDiv.innerHTML = `
+                    <div class="json-error-message">❌ Save failed</div>
+                    <div class="json-error-details">
+                        <strong>Error:</strong> ${data.message}
+                    </div>
+                `;
+                validationDiv.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            showMessage(`Error saving configuration: ${error}`, 'error');
+            // Show error in validation area
+            validationDiv.className = 'json-validation error';
+            validationDiv.innerHTML = `
+                <div class="json-error-message">❌ Save failed</div>
+                <div class="json-error-details">
+                    <strong>Error:</strong> ${error}
+                </div>
+            `;
+            validationDiv.style.display = 'block';
+        })
+        .finally(() => {
+            // Restore button state
+            saveButton.textContent = originalText;
+            saveButton.disabled = false;
+        });
     }
 
     function saveSportsConfig() {
@@ -2541,6 +2771,51 @@
     // Set default active tab
     document.addEventListener("DOMContentLoaded", function() {
         document.querySelector('.tab-link').click();
+        
+        // Add real-time JSON validation for the raw JSON textareas
+        const mainConfigTextarea = document.getElementById('main-config-json');
+        const secretsConfigTextarea = document.getElementById('secrets-config-json');
+        
+        function addJsonValidationListener(textarea, validationId) {
+            let validationTimeout;
+            const statusId = validationId.replace('-validation', '-status');
+            const statusElement = document.getElementById(statusId);
+            
+            textarea.addEventListener('input', function() {
+                // Clear previous timeout
+                clearTimeout(validationTimeout);
+                
+                // Set a new timeout to validate after user stops typing
+                validationTimeout = setTimeout(() => {
+                    const jsonText = textarea.value;
+                    
+                    try {
+                        JSON.parse(jsonText);
+                        textarea.classList.remove('error');
+                        textarea.classList.add('valid');
+                        if (statusElement) {
+                            statusElement.textContent = 'VALID';
+                            statusElement.className = 'json-status valid';
+                        }
+                    } catch (error) {
+                        textarea.classList.remove('valid');
+                        textarea.classList.add('error');
+                        if (statusElement) {
+                            statusElement.textContent = 'INVALID';
+                            statusElement.className = 'json-status error';
+                        }
+                    }
+                }, 500); // Wait 500ms after user stops typing
+            });
+        }
+        
+        if (mainConfigTextarea) {
+            addJsonValidationListener(mainConfigTextarea, 'main-config-validation');
+        }
+        
+        if (secretsConfigTextarea) {
+            addJsonValidationListener(secretsConfigTextarea, 'secrets-config-validation');
+        }
     });
     </script>
 </body>

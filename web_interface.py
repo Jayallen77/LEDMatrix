@@ -286,5 +286,47 @@ def run_action_route():
             'message': f'Error running action: {e}'
         }), 400
 
+@app.route('/save_raw_json', methods=['POST'])
+def save_raw_json_route():
+    try:
+        data = request.get_json()
+        config_type = data.get('config_type')
+        config_data = data.get('config_data')
+        
+        if not config_type or not config_data:
+            return jsonify({
+                'status': 'error',
+                'message': 'Missing config_type or config_data'
+            }), 400
+        
+        if config_type not in ['main', 'secrets']:
+            return jsonify({
+                'status': 'error',
+                'message': 'Invalid config_type. Must be "main" or "secrets"'
+            }), 400
+        
+        # Validate JSON format
+        try:
+            parsed_data = json.loads(config_data)
+        except json.JSONDecodeError as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Invalid JSON format: {str(e)}'
+            }), 400
+        
+        # Save the raw JSON
+        config_manager.save_raw_file_content(config_type, parsed_data)
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'{config_type.capitalize()} configuration saved successfully!'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error saving raw JSON: {str(e)}'
+        }), 400
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True) 
