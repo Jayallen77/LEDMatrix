@@ -137,6 +137,8 @@
     },
     "nhl_scoreboard": {
         "enabled": false,
+        "live_priority": true,
+        "live_game_duration": 20,
         "show_odds": true,
         "test_mode": false,
         "update_interval_seconds": 3600,
@@ -155,6 +157,8 @@
     },
     "nba_scoreboard": {
         "enabled": false,
+        "live_priority": true,
+        "live_game_duration": 20,
         "show_odds": true,
         "test_mode": false,
         "update_interval_seconds": 3600,
@@ -176,6 +180,8 @@
     },
     "nfl_scoreboard": {
         "enabled": false,
+        "live_priority": true,
+        "live_game_duration": 20,
         "show_odds": true,
         "test_mode": false,
         "update_interval_seconds": 3600,
@@ -196,6 +202,8 @@
     },
     "ncaa_fb_scoreboard": {
         "enabled": true,
+        "live_priority": true,
+        "live_game_duration": 20,
         "show_odds": true,
         "test_mode": false,
         "update_interval_seconds": 3600,
@@ -217,6 +225,8 @@
     },
     "ncaa_baseball_scoreboard": {
         "enabled": false,
+        "live_priority": true,
+        "live_game_duration": 30,
         "show_odds": true,
         "test_mode": false,
         "update_interval_seconds": 3600,
@@ -236,6 +246,8 @@
     },
     "ncaam_basketball_scoreboard": {
         "enabled": false,
+        "live_priority": true,
+        "live_game_duration": 20,
         "show_odds": true,
         "test_mode": false,
         "update_interval_seconds": 3600,
@@ -257,6 +269,8 @@
     },
     "mlb": {
         "enabled":  false,
+        "live_priority": true,
+        "live_game_duration": 30,
         "show_odds": true,
         "test_mode": false,
         "update_interval_seconds": 3600,
@@ -279,6 +293,8 @@
     },
     "milb": {
         "enabled":  false,
+        "live_priority": true,
+        "live_game_duration": 30,
         "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 30,
@@ -309,6 +325,8 @@
     },
     "soccer_scoreboard": {
         "enabled": false,
+        "live_priority": true,
+        "live_game_duration": 20,
         "show_odds": true,
         "test_mode": false,
         "update_interval_seconds": 3600,
