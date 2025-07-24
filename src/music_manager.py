@@ -770,7 +770,7 @@ class MusicManager:
             self.title_scroll_tick = 0
 
         # --- Artist --- 
-        y_pos_artist = y_pos_title + line_height_title + padding_between_lines - 1
+        y_pos_artist = y_pos_title + line_height_title + padding_between_lines - 2
         artist_width = self.display_manager.get_text_width(artist, font_artist_album)
         current_artist_display_text = artist
         if artist_width > text_area_width:
@@ -798,7 +798,7 @@ class MusicManager:
 
         # --- Progress Bar --- 
         progress_bar_height = 3
-        progress_bar_y = matrix_height - progress_bar_height - 2 
+        progress_bar_y = matrix_height - progress_bar_height - 1 
         duration_ms = current_track_info_snapshot.get('duration_ms', 0)
         progress_ms = current_track_info_snapshot.get('progress_ms', 0)
 
