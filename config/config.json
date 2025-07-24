@@ -252,7 +252,7 @@
         }
     },
     "youtube": {
-        "enabled":  true,
+        "enabled":  false,
         "update_interval": 3600
     },
     "mlb": {
