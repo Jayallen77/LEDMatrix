@@ -2145,8 +2145,6 @@
                 <h2>API Keys Configuration</h2>
                 <p>Enter your API keys for various services. These are stored securely and not shared.</p>
                 
-                <button type="button" class="toggle-json-btn" onclick="toggleJsonEditor('secrets')">Toggle JSON Editor</button>
-                
                 <div id="secrets-form" class="form-editor">
                     <form action="{{ url_for('save_config_route') }}" method="POST" id="secrets-form-content">
                         <input type="hidden" name="config_type" value="secrets">
@@ -2272,7 +2270,6 @@
                         <button type="button" onclick="copyToClipboard('main-config-json')" style="margin-right: 10px;">Copy Main Config</button>
                         <button type="button" onclick="formatJson('main-config-json')" style="background-color: #FF9800; margin-right: 10px;">Format JSON</button>
                         <button type="button" onclick="validateJson('main-config-json', 'main-config-validation')" style="background-color: #2196F3;">Validate JSON</button>
-                        <button type="button" onclick="previewChanges('main')" style="background-color: #9C27B0; margin-right: 10px;">Preview Changes</button>
                         <button type="button" onclick="saveRawJson('main')" class="save-button" style="margin-left: 10px;">Save Main Config</button>
                     </div>
                 </div>
