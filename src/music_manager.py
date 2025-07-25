@@ -761,12 +761,11 @@ class MusicManager:
         matrix_height = self.display_manager.matrix.height
         
         # Define positions as percentages (0.0 to 1.0)
-        TITLE_Y_PERCENT = 0.03   # 3% from top
         ARTIST_Y_PERCENT = 0.34  # 34% from top  
-        ALBUM_Y_PERCENT = 0.59   # 59% from top
+        ALBUM_Y_PERCENT = 0.60   # 60% from top
         
         # Calculate actual pixel positions
-        y_pos_title_top = int(matrix_height * TITLE_Y_PERCENT)
+        y_pos_title_top = 1
         y_pos_artist_top = int(matrix_height * ARTIST_Y_PERCENT)
         y_pos_album_top = int(matrix_height * ALBUM_Y_PERCENT)
         
