@@ -759,8 +759,8 @@ class MusicManager:
 
         # Y positions based on a simple top-down calculation
         y_pos_title_top = 1
-        y_pos_artist_top = 10
-        y_pos_album_top = 18
+        y_pos_artist_top = 11
+        y_pos_album_top = 19
         
         TEXT_SCROLL_DIVISOR = 5 
 
