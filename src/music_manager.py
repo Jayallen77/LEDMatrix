@@ -753,18 +753,15 @@ class MusicManager:
         ascent, descent = font_title.getmetrics()
         line_height_title = ascent + descent
         
-        # Use a reliable hardcoded value for the BDF font's line height
-        line_height_artist_album = 8 
-        padding_between_lines = 1
+        # Use a static value for the BDF font's line height
+        LINE_HEIGHT_BDF = 8  # Fixed pixel height for 5x7 BDF font
+        PADDING_BETWEEN_LINES = 1
 
         # Y positions based on a simple top-down calculation
         y_pos_title_top = 2
-        y_pos_artist_top = y_pos_title_top + line_height_title + padding_between_lines
-        y_pos_album_top = y_pos_artist_top + line_height_artist_album + padding_between_lines
+        y_pos_artist_top = y_pos_title_top + line_height_title + PADDING_BETWEEN_LINES
+        y_pos_album_top = y_pos_artist_top + LINE_HEIGHT_BDF + PADDING_BETWEEN_LINES
         
-        # Local offset to counteract the hardcoded `y+=6` in _draw_bdf_text
-        bdf_y_offset = -4
-
         TEXT_SCROLL_DIVISOR = 5 
 
         # --- Title --- 
@@ -795,7 +792,7 @@ class MusicManager:
             current_artist_display_text = artist[self.scroll_position_artist:] + "   " + artist[:self.scroll_position_artist]
 
         self.display_manager.draw_text(current_artist_display_text, 
-                                      x=text_area_x_start, y=y_pos_artist_top + bdf_y_offset, color=(180, 180, 180), font=font_artist_album)
+                                      x=text_area_x_start, y=y_pos_artist_top, color=(180, 180, 180), font=font_artist_album)
         if artist_width > text_area_width:
             self.artist_scroll_tick += 1
             if self.artist_scroll_tick % TEXT_SCROLL_DIVISOR == 0:
@@ -806,13 +803,13 @@ class MusicManager:
             self.artist_scroll_tick = 0
             
         # --- Album ---
-        if (matrix_height - y_pos_album_top) >= line_height_artist_album : 
+        if (matrix_height - y_pos_album_top) >= LINE_HEIGHT_BDF : 
             album_width = self.display_manager.get_text_width(album, font_artist_album)
             # Display album if it fits or can be scrolled (maintains original behavior but adds scrolling)
             if album_width <= text_area_width:
                 # Album fits without scrolling - display normally
                 self.display_manager.draw_text(album, 
-                                             x=text_area_x_start, y=y_pos_album_top + bdf_y_offset, color=(150, 150, 150), font=font_artist_album)
+                                             x=text_area_x_start, y=y_pos_album_top, color=(150, 150, 150), font=font_artist_album)
                 self.scroll_position_album = 0
                 self.album_scroll_tick = 0
             elif album_width > text_area_width:
@@ -823,7 +820,7 @@ class MusicManager:
                 current_album_display_text = album[self.scroll_position_album:] + "   " + album[:self.scroll_position_album]
                 
                 self.display_manager.draw_text(current_album_display_text, 
-                                             x=text_area_x_start, y=y_pos_album_top + bdf_y_offset, color=(150, 150, 150), font=font_artist_album)
+                                             x=text_area_x_start, y=y_pos_album_top, color=(150, 150, 150), font=font_artist_album)
                 self.album_scroll_tick += 1
                 if self.album_scroll_tick % TEXT_SCROLL_DIVISOR == 0:
                     self.scroll_position_album = (self.scroll_position_album + 1) % len(album)
