@@ -367,6 +367,11 @@
                 "enabled": true,
                 "data_file": "of_the_day/slovenian_word_of_the_day.json",
                 "display_name": "Slovenian Word of the Day"
+            },
+            "bible_verse_of_the_day": {
+                "enabled": true,
+                "data_file": "of_the_day/bible_verse_of_the_day.json",
+                "display_name": "Bible Verse of the Day"
             }
         }
     }
