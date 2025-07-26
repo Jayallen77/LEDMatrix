@@ -75,7 +75,7 @@
         "use_short_date_format": true
     },
     "clock": {
-        "enabled": false,
+        "enabled": true,
         "format": "%I:%M %p",
         "update_interval": 1
     },
@@ -346,13 +346,13 @@
         }
     },
     "music": {
-        "enabled": true,
+        "enabled": false,
         "preferred_source": "ytm",
         "YTM_COMPANION_URL": "http://192.168.86.12:9863",
         "POLLING_INTERVAL_SECONDS": 1
     },
     "of_the_day": {
-        "enabled": true,
+        "enabled": false,
         "display_rotate_interval": 20,
         "update_interval": 3600,
         "subtitle_rotate_interval": 10,
