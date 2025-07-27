@@ -476,7 +476,8 @@ class DisplayController:
         if self.youtube: self.youtube.update()
         if self.text_display: self.text_display.update()
         if self.of_the_day: self.of_the_day.update(time.time())
-        if self.news_manager: self.news_manager.fetch_news_data()
+        # News manager fetches data when displayed, not during updates
+        # if self.news_manager: self.news_manager.fetch_news_data()
         
         # Update NHL managers
         if self.nhl_live: self.nhl_live.update()

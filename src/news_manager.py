@@ -430,6 +430,10 @@ class NewsManager:
             self.display_manager.image = img
             self.display_manager.update_display()
             
+            # Debug: log scroll position
+            if hasattr(self, 'scroll_position') and hasattr(self, 'total_scroll_width'):
+                logger.debug(f"Scroll position: {self.scroll_position}/{self.total_scroll_width}")
+            
         except Exception as e:
             logger.error(f"Error in news display: {e}")
             # Create error image
@@ -504,10 +508,5 @@ class NewsManager:
 
     def get_dynamic_duration(self) -> int:
         """Get the calculated dynamic duration for display"""
-        # Ensure we have current data and calculated duration
-        if not self.cached_text or self.dynamic_duration == 60:
-            # Try to refresh if we don't have current data
-            if self.should_update() or not self.current_headlines:
-                self.fetch_news_data()
-        
+        # Return the current calculated duration without fetching data
         return self.dynamic_duration
