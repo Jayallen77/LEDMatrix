@@ -93,9 +93,9 @@ class NewsManager:
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
         
-        logger.info(f"NewsManager initialized with feeds: {self.enabled_feeds}")
-        logger.info(f"Headlines per feed: {self.headlines_per_feed}")
-        logger.info(f"Scroll settings - Speed: {self.scroll_speed} pixels/frame, Delay: {self.scroll_delay*1000:.2f}ms")
+        logger.debug(f"NewsManager initialized with feeds: {self.enabled_feeds}")
+        logger.debug(f"Headlines per feed: {self.headlines_per_feed}")
+        logger.debug(f"Scroll settings - Speed: {self.scroll_speed} pixels/frame, Delay: {self.scroll_delay*1000:.2f}ms")
 
     def parse_rss_feed(self, url: str, feed_name: str) -> List[Dict[str, Any]]:
         """Parse RSS feed and return list of headlines"""
@@ -138,7 +138,7 @@ class NewsManager:
                             'timestamp': datetime.now().isoformat()
                         })
                         
-            logger.info(f"Parsed {len(headlines)} headlines from {feed_name}")
+            logger.debug(f"Parsed {len(headlines)} headlines from {feed_name}")
             return headlines[:self.headlines_per_feed]
             
         except Exception as e:
@@ -281,22 +281,22 @@ class NewsManager:
             # Apply configured min/max limits
             if calculated_duration < self.min_duration:
                 self.dynamic_duration = self.min_duration
-                logger.info(f"Duration capped to minimum: {self.min_duration}s")
+                logger.debug(f"Duration capped to minimum: {self.min_duration}s")
             elif calculated_duration > self.max_duration:
                 self.dynamic_duration = self.max_duration
-                logger.info(f"Duration capped to maximum: {self.max_duration}s")
+                logger.debug(f"Duration capped to maximum: {self.max_duration}s")
             else:
                 self.dynamic_duration = calculated_duration
                 
-            logger.info(f"Dynamic duration calculation:")
-            logger.info(f"  Display width: {display_width}px")
-            logger.info(f"  Text width: {self.total_scroll_width}px")
-            logger.info(f"  Total scroll distance: {total_scroll_distance}px")
-            logger.info(f"  Frames needed: {frames_needed:.1f}")
-            logger.info(f"  Base time: {total_time:.2f}s")
-            logger.info(f"  Buffer time: {buffer_time:.2f}s ({self.duration_buffer*100}%)")
-            logger.info(f"  Calculated duration: {calculated_duration}s")
-            logger.info(f"  Final duration: {self.dynamic_duration}s")
+            logger.debug(f"Dynamic duration calculation:")
+            logger.debug(f"  Display width: {display_width}px")
+            logger.debug(f"  Text width: {self.total_scroll_width}px")
+            logger.debug(f"  Total scroll distance: {total_scroll_distance}px")
+            logger.debug(f"  Frames needed: {frames_needed:.1f}")
+            logger.debug(f"  Base time: {total_time:.2f}s")
+            logger.debug(f"  Buffer time: {buffer_time:.2f}s ({self.duration_buffer*100}%)")
+            logger.debug(f"  Calculated duration: {calculated_duration}s")
+            logger.debug(f"  Final duration: {self.dynamic_duration}s")
             
         except Exception as e:
             logger.error(f"Error calculating dynamic duration: {e}")
@@ -416,7 +416,7 @@ class NewsManager:
         try:
             # Only fetch data once when we start displaying
             if not self.current_headlines and not self.is_fetching:
-                logger.info("Initializing news display - fetching data")
+                logger.debug("Initializing news display - fetching data")
                 self.is_fetching = True
                 try:
                     self.fetch_news_data()
@@ -451,7 +451,7 @@ class NewsManager:
                 time.sleep(self.scroll_delay)
                 
         except KeyboardInterrupt:
-            logger.info("News display interrupted by user")
+            logger.debug("News display interrupted by user")
         except Exception as e:
             logger.error(f"Error in news display loop: {e}")
 
@@ -464,7 +464,7 @@ class NewsManager:
                 self.config['news_manager'] = {}
             self.config['news_manager']['custom_feeds'] = self.custom_feeds
             self.config_manager.save_config(self.config)
-            logger.info(f"Added custom feed: {name} -> {url}")
+            logger.debug(f"Added custom feed: {name} -> {url}")
 
     def remove_custom_feed(self, name: str):
         """Remove a custom RSS feed"""
@@ -473,7 +473,7 @@ class NewsManager:
             # Update config
             self.config['news_manager']['custom_feeds'] = self.custom_feeds
             self.config_manager.save_config(self.config)
-            logger.info(f"Removed custom feed: {name}")
+            logger.debug(f"Removed custom feed: {name}")
 
     def set_enabled_feeds(self, feeds: List[str]):
         """Set which feeds are enabled"""
@@ -483,7 +483,7 @@ class NewsManager:
             self.config['news_manager'] = {}
         self.config['news_manager']['enabled_feeds'] = self.enabled_feeds
         self.config_manager.save_config(self.config)
-        logger.info(f"Updated enabled feeds: {self.enabled_feeds}")
+        logger.debug(f"Updated enabled feeds: {self.enabled_feeds}")
         
         # Refresh headlines
         self.fetch_news_data()

@@ -456,7 +456,7 @@
         "max_duration": 300,
         "duration_buffer": 0.1,
         "font_size": 12,
-        "font_path": "assets/fonts/press-start-2p.ttf",
+        "font_path": "assets/fonts/PressStart2P-Regular.ttf",
         "text_color": [
             255,
             255,
