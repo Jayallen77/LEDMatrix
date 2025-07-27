@@ -430,19 +430,26 @@ class NewsManager:
                 finally:
                     self.is_fetching = False
             
-            # Get the current news display image
-            img = self.get_news_display()
+            # Run continuous scrolling loop for smooth animation
+            start_time = time.time()
+            duration = self.get_dynamic_duration()
             
-            # Set the image and update display
-            self.display_manager.image = img
-            self.display_manager.update_display()
+            while time.time() - start_time < duration:
+                # Get the current news display image
+                img = self.get_news_display()
+                
+                # Set the image and update display
+                self.display_manager.image = img
+                self.display_manager.update_display()
+                
+                # Add the scroll delay to control speed
+                time.sleep(self.scroll_delay)
+                
+                # Debug: log scroll position
+                if hasattr(self, 'scroll_position') and hasattr(self, 'total_scroll_width'):
+                    logger.debug(f"Scroll position: {self.scroll_position}/{self.total_scroll_width}")
             
-            # Add the scroll delay to control speed
-            time.sleep(self.scroll_delay)
-            
-            # Debug: log scroll position
-            if hasattr(self, 'scroll_position') and hasattr(self, 'total_scroll_width'):
-                logger.debug(f"Scroll position: {self.scroll_position}/{self.total_scroll_width}")
+            return True
             
         except Exception as e:
             logger.error(f"Error in news display: {e}")
@@ -450,6 +457,7 @@ class NewsManager:
             error_img = self.create_error_image(str(e))
             self.display_manager.image = error_img
             self.display_manager.update_display()
+            return False
 
     def run_news_display(self):
         """Standalone method to run news display in its own loop"""
