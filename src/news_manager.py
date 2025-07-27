@@ -227,7 +227,9 @@ class NewsManager:
             # Load font
             try:
                 font = ImageFont.truetype(self.font_path, self.font_size)
-            except:
+                logger.debug(f"Successfully loaded custom font: {self.font_path}")
+            except Exception as e:
+                logger.warning(f"Failed to load custom font '{self.font_path}': {e}. Using default font.")
                 font = ImageFont.load_default()
                 
             # Calculate text width
@@ -323,7 +325,9 @@ class NewsManager:
             # Load font
             try:
                 font = ImageFont.truetype(self.font_path, self.font_size)
-            except:
+                logger.debug(f"Successfully loaded custom font: {self.font_path}")
+            except Exception as e:
+                logger.warning(f"Failed to load custom font '{self.font_path}': {e}. Using default font.")
                 font = ImageFont.load_default()
             
             # Calculate vertical position (center the text)
@@ -373,7 +377,9 @@ class NewsManager:
         
         try:
             font = ImageFont.truetype(self.font_path, self.font_size)
-        except:
+            logger.debug(f"Successfully loaded custom font: {self.font_path}")
+        except Exception as e:
+            logger.warning(f"Failed to load custom font '{self.font_path}': {e}. Using default font.")
             font = ImageFont.load_default()
         
         text = "Loading news..."
@@ -397,7 +403,9 @@ class NewsManager:
         
         try:
             font = ImageFont.truetype(self.font_path, max(8, self.font_size - 2))
-        except:
+            logger.debug(f"Successfully loaded custom font: {self.font_path}")
+        except Exception as e:
+            logger.warning(f"Failed to load custom font '{self.font_path}': {e}. Using default font.")
             font = ImageFont.load_default()
         
         text = f"News Error: {error_msg[:50]}..."
