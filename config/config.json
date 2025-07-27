@@ -436,8 +436,8 @@
     "news_manager": {
         "enabled": true,
         "update_interval": 300,
-        "scroll_speed": 2,
-        "scroll_delay": 0.02,
+        "scroll_speed": 1,
+        "scroll_delay": 0.01,
         "headlines_per_feed": 2,
         "enabled_feeds": [
             "NFL",
@@ -456,7 +456,7 @@
         "max_duration": 300,
         "duration_buffer": 0.1,
         "font_size": 12,
-        "font_path": "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "font_path": "assets/fonts/press-start-2p.ttf",
         "text_color": [
             255,
             255,
