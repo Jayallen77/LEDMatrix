@@ -93,6 +93,16 @@ class DisplayManager:
         # Draw a test pattern
         self._draw_test_pattern()
 
+    @property
+    def width(self):
+        """Get the display width."""
+        return self.matrix.width if hasattr(self, 'matrix') else 128
+
+    @property
+    def height(self):
+        """Get the display height."""
+        return self.matrix.height if hasattr(self, 'matrix') else 32
+
     def _draw_test_pattern(self):
         """Draw a test pattern to verify the display is working."""
         self.clear()
