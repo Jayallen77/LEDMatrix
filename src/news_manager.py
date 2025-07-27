@@ -360,8 +360,7 @@ class NewsManager:
                         self.prepare_headlines_for_display()
                         self.rotation_count = 0
                 
-                # Add scroll delay to control speed
-                time.sleep(self.scroll_delay)
+                # Remove the delay - let the display controller timing control the speed
             
             return img
             
@@ -521,6 +520,7 @@ class NewsManager:
 
     def get_dynamic_duration(self) -> int:
         """Get the calculated dynamic duration for display"""
-        # For smooth scrolling, use a fixed short duration so display controller calls us frequently
-        # This allows the scroll_delay to control the actual scrolling speed
-        return 1  # 1 second duration - display controller will call us every second
+        # For smooth scrolling, use a very short duration so display controller calls us frequently
+        # The scroll_speed controls how many pixels we move per call
+                # Return the current calculated duration without fetching data
+        return self.dynamic_duration  # 0.1 second duration - display controller will call us 10 times per second
