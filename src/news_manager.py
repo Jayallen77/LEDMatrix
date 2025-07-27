@@ -521,5 +521,6 @@ class NewsManager:
 
     def get_dynamic_duration(self) -> int:
         """Get the calculated dynamic duration for display"""
-        # Return the current calculated duration without fetching data
-        return self.dynamic_duration
+        # For smooth scrolling, use a fixed short duration so display controller calls us frequently
+        # This allows the scroll_delay to control the actual scrolling speed
+        return 1  # 1 second duration - display controller will call us every second
