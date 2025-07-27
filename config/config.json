@@ -75,18 +75,18 @@
         "use_short_date_format": true
     },
     "clock": {
-        "enabled": false,
+        "enabled": true,
         "format": "%I:%M %p",
         "update_interval": 1
     },
     "weather": {
-        "enabled": false,
+        "enabled": true,
         "update_interval": 1800,
         "units": "imperial",
         "display_format": "{temp}°F\n{condition}"
     },
     "stocks": {
-        "enabled": false,
+        "enabled": true,
         "update_interval": 600,
         "scroll_speed": 1,
         "scroll_delay": 0.01,
@@ -97,7 +97,7 @@
         "display_format": "{symbol}: ${price} ({change}%)"
     },
     "crypto": {
-        "enabled": false,
+        "enabled": true,
         "update_interval": 600,
         "symbols": [
             "BTC-USD", "ETH-USD"
@@ -105,7 +105,7 @@
         "display_format": "{symbol}: ${price} ({change}%)"
     },
     "stock_news": {
-        "enabled": false,
+        "enabled": true,
         "update_interval": 3600,
         "scroll_speed": 1,
         "scroll_delay": 0.01,
@@ -113,7 +113,7 @@
         "headlines_per_rotation": 2
     },
     "odds_ticker": {
-        "enabled": false,
+        "enabled": true,
         "show_favorite_teams_only": true,
         "games_per_favorite_team": 1,
         "max_games_per_league": 5,
@@ -128,7 +128,7 @@
         "show_channel_logos": true
     },
     "calendar": {
-        "enabled": false,
+        "enabled": true,
         "credentials_file": "credentials.json",
         "token_file": "token.pickle",
         "update_interval": 3600,
@@ -179,7 +179,7 @@
         }
     },
     "nfl_scoreboard": {
-        "enabled": false,
+        "enabled": true,
         "live_priority": true,
         "live_game_duration": 20,
         "show_odds": true,
@@ -201,7 +201,7 @@
         }
     },
     "ncaa_fb_scoreboard": {
-        "enabled": false,
+        "enabled": true,
         "live_priority": true,
         "live_game_duration": 20,
         "show_odds": true,
@@ -264,12 +264,12 @@
         }
     },
     "youtube": {
-        "enabled":  false,
+        "enabled":  true,
         "update_interval": 3600
     },
     "mlb": {
-        "enabled":  false,
-        "live_priority": true,
+        "enabled":  true,
+        "live_priority": false,
         "live_game_duration": 30,
         "show_odds": true,
         "test_mode": false,
@@ -292,8 +292,8 @@
         }
     },
     "milb": {
-        "enabled":  false,
-        "live_priority": true,
+        "enabled":  true,
+        "live_priority": false,
         "live_game_duration": 30,
         "test_mode": false,
         "update_interval_seconds": 3600,
@@ -346,13 +346,13 @@
         }
     },
     "music": {
-        "enabled": true,
+        "enabled":  true,
         "preferred_source": "ytm",
         "YTM_COMPANION_URL": "http://192.168.86.12:9863",
         "POLLING_INTERVAL_SECONDS": 1
     },
     "of_the_day": {
-        "enabled": true,
+        "enabled":  true,
         "display_rotate_interval": 20,
         "update_interval": 3600,
         "subtitle_rotate_interval": 10,

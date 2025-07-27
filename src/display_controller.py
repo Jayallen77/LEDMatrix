@@ -759,8 +759,14 @@ class DisplayController:
         """Add or remove live modes from available_modes based on live_priority and live games."""
         # Helper to add/remove live modes for all sports
         def update_mode(mode_name, manager, live_priority):
+            # If manager is None (sport disabled), remove the mode from rotation
+            if manager is None:
+                if mode_name in self.available_modes:
+                    self.available_modes.remove(mode_name)
+                return
+            
             if not live_priority:
-                if manager and getattr(manager, 'live_games', None):
+                if getattr(manager, 'live_games', None):
                     if mode_name not in self.available_modes:
                         self.available_modes.append(mode_name)
                 else:
@@ -822,7 +828,8 @@ class DisplayController:
                     ('ncaam_basketball', 'ncaam_basketball_live', self.ncaam_basketball_live_priority)
                 ]:
                     manager = getattr(self, attr, None)
-                    if priority and manager and getattr(manager, 'live_games', None):
+                    # Only consider sports that are enabled (manager is not None)
+                    if manager is not None and priority and getattr(manager, 'live_games', None):
                         live_priority_takeover = True
                         live_priority_sport = sport
                         break
@@ -1013,6 +1020,13 @@ class DisplayController:
                             self.force_clear = False 
                     elif self.current_display_mode != 'none':
                          logger.warning(f"No manager found or selected for display mode: {self.current_display_mode}")
+                         # If we can't display the current mode, switch to the next available mode
+                         if self.available_modes:
+                             self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
+                             self.current_display_mode = self.available_modes[self.current_mode_index]
+                             logger.info(f"Switching to next available mode: {self.current_display_mode}")
+                         else:
+                             logger.error("No available display modes found!")
 
                 except Exception as e:
                     logger.error(f"Error during display update for mode {self.current_display_mode}: {e}", exc_info=True)
