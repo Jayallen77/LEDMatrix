@@ -336,6 +336,9 @@ class NewsManager:
             
             # Calculate scroll position for smooth animation
             if self.total_scroll_width > 0:
+                # Use modulo for continuous scrolling like stock ticker
+                self.scroll_position = (self.scroll_position + self.scroll_speed) % self.total_scroll_width
+                
                 # Scroll from right to left
                 x_pos = width - self.scroll_position
                 
@@ -346,12 +349,8 @@ class NewsManager:
                 if x_pos + self.total_scroll_width < width:
                     draw.text((x_pos + self.total_scroll_width, y_pos), self.cached_text, font=font, fill=self.text_color)
                 
-                # Update scroll position
-                self.scroll_position += self.scroll_speed
-                
-                # Reset scroll when text has completely passed
-                if self.scroll_position >= self.total_scroll_width:
-                    self.scroll_position = 0
+                # Check if we should rotate headlines (when scroll wraps around)
+                if self.scroll_position == 0:
                     self.rotation_count += 1
                     
                     # Check if we should rotate headlines
