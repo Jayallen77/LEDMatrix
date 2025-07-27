@@ -26,7 +26,7 @@ class NewsManager:
         self.config_manager = ConfigManager()
         self.display_manager = display_manager
         self.news_config = config.get('news_manager', {})
-        self.last_update = 0
+        self.last_update = time.time()  # Initialize to current time
         self.news_data = {}
         self.current_headline_index = 0
         self.scroll_position = 0
@@ -38,6 +38,7 @@ class NewsManager:
         self.total_scroll_width = 0
         self.headlines_displayed = set()  # Track displayed headlines for rotation
         self.dynamic_duration = 60  # Default duration in seconds
+        self.is_fetching = False  # Flag to prevent multiple simultaneous fetches
         
         # Default RSS feeds
         self.default_feeds = {
@@ -308,11 +309,8 @@ class NewsManager:
     def get_news_display(self) -> Image.Image:
         """Generate the scrolling news ticker display"""
         try:
-            # Update news if needed
-            if self.should_update() or not self.current_headlines:
-                self.fetch_news_data()
-            
             if not self.cached_text:
+                logger.debug("No cached text available, showing loading image")
                 return self.create_no_news_image()
             
             # Create display image
@@ -416,6 +414,15 @@ class NewsManager:
     def display_news(self, force_clear: bool = False):
         """Display method for news ticker - called by display controller"""
         try:
+            # Only fetch data once when we start displaying
+            if not self.current_headlines and not self.is_fetching:
+                logger.info("Initializing news display - fetching data")
+                self.is_fetching = True
+                try:
+                    self.fetch_news_data()
+                finally:
+                    self.is_fetching = False
+            
             # Get the current news display image
             img = self.get_news_display()
             
