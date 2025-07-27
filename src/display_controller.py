@@ -516,36 +516,36 @@ class DisplayController:
         """
         # Prioritize sports (e.g., Soccer > NHL > NBA > MLB)
         live_checks = {
-            'nhl': self.nhl_live and self.nhl_live.live_games,
-            'nba': self.nba_live and self.nba_live.live_games,
-            'mlb': self.mlb_live and self.mlb_live.live_games,
-            'milb': self.milb_live and self.milb_live.live_games,
-            'nfl': self.nfl_live and self.nfl_live.live_games,
+            'nhl': self.nhl_live and self.nhl_live.live_games and len(self.nhl_live.live_games) > 0,
+            'nba': self.nba_live and self.nba_live.live_games and len(self.nba_live.live_games) > 0,
+            'mlb': self.mlb_live and self.mlb_live.live_games and len(self.mlb_live.live_games) > 0,
+            'milb': self.milb_live and self.milb_live.live_games and len(self.milb_live.live_games) > 0,
+            'nfl': self.nfl_live and self.nfl_live.live_games and len(self.nfl_live.live_games) > 0,
             # ... other sports
         }
 
-        for sport, live_games in live_checks.items():
-            if live_games:
+        for sport, has_live_games in live_checks.items():
+            if has_live_games:
                 logger.debug(f"{sport.upper()} live games available")
                 return True, sport
 
         if 'ncaa_fb_scoreboard' in self.config and self.config['ncaa_fb_scoreboard'].get('enabled', False):
-            if self.ncaa_fb_live and self.ncaa_fb_live.live_games:
+            if self.ncaa_fb_live and self.ncaa_fb_live.live_games and len(self.ncaa_fb_live.live_games) > 0:
                 logger.debug("NCAA FB live games available")
                 return True, 'ncaa_fb'
         
         if 'ncaa_baseball_scoreboard' in self.config and self.config['ncaa_baseball_scoreboard'].get('enabled', False):
-            if self.ncaa_baseball_live and self.ncaa_baseball_live.live_games:
+            if self.ncaa_baseball_live and self.ncaa_baseball_live.live_games and len(self.ncaa_baseball_live.live_games) > 0:
                 logger.debug("NCAA Baseball live games available")
                 return True, 'ncaa_baseball'
 
         if 'ncaam_basketball_scoreboard' in self.config and self.config['ncaam_basketball_scoreboard'].get('enabled', False):
-            if self.ncaam_basketball_live and self.ncaam_basketball_live.live_games:
+            if self.ncaam_basketball_live and self.ncaam_basketball_live.live_games and len(self.ncaam_basketball_live.live_games) > 0:
                 logger.debug("NCAA Men's Basketball live games available")
                 return True, 'ncaam_basketball'
         # Add more sports checks here (e.g., MLB, Soccer)
         if 'mlb' in self.config and self.config['mlb'].get('enabled', False):
-            if self.mlb_live and self.mlb_live.live_games:
+            if self.mlb_live and self.mlb_live.live_games and len(self.mlb_live.live_games) > 0:
                 return True, 'mlb'
             
         return False, None
@@ -763,15 +763,19 @@ class DisplayController:
             if manager is None:
                 if mode_name in self.available_modes:
                     self.available_modes.remove(mode_name)
+                    logger.debug(f"Removed {mode_name} from rotation (manager is None)")
                 return
             
             if not live_priority:
-                if getattr(manager, 'live_games', None):
+                live_games = getattr(manager, 'live_games', None)
+                if live_games and len(live_games) > 0:  # Check if there are actually live games
                     if mode_name not in self.available_modes:
                         self.available_modes.append(mode_name)
+                        logger.debug(f"Added {mode_name} to rotation (found {len(live_games)} live games)")
                 else:
                     if mode_name in self.available_modes:
                         self.available_modes.remove(mode_name)
+                        logger.debug(f"Removed {mode_name} from rotation (no live games)")
         update_mode('nhl_live', getattr(self, 'nhl_live', None), self.nhl_live_priority)
         update_mode('nba_live', getattr(self, 'nba_live', None), self.nba_live_priority)
         update_mode('mlb_live', getattr(self, 'mlb_live', None), self.mlb_live_priority)
@@ -828,8 +832,9 @@ class DisplayController:
                     ('ncaam_basketball', 'ncaam_basketball_live', self.ncaam_basketball_live_priority)
                 ]:
                     manager = getattr(self, attr, None)
-                    # Only consider sports that are enabled (manager is not None)
-                    if manager is not None and priority and getattr(manager, 'live_games', None):
+                    # Only consider sports that are enabled (manager is not None) and have actual live games
+                    live_games = getattr(manager, 'live_games', None) if manager is not None else None
+                    if manager is not None and priority and live_games and len(live_games) > 0:
                         live_priority_takeover = True
                         live_priority_sport = sport
                         break
