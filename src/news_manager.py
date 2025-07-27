@@ -173,7 +173,7 @@ class NewsManager:
             self.prepare_headlines_for_display()
             
             self.last_update = time.time()
-            logger.info(f"Fetched {len(all_headlines)} total headlines from {len(self.enabled_feeds)} feeds")
+            logger.debug(f"Fetched {len(all_headlines)} total headlines from {len(self.enabled_feeds)} feeds")
             
         except Exception as e:
             logger.error(f"Error fetching news data: {e}")
@@ -216,7 +216,7 @@ class NewsManager:
             self.calculate_scroll_dimensions()
             
             self.current_headlines = display_headlines
-            logger.info(f"Prepared {len(display_headlines)} headlines for display")
+            logger.debug(f"Prepared {len(display_headlines)} headlines for display")
 
     def calculate_scroll_dimensions(self):
         """Calculate exact dimensions needed for smooth scrolling"""
@@ -241,8 +241,8 @@ class NewsManager:
             # Calculate dynamic display duration
             self.calculate_dynamic_duration()
             
-            logger.info(f"Text width calculated: {self.total_scroll_width} pixels")
-            logger.info(f"Dynamic duration calculated: {self.dynamic_duration} seconds")
+            logger.debug(f"Text width calculated: {self.total_scroll_width} pixels")
+            logger.debug(f"Dynamic duration calculated: {self.dynamic_duration} seconds")
             
         except Exception as e:
             logger.error(f"Error calculating scroll dimensions: {e}")
@@ -254,7 +254,7 @@ class NewsManager:
         # If dynamic duration is disabled, use fixed duration from config
         if not self.dynamic_duration_enabled:
             self.dynamic_duration = self.news_config.get('fixed_duration', 60)
-            logger.info(f"Dynamic duration disabled, using fixed duration: {self.dynamic_duration}s")
+            logger.debug(f"Dynamic duration disabled, using fixed duration: {self.dynamic_duration}s")
             return
             
         if not self.total_scroll_width:

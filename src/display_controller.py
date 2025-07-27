@@ -296,6 +296,9 @@ class DisplayController:
         # Set initial display to first available mode (clock)
         self.current_mode_index = 0
         self.current_display_mode = self.available_modes[0] if self.available_modes else 'none'
+        # Reset logged duration when mode is initialized
+        if hasattr(self, '_last_logged_duration'):
+            delattr(self, '_last_logged_duration')
         self.last_switch = time.time()
         self.force_clear = True
         self.update_interval = 0.01  # Reduced from 0.1 to 0.01 for smoother scrolling
@@ -447,7 +450,10 @@ class DisplayController:
         if mode_key == 'news_manager' and self.news_manager:
             try:
                 dynamic_duration = self.news_manager.get_dynamic_duration()
-                logger.info(f"Using dynamic duration for news_manager: {dynamic_duration} seconds")
+                # Only log if duration has changed or we haven't logged this duration yet
+                if not hasattr(self, '_last_logged_duration') or self._last_logged_duration != dynamic_duration:
+                    logger.info(f"Using dynamic duration for news_manager: {dynamic_duration} seconds")
+                    self._last_logged_duration = dynamic_duration
                 return dynamic_duration
             except Exception as e:
                 logger.error(f"Error getting dynamic duration for news_manager: {e}")
@@ -853,6 +859,9 @@ class DisplayController:
                             if self.current_display_mode != new_mode:
                                 logger.info(f"Switching to only active live sport: {new_mode} from {self.current_display_mode}")
                                 self.current_display_mode = new_mode
+                                # Reset logged duration when mode changes
+                                if hasattr(self, '_last_logged_duration'):
+                                    delattr(self, '_last_logged_duration')
                                 self.force_clear = True
                             else:
                                 self.force_clear = False
@@ -873,6 +882,9 @@ class DisplayController:
                             if previous_mode_before_switch == 'music' and self.music_manager:
                                 self.music_manager.deactivate_music_display()
                             self.current_display_mode = new_mode
+                            # Reset logged duration when mode changes
+                            if hasattr(self, '_last_logged_duration'):
+                                delattr(self, '_last_logged_duration')
                             self.force_clear = True
                             self.last_switch = current_time
                             manager_to_display = getattr(self, f"{live_priority_sport}_live", None)
@@ -896,6 +908,9 @@ class DisplayController:
                             if previous_mode_before_switch == 'music' and self.music_manager and new_mode_after_timer != 'music':
                                 self.music_manager.deactivate_music_display()
                             self.current_display_mode = new_mode_after_timer
+                            # Reset logged duration when mode changes
+                            if hasattr(self, '_last_logged_duration'):
+                                delattr(self, '_last_logged_duration')
                         if needs_switch:
                             self.force_clear = True
                             self.last_switch = current_time
