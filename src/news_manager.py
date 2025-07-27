@@ -418,7 +418,8 @@ class NewsManager:
         try:
             while True:
                 img = self.get_news_display()
-                self.display_manager.display_image(img)
+                self.display_manager.image = img
+                self.display_manager.update_display()
                 time.sleep(self.scroll_delay)
                 
         except KeyboardInterrupt:
