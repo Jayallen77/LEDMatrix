@@ -438,6 +438,9 @@ class NewsManager:
             self.display_manager.image = img
             self.display_manager.update_display()
             
+            # Add the scroll delay to control speed
+            time.sleep(self.scroll_delay)
+            
             # Debug: log scroll position
             if hasattr(self, 'scroll_position') and hasattr(self, 'total_scroll_width'):
                 logger.debug(f"Scroll position: {self.scroll_position}/{self.total_scroll_width}")
