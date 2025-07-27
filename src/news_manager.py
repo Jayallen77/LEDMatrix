@@ -413,8 +413,25 @@ class NewsManager:
         draw.text((x, y), text, font=font, fill=(255, 0, 0))
         return img
 
-    def display_news(self):
-        """Main display method for news ticker"""
+    def display_news(self, force_clear: bool = False):
+        """Display method for news ticker - called by display controller"""
+        try:
+            # Get the current news display image
+            img = self.get_news_display()
+            
+            # Set the image and update display
+            self.display_manager.image = img
+            self.display_manager.update_display()
+            
+        except Exception as e:
+            logger.error(f"Error in news display: {e}")
+            # Create error image
+            error_img = self.create_error_image(str(e))
+            self.display_manager.image = error_img
+            self.display_manager.update_display()
+
+    def run_news_display(self):
+        """Standalone method to run news display in its own loop"""
         try:
             while True:
                 img = self.get_news_display()
