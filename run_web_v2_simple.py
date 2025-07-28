@@ -44,9 +44,14 @@ def main():
     
     # Install dependencies
     logger.info("Installing dependencies...")
-    subprocess.check_call([
-        str(venv_pip), 'install', '-r', 'requirements_web_v2.txt'
-    ])
+    try:
+        subprocess.check_call([
+            str(venv_pip), 'install', '-r', 'requirements_web_v2.txt'
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        logger.info("Dependencies installed successfully")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to install dependencies: {e}")
+        return
     
     # Run the web interface
     logger.info("Starting web interface on http://0.0.0.0:5001")

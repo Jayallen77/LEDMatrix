@@ -71,7 +71,7 @@ def check_dependencies(venv_path):
         try:
             subprocess.check_call([
                 str(venv_python), '-c', f'import {package}'
-            ], capture_output=True)
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError:
             missing_packages.append(package)
     
