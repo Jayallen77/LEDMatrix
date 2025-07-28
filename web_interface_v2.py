@@ -7,6 +7,7 @@ import subprocess
 import threading
 import time
 import base64
+import psutil
 from pathlib import Path
 from src.config_manager import ConfigManager
 from src.display_manager import DisplayManager
@@ -51,10 +52,10 @@ class DisplayMonitor:
                 if display_manager and hasattr(display_manager, 'image'):
                     # Convert PIL image to base64 for web display
                     img_buffer = io.BytesIO()
-                    # Scale up the image for better visibility
+                    # Scale up the image for better visibility (8x instead of 4x for better clarity)
                     scaled_img = display_manager.image.resize((
-                        display_manager.image.width * 4,
-                        display_manager.image.height * 4
+                        display_manager.image.width * 8,
+                        display_manager.image.height * 8
                     ), Image.NEAREST)
                     scaled_img.save(img_buffer, format='PNG')
                     img_str = base64.b64encode(img_buffer.getvalue()).decode()
@@ -72,7 +73,7 @@ class DisplayMonitor:
             except Exception as e:
                 print(f"Display monitor error: {e}")
                 
-            time.sleep(0.1)  # Update 10 times per second
+            time.sleep(0.05)  # Update 20 times per second for smoother display
 
 display_monitor = DisplayMonitor()
 
@@ -82,12 +83,24 @@ def index():
         main_config = config_manager.load_config()
         schedule_config = main_config.get('schedule', {})
         
-        # Get system status
+        # Get system status including CPU utilization
         system_status = get_system_status()
+        
+        # Get raw config data for JSON editors
+        main_config_data = config_manager.get_raw_file_content('main')
+        secrets_config_data = config_manager.get_raw_file_content('secrets')
+        main_config_json = json.dumps(main_config_data, indent=4)
+        secrets_config_json = json.dumps(secrets_config_data, indent=4)
         
         return render_template('index_v2.html', 
                              schedule_config=schedule_config,
                              main_config=main_config,
+                             main_config_data=main_config_data,
+                             secrets_config=secrets_config_data,
+                             main_config_json=main_config_json,
+                             secrets_config_json=secrets_config_json,
+                             main_config_path=config_manager.get_config_path(),
+                             secrets_config_path=config_manager.get_secrets_path(),
                              system_status=system_status,
                              editor_mode=editor_mode)
                              
@@ -96,24 +109,29 @@ def index():
         return render_template('index_v2.html', 
                              schedule_config={},
                              main_config={},
+                             main_config_data={},
+                             secrets_config={},
+                             main_config_json="{}",
+                             secrets_config_json="{}",
+                             main_config_path="",
+                             secrets_config_path="",
                              system_status={},
                              editor_mode=False)
 
 def get_system_status():
-    """Get current system status including display state and performance metrics."""
+    """Get current system status including display state, performance metrics, and CPU utilization."""
     try:
         # Check if display service is running
         result = subprocess.run(['sudo', 'systemctl', 'is-active', 'ledmatrix'], 
                               capture_output=True, text=True)
         service_active = result.stdout.strip() == 'active'
         
-        # Get memory usage
-        with open('/proc/meminfo', 'r') as f:
-            meminfo = f.read()
+        # Get memory usage using psutil for better accuracy
+        memory = psutil.virtual_memory()
+        mem_used_percent = round(memory.percent, 1)
         
-        mem_total = int([line for line in meminfo.split('\n') if 'MemTotal' in line][0].split()[1])
-        mem_available = int([line for line in meminfo.split('\n') if 'MemAvailable' in line][0].split()[1])
-        mem_used_percent = round((mem_total - mem_available) / mem_total * 100, 1)
+        # Get CPU utilization
+        cpu_percent = round(psutil.cpu_percent(interval=0.1), 1)
         
         # Get CPU temperature
         try:
@@ -129,10 +147,16 @@ def get_system_status():
         uptime_hours = int(uptime_seconds // 3600)
         uptime_minutes = int((uptime_seconds % 3600) // 60)
         
+        # Get disk usage
+        disk = psutil.disk_usage('/')
+        disk_used_percent = round((disk.used / disk.total) * 100, 1)
+        
         return {
             'service_active': service_active,
             'memory_used_percent': mem_used_percent,
+            'cpu_percent': cpu_percent,
             'cpu_temp': round(temp, 1),
+            'disk_used_percent': disk_used_percent,
             'uptime': f"{uptime_hours}h {uptime_minutes}m",
             'display_connected': display_manager is not None,
             'editor_mode': editor_mode
@@ -141,7 +165,9 @@ def get_system_status():
         return {
             'service_active': False,
             'memory_used_percent': 0,
+            'cpu_percent': 0,
             'cpu_temp': 0,
+            'disk_used_percent': 0,
             'uptime': '0h 0m',
             'display_connected': False,
             'editor_mode': False,
@@ -371,6 +397,380 @@ def system_action():
 def get_system_status_api():
     """Get system status as JSON."""
     return jsonify(get_system_status())
+
+# Add all the routes from the original web interface for compatibility
+@app.route('/save_schedule', methods=['POST'])
+def save_schedule_route():
+    try:
+        main_config = config_manager.load_config()
+        
+        schedule_data = {
+            'enabled': 'schedule_enabled' in request.form,
+            'start_time': request.form.get('start_time', '07:00'),
+            'end_time': request.form.get('end_time', '22:00')
+        }
+        
+        main_config['schedule'] = schedule_data
+        config_manager.save_config(main_config)
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Schedule updated successfully! Restart the display for changes to take effect.'
+        })
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error saving schedule: {e}'
+        }), 400
+
+@app.route('/save_config', methods=['POST'])
+def save_config_route():
+    config_type = request.form.get('config_type')
+    config_data_str = request.form.get('config_data')
+    
+    try:
+        if config_type == 'main':
+            # Handle form-based configuration updates
+            main_config = config_manager.load_config()
+            
+            # Update display settings
+            if 'rows' in request.form:
+                main_config['display']['hardware']['rows'] = int(request.form.get('rows', 32))
+                main_config['display']['hardware']['cols'] = int(request.form.get('cols', 64))
+                main_config['display']['hardware']['chain_length'] = int(request.form.get('chain_length', 2))
+                main_config['display']['hardware']['parallel'] = int(request.form.get('parallel', 1))
+                main_config['display']['hardware']['brightness'] = int(request.form.get('brightness', 95))
+                main_config['display']['hardware']['hardware_mapping'] = request.form.get('hardware_mapping', 'adafruit-hat-pwm')
+                main_config['display']['runtime']['gpio_slowdown'] = int(request.form.get('gpio_slowdown', 3))
+                # Add all the missing LED Matrix hardware options
+                main_config['display']['hardware']['scan_mode'] = int(request.form.get('scan_mode', 0))
+                main_config['display']['hardware']['pwm_bits'] = int(request.form.get('pwm_bits', 9))
+                main_config['display']['hardware']['pwm_dither_bits'] = int(request.form.get('pwm_dither_bits', 1))
+                main_config['display']['hardware']['pwm_lsb_nanoseconds'] = int(request.form.get('pwm_lsb_nanoseconds', 130))
+                main_config['display']['hardware']['disable_hardware_pulsing'] = 'disable_hardware_pulsing' in request.form
+                main_config['display']['hardware']['inverse_colors'] = 'inverse_colors' in request.form
+                main_config['display']['hardware']['show_refresh_rate'] = 'show_refresh_rate' in request.form
+                main_config['display']['hardware']['limit_refresh_rate_hz'] = int(request.form.get('limit_refresh_rate_hz', 120))
+                main_config['display']['use_short_date_format'] = 'use_short_date_format' in request.form
+            
+            # If config_data is provided as JSON, merge it
+            if config_data_str:
+                try:
+                    new_data = json.loads(config_data_str)
+                    # Merge the new data with existing config
+                    for key, value in new_data.items():
+                        if key in main_config:
+                            if isinstance(value, dict) and isinstance(main_config[key], dict):
+                                merge_dict(main_config[key], value)
+                            else:
+                                main_config[key] = value
+                        else:
+                            main_config[key] = value
+                except json.JSONDecodeError:
+                    return jsonify({
+                        'status': 'error',
+                        'message': 'Error: Invalid JSON format in config data.'
+                    }), 400
+            
+            config_manager.save_config(main_config)
+            return jsonify({
+                'status': 'success',
+                'message': 'Main configuration saved successfully!'
+            })
+            
+        elif config_type == 'secrets':
+            # Handle secrets configuration
+            secrets_config = config_manager.get_raw_file_content('secrets')
+            
+            # If config_data is provided as JSON, use it
+            if config_data_str:
+                try:
+                    new_data = json.loads(config_data_str)
+                    config_manager.save_raw_file_content('secrets', new_data)
+                except json.JSONDecodeError:
+                    return jsonify({
+                        'status': 'error',
+                        'message': 'Error: Invalid JSON format for secrets config.'
+                    }), 400
+            else:
+                config_manager.save_raw_file_content('secrets', secrets_config)
+            
+            return jsonify({
+                'status': 'success',
+                'message': 'Secrets configuration saved successfully!'
+            })
+        
+    except json.JSONDecodeError:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error: Invalid JSON format for {config_type} config.'
+        }), 400
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error saving {config_type} configuration: {e}'
+        }), 400
+
+@app.route('/run_action', methods=['POST'])
+def run_action_route():
+    try:
+        data = request.get_json()
+        action = data.get('action')
+        
+        if action == 'start_display':
+            result = subprocess.run(['sudo', 'systemctl', 'start', 'ledmatrix'], 
+                                 capture_output=True, text=True)
+        elif action == 'stop_display':
+            result = subprocess.run(['sudo', 'systemctl', 'stop', 'ledmatrix'], 
+                                 capture_output=True, text=True)
+        elif action == 'enable_autostart':
+            result = subprocess.run(['sudo', 'systemctl', 'enable', 'ledmatrix'], 
+                                 capture_output=True, text=True)
+        elif action == 'disable_autostart':
+            result = subprocess.run(['sudo', 'systemctl', 'disable', 'ledmatrix'], 
+                                 capture_output=True, text=True)
+        elif action == 'reboot_system':
+            result = subprocess.run(['sudo', 'reboot'], 
+                                 capture_output=True, text=True)
+        elif action == 'git_pull':
+            home_dir = str(Path.home())
+            project_dir = os.path.join(home_dir, 'LEDMatrix')
+            result = subprocess.run(['git', 'pull'], 
+                                 capture_output=True, text=True, cwd=project_dir, check=True)
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': f'Unknown action: {action}'
+            }), 400
+        
+        return jsonify({
+            'status': 'success' if result.returncode == 0 else 'error',
+            'message': f'Action {action} completed with return code {result.returncode}',
+            'stdout': result.stdout,
+            'stderr': result.stderr
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error running action: {e}'
+        }), 400
+
+@app.route('/get_logs', methods=['GET'])
+def get_logs():
+    try:
+        # Get logs from journalctl for the ledmatrix service
+        result = subprocess.run(
+            ['sudo', 'journalctl', '-u', 'ledmatrix.service', '-n', '500', '--no-pager'],
+            capture_output=True, text=True, check=True
+        )
+        logs = result.stdout
+        return jsonify({'status': 'success', 'logs': logs})
+    except subprocess.CalledProcessError as e:
+        # If the command fails, return the error
+        error_message = f"Error fetching logs: {e.stderr}"
+        return jsonify({'status': 'error', 'message': error_message}), 500
+    except Exception as e:
+        # Handle other potential exceptions
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/save_raw_json', methods=['POST'])
+def save_raw_json_route():
+    try:
+        data = request.get_json()
+        config_type = data.get('config_type')
+        config_data = data.get('config_data')
+        
+        if not config_type or not config_data:
+            return jsonify({
+                'status': 'error',
+                'message': 'Missing config_type or config_data'
+            }), 400
+        
+        if config_type not in ['main', 'secrets']:
+            return jsonify({
+                'status': 'error',
+                'message': 'Invalid config_type. Must be "main" or "secrets"'
+            }), 400
+        
+        # Validate JSON format
+        try:
+            parsed_data = json.loads(config_data)
+        except json.JSONDecodeError as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Invalid JSON format: {str(e)}'
+            }), 400
+        
+        # Save the raw JSON
+        config_manager.save_raw_file_content(config_type, parsed_data)
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'{config_type.capitalize()} configuration saved successfully!'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error saving raw JSON: {str(e)}'
+        }), 400
+
+# Add news manager routes for compatibility
+@app.route('/news_manager/status', methods=['GET'])
+def get_news_manager_status():
+    """Get news manager status and configuration"""
+    try:
+        config = config_manager.load_config()
+        news_config = config.get('news_manager', {})
+        
+        # Try to get status from the running display controller if possible
+        status = {
+            'enabled': news_config.get('enabled', False),
+            'enabled_feeds': news_config.get('enabled_feeds', []),
+            'available_feeds': [
+                'MLB', 'NFL', 'NCAA FB', 'NHL', 'NBA', 'TOP SPORTS', 
+                'BIG10', 'NCAA', 'Other'
+            ],
+            'headlines_per_feed': news_config.get('headlines_per_feed', 2),
+            'rotation_enabled': news_config.get('rotation_enabled', True),
+            'custom_feeds': news_config.get('custom_feeds', {})
+        }
+        
+        return jsonify({
+            'status': 'success',
+            'data': status
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error getting news manager status: {str(e)}'
+        }), 400
+
+@app.route('/news_manager/update_feeds', methods=['POST'])
+def update_news_feeds():
+    """Update enabled news feeds"""
+    try:
+        data = request.get_json()
+        enabled_feeds = data.get('enabled_feeds', [])
+        headlines_per_feed = data.get('headlines_per_feed', 2)
+        
+        config = config_manager.load_config()
+        if 'news_manager' not in config:
+            config['news_manager'] = {}
+            
+        config['news_manager']['enabled_feeds'] = enabled_feeds
+        config['news_manager']['headlines_per_feed'] = headlines_per_feed
+        
+        config_manager.save_config(config)
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'News feeds updated successfully!'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error updating news feeds: {str(e)}'
+        }), 400
+
+@app.route('/news_manager/add_custom_feed', methods=['POST'])
+def add_custom_news_feed():
+    """Add a custom RSS feed"""
+    try:
+        data = request.get_json()
+        name = data.get('name', '').strip()
+        url = data.get('url', '').strip()
+        
+        if not name or not url:
+            return jsonify({
+                'status': 'error',
+                'message': 'Name and URL are required'
+            }), 400
+            
+        config = config_manager.load_config()
+        if 'news_manager' not in config:
+            config['news_manager'] = {}
+        if 'custom_feeds' not in config['news_manager']:
+            config['news_manager']['custom_feeds'] = {}
+            
+        config['news_manager']['custom_feeds'][name] = url
+        config_manager.save_config(config)
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Custom feed "{name}" added successfully!'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error adding custom feed: {str(e)}'
+        }), 400
+
+@app.route('/news_manager/remove_custom_feed', methods=['POST'])
+def remove_custom_news_feed():
+    """Remove a custom RSS feed"""
+    try:
+        data = request.get_json()
+        name = data.get('name', '').strip()
+        
+        if not name:
+            return jsonify({
+                'status': 'error',
+                'message': 'Feed name is required'
+            }), 400
+            
+        config = config_manager.load_config()
+        custom_feeds = config.get('news_manager', {}).get('custom_feeds', {})
+        
+        if name in custom_feeds:
+            del custom_feeds[name]
+            config_manager.save_config(config)
+            
+            return jsonify({
+                'status': 'success',
+                'message': f'Custom feed "{name}" removed successfully!'
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': f'Custom feed "{name}" not found'
+            }), 404
+            
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error removing custom feed: {str(e)}'
+        }), 400
+
+@app.route('/news_manager/toggle', methods=['POST'])
+def toggle_news_manager():
+    """Toggle news manager on/off"""
+    try:
+        data = request.get_json()
+        enabled = data.get('enabled', False)
+        
+        config = config_manager.load_config()
+        if 'news_manager' not in config:
+            config['news_manager'] = {}
+            
+        config['news_manager']['enabled'] = enabled
+        config_manager.save_config(config)
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'News manager {"enabled" if enabled else "disabled"} successfully!'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error toggling news manager: {str(e)}'
+        }), 400
 
 @app.route('/logs')
 def view_logs():
