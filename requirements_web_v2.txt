@@ -3,3 +3,6 @@ Flask-SocketIO==5.3.6
 Pillow>=9.0.0
 python-socketio>=5.0.0
 eventlet>=0.33.0
+freetype-py==2.5.1
+requests>=2.32.0
+pytz==2023.3
