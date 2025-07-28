@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file
 from flask_socketio import SocketIO, emit
 import json
@@ -447,4 +448,4 @@ if __name__ == '__main__':
     display_monitor.start()
     
     # Run the app
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
+    socketio.run(app, host='0.0.0.0', port=5001, debug=False, allow_unsafe_werkzeug=True)
