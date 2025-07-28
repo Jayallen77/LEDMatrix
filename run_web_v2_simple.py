@@ -53,6 +53,18 @@ def main():
         logger.error(f"Failed to install dependencies: {e}")
         return
     
+    # Install rgbmatrix module from local source
+    logger.info("Installing rgbmatrix module...")
+    try:
+        rgbmatrix_path = script_dir / 'rpi-rgb-led-matrix-master' / 'bindings' / 'python'
+        subprocess.check_call([
+            str(venv_pip), 'install', '-e', str(rgbmatrix_path)
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        logger.info("rgbmatrix module installed successfully")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to install rgbmatrix module: {e}")
+        return
+    
     # Run the web interface
     logger.info("Starting web interface on http://0.0.0.0:5001")
     subprocess.run([str(venv_python), 'web_interface_v2.py'])

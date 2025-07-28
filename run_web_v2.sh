@@ -25,6 +25,10 @@ source venv_web_v2/bin/activate
 echo "Installing dependencies..."
 pip install -r requirements_web_v2.txt
 
+# Install rgbmatrix module from local source
+echo "Installing rgbmatrix module..."
+pip install -e rpi-rgb-led-matrix-master/bindings/python
+
 # Run the web interface
 echo "Starting web interface on http://0.0.0.0:5001"
 python web_interface_v2.py 

@@ -88,6 +88,19 @@ def check_dependencies(venv_path):
             logger.error(f"Failed to install dependencies: {e}")
             return False
     
+    # Install rgbmatrix module from local source
+    logger.info("Installing rgbmatrix module...")
+    try:
+        venv_pip = get_venv_pip(venv_path)
+        rgbmatrix_path = Path(__file__).parent / 'rpi-rgb-led-matrix-master' / 'bindings' / 'python'
+        subprocess.check_call([
+            str(venv_pip), 'install', '-e', str(rgbmatrix_path)
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        logger.info("rgbmatrix module installed successfully")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to install rgbmatrix module: {e}")
+        return False
+    
     return True
 
 def check_permissions():
