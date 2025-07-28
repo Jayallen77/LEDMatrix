@@ -42,7 +42,7 @@ def main():
         venv_python = venv_path / 'bin' / 'python'
         venv_pip = venv_path / 'bin' / 'pip'
     
-    # Install dependencies
+    # Always install dependencies to ensure everything is up to date
     logger.info("Installing dependencies...")
     try:
         subprocess.check_call([

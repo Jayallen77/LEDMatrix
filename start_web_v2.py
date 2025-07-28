@@ -60,7 +60,8 @@ def check_dependencies(venv_path):
         'flask_socketio',
         'PIL',
         'socketio',
-        'eventlet'
+        'eventlet',
+        'freetype'
     ]
     
     # Use the virtual environment's Python to check imports
