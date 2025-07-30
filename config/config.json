@@ -327,7 +327,7 @@
     },
     "milb": {
         "enabled": true,
-        "live_priority": false,
+        "live_priority": true,
         "live_game_duration": 30,
         "test_mode": false,
         "update_interval_seconds": 3600,
