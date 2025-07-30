@@ -774,7 +774,14 @@ class DisplayController:
     def _update_live_modes_in_rotation(self):
         """Add or remove live modes from available_modes based on live_priority and live games."""
         # Helper to add/remove live modes for all sports
-        def update_mode(mode_name, manager, live_priority):
+        def update_mode(mode_name, manager, live_priority, sport_enabled):
+            # Only process if the sport is enabled in config
+            if not sport_enabled:
+                # If sport is disabled, ensure the mode is removed from rotation
+                if mode_name in self.available_modes:
+                    self.available_modes.remove(mode_name)
+                return
+                
             if not live_priority:
                 # Only add to rotation if manager exists and has live games
                 if manager and getattr(manager, 'live_games', None):
@@ -788,15 +795,27 @@ class DisplayController:
                 # These modes are only used for live priority takeover
                 if mode_name in self.available_modes:
                     self.available_modes.remove(mode_name)
-        update_mode('nhl_live', getattr(self, 'nhl_live', None), self.nhl_live_priority)
-        update_mode('nba_live', getattr(self, 'nba_live', None), self.nba_live_priority)
-        update_mode('mlb_live', getattr(self, 'mlb_live', None), self.mlb_live_priority)
-        update_mode('milb_live', getattr(self, 'milb_live', None), self.milb_live_priority)
-        update_mode('soccer_live', getattr(self, 'soccer_live', None), self.soccer_live_priority)
-        update_mode('nfl_live', getattr(self, 'nfl_live', None), self.nfl_live_priority)
-        update_mode('ncaa_fb_live', getattr(self, 'ncaa_fb_live', None), self.ncaa_fb_live_priority)
-        update_mode('ncaa_baseball_live', getattr(self, 'ncaa_baseball_live', None), self.ncaa_baseball_live_priority)
-        update_mode('ncaam_basketball_live', getattr(self, 'ncaam_basketball_live', None), self.ncaam_basketball_live_priority)
+        
+        # Check if each sport is enabled before processing
+        nhl_enabled = self.config.get('nhl_scoreboard', {}).get('enabled', False)
+        nba_enabled = self.config.get('nba_scoreboard', {}).get('enabled', False)
+        mlb_enabled = self.config.get('mlb', {}).get('enabled', False)
+        milb_enabled = self.config.get('milb', {}).get('enabled', False)
+        soccer_enabled = self.config.get('soccer_scoreboard', {}).get('enabled', False)
+        nfl_enabled = self.config.get('nfl_scoreboard', {}).get('enabled', False)
+        ncaa_fb_enabled = self.config.get('ncaa_fb_scoreboard', {}).get('enabled', False)
+        ncaa_baseball_enabled = self.config.get('ncaa_baseball_scoreboard', {}).get('enabled', False)
+        ncaam_basketball_enabled = self.config.get('ncaam_basketball_scoreboard', {}).get('enabled', False)
+        
+        update_mode('nhl_live', getattr(self, 'nhl_live', None), self.nhl_live_priority, nhl_enabled)
+        update_mode('nba_live', getattr(self, 'nba_live', None), self.nba_live_priority, nba_enabled)
+        update_mode('mlb_live', getattr(self, 'mlb_live', None), self.mlb_live_priority, mlb_enabled)
+        update_mode('milb_live', getattr(self, 'milb_live', None), self.milb_live_priority, milb_enabled)
+        update_mode('soccer_live', getattr(self, 'soccer_live', None), self.soccer_live_priority, soccer_enabled)
+        update_mode('nfl_live', getattr(self, 'nfl_live', None), self.nfl_live_priority, nfl_enabled)
+        update_mode('ncaa_fb_live', getattr(self, 'ncaa_fb_live', None), self.ncaa_fb_live_priority, ncaa_fb_enabled)
+        update_mode('ncaa_baseball_live', getattr(self, 'ncaa_baseball_live', None), self.ncaa_baseball_live_priority, ncaa_baseball_enabled)
+        update_mode('ncaam_basketball_live', getattr(self, 'ncaam_basketball_live', None), self.ncaam_basketball_live_priority, ncaam_basketball_enabled)
 
     def run(self):
         """Run the display controller, switching between displays."""
