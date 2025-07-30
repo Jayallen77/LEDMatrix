@@ -538,38 +538,31 @@ class DisplayController:
             sport_type will be 'nhl', 'nba', 'mlb', 'milb', 'soccer' or None
         """
         # Prioritize sports (e.g., Soccer > NHL > NBA > MLB)
-        live_checks = {
-            'nhl': self.nhl_live and self.nhl_live.live_games,
-            'nba': self.nba_live and self.nba_live.live_games,
-            'mlb': self.mlb_live and self.mlb_live.live_games,
-            'milb': self.milb_live and self.milb_live.live_games,
-            'nfl': self.nfl_live and self.nfl_live.live_games,
-            # ... other sports
-        }
+        # Only include sports that are enabled in config
+        live_checks = {}
+        if 'nhl_scoreboard' in self.config and self.config['nhl_scoreboard'].get('enabled', False):
+            live_checks['nhl'] = self.nhl_live and self.nhl_live.live_games
+        if 'nba_scoreboard' in self.config and self.config['nba_scoreboard'].get('enabled', False):
+            live_checks['nba'] = self.nba_live and self.nba_live.live_games
+        if 'mlb' in self.config and self.config['mlb'].get('enabled', False):
+            live_checks['mlb'] = self.mlb_live and self.mlb_live.live_games
+        if 'milb' in self.config and self.config['milb'].get('enabled', False):
+            live_checks['milb'] = self.milb_live and self.milb_live.live_games
+        if 'nfl_scoreboard' in self.config and self.config['nfl_scoreboard'].get('enabled', False):
+            live_checks['nfl'] = self.nfl_live and self.nfl_live.live_games
+        if 'soccer_scoreboard' in self.config and self.config['soccer_scoreboard'].get('enabled', False):
+            live_checks['soccer'] = self.soccer_live and self.soccer_live.live_games
+        if 'ncaa_fb_scoreboard' in self.config and self.config['ncaa_fb_scoreboard'].get('enabled', False):
+            live_checks['ncaa_fb'] = self.ncaa_fb_live and self.ncaa_fb_live.live_games
+        if 'ncaa_baseball_scoreboard' in self.config and self.config['ncaa_baseball_scoreboard'].get('enabled', False):
+            live_checks['ncaa_baseball'] = self.ncaa_baseball_live and self.ncaa_baseball_live.live_games
+        if 'ncaam_basketball_scoreboard' in self.config and self.config['ncaam_basketball_scoreboard'].get('enabled', False):
+            live_checks['ncaam_basketball'] = self.ncaam_basketball_live and self.ncaam_basketball_live.live_games
 
         for sport, live_games in live_checks.items():
             if live_games:
                 logger.debug(f"{sport.upper()} live games available")
                 return True, sport
-
-        if 'ncaa_fb_scoreboard' in self.config and self.config['ncaa_fb_scoreboard'].get('enabled', False):
-            if self.ncaa_fb_live and self.ncaa_fb_live.live_games:
-                logger.debug("NCAA FB live games available")
-                return True, 'ncaa_fb'
-        
-        if 'ncaa_baseball_scoreboard' in self.config and self.config['ncaa_baseball_scoreboard'].get('enabled', False):
-            if self.ncaa_baseball_live and self.ncaa_baseball_live.live_games:
-                logger.debug("NCAA Baseball live games available")
-                return True, 'ncaa_baseball'
-
-        if 'ncaam_basketball_scoreboard' in self.config and self.config['ncaam_basketball_scoreboard'].get('enabled', False):
-            if self.ncaam_basketball_live and self.ncaam_basketball_live.live_games:
-                logger.debug("NCAA Men's Basketball live games available")
-                return True, 'ncaam_basketball'
-        # Add more sports checks here (e.g., MLB, Soccer)
-        if 'mlb' in self.config and self.config['mlb'].get('enabled', False):
-            if self.mlb_live and self.mlb_live.live_games:
-                return True, 'mlb'
             
         return False, None
 
