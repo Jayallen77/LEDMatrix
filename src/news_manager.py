@@ -30,7 +30,7 @@ class NewsManager:
         self.news_data = {}
         self.current_headline_index = 0
         self.scroll_position = 0
-        self.cached_text_image = None
+        self.scrolling_image = None  # Pre-rendered image for smooth scrolling
         self.cached_text = None
         self.cache_manager = CacheManager()
         self.current_headlines = []
@@ -214,6 +214,7 @@ class NewsManager:
             
             # Calculate text dimensions for perfect scrolling
             self.calculate_scroll_dimensions()
+            self.create_scrolling_image()
             
             self.current_headlines = display_headlines
             logger.debug(f"Prepared {len(display_headlines)} headlines for display")
@@ -250,6 +251,29 @@ class NewsManager:
             logger.error(f"Error calculating scroll dimensions: {e}")
             self.total_scroll_width = len(self.cached_text) * 8  # Fallback estimate
             self.calculate_dynamic_duration()
+
+    def create_scrolling_image(self):
+        """Create a pre-rendered image for smooth scrolling."""
+        if not self.cached_text:
+            self.scrolling_image = None
+            return
+
+        try:
+            font = ImageFont.truetype(self.font_path, self.font_size)
+        except Exception as e:
+            logger.warning(f"Failed to load custom font for pre-rendering: {e}. Using default.")
+            font = ImageFont.load_default()
+
+        height = self.display_manager.height
+        width = self.total_scroll_width
+
+        self.scrolling_image = Image.new('RGB', (width, height), (0, 0, 0))
+        draw = ImageDraw.Draw(self.scrolling_image)
+
+        text_height = self.font_size
+        y_pos = (height - text_height) // 2
+        draw.text((0, y_pos), self.cached_text, font=font, fill=self.text_color)
+        logger.debug("Pre-rendered scrolling news image created.")
 
     def calculate_dynamic_duration(self):
         """Calculate the exact time needed to display all headlines"""
@@ -309,57 +333,46 @@ class NewsManager:
         return (time.time() - self.last_update) > self.update_interval
 
     def get_news_display(self) -> Image.Image:
-        """Generate the scrolling news ticker display"""
+        """Generate the scrolling news ticker display by cropping the pre-rendered image."""
         try:
-            if not self.cached_text:
-                logger.debug("No cached text available, showing loading image")
+            if not self.scrolling_image:
+                logger.debug("No pre-rendered image available, showing loading image.")
                 return self.create_no_news_image()
-            
-            # Create display image
+
             width = self.display_manager.width
             height = self.display_manager.height
+
+            # Use modulo for continuous scrolling
+            self.scroll_position = (self.scroll_position + self.scroll_speed) % self.total_scroll_width
+
+            # Crop the visible part of the image
+            x = self.scroll_position
+            visible_end = x + width
             
-            img = Image.new('RGB', (width, height), (0, 0, 0))
-            draw = ImageDraw.Draw(img)
-            
-            # Load font
-            try:
-                font = ImageFont.truetype(self.font_path, self.font_size)
-                logger.debug(f"Successfully loaded custom font: {self.font_path}")
-            except Exception as e:
-                logger.warning(f"Failed to load custom font '{self.font_path}': {e}. Using default font.")
-                font = ImageFont.load_default()
-            
-            # Calculate vertical position (center the text)
-            text_height = self.font_size
-            y_pos = (height - text_height) // 2
-            
-            # Calculate scroll position for smooth animation
-            if self.total_scroll_width > 0:
-                # Scroll from right to left
-                x_pos = width - self.scroll_position
+            if visible_end <= self.total_scroll_width:
+                # No wrap-around needed
+                img = self.scrolling_image.crop((x, 0, visible_end, height))
+            else:
+                # Handle wrap-around
+                img = Image.new('RGB', (width, height))
                 
-                # Draw the text
-                draw.text((x_pos, y_pos), self.cached_text, font=font, fill=self.text_color)
+                width1 = self.total_scroll_width - x
+                portion1 = self.scrolling_image.crop((x, 0, self.total_scroll_width, height))
+                img.paste(portion1, (0, 0))
                 
-                # If text has scrolled partially off screen, draw it again for seamless loop
-                if x_pos + self.total_scroll_width < width:
-                    draw.text((x_pos + self.total_scroll_width, y_pos), self.cached_text, font=font, fill=self.text_color)
-                
-                # Update scroll position
-                self.scroll_position += self.scroll_speed
-                
-                # Reset scroll when text has completely passed
-                if self.scroll_position >= self.total_scroll_width:
-                    self.scroll_position = 0
-                    self.rotation_count += 1
-                    
-                    # Check if we should rotate headlines
-                    if (self.rotation_enabled and 
-                        self.rotation_count >= self.rotation_threshold and 
-                        any(len(headlines) > self.headlines_per_feed for headlines in self.news_data.values())):
-                        self.prepare_headlines_for_display()
-                        self.rotation_count = 0
+                width2 = width - width1
+                portion2 = self.scrolling_image.crop((0, 0, width2, height))
+                img.paste(portion2, (width1, 0))
+
+            # Check for rotation when scroll completes a cycle
+            if self.scroll_position < self.scroll_speed: # Check if we just wrapped around
+                self.rotation_count += 1
+                if (self.rotation_enabled and 
+                    self.rotation_count >= self.rotation_threshold and 
+                    any(len(headlines) > self.headlines_per_feed for headlines in self.news_data.values())):
+                    logger.info("News rotation threshold reached. Preparing new headlines.")
+                    self.prepare_headlines_for_display()
+                    self.rotation_count = 0
             
             return img
             
@@ -438,9 +451,14 @@ class NewsManager:
             self.display_manager.image = img
             self.display_manager.update_display()
             
+            # Add scroll delay to control speed
+            time.sleep(self.scroll_delay)
+            
             # Debug: log scroll position
             if hasattr(self, 'scroll_position') and hasattr(self, 'total_scroll_width'):
                 logger.debug(f"Scroll position: {self.scroll_position}/{self.total_scroll_width}")
+            
+            return True
             
         except Exception as e:
             logger.error(f"Error in news display: {e}")
@@ -448,6 +466,7 @@ class NewsManager:
             error_img = self.create_error_image(str(e))
             self.display_manager.image = error_img
             self.display_manager.update_display()
+            return False
 
     def run_news_display(self):
         """Standalone method to run news display in its own loop"""
@@ -516,5 +535,6 @@ class NewsManager:
 
     def get_dynamic_duration(self) -> int:
         """Get the calculated dynamic duration for display"""
-        # Return the current calculated duration without fetching data
-        return self.dynamic_duration
+        # For smooth scrolling, use a very short duration so display controller calls us frequently
+        # The scroll_speed controls how many pixels we move per call
+        return 0.1  # 0.1 second duration - display controller will call us 10 times per second
