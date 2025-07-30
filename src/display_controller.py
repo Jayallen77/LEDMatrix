@@ -783,12 +783,18 @@ class DisplayController:
         # Helper to add/remove live modes for all sports
         def update_mode(mode_name, manager, live_priority):
             if not live_priority:
+                # Only add to rotation if manager exists and has live games
                 if manager and getattr(manager, 'live_games', None):
                     if mode_name not in self.available_modes:
                         self.available_modes.append(mode_name)
                 else:
                     if mode_name in self.available_modes:
                         self.available_modes.remove(mode_name)
+            else:
+                # For live_priority=True, never add to regular rotation
+                # These modes are only used for live priority takeover
+                if mode_name in self.available_modes:
+                    self.available_modes.remove(mode_name)
         update_mode('nhl_live', getattr(self, 'nhl_live', None), self.nhl_live_priority)
         update_mode('nba_live', getattr(self, 'nba_live', None), self.nba_live_priority)
         update_mode('mlb_live', getattr(self, 'mlb_live', None), self.mlb_live_priority)
