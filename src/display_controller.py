@@ -966,38 +966,56 @@ class DisplayController:
                             manager_to_display = self.nhl_recent
                         elif self.current_display_mode == 'nhl_upcoming' and self.nhl_upcoming:
                             manager_to_display = self.nhl_upcoming
+                        elif self.current_display_mode == 'nhl_live' and self.nhl_live:
+                            manager_to_display = self.nhl_live
                         elif self.current_display_mode == 'nba_recent' and self.nba_recent:
                             manager_to_display = self.nba_recent
                         elif self.current_display_mode == 'nba_upcoming' and self.nba_upcoming:
                             manager_to_display = self.nba_upcoming
+                        elif self.current_display_mode == 'nba_live' and self.nba_live:
+                            manager_to_display = self.nba_live
                         elif self.current_display_mode == 'mlb_recent' and self.mlb_recent:
                             manager_to_display = self.mlb_recent
                         elif self.current_display_mode == 'mlb_upcoming' and self.mlb_upcoming:
                             manager_to_display = self.mlb_upcoming
+                        elif self.current_display_mode == 'mlb_live' and self.mlb_live:
+                            manager_to_display = self.mlb_live
                         elif self.current_display_mode == 'milb_recent' and self.milb_recent:
                             manager_to_display = self.milb_recent
                         elif self.current_display_mode == 'milb_upcoming' and self.milb_upcoming:
                             manager_to_display = self.milb_upcoming
+                        elif self.current_display_mode == 'milb_live' and self.milb_live:
+                            manager_to_display = self.milb_live
                         elif self.current_display_mode == 'soccer_recent' and self.soccer_recent:
                             manager_to_display = self.soccer_recent
                         elif self.current_display_mode == 'soccer_upcoming' and self.soccer_upcoming:
                             manager_to_display = self.soccer_upcoming
+                        elif self.current_display_mode == 'soccer_live' and self.soccer_live:
+                            manager_to_display = self.soccer_live
                         elif self.current_display_mode == 'nfl_recent' and self.nfl_recent:
                             manager_to_display = self.nfl_recent
                         elif self.current_display_mode == 'nfl_upcoming' and self.nfl_upcoming:
                             manager_to_display = self.nfl_upcoming
+                        elif self.current_display_mode == 'nfl_live' and self.nfl_live:
+                            manager_to_display = self.nfl_live
                         elif self.current_display_mode == 'ncaa_fb_recent' and self.ncaa_fb_recent:
                             manager_to_display = self.ncaa_fb_recent
                         elif self.current_display_mode == 'ncaa_fb_upcoming' and self.ncaa_fb_upcoming:
                             manager_to_display = self.ncaa_fb_upcoming
+                        elif self.current_display_mode == 'ncaa_fb_live' and self.ncaa_fb_live:
+                            manager_to_display = self.ncaa_fb_live
                         elif self.current_display_mode == 'ncaa_baseball_recent' and self.ncaa_baseball_recent:
                             manager_to_display = self.ncaa_baseball_recent
                         elif self.current_display_mode == 'ncaa_baseball_upcoming' and self.ncaa_baseball_upcoming:
                             manager_to_display = self.ncaa_baseball_upcoming
+                        elif self.current_display_mode == 'ncaa_baseball_live' and self.ncaa_baseball_live:
+                            manager_to_display = self.ncaa_baseball_live
                         elif self.current_display_mode == 'ncaam_basketball_recent' and self.ncaam_basketball_recent:
                             manager_to_display = self.ncaam_basketball_recent
                         elif self.current_display_mode == 'ncaam_basketball_upcoming' and self.ncaam_basketball_upcoming:
                             manager_to_display = self.ncaam_basketball_upcoming
+                        elif self.current_display_mode == 'ncaam_basketball_live' and self.ncaam_basketball_live:
+                            manager_to_display = self.ncaam_basketball_live
 
 
                 # --- Perform Display Update ---
