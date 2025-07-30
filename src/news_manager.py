@@ -219,6 +219,29 @@ class NewsManager:
             self.current_headlines = display_headlines
             logger.debug(f"Prepared {len(display_headlines)} headlines for display")
 
+    def create_scrolling_image(self):
+        """Create a pre-rendered image for smooth scrolling."""
+        if not self.cached_text:
+            self.scrolling_image = None
+            return
+
+        try:
+            font = ImageFont.truetype(self.font_path, self.font_size)
+        except Exception as e:
+            logger.warning(f"Failed to load custom font for pre-rendering: {e}. Using default.")
+            font = ImageFont.load_default()
+
+        height = self.display_manager.height
+        width = self.total_scroll_width
+
+        self.scrolling_image = Image.new('RGB', (width, height), (0, 0, 0))
+        draw = ImageDraw.Draw(self.scrolling_image)
+
+        text_height = self.font_size
+        y_pos = (height - text_height) // 2
+        draw.text((0, y_pos), self.cached_text, font=font, fill=self.text_color)
+        logger.debug("Pre-rendered scrolling news image created.")
+
     def calculate_scroll_dimensions(self):
         """Calculate exact dimensions needed for smooth scrolling"""
         if not self.cached_text:
@@ -537,4 +560,6 @@ class NewsManager:
         """Get the calculated dynamic duration for display"""
         # For smooth scrolling, use a very short duration so display controller calls us frequently
         # The scroll_speed controls how many pixels we move per call
-        return 0.1  # 0.1 second duration - display controller will call us 10 times per second
+        # Return the current calculated duration without fetching data
+        return self.dynamic_duration  # 0.1 second duration - display controller will call us 10 times per second
+
