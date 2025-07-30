@@ -879,6 +879,7 @@ class DisplayController:
                     if live_priority_takeover:
                         new_mode = f"{live_priority_sport}_live"
                         if self.current_display_mode != new_mode:
+                            logger.info(f"Live priority takeover: Switching to {new_mode} from {self.current_display_mode}")
                             if previous_mode_before_switch == 'music' and self.music_manager:
                                 self.music_manager.deactivate_music_display()
                             self.current_display_mode = new_mode
@@ -907,6 +908,8 @@ class DisplayController:
                             new_mode_after_timer = self.available_modes[self.current_mode_index]
                             if previous_mode_before_switch == 'music' and self.music_manager and new_mode_after_timer != 'music':
                                 self.music_manager.deactivate_music_display()
+                            if self.current_display_mode != new_mode_after_timer:
+                                logger.info(f"Switching to {new_mode_after_timer} from {self.current_display_mode}")
                             self.current_display_mode = new_mode_after_timer
                             # Reset logged duration when mode changes
                             if hasattr(self, '_last_logged_duration'):
@@ -981,6 +984,11 @@ class DisplayController:
 
                 # --- Perform Display Update ---
                 try:
+                    # Log which display is being shown
+                    if self.current_display_mode != getattr(self, '_last_logged_mode', None):
+                        logger.info(f"Showing {self.current_display_mode}")
+                        self._last_logged_mode = self.current_display_mode
+                    
                     if self.current_display_mode == 'music' and self.music_manager:
                         # Call MusicManager's display method
                         self.music_manager.display(force_clear=self.force_clear)
