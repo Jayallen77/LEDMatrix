@@ -346,6 +346,16 @@ class BaseMiLBManager:
                     }
                 }
 
+            # Check if we're in MiLB season (April-September)
+            now = datetime.now()
+            current_month = now.month
+            in_season = 4 <= current_month <= 9
+            
+            if not in_season:
+                self.logger.info("MiLB is currently in offseason (October-March). No games expected.")
+                self.logger.info("Consider enabling test_mode for offseason testing.")
+                return {}
+
             # MiLB league sport IDs (configurable)
             sport_ids = self.milb_config.get('sport_ids', [10, 11, 12, 13, 14, 15]) # Mexican, AAA, AA, A+, A, Rookie
 
