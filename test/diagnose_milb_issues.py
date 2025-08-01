@@ -259,8 +259,8 @@ def test_cache_manager():
             print(f"❌ Cache get operation failed - data mismatch")
         
         # Clean up test data
-        cache_manager.delete(test_key)
-        print(f"✅ Cache delete operation successful")
+        cache_manager.clear_cache(test_key)
+        print(f"✅ Cache clear operation successful")
         
         return True
         
