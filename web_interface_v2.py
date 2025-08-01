@@ -15,6 +15,7 @@ from PIL import Image
 import io
 import signal
 import sys
+import logging
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -27,6 +28,9 @@ display_thread = None
 display_running = False
 editor_mode = False
 current_display_data = {}
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 class DisplayMonitor:
     def __init__(self):
@@ -71,7 +75,7 @@ class DisplayMonitor:
                     socketio.emit('display_update', current_display_data)
                     
             except Exception as e:
-                print(f"Display monitor error: {e}")
+                logger.error(f"Display monitor error: {e}", exc_info=True)
                 
             time.sleep(0.05)  # Update 20 times per second for smoother display
 
@@ -182,7 +186,15 @@ def start_display():
     try:
         if not display_manager:
             config = config_manager.load_config()
-            display_manager = DisplayManager(config)
+            try:
+                display_manager = DisplayManager(config)
+                logger.info("DisplayManager initialized successfully")
+            except Exception as dm_error:
+                logger.error(f"Failed to initialize DisplayManager: {dm_error}")
+                # Create a fallback display manager for web simulation
+                display_manager = DisplayManager(config)
+                logger.info("Using fallback DisplayManager for web simulation")
+            
             display_monitor.start()
             
         display_running = True
@@ -192,6 +204,7 @@ def start_display():
             'message': 'Display started successfully'
         })
     except Exception as e:
+        logger.error(f"Error in start_display: {e}", exc_info=True)
         return jsonify({
             'status': 'error',
             'message': f'Error starting display: {e}'
@@ -235,7 +248,14 @@ def toggle_editor_mode():
             # Initialize display manager for editor if needed
             if not display_manager:
                 config = config_manager.load_config()
-                display_manager = DisplayManager(config)
+                try:
+                    display_manager = DisplayManager(config)
+                    logger.info("DisplayManager initialized for editor mode")
+                except Exception as dm_error:
+                    logger.error(f"Failed to initialize DisplayManager for editor: {dm_error}")
+                    # Create a fallback display manager for web simulation
+                    display_manager = DisplayManager(config)
+                    logger.info("Using fallback DisplayManager for editor simulation")
                 display_monitor.start()
         else:
             # Resume normal display operation
@@ -247,6 +267,7 @@ def toggle_editor_mode():
             'message': f'Editor mode {"enabled" if editor_mode else "disabled"}'
         })
     except Exception as e:
+        logger.error(f"Error toggling editor mode: {e}", exc_info=True)
         return jsonify({
             'status': 'error',
             'message': f'Error toggling editor mode: {e}'

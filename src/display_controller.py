@@ -915,7 +915,19 @@ class DisplayController:
                         # No live_priority takeover, regular rotation
                         needs_switch = False
                         if self.current_display_mode.endswith('_live'):
-                            needs_switch = True
+                            # For live modes without live_priority, check if duration has elapsed
+                            if current_time - self.last_switch >= self.get_current_duration():
+                                needs_switch = True
+                                self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
+                                new_mode_after_timer = self.available_modes[self.current_mode_index]
+                                if previous_mode_before_switch == 'music' and self.music_manager and new_mode_after_timer != 'music':
+                                    self.music_manager.deactivate_music_display()
+                                if self.current_display_mode != new_mode_after_timer:
+                                    logger.info(f"Switching to {new_mode_after_timer} from {self.current_display_mode}")
+                                self.current_display_mode = new_mode_after_timer
+                                # Reset logged duration when mode changes
+                                if hasattr(self, '_last_logged_duration'):
+                                    delattr(self, '_last_logged_duration')
                         elif current_time - self.last_switch >= self.get_current_duration():
                             if self.current_display_mode == 'calendar' and self.calendar:
                                 self.calendar.advance_event()
