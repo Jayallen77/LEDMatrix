@@ -55,7 +55,7 @@ class NewsManager:
         
         # Get scroll settings from config
         self.scroll_speed = self.news_config.get('scroll_speed', 2)
-        self.scroll_delay = self.news_config.get('scroll_delay', 0.02)
+        self.scroll_delay = self.news_config.get('scroll_delay', 0.01)  # Reduced from 0.02 to 0.01 for smoother scrolling
         self.update_interval = self.news_config.get('update_interval', 300)  # 5 minutes
         
         # Get headline settings from config

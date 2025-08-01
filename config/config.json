@@ -90,7 +90,7 @@
         "enabled": true,
         "update_interval": 600,
         "scroll_speed": 1,
-        "scroll_delay": 0.01,
+        "scroll_delay": 0.005,
         "toggle_chart": false,
         "symbols": [
             "ASTS",
@@ -116,7 +116,7 @@
         "enabled": true,
         "update_interval": 3600,
         "scroll_speed": 1,
-        "scroll_delay": 0.01,
+        "scroll_delay": 0.005,
         "max_headlines_per_symbol": 1,
         "headlines_per_rotation": 2
     },
@@ -135,7 +135,7 @@
         ],
         "update_interval": 3600,
         "scroll_speed": 1,
-        "scroll_delay": 0.01,
+        "scroll_delay": 0.005,
         "loop": true,
         "future_fetch_days": 50,
         "show_channel_logos": true
@@ -437,7 +437,7 @@
         "enabled": true,
         "update_interval": 300,
         "scroll_speed": 1,
-        "scroll_delay": 0.01,
+        "scroll_delay": 0.005,
         "headlines_per_feed": 2,
         "enabled_feeds": [
             "NFL",

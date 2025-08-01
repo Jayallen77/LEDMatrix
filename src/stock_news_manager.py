@@ -35,7 +35,7 @@ class StockNewsManager:
         
         # Get scroll settings from config with faster defaults
         self.scroll_speed = self.stock_news_config.get('scroll_speed', 1)
-        self.scroll_delay = self.stock_news_config.get('scroll_delay', 0.001)  # Default to 1ms instead of 50ms
+        self.scroll_delay = self.stock_news_config.get('scroll_delay', 0.005)  # Default to 5ms for smoother scrolling
         
         # Get headline settings from config
         self.max_headlines_per_symbol = self.stock_news_config.get('max_headlines_per_symbol', 1)
@@ -370,7 +370,7 @@ class StockNewsManager:
                 draw = ImageDraw.Draw(self.display_manager.image)
                 draw.text((width//4, height//2), "Loading news...", font=self.display_manager.small_font, fill=(255, 255, 255))
                 self.display_manager.update_display()
-                time.sleep(0.1)  # Short delay to prevent CPU hogging
+                # Removed sleep delay to improve scrolling performance
                 return True
         
         # --- Scrolling logic remains the same --- 

@@ -555,14 +555,14 @@ class StockManager:
                 self.display_manager.update_display(image_array)
                 
                 # Small delay for smooth animation
-                time.sleep(0.01)  # Reduced delay to 10ms for smoother scrolling
+                time.sleep(0.005)  # Reduced delay to 5ms for smoother scrolling
             
             # Show final position briefly
             final_image = full_image.crop((scroll_width - width, 0, scroll_width, height))
             rgb_image = final_image.convert('RGB')
             image_array = np.array(rgb_image)
             self.display_manager.update_display(image_array)
-            time.sleep(0.5)  # Brief pause at the end
+            time.sleep(0.2)  # Reduced pause at the end for better performance
             
         except Exception as e:
             logger.error(f"Error updating stock display for {symbol}: {str(e)}")
