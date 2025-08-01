@@ -21,6 +21,15 @@ class WeatherManager:
         self.daily_forecast = None
         self.last_draw_time = 0
         self.cache_manager = CacheManager()
+        
+        # Error handling and throttling
+        self.consecutive_errors = 0
+        self.last_error_time = 0
+        self.error_backoff_time = 60  # Start with 1 minute backoff
+        self.max_consecutive_errors = 5  # Stop trying after 5 consecutive errors
+        self.error_log_throttle = 300  # Only log errors every 5 minutes
+        self.last_error_log_time = 0
+        
         # Layout constants
         self.PADDING = 1
         self.ICON_SIZE = {
@@ -50,9 +59,26 @@ class WeatherManager:
 
     def _fetch_weather(self) -> None:
         """Fetch current weather and forecast data from OpenWeatherMap API."""
+        current_time = time.time()
+        
+        # Check if we're in error backoff period
+        if self.consecutive_errors >= self.max_consecutive_errors:
+            if current_time - self.last_error_time < self.error_backoff_time:
+                # Still in backoff period, don't attempt fetch
+                if current_time - self.last_error_log_time > self.error_log_throttle:
+                    print(f"Weather API disabled due to {self.consecutive_errors} consecutive errors. Retrying in {self.error_backoff_time - (current_time - self.last_error_time):.0f} seconds")
+                    self.last_error_log_time = current_time
+                return
+            else:
+                # Backoff period expired, reset error count and try again
+                self.consecutive_errors = 0
+                self.error_backoff_time = 60  # Reset to initial backoff
+        
         api_key = self.weather_config.get('api_key')
-        if not api_key:
-            print("No API key configured for weather")
+        if not api_key or api_key == "YOUR_OPENWEATHERMAP_API_KEY":
+            if current_time - self.last_error_log_time > self.error_log_throttle:
+                print("No valid API key configured for weather")
+                self.last_error_log_time = current_time
             return
 
         # Try to get cached data first
@@ -63,6 +89,8 @@ class WeatherManager:
             if self.weather_data and self.forecast_data:
                 self._process_forecast_data(self.forecast_data)
                 self.last_update = time.time()
+                # Reset error count on successful cache usage
+                self.consecutive_errors = 0
                 print("Using cached weather data")
                 return
 
@@ -126,9 +154,24 @@ class WeatherManager:
             self.cache_manager.update_cache('weather', cache_data)
             
             self.last_update = time.time()
+            # Reset error count on successful fetch
+            self.consecutive_errors = 0
             print("Weather data updated successfully")
+            
         except Exception as e:
-            print(f"Error fetching weather data: {e}")
+            self.consecutive_errors += 1
+            self.last_error_time = current_time
+            
+            # Exponential backoff: double the backoff time (max 1 hour)
+            self.error_backoff_time = min(self.error_backoff_time * 2, 3600)
+            
+            # Only log errors periodically to avoid spam
+            if current_time - self.last_error_log_time > self.error_log_throttle:
+                print(f"Error fetching weather data (attempt {self.consecutive_errors}/{self.max_consecutive_errors}): {e}")
+                if self.consecutive_errors >= self.max_consecutive_errors:
+                    print(f"Weather API disabled for {self.error_backoff_time} seconds due to repeated failures")
+                self.last_error_log_time = current_time
+            
             # If we have cached data, use it as fallback
             if cached_data:
                 self.weather_data = cached_data.get('current')
