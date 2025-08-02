@@ -317,7 +317,7 @@ class BaseMiLBManager:
 
     def _fetch_milb_api_data(self, use_cache: bool = True) -> Dict[str, Any]:
         """Fetch MiLB game data from the MLB Stats API."""
-        cache_key = "milb_live_api_data"
+        cache_key = "milb_api_data"
         if use_cache:
             cached_data = self.cache_manager.get_with_auto_strategy(cache_key)
             if cached_data:
@@ -345,16 +345,6 @@ class BaseMiLBManager:
                         'start_time': datetime.now(timezone.utc).isoformat()
                     }
                 }
-
-            # Check if we're in MiLB season (April-September)
-            now = datetime.now()
-            current_month = now.month
-            in_season = 4 <= current_month <= 9
-            
-            if not in_season:
-                self.logger.info("MiLB is currently in offseason (October-March). No games expected.")
-                self.logger.info("Consider enabling test_mode for offseason testing.")
-                return {}
 
             # MiLB league sport IDs (configurable)
             sport_ids = self.milb_config.get('sport_ids', [10, 11, 12, 13, 14, 15]) # Mexican, AAA, AA, A+, A, Rookie
@@ -510,36 +500,11 @@ class BaseMiLBManager:
                 mapped_status = 'status_scheduled'
                 mapped_status_state = 'pre'
 
-            # Extract scores with fallback logic
-            away_score = game['away'].get('score')
-            home_score = game['home'].get('score')
-            
-            # Debug logging for score extraction
-            self.logger.debug(f"Initial scores for {away_abbr} @ {home_abbr}: away={away_score}, home={home_score}")
-            
-            # If scores are None or missing, try to get from linescore
-            if away_score is None or home_score is None:
-                linescore = game.get('linescore', {})
-                if linescore:
-                    teams_in_linescore = linescore.get('teams', {})
-                    if away_score is None:
-                        away_score = teams_in_linescore.get('away', {}).get('runs', 0)
-                        self.logger.debug(f"Got away score from linescore: {away_score}")
-                    if home_score is None:
-                        home_score = teams_in_linescore.get('home', {}).get('runs', 0)
-                        self.logger.debug(f"Got home score from linescore: {home_score}")
-            
-            # Final fallback to 0 if still None
-            away_score = away_score if away_score is not None else 0
-            home_score = home_score if home_score is not None else 0
-            
-            self.logger.debug(f"Final scores for {away_abbr} @ {home_abbr}: away={away_score}, home={home_score}")
-            
             game_data = {
                 'away_team': away_abbr,
                 'home_team': home_abbr,
-                'away_score': away_score,
-                'home_score': home_score,
+                'away_score': game['away']['score'],
+                'home_score': game['home']['score'],
                 'status': mapped_status,
                 'status_state': mapped_status_state,
                 'start_time': game['date'],
@@ -564,21 +529,9 @@ class BaseMiLBManager:
 
                         # Overwrite score and inning data with more accurate live data from the live feed
                         if linescore_live:
-                            # Extract scores from live feed with fallback
-                            away_runs = linescore_live.get('teams', {}).get('away', {}).get('runs')
-                            home_runs = linescore_live.get('teams', {}).get('home', {}).get('runs')
-                            
-                            # Only update if we got valid scores from live feed
-                            if away_runs is not None:
-                                game_data['away_score'] = away_runs
-                            if home_runs is not None:
-                                game_data['home_score'] = home_runs
-                            
-                            # Update inning info
-                            current_inning = linescore_live.get('currentInning')
-                            if current_inning is not None:
-                                game_data['inning'] = current_inning
-                            
+                            game_data['away_score'] = linescore_live.get('teams', {}).get('away', {}).get('runs', game_data['away_score'])
+                            game_data['home_score'] = linescore_live.get('teams', {}).get('home', {}).get('runs', game_data['home_score'])
+                            game_data['inning'] = linescore_live.get('currentInning', game_data['inning'])
                             inning_state_live = linescore_live.get('inningState', '').lower()
                             if inning_state_live:
                                 game_data['inning_half'] = 'bottom' if 'bottom' in inning_state_live else 'top'

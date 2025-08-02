@@ -329,7 +329,7 @@
         "enabled": true,
         "live_priority": true,
         "live_game_duration": 30,
-        "test_mode": true,
+        "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 30,
         "recent_update_interval": 3600,
