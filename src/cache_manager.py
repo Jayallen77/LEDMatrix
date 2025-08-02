@@ -40,6 +40,7 @@ class CacheManager:
         try:
             from src.config_manager import ConfigManager
             self.config_manager = ConfigManager()
+            self.config_manager.load_config()
         except ImportError:
             self.config_manager = None
             self.logger.warning("ConfigManager not available, using default cache intervals")
@@ -435,7 +436,7 @@ class CacheManager:
             return default_intervals.get(sport_key, 60)
         
         try:
-            config = self.config_manager.get_config()
+            config = self.config_manager.config
             # For MiLB, look for "milb" config instead of "milb_scoreboard"
             if sport_key == 'milb':
                 sport_config = config.get("milb", {})
