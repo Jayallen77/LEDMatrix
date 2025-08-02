@@ -419,15 +419,19 @@ class BaseMiLBManager:
                             status_obj = event['status']
                             status_state = status_obj.get('abstractGameState', 'Preview') # Changed default to 'Preview'
 
-                            # Map status to a consistent format
-                            status_map = {
-                                'in progress': 'status_in_progress',
-                                'final': 'status_final',
-                                'scheduled': 'status_scheduled',
-                                'preview': 'status_scheduled'
-                            }
-                            mapped_status = status_map.get(status_obj.get('detailedState', '').lower(), 'status_other')
-                            mapped_status_state = 'in' if mapped_status == 'status_in_progress' else 'post' if mapped_status == 'status_final' else 'pre'
+                            # Map status to a consistent format using abstractGameState
+                            mapped_status = 'status_other'
+                            mapped_status_state = 'pre'
+                            
+                            if status_state == 'Live':
+                                mapped_status = 'status_in_progress'
+                                mapped_status_state = 'in'
+                            elif status_state == 'Final':
+                                mapped_status = 'status_final'
+                                mapped_status_state = 'post'
+                            elif status_state in ['Preview', 'Scheduled']:
+                                mapped_status = 'status_scheduled'
+                                mapped_status_state = 'pre'
 
                             game_data = {
                                 'id': game_pk,
@@ -689,23 +693,35 @@ class MiLBLiveManager(BaseMiLBManager):
             else:
                 # Fetch live game data from MiLB API
                 games = self._fetch_milb_api_data(use_cache=False)
+                if not games:
+                    self.logger.debug("[MiLB] No games returned from API")
                 if games:
+                    # Debug: Log all games found
+                    self.logger.debug(f"[MiLB] Found {len(games)} total games from API")
+                    for game_id, game in games.items():
+                        self.logger.debug(f"[MiLB] Game {game_id}: {game['away_team']} @ {game['home_team']} - Status: {game['status']}, State: {game['status_state']}")
+                    
                     # Find all live games involving favorite teams
                     new_live_games = []
                     for game in games.values():
                         # Only process games that are actually in progress
                         if game['status_state'] == 'in' and game['status'] == 'status_in_progress':
+                            self.logger.debug(f"[MiLB] Found live game: {game['away_team']} @ {game['home_team']}")
                             if not self.favorite_teams or (
                                 game['home_team'] in self.favorite_teams or 
                                 game['away_team'] in self.favorite_teams
                             ):
+                                self.logger.debug(f"[MiLB] Processing favorite team game: {game['away_team']} @ {game['home_team']}")
                                 # Ensure scores are valid numbers
                                 try:
                                     game['home_score'] = int(game['home_score'])
                                     game['away_score'] = int(game['away_score'])
                                     new_live_games.append(game)
+                                    self.logger.debug(f"[MiLB] Added live game to list: {game['away_team']} @ {game['home_team']}")
                                 except (ValueError, TypeError):
                                     self.logger.warning(f"Invalid score format for game {game['away_team']} @ {game['home_team']}")
+                            else:
+                                self.logger.debug(f"[MiLB] Skipping non-favorite team game: {game['away_team']} @ {game['home_team']}")
                     
                     # Only log if there's a change in games or enough time has passed
                     should_log = (
@@ -750,6 +766,7 @@ class MiLBLiveManager(BaseMiLBManager):
                             self.last_display_update = current_time
                     else:
                         # No live games found
+                        self.logger.debug("[MiLB] No live games found in API response")
                         self.live_games = []
                         self.current_game = None
                 
