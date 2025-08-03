@@ -413,6 +413,15 @@ class BaseMiLBManager:
                         else:
                             home_record_str = ''
 
+                        # --- TEMP: Comprehensive Debugging ---
+                        self.logger.info(f"[MiLB DEBUG] Raw event data for game {game_pk}:\n{json.dumps(event, indent=2)}")
+                        
+                        game_date = event.get('gameDate')
+                        if not game_date:
+                            self.logger.warning(f"Skipping game {game_pk} due to missing 'gameDate'.")
+                            continue
+                        # --- End of TEMP Debugging ---
+
                         is_favorite_game = (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams)
                         
                         if not self.favorite_teams or is_favorite_game:
