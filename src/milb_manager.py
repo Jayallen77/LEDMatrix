@@ -194,11 +194,9 @@ class BaseMiLBManager:
             # Update the display
             self.display_manager.update_display()
             
-            # Format game date and time
-            game_time_str = game_data.get('start_time')
             if not game_time_str or 'TBD' in game_time_str:
-                game_date = "TBD"
-                game_time_str = ""
+                game_date_str = "TBD"
+                game_time_formatted_str = ""
             else:
                 game_time = datetime.fromisoformat(game_time_str.replace('Z', '+00:00'))
                 timezone_str = self.config.get('timezone', 'UTC')
@@ -214,29 +212,27 @@ class BaseMiLBManager:
                 # Check date format from config
                 use_short_date_format = self.config.get('display', {}).get('use_short_date_format', False)
                 if use_short_date_format:
-                    game_date = local_time.strftime("%-m/%-d")
+                    game_date_str = local_time.strftime("%-m/%-d")
                 else:
-                    game_date = self.display_manager.format_date_with_ordinal(local_time)
+                    game_date_str = self.display_manager.format_date_with_ordinal(local_time)
 
-                game_time_str = self._format_game_time(game_data['start_time'])
+                game_time_formatted_str = self._format_game_time(game_data['start_time'])
             
             # Draw date and time using NHL-style fonts
             date_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
             time_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
             
             # Draw date in center
-            date_width = draw.textlength(game_date, font=date_font)
+            date_width = draw.textlength(game_date_str, font=date_font)
             date_x = (width - date_width) // 2
             date_y = (height - date_font.size) // 2 - 3
-            # draw.text((date_x, date_y), game_date, font=date_font, fill=(255, 255, 255))
-            self._draw_text_with_outline(draw, game_date, (date_x, date_y), date_font)
+            self._draw_text_with_outline(draw, game_date_str, (date_x, date_y), date_font)
             
             # Draw time below date
-            time_width = draw.textlength(game_time_str, font=time_font)
+            time_width = draw.textlength(game_time_formatted_str, font=time_font)
             time_x = (width - time_width) // 2
             time_y = date_y + 10
-            # draw.text((time_x, time_y), game_time_str, font=time_font, fill=(255, 255, 255))
-            self._draw_text_with_outline(draw, game_time_str, (time_x, time_y), time_font)
+            self._draw_text_with_outline(draw, game_time_formatted_str, (time_x, time_y), time_font)
         
         # For recent/final games, show scores and status
         elif game_data['status'] in ['status_final', 'final', 'completed']:
@@ -450,7 +446,7 @@ class BaseMiLBManager:
                                 'home_score': event['teams']['home'].get('score', 0),
                                 'status': mapped_status,
                                 'status_state': mapped_status_state,
-                                'start_time': event['gameDate'],
+                                'start_time': event.get('gameDate'),
                                 'away_record': away_record_str,
                                 'home_record': home_record_str
                             }
@@ -1074,29 +1070,38 @@ class MiLBRecentManager(BaseMiLBManager):
             favorite_games_log = []
             
             for game_id, game in games.items():
-                # Convert game time to UTC datetime
-                game_time_str = game['start_time'].replace('Z', '+00:00')
-                game_time = datetime.fromisoformat(game_time_str)
+                # Convert game time to UTC datetime, now safely checking for key existence
+                start_time_str = game.get('start_time')
+                if not start_time_str:
+                    self.logger.warning(f"Skipping game {game_id} due to missing 'start_time'.")
+                    continue
+                
+                try:
+                    game_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+                except ValueError:
+                    self.logger.warning(f"Could not parse start_time '{start_time_str}' for game {game_id}. Skipping.")
+                    continue
+                    
                 if game_time.tzinfo is None:
                     game_time = game_time.replace(tzinfo=timezone.utc)
                 
                 # Check if this is a favorite team game
-                is_favorite_game = (game['home_team'] in self.favorite_teams or 
-                                  game['away_team'] in self.favorite_teams)
+                is_favorite_game = (game.get('home_team') in self.favorite_teams or 
+                                  game.get('away_team') in self.favorite_teams)
                 
                 # Log all games for debugging
-                game_info = f"{game['away_team']} @ {game['home_team']} (Status: {game['status']}, State: {game['status_state']})"
+                game_info = f"{game.get('away_team')} @ {game.get('home_team')} (Status: {game.get('status')}, State: {game.get('status_state')})"
                 all_games_log.append(game_info)
                 
                 if is_favorite_game:
                     favorite_games_log.append(game_info)
-                    logger.info(f"[MiLB] Found favorite team game: {game['away_team']} @ {game['home_team']}")
-                    logger.info(f"[MiLB] Game time (UTC): {game_time}")
-                    logger.info(f"[MiLB] Game status: {game['status']}, State: {game['status_state']}")
-                    logger.info(f"[MiLB] Scores: {game['away_team']} {game.get('away_score', 0)} - {game['home_team']} {game.get('home_score', 0)}")
+                    self.logger.info(f"[MiLB] Found favorite team game: {game.get('away_team')} @ {game.get('home_team')}")
+                    self.logger.info(f"[MiLB] Game time (UTC): {game_time}")
+                    self.logger.info(f"[MiLB] Game status: {game.get('status')}, State: {game.get('status_state')}")
+                    self.logger.info(f"[MiLB] Scores: {game.get('away_team')} {game.get('away_score', 0)} - {game.get('home_team')} {game.get('home_score', 0)}")
                 
                 # Use status_state to determine if game is final
-                is_final = game['status_state'] in ['post', 'final', 'completed']
+                is_final = game.get('status_state') in ['post', 'final', 'completed']
                 
                 self.logger.info(f"[MiLB] Game Time: {game_time.isoformat()}")
                 self.logger.info(f"[MiLB] Is final: {is_final}")
@@ -1113,7 +1118,7 @@ class MiLBRecentManager(BaseMiLBManager):
             logger.info(f"[MiLB] Favorite team games found ({len(favorite_games_log)}): {favorite_games_log}")
             
             # Sort by game time (most recent first) and limit to recent_games_to_show
-            new_recent_games.sort(key=lambda x: x['start_time'], reverse=True)
+            new_recent_games.sort(key=lambda x: x.get('start_time', ''), reverse=True)
             new_recent_games = new_recent_games[:self.recent_games_to_show]
             
             if new_recent_games:
@@ -1126,18 +1131,25 @@ class MiLBRecentManager(BaseMiLBManager):
                 logger.info("[MiLB] No final games found for favorite teams, checking for any recent games...")
                 fallback_games = []
                 for game_id, game in games.items():
-                    if (game['home_team'] in self.favorite_teams or game['away_team'] in self.favorite_teams):
-                        game_time_str = game['start_time'].replace('Z', '+00:00')
-                        game_time = datetime.fromisoformat(game_time_str)
+                    if (game.get('home_team') in self.favorite_teams or game.get('away_team') in self.favorite_teams):
+                        start_time_str = game.get('start_time')
+                        if not start_time_str:
+                            continue
+                        
+                        try:
+                            game_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+                        except ValueError:
+                            continue
+                            
                         if game_time.tzinfo is None:
                             game_time = game_time.replace(tzinfo=timezone.utc)
                         
                         # Include any game from the last 7 days
                         if game_time >= datetime.now(timezone.utc) - timedelta(days=7):
                             fallback_games.append(game)
-                            logger.info(f"[MiLB] Added fallback game: {game['away_team']} @ {game['home_team']} (Status: {game['status_state']})")
+                            logger.info(f"[MiLB] Added fallback game: {game.get('away_team')} @ {game.get('home_team')} (Status: {game.get('status_state')})")
                 
-                fallback_games.sort(key=lambda x: x['start_time'], reverse=True)
+                fallback_games.sort(key=lambda x: x.get('start_time', ''), reverse=True)
                 fallback_games = fallback_games[:self.recent_games_to_show]
                 
                 if fallback_games:
@@ -1204,8 +1216,19 @@ class MiLBUpcomingManager(BaseMiLBManager):
     def update(self):
         """Update upcoming games data."""
         current_time = time.time()
+        
+        # Add a check to see if the manager is enabled
+        if not self.milb_config.get('enabled', True):
+            # If the manager is disabled, clear any existing games and return
+            if self.upcoming_games:
+                self.upcoming_games = []
+                self.current_game = None
+                self.logger.info("[MiLB Upcoming] Manager is disabled, clearing games.")
+            return
+
         self.logger.debug(f"[MiLB] show_favorite_teams_only: {self.milb_config.get('show_favorite_teams_only', False)}")
         self.logger.debug(f"[MiLB] favorite_teams: {self.favorite_teams}")
+        
         if self.last_update != 0 and (current_time - self.last_update < self.update_interval):
             return
             
@@ -1214,13 +1237,16 @@ class MiLBUpcomingManager(BaseMiLBManager):
             games = self._fetch_milb_api_data(use_cache=True)
             if not games:
                 self.logger.warning("[MiLB] No games returned from API for upcoming games update.")
+                if self.upcoming_games: # Clear games if API returns nothing
+                    self.upcoming_games = []
+                    self.current_game = None
                 return
 
             # --- Optimization: Filter for favorite teams before processing ---
             if self.milb_config.get("show_favorite_teams_only", False) and self.favorite_teams:
                 games = {
                     game_id: game for game_id, game in games.items()
-                    if game['home_team'] in self.favorite_teams or game['away_team'] in self.favorite_teams
+                    if game.get('home_team') in self.favorite_teams or game.get('away_team') in self.favorite_teams
                 }
                 self.logger.info(f"[MiLB Upcoming] Filtered to {len(games)} games for favorite teams.")
 
@@ -1233,43 +1259,58 @@ class MiLBUpcomingManager(BaseMiLBManager):
             for game_id, game in games.items():
                 self.logger.debug(f"[MiLB] Processing game {game_id} for upcoming games...")
                 
-                game_time = datetime.fromisoformat(game['start_time'].replace('Z', '+00:00'))
-                if game_time.tzinfo is None:
-                    game_time = game_time.replace(tzinfo=timezone.utc)
+                # Ensure start_time exists before processing
+                if 'start_time' not in game or not game['start_time']:
+                    self.logger.warning(f"Skipping game {game_id} due to missing or empty 'start_time'.")
+                    continue
+
+                try:
+                    game_time = datetime.fromisoformat(game['start_time'].replace('Z', '+00:00'))
+                    if game_time.tzinfo is None:
+                        game_time = game_time.replace(tzinfo=timezone.utc)
+                except (ValueError, TypeError) as e:
+                    self.logger.error(f"Could not parse start_time for game {game_id}: {game['start_time']}. Error: {e}")
+                    continue
                 
                 is_upcoming = (
-                    game['status_state'] not in ['post', 'final', 'completed'] and
+                    game.get('status_state') not in ['post', 'final', 'completed'] and
                     game_time > now_utc
                 )
                 
-                # Add debug logging for upcoming games logic
-                self.logger.debug(f"[MiLB] Game {game['away_team']} @ {game['home_team']}:")
+                self.logger.debug(f"[MiLB] Game {game.get('away_team')} @ {game.get('home_team')}:")
                 self.logger.debug(f"[MiLB]   Game time: {game_time}")
                 self.logger.debug(f"[MiLB]   Current time: {now_utc}")
-                self.logger.debug(f"[MiLB]   Status state: {game['status_state']}")
+                self.logger.debug(f"[MiLB]   Status state: {game.get('status_state')}")
                 self.logger.debug(f"[MiLB]   Is upcoming: {is_upcoming}")
                 
                 if is_upcoming:
                     new_upcoming_games.append(game)
-                    self.logger.info(f"[MiLB] Added upcoming game: {game['away_team']} @ {game['home_team']} at {game_time}")
+                    self.logger.info(f"[MiLB] Added upcoming game: {game.get('away_team')} @ {game.get('home_team')} at {game_time}")
                 
             # Sort by game time (soonest first) and limit to upcoming_games_to_show
-            new_upcoming_games.sort(key=lambda x: x['start_time'])
+            new_upcoming_games.sort(key=lambda x: x.get('start_time', ''))
             new_upcoming_games = new_upcoming_games[:self.upcoming_games_to_show]
                 
-            if new_upcoming_games:
-                self.logger.info(f"[MiLB] Found {len(new_upcoming_games)} upcoming games for favorite teams")
+            # Compare new list with old list to see if an update is needed
+            if self.upcoming_games != new_upcoming_games:
+                self.logger.info(f"[MiLB] Upcoming games have changed. Updating list.")
                 self.upcoming_games = new_upcoming_games
-                if not self.current_game:
-                    self.current_game = self.upcoming_games[0]
-            else:
-                self.logger.info("[MiLB] No upcoming games found for favorite teams")
-                self.upcoming_games = []
-                self.current_game = None
                 
+                # Reset current_game if the list is updated
+                if self.upcoming_games:
+                    # Check if the current game is still in the list
+                    current_game_id = self.current_game.get('id') if self.current_game else None
+                    if not any(g.get('id') == current_game_id for g in self.upcoming_games):
+                        self.current_game_index = 0
+                        self.current_game = self.upcoming_games[0]
+                        self.last_game_switch = current_time
+                else:
+                    self.current_game = None # No upcoming games
+            
             self.last_update = current_time
                 
         except Exception as e:
+            # Use exc_info=True to log the full traceback
             self.logger.error(f"[MiLB] Error updating upcoming games: {e}", exc_info=True)
 
     def display(self, force_clear: bool = False):
