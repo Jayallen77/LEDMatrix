@@ -18,14 +18,14 @@ logger = logging.getLogger(__name__)
 
 class BaseMLBManager:
     """Base class for MLB managers with common functionality."""
-    def __init__(self, config: Dict[str, Any], display_manager):
+    def __init__(self, config: Dict[str, Any], display_manager, cache_manager: CacheManager):
         self.config = config
         self.display_manager = display_manager
         self.mlb_config = config.get('mlb', {})
         self.show_odds = self.mlb_config.get("show_odds", False)
         self.favorite_teams = self.mlb_config.get('favorite_teams', [])
         self.show_records = self.mlb_config.get('show_records', False)
-        self.cache_manager = CacheManager()
+        self.cache_manager = cache_manager
         self.odds_manager = OddsManager(self.cache_manager, self.config)
         self.logger = logging.getLogger(__name__)
         
@@ -704,8 +704,8 @@ class BaseMLBManager:
 
 class MLBLiveManager(BaseMLBManager):
     """Manager for displaying live MLB games."""
-    def __init__(self, config: Dict[str, Any], display_manager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.logger.info("Initialized MLB Live Manager")
         self.live_games = []
         self.current_game = None  # Initialize current_game to None
@@ -1120,8 +1120,8 @@ class MLBLiveManager(BaseMLBManager):
 
 class MLBRecentManager(BaseMLBManager):
     """Manager for displaying recent MLB games."""
-    def __init__(self, config: Dict[str, Any], display_manager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.logger.info("Initialized MLB Recent Manager")
         self.recent_games = []
         self.current_game = None
@@ -1261,8 +1261,8 @@ class MLBRecentManager(BaseMLBManager):
 
 class MLBUpcomingManager(BaseMLBManager):
     """Manager for displaying upcoming MLB games."""
-    def __init__(self, config: Dict[str, Any], display_manager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.logger.info("Initialized MLB Upcoming Manager")
         self.upcoming_games = []
         self.current_game = None

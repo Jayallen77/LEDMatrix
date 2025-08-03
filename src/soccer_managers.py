@@ -37,56 +37,6 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-class CacheManager:
-    """Manages caching of ESPN API responses."""
-    _instance = None
-    _cache = {}
-    _cache_timestamps = {}
-    
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(CacheManager, cls).__new__(cls)
-        return cls._instance
-    
-    @classmethod
-    def get(cls, key: str, max_age: int = 60) -> Optional[Dict]:
-        """
-        Get data from cache if it exists and is not stale.
-        Args:
-            key: Cache key (usually the date string or league)
-            max_age: Maximum age of cached data in seconds
-        Returns:
-            Cached data if valid, None if missing or stale
-        """
-        if key not in cls._cache:
-            return None
-            
-        timestamp = cls._cache_timestamps.get(key, 0)
-        if time.time() - timestamp > max_age:
-            # Data is stale, remove it
-            del cls._cache[key]
-            del cls._cache_timestamps[key]
-            return None
-            
-        return cls._cache[key]
-    
-    @classmethod
-    def set(cls, key: str, data: Dict) -> None:
-        """
-        Store data in cache with current timestamp.
-        Args:
-            key: Cache key
-            data: Data to cache
-        """
-        cls._cache[key] = data
-        cls._cache_timestamps[key] = time.time()
-    
-    @classmethod
-    def clear(cls) -> None:
-        """Clear all cached data."""
-        cls._cache.clear()
-        cls._cache_timestamps.clear()
-
 class BaseSoccerManager:
     """Base class for Soccer managers with common functionality."""
     # Class variables for warning tracking
@@ -95,21 +45,18 @@ class BaseSoccerManager:
     _warning_cooldown = 60  # Only log warnings once per minute
     _shared_data = {}  # Dictionary to hold shared data per league/date
     _last_shared_update = {} # Dictionary for update times per league/date
-    cache_manager = CacheManager()
-    odds_manager = OddsManager(cache_manager, ConfigManager())
-    logger = logging.getLogger('Soccer') # Use 'Soccer' logger
-    
-    # Class attribute to store soccer_config for shared access
     _soccer_config_shared = {} 
     _team_league_map = {} # In-memory cache for the map
     _map_last_updated = 0
 
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
         self.display_manager = display_manager
         self.config = config
         self.soccer_config = config.get("soccer_scoreboard", {}) # Use 'soccer_scoreboard' config
         BaseSoccerManager._soccer_config_shared = self.soccer_config # Store for class methods
-        
+        self.cache_manager = cache_manager
+        self.odds_manager = OddsManager(self.cache_manager, self.config)
+        self.logger = logging.getLogger(__name__)
         self.is_enabled = self.soccer_config.get("enabled", False)
         self.show_odds = self.soccer_config.get("show_odds", False)
         self.test_mode = self.soccer_config.get("test_mode", False)
@@ -701,8 +648,8 @@ class BaseSoccerManager:
 
 class SoccerLiveManager(BaseSoccerManager):
     """Manager for live Soccer games."""
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.update_interval = self.soccer_config.get("live_update_interval", 20) # Slightly longer for soccer?
         self.no_data_interval = 300
         self.last_update = 0
@@ -855,8 +802,8 @@ class SoccerLiveManager(BaseSoccerManager):
 
 class SoccerRecentManager(BaseSoccerManager):
     """Manager for recently completed Soccer games."""
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.recent_games = [] # Holds all fetched recent games matching criteria
         self.games_list = []   # Holds games filtered by favorite teams (if applicable)
         self.current_game_index = 0
@@ -958,8 +905,8 @@ class SoccerRecentManager(BaseSoccerManager):
 
 class SoccerUpcomingManager(BaseSoccerManager):
     """Manager for upcoming Soccer games."""
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.upcoming_games = [] # Filtered list for display
         self.current_game_index = 0
         self.last_update = 0

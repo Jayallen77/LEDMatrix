@@ -23,56 +23,6 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-class CacheManager:
-    """Manages caching of ESPN API responses."""
-    _instance = None
-    _cache = {}
-    _cache_timestamps = {}
-    
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(CacheManager, cls).__new__(cls)
-        return cls._instance
-    
-    @classmethod
-    def get(cls, key: str, max_age: int = 60) -> Optional[Dict]:
-        """
-        Get data from cache if it exists and is not stale.
-        Args:
-            key: Cache key (usually the date string)
-            max_age: Maximum age of cached data in seconds
-        Returns:
-            Cached data if valid, None if missing or stale
-        """
-        if key not in cls._cache:
-            return None
-            
-        timestamp = cls._cache_timestamps.get(key, 0)
-        if time.time() - timestamp > max_age:
-            # Data is stale, remove it
-            del cls._cache[key]
-            del cls._cache_timestamps[key]
-            return None
-            
-        return cls._cache[key]
-    
-    @classmethod
-    def set(cls, key: str, data: Dict) -> None:
-        """
-        Store data in cache with current timestamp.
-        Args:
-            key: Cache key (usually the date string)
-            data: Data to cache
-        """
-        cls._cache[key] = data
-        cls._cache_timestamps[key] = time.time()
-    
-    @classmethod
-    def clear(cls) -> None:
-        """Clear all cached data."""
-        cls._cache.clear()
-        cls._cache_timestamps.clear()
-
 class BaseNHLManager:
     """Base class for NHL managers with common functionality."""
     # Class variables for warning tracking
@@ -81,14 +31,14 @@ class BaseNHLManager:
     _warning_cooldown = 60  # Only log warnings once per minute
     _shared_data = None
     _last_shared_update = 0
-    cache_manager = CacheManager()  # Make cache_manager a class attribute
-    odds_manager = OddsManager(cache_manager, ConfigManager())
-    logger = logging.getLogger('NHL')  # Make logger a class attribute
     
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
         self.display_manager = display_manager
         self.config_manager = ConfigManager()
         self.config = config
+        self.cache_manager = cache_manager
+        self.odds_manager = OddsManager(self.cache_manager, self.config)
+        self.logger = logging.getLogger(__name__)
         self.nhl_config = config.get("nhl_scoreboard", {})
         self.is_enabled = self.nhl_config.get("enabled", False)
         self.show_odds = self.nhl_config.get("show_odds", False)
@@ -554,8 +504,8 @@ class BaseNHLManager:
 
 class NHLLiveManager(BaseNHLManager):
     """Manager for live NHL games."""
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.update_interval = self.nhl_config.get("live_update_interval", 15)  # 15 seconds for live games
         self.no_data_interval = 300  # 5 minutes when no live games
         self.last_update = 0
@@ -689,8 +639,8 @@ class NHLLiveManager(BaseNHLManager):
 
 class NHLRecentManager(BaseNHLManager):
     """Manager for recently completed NHL games."""
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.recent_games = []
         self.current_game_index = 0
         self.last_update = 0
@@ -784,8 +734,8 @@ class NHLRecentManager(BaseNHLManager):
 
 class NHLUpcomingManager(BaseNHLManager):
     """Manager for upcoming NHL games."""
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.upcoming_games = []
         self.current_game_index = 0
         self.last_update = 0

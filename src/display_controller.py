@@ -16,6 +16,7 @@ from src.clock import Clock
 from src.weather_manager import WeatherManager
 from src.display_manager import DisplayManager
 from src.config_manager import ConfigManager
+from src.cache_manager import CacheManager
 from src.stock_manager import StockManager
 from src.stock_news_manager import StockNewsManager
 from src.odds_ticker_manager import OddsTickerManager
@@ -45,6 +46,7 @@ class DisplayController:
         
         self.config_manager = ConfigManager()
         self.config = self.config_manager.load_config()
+        self.cache_manager = CacheManager()
         logger.info("Config loaded in %.3f seconds", time.time() - start_time)
         
         config_time = time.time()
@@ -101,9 +103,9 @@ class DisplayController:
         nhl_display_modes = self.config.get('nhl_scoreboard', {}).get('display_modes', {})
         
         if nhl_enabled:
-            self.nhl_live = NHLLiveManager(self.config, self.display_manager) if nhl_display_modes.get('nhl_live', True) else None
-            self.nhl_recent = NHLRecentManager(self.config, self.display_manager) if nhl_display_modes.get('nhl_recent', True) else None
-            self.nhl_upcoming = NHLUpcomingManager(self.config, self.display_manager) if nhl_display_modes.get('nhl_upcoming', True) else None
+            self.nhl_live = NHLLiveManager(self.config, self.display_manager, self.cache_manager) if nhl_display_modes.get('nhl_live', True) else None
+            self.nhl_recent = NHLRecentManager(self.config, self.display_manager, self.cache_manager) if nhl_display_modes.get('nhl_recent', True) else None
+            self.nhl_upcoming = NHLUpcomingManager(self.config, self.display_manager, self.cache_manager) if nhl_display_modes.get('nhl_upcoming', True) else None
         else:
             self.nhl_live = None
             self.nhl_recent = None
@@ -116,9 +118,9 @@ class DisplayController:
         nba_display_modes = self.config.get('nba_scoreboard', {}).get('display_modes', {})
         
         if nba_enabled:
-            self.nba_live = NBALiveManager(self.config, self.display_manager) if nba_display_modes.get('nba_live', True) else None
-            self.nba_recent = NBARecentManager(self.config, self.display_manager) if nba_display_modes.get('nba_recent', True) else None
-            self.nba_upcoming = NBAUpcomingManager(self.config, self.display_manager) if nba_display_modes.get('nba_upcoming', True) else None
+            self.nba_live = NBALiveManager(self.config, self.display_manager, self.cache_manager) if nba_display_modes.get('nba_live', True) else None
+            self.nba_recent = NBARecentManager(self.config, self.display_manager, self.cache_manager) if nba_display_modes.get('nba_recent', True) else None
+            self.nba_upcoming = NBAUpcomingManager(self.config, self.display_manager, self.cache_manager) if nba_display_modes.get('nba_upcoming', True) else None
         else:
             self.nba_live = None
             self.nba_recent = None
@@ -131,9 +133,9 @@ class DisplayController:
         mlb_display_modes = self.config.get('mlb', {}).get('display_modes', {})
         
         if mlb_enabled:
-            self.mlb_live = MLBLiveManager(self.config, self.display_manager) if mlb_display_modes.get('mlb_live', True) else None
-            self.mlb_recent = MLBRecentManager(self.config, self.display_manager) if mlb_display_modes.get('mlb_recent', True) else None
-            self.mlb_upcoming = MLBUpcomingManager(self.config, self.display_manager) if mlb_display_modes.get('mlb_upcoming', True) else None
+            self.mlb_live = MLBLiveManager(self.config, self.display_manager, self.cache_manager) if mlb_display_modes.get('mlb_live', True) else None
+            self.mlb_recent = MLBRecentManager(self.config, self.display_manager, self.cache_manager) if mlb_display_modes.get('mlb_recent', True) else None
+            self.mlb_upcoming = MLBUpcomingManager(self.config, self.display_manager, self.cache_manager) if mlb_display_modes.get('mlb_upcoming', True) else None
         else:
             self.mlb_live = None
             self.mlb_recent = None
@@ -146,9 +148,9 @@ class DisplayController:
         milb_display_modes = self.config.get('milb', {}).get('display_modes', {})
         
         if milb_enabled:
-            self.milb_live = MiLBLiveManager(self.config, self.display_manager) if milb_display_modes.get('milb_live', True) else None
-            self.milb_recent = MiLBRecentManager(self.config, self.display_manager) if milb_display_modes.get('milb_recent', True) else None
-            self.milb_upcoming = MiLBUpcomingManager(self.config, self.display_manager) if milb_display_modes.get('milb_upcoming', True) else None
+            self.milb_live = MiLBLiveManager(self.config, self.display_manager, self.cache_manager) if milb_display_modes.get('milb_live', True) else None
+            self.milb_recent = MiLBRecentManager(self.config, self.display_manager, self.cache_manager) if milb_display_modes.get('milb_recent', True) else None
+            self.milb_upcoming = MiLBUpcomingManager(self.config, self.display_manager, self.cache_manager) if milb_display_modes.get('milb_upcoming', True) else None
         else:
             self.milb_live = None
             self.milb_recent = None
@@ -161,9 +163,9 @@ class DisplayController:
         soccer_display_modes = self.config.get('soccer_scoreboard', {}).get('display_modes', {})
         
         if soccer_enabled:
-            self.soccer_live = SoccerLiveManager(self.config, self.display_manager) if soccer_display_modes.get('soccer_live', True) else None
-            self.soccer_recent = SoccerRecentManager(self.config, self.display_manager) if soccer_display_modes.get('soccer_recent', True) else None
-            self.soccer_upcoming = SoccerUpcomingManager(self.config, self.display_manager) if soccer_display_modes.get('soccer_upcoming', True) else None
+            self.soccer_live = SoccerLiveManager(self.config, self.display_manager, self.cache_manager) if soccer_display_modes.get('soccer_live', True) else None
+            self.soccer_recent = SoccerRecentManager(self.config, self.display_manager, self.cache_manager) if soccer_display_modes.get('soccer_recent', True) else None
+            self.soccer_upcoming = SoccerUpcomingManager(self.config, self.display_manager, self.cache_manager) if soccer_display_modes.get('soccer_upcoming', True) else None
         else:
             self.soccer_live = None
             self.soccer_recent = None
@@ -176,9 +178,9 @@ class DisplayController:
         nfl_display_modes = self.config.get('nfl_scoreboard', {}).get('display_modes', {})
         
         if nfl_enabled:
-            self.nfl_live = NFLLiveManager(self.config, self.display_manager) if nfl_display_modes.get('nfl_live', True) else None
-            self.nfl_recent = NFLRecentManager(self.config, self.display_manager) if nfl_display_modes.get('nfl_recent', True) else None
-            self.nfl_upcoming = NFLUpcomingManager(self.config, self.display_manager) if nfl_display_modes.get('nfl_upcoming', True) else None
+            self.nfl_live = NFLLiveManager(self.config, self.display_manager, self.cache_manager) if nfl_display_modes.get('nfl_live', True) else None
+            self.nfl_recent = NFLRecentManager(self.config, self.display_manager, self.cache_manager) if nfl_display_modes.get('nfl_recent', True) else None
+            self.nfl_upcoming = NFLUpcomingManager(self.config, self.display_manager, self.cache_manager) if nfl_display_modes.get('nfl_upcoming', True) else None
         else:
             self.nfl_live = None
             self.nfl_recent = None
@@ -191,9 +193,9 @@ class DisplayController:
         ncaa_fb_display_modes = self.config.get('ncaa_fb_scoreboard', {}).get('display_modes', {})
         
         if ncaa_fb_enabled:
-            self.ncaa_fb_live = NCAAFBLiveManager(self.config, self.display_manager) if ncaa_fb_display_modes.get('ncaa_fb_live', True) else None
-            self.ncaa_fb_recent = NCAAFBRecentManager(self.config, self.display_manager) if ncaa_fb_display_modes.get('ncaa_fb_recent', True) else None
-            self.ncaa_fb_upcoming = NCAAFBUpcomingManager(self.config, self.display_manager) if ncaa_fb_display_modes.get('ncaa_fb_upcoming', True) else None
+            self.ncaa_fb_live = NCAAFBLiveManager(self.config, self.display_manager, self.cache_manager) if ncaa_fb_display_modes.get('ncaa_fb_live', True) else None
+            self.ncaa_fb_recent = NCAAFBRecentManager(self.config, self.display_manager, self.cache_manager) if ncaa_fb_display_modes.get('ncaa_fb_recent', True) else None
+            self.ncaa_fb_upcoming = NCAAFBUpcomingManager(self.config, self.display_manager, self.cache_manager) if ncaa_fb_display_modes.get('ncaa_fb_upcoming', True) else None
         else:
             self.ncaa_fb_live = None
             self.ncaa_fb_recent = None
@@ -206,9 +208,9 @@ class DisplayController:
         ncaa_baseball_display_modes = self.config.get('ncaa_baseball_scoreboard', {}).get('display_modes', {})
         
         if ncaa_baseball_enabled:
-            self.ncaa_baseball_live = NCAABaseballLiveManager(self.config, self.display_manager) if ncaa_baseball_display_modes.get('ncaa_baseball_live', True) else None
-            self.ncaa_baseball_recent = NCAABaseballRecentManager(self.config, self.display_manager) if ncaa_baseball_display_modes.get('ncaa_baseball_recent', True) else None
-            self.ncaa_baseball_upcoming = NCAABaseballUpcomingManager(self.config, self.display_manager) if ncaa_baseball_display_modes.get('ncaa_baseball_upcoming', True) else None
+            self.ncaa_baseball_live = NCAABaseballLiveManager(self.config, self.display_manager, self.cache_manager) if ncaa_baseball_display_modes.get('ncaa_baseball_live', True) else None
+            self.ncaa_baseball_recent = NCAABaseballRecentManager(self.config, self.display_manager, self.cache_manager) if ncaa_baseball_display_modes.get('ncaa_baseball_recent', True) else None
+            self.ncaa_baseball_upcoming = NCAABaseballUpcomingManager(self.config, self.display_manager, self.cache_manager) if ncaa_baseball_display_modes.get('ncaa_baseball_upcoming', True) else None
         else:
             self.ncaa_baseball_live = None
             self.ncaa_baseball_recent = None
@@ -221,9 +223,9 @@ class DisplayController:
         ncaam_basketball_display_modes = self.config.get('ncaam_basketball_scoreboard', {}).get('display_modes', {})
         
         if ncaam_basketball_enabled:
-            self.ncaam_basketball_live = NCAAMBasketballLiveManager(self.config, self.display_manager) if ncaam_basketball_display_modes.get('ncaam_basketball_live', True) else None
-            self.ncaam_basketball_recent = NCAAMBasketballRecentManager(self.config, self.display_manager) if ncaam_basketball_display_modes.get('ncaam_basketball_recent', True) else None
-            self.ncaam_basketball_upcoming = NCAAMBasketballUpcomingManager(self.config, self.display_manager) if ncaam_basketball_display_modes.get('ncaam_basketball_upcoming', True) else None
+            self.ncaam_basketball_live = NCAAMBasketballLiveManager(self.config, self.display_manager, self.cache_manager) if ncaam_basketball_display_modes.get('ncaam_basketball_live', True) else None
+            self.ncaam_basketball_recent = NCAAMBasketballRecentManager(self.config, self.display_manager, self.cache_manager) if ncaam_basketball_display_modes.get('ncaam_basketball_recent', True) else None
+            self.ncaam_basketball_upcoming = NCAAMBasketballUpcomingManager(self.config, self.display_manager, self.cache_manager) if ncaam_basketball_display_modes.get('ncaam_basketball_upcoming', True) else None
         else:
             self.ncaam_basketball_live = None
             self.ncaam_basketball_recent = None
@@ -1141,4 +1143,4 @@ def main():
     controller.run()
 
 if __name__ == "__main__":
-    main() 
+    main()

@@ -32,14 +32,14 @@ class BaseNBAManager:
     _last_log_times = {}
     _shared_data = None
     _last_shared_update = 0
-    cache_manager = CacheManager()  # Make cache_manager a class attribute
-    odds_manager = OddsManager(cache_manager, ConfigManager())
-    logger = logging.getLogger('NBA')  # Make logger a class attribute
     
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
         self.display_manager = display_manager
         self.config_manager = ConfigManager()
         self.config = config
+        self.cache_manager = cache_manager
+        self.odds_manager = OddsManager(self.cache_manager, self.config)
+        self.logger = logging.getLogger(__name__)
         self.nba_config = config.get("nba_scoreboard", {})
         self.is_enabled = self.nba_config.get("enabled", False)
         self.show_odds = self.nba_config.get("show_odds", False)
@@ -658,8 +658,8 @@ class BaseNBAManager:
 
 class NBALiveManager(BaseNBAManager):
     """Manager for live NBA games."""
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.update_interval = self.nba_config.get("live_update_interval", 30)
         self.no_data_interval = 300
         self.last_update = 0
@@ -714,8 +714,8 @@ class NBALiveManager(BaseNBAManager):
 
 class NBARecentManager(BaseNBAManager):
     """Manager for recently completed NBA games."""
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.recent_games = []
         self.current_game_index = 0
         self.last_update = 0
@@ -790,8 +790,8 @@ class NBARecentManager(BaseNBAManager):
 
 class NBAUpcomingManager(BaseNBAManager):
     """Manager for upcoming NBA games."""
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.upcoming_games = []
         self.current_game_index = 0
         self.last_update = 0

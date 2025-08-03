@@ -32,14 +32,14 @@ class BaseNCAAMBasketballManager:
     _last_log_times = {}
     _shared_data = None
     _last_shared_update = 0
-    cache_manager = CacheManager()  # Make cache_manager a class attribute
-    odds_manager = OddsManager(cache_manager, ConfigManager())
-    logger = logging.getLogger('NCAAMBasketball')  # Make logger a class attribute
     
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
         self.display_manager = display_manager
         self.config_manager = ConfigManager()
         self.config = config
+        self.cache_manager = cache_manager
+        self.odds_manager = OddsManager(self.cache_manager, self.config)
+        self.logger = logging.getLogger(__name__)
         self.ncaam_basketball_config = config.get("ncaam_basketball_scoreboard", {})
         self.is_enabled = self.ncaam_basketball_config.get("enabled", False)
         self.show_odds = self.ncaam_basketball_config.get("show_odds", False)
@@ -600,8 +600,8 @@ class BaseNCAAMBasketballManager:
 
 class NCAAMBasketballLiveManager(BaseNCAAMBasketballManager):
     """Manager for live NCAA MB games."""
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.update_interval = self.ncaam_basketball_config.get("live_update_interval", 15)  # 15 seconds for live games
         self.no_data_interval = 300  # 5 minutes when no live games
         self.last_update = 0
@@ -777,8 +777,8 @@ class NCAAMBasketballLiveManager(BaseNCAAMBasketballManager):
 
 class NCAAMBasketballRecentManager(BaseNCAAMBasketballManager):
     """Manager for recently completed NCAA MB games."""
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.recent_games = []
         self.current_game_index = 0
         self.last_update = 0
@@ -912,8 +912,8 @@ class NCAAMBasketballRecentManager(BaseNCAAMBasketballManager):
 
 class NCAAMBasketballUpcomingManager(BaseNCAAMBasketballManager):
     """Manager for upcoming NCAA MB games."""
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.upcoming_games = []
         self.current_game_index = 0
         self.last_update = 0

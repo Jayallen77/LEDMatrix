@@ -34,14 +34,14 @@ class BaseNFLManager: # Renamed class
     _warning_cooldown = 60  # Only log warnings once per minute
     _shared_data = None
     _last_shared_update = 0
-    cache_manager = CacheManager()
-    odds_manager = OddsManager(cache_manager, ConfigManager())
-    logger = logging.getLogger('NFL') # Changed logger name
-
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
+    
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
         self.display_manager = display_manager
         self.config_manager = ConfigManager()
         self.config = config
+        self.cache_manager = cache_manager
+        self.odds_manager = OddsManager(self.cache_manager, self.config)
+        self.logger = logging.getLogger(__name__)
         self.nfl_config = config.get("nfl_scoreboard", {}) # Changed config key
         self.is_enabled = self.nfl_config.get("enabled", False)
         self.show_odds = self.nfl_config.get("show_odds", False)
@@ -482,8 +482,8 @@ class BaseNFLManager: # Renamed class
 
 class NFLLiveManager(BaseNFLManager): # Renamed class
     """Manager for live NFL games."""
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.update_interval = self.nfl_config.get("live_update_interval", 15)
         self.no_data_interval = 300
         self.last_update = 0
@@ -799,8 +799,8 @@ class NFLLiveManager(BaseNFLManager): # Renamed class
 
 class NFLRecentManager(BaseNFLManager): # Renamed class
     """Manager for recently completed NFL games."""
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.recent_games = [] # Store all fetched recent games initially
         self.games_list = [] # Filtered list for display (favorite teams)
         self.current_game_index = 0
@@ -1014,8 +1014,8 @@ class NFLRecentManager(BaseNFLManager): # Renamed class
 
 class NFLUpcomingManager(BaseNFLManager): # Renamed class
     """Manager for upcoming NFL games."""
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.upcoming_games = [] # Store all fetched upcoming games initially
         self.games_list = [] # Filtered list for display (favorite teams)
         self.current_game_index = 0

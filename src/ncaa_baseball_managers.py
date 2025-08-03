@@ -21,14 +21,14 @@ ESPN_NCAABB_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/base
 
 class BaseNCAABaseballManager:
     """Base class for NCAA Baseball managers with common functionality."""
-    def __init__(self, config: Dict[str, Any], display_manager):
+    def __init__(self, config: Dict[str, Any], display_manager, cache_manager: CacheManager):
         self.config = config
         self.display_manager = display_manager
         self.ncaa_baseball_config = config.get('ncaa_baseball_scoreboard', {})
         self.show_odds = self.ncaa_baseball_config.get('show_odds', False)
         self.show_records = self.ncaa_baseball_config.get('show_records', False)
         self.favorite_teams = self.ncaa_baseball_config.get('favorite_teams', [])
-        self.cache_manager = CacheManager()
+        self.cache_manager = cache_manager
         self.odds_manager = OddsManager(self.cache_manager, self.config)
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)  # Set logger level to DEBUG
@@ -542,8 +542,8 @@ class BaseNCAABaseballManager:
 
 class NCAABaseballLiveManager(BaseNCAABaseballManager):
     """Manager for displaying live NCAA Baseball games."""
-    def __init__(self, config: Dict[str, Any], display_manager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.logger.info("Initialized NCAA Baseball Live Manager")
         self.live_games = []
         self.current_game = None
@@ -836,8 +836,8 @@ class NCAABaseballLiveManager(BaseNCAABaseballManager):
 
 class NCAABaseballRecentManager(BaseNCAABaseballManager):
     """Manager for displaying recent NCAA Baseball games."""
-    def __init__(self, config: Dict[str, Any], display_manager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.logger.info("Initialized NCAA Baseball Recent Manager")
         self.recent_games = []
         self.current_game = None
@@ -943,8 +943,8 @@ class NCAABaseballRecentManager(BaseNCAABaseballManager):
 
 class NCAABaseballUpcomingManager(BaseNCAABaseballManager):
     """Manager for displaying upcoming NCAA Baseball games."""
-    def __init__(self, config: Dict[str, Any], display_manager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.logger.info("Initialized NCAA Baseball Upcoming Manager")
         self.upcoming_games = []
         self.current_game = None

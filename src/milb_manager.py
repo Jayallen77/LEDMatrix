@@ -17,13 +17,13 @@ logger = logging.getLogger(__name__)
 
 class BaseMiLBManager:
     """Base class for MiLB managers with common functionality."""
-    def __init__(self, config: Dict[str, Any], display_manager):
+    def __init__(self, config: Dict[str, Any], display_manager, cache_manager: CacheManager):
         self.config = config
         self.display_manager = display_manager
         self.milb_config = config.get('milb', {})
         self.favorite_teams = self.milb_config.get('favorite_teams', [])
         self.show_records = self.milb_config.get('show_records', False)
-        self.cache_manager = CacheManager()
+        self.cache_manager = cache_manager
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)  # Set logger level to INFO
         
@@ -610,8 +610,8 @@ class BaseMiLBManager:
 
 class MiLBLiveManager(BaseMiLBManager):
     """Manager for displaying live MiLB games."""
-    def __init__(self, config: Dict[str, Any], display_manager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.logger.info("Initialized MiLB Live Manager")
         self.live_games = []
         self.current_game = None  # Initialize current_game to None
@@ -1021,8 +1021,8 @@ class MiLBLiveManager(BaseMiLBManager):
 
 class MiLBRecentManager(BaseMiLBManager):
     """Manager for displaying recent MiLB games."""
-    def __init__(self, config: Dict[str, Any], display_manager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.logger.info("Initialized MiLB Recent Manager")
         self.recent_games = []
         self.current_game = None
@@ -1177,8 +1177,8 @@ class MiLBRecentManager(BaseMiLBManager):
 
 class MiLBUpcomingManager(BaseMiLBManager):
     """Manager for upcoming MiLB games."""
-    def __init__(self, config: Dict[str, Any], display_manager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.logger = logging.getLogger(__name__)
         self.upcoming_games = []
         self.current_game = None
