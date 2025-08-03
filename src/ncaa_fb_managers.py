@@ -38,14 +38,14 @@ class BaseNCAAFBManager: # Renamed class
     _last_shared_update = 0
     _processed_games_cache = {}  # Cache for processed game data
     _processed_games_timestamp = 0
-    cache_manager = CacheManager()
-    odds_manager = OddsManager(cache_manager, ConfigManager())
     logger = logging.getLogger('NCAAFB') # Changed logger name
 
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
         self.display_manager = display_manager
-        self.config_manager = ConfigManager()
         self.config = config
+        self.cache_manager = cache_manager
+        self.config_manager = self.cache_manager.config_manager
+        self.odds_manager = OddsManager(self.cache_manager, self.config_manager)
         self.ncaa_fb_config = config.get("ncaa_fb_scoreboard", {}) # Changed config key
         self.is_enabled = self.ncaa_fb_config.get("enabled", False)
         self.show_odds = self.ncaa_fb_config.get("show_odds", False)
@@ -541,8 +541,8 @@ class BaseNCAAFBManager: # Renamed class
 
 class NCAAFBLiveManager(BaseNCAAFBManager): # Renamed class
     """Manager for live NCAA FB games.""" # Updated docstring
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.update_interval = self.ncaa_fb_config.get("live_update_interval", 15)
         self.no_data_interval = 300
         self.last_update = 0
@@ -863,8 +863,8 @@ class NCAAFBLiveManager(BaseNCAAFBManager): # Renamed class
 
 class NCAAFBRecentManager(BaseNCAAFBManager): # Renamed class
     """Manager for recently completed NCAA FB games.""" # Updated docstring
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.recent_games = [] # Store all fetched recent games initially
         self.games_list = [] # Filtered list for display (favorite teams)
         self.current_game_index = 0
@@ -1070,8 +1070,8 @@ class NCAAFBRecentManager(BaseNCAAFBManager): # Renamed class
 
 class NCAAFBUpcomingManager(BaseNCAAFBManager): # Renamed class
     """Manager for upcoming NCAA FB games.""" # Updated docstring
-    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager):
-        super().__init__(config, display_manager)
+    def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
+        super().__init__(config, display_manager, cache_manager)
         self.upcoming_games = [] # Store all fetched upcoming games initially
         self.games_list = [] # Filtered list for display (favorite teams)
         self.current_game_index = 0
