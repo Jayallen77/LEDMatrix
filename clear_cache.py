@@ -15,9 +15,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from cache_manager import CacheManager
 
-def list_cache_keys(cache_dir):
+def list_cache_keys(cache_manager):
     """List all available cache keys."""
-    if not os.path.exists(cache_dir):
+    cache_dir = cache_manager.cache_dir
+    if not cache_dir or not os.path.exists(cache_dir):
         print(f"Cache directory does not exist: {cache_dir}")
         return []
     
@@ -69,8 +70,7 @@ def show_cache_info(cache_manager, key=None):
             print(f"Error checking cache key '{key}': {e}")
     else:
         # Show all cache keys
-        cache_dir = cache_manager.cache_dir
-        keys = list_cache_keys(cache_dir)
+        keys = list_cache_keys(cache_manager)
         if keys:
             print("Available cache keys:")
             for key in sorted(keys):
@@ -88,13 +88,11 @@ def main():
                        help='Clear a specific cache key')
     parser.add_argument('--info', '-i', type=str, metavar='KEY',
                        help='Show information about a specific cache key')
-    parser.add_argument('--cache-dir', type=str, default='cache',
-                       help='Cache directory path (default: cache)')
     
     args = parser.parse_args()
     
     # Initialize cache manager
-    cache_manager = CacheManager(cache_dir=args.cache_dir)
+    cache_manager = CacheManager()
     
     if args.list:
         show_cache_info(cache_manager)
