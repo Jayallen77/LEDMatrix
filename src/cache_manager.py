@@ -512,8 +512,13 @@ class CacheManager:
                 'force_refresh': False
             },
             'odds': {
-                'max_age': 3600,  # 1 hour
-                'memory_ttl': 7200,
+                'max_age': 1800,  # 30 minutes for upcoming games
+                'memory_ttl': 3600,
+                'force_refresh': False
+            },
+            'odds_live': {
+                'max_age': 120,  # 2 minutes for live games (odds change rapidly)
+                'memory_ttl': 240,
                 'force_refresh': False
             },
             
@@ -566,9 +571,12 @@ class CacheManager:
         if 'news' in key_lower:
             return 'news'
         
-        # Odds data
+        # Odds data - differentiate between live and upcoming games
         if 'odds' in key_lower:
-            return 'odds'
+            # For live games, use shorter cache; for upcoming games, use longer cache
+            if any(x in key_lower for x in ['live', 'current']):
+                return 'odds_live'  # Live odds change more frequently
+            return 'odds'  # Regular odds for upcoming games
         
         # Sports schedules and team info
         if any(x in key_lower for x in ['schedule', 'team_map', 'league']):
