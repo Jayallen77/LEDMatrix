@@ -137,30 +137,74 @@ class CacheManager:
             return None
         return os.path.join(self.cache_dir, f"{key}.json")
         
-    def get_cached_data(self, key: str, max_age: int = 300) -> Optional[Dict]:
-        """Get data from cache if it exists and is not stale."""
-        if key not in self._memory_cache:
-            return None
-            
-        timestamp = self._memory_cache_timestamps.get(key)
-        if timestamp is None:
-            return None
-            
-        # Convert timestamp to float if it's a string
-        if isinstance(timestamp, str):
-            try:
-                timestamp = float(timestamp)
-            except ValueError:
-                self.logger.error(f"Invalid timestamp format for key {key}: {timestamp}")
-                return None
-                
-        if time.time() - timestamp <= max_age:
-            return self._memory_cache[key]
-        else:
-            # Data is stale, remove it
+    def get_cached_data(self, key: str, max_age: int = 300, memory_ttl: Optional[int] = None) -> Optional[Dict]:
+        """Get data from cache (memory first, then disk) honoring TTLs.
+
+        - memory_ttl: TTL for in-memory entry; defaults to max_age if not provided
+        - max_age: TTL for persisted (on-disk) entry based on the stored timestamp
+        """
+        now = time.time()
+        in_memory_ttl = memory_ttl if memory_ttl is not None else max_age
+
+        # 1) Memory cache
+        if key in self._memory_cache:
+            timestamp = self._memory_cache_timestamps.get(key)
+            if isinstance(timestamp, str):
+                try:
+                    timestamp = float(timestamp)
+                except ValueError:
+                    self.logger.error(f"Invalid timestamp format for key {key}: {timestamp}")
+                    timestamp = None
+            if timestamp is not None and (now - float(timestamp) <= in_memory_ttl):
+                return self._memory_cache[key]
+            # Expired memory entry → evict and fall through to disk
             self._memory_cache.pop(key, None)
             self._memory_cache_timestamps.pop(key, None)
-            return None
+
+        # 2) Disk cache
+        cache_path = self._get_cache_path(key)
+        if cache_path and os.path.exists(cache_path):
+            try:
+                with self._cache_lock:
+                    with open(cache_path, 'r') as f:
+                        record = json.load(f)
+                # Determine record timestamp (prefer embedded, else file mtime)
+                record_ts = None
+                if isinstance(record, dict):
+                    record_ts = record.get('timestamp')
+                if record_ts is None:
+                    try:
+                        record_ts = os.path.getmtime(cache_path)
+                    except OSError:
+                        record_ts = None
+                if record_ts is not None:
+                    try:
+                        record_ts = float(record_ts)
+                    except (TypeError, ValueError):
+                        record_ts = None
+
+                if record_ts is None or (now - record_ts) <= max_age:
+                    # Hydrate memory cache (use current time to start memory TTL window)
+                    self._memory_cache[key] = record
+                    self._memory_cache_timestamps[key] = now
+                    return record
+                else:
+                    # Stale on disk; keep file for potential diagnostics but treat as miss
+                    return None
+            except json.JSONDecodeError as e:
+                self.logger.error(f"Error parsing cache file for {key}: {e}")
+                # If the file is corrupted, remove it
+                try:
+                    os.remove(cache_path)
+                except OSError:
+                    pass
+                return None
+            except Exception as e:
+                self.logger.error(f"Error loading cache for {key}: {e}")
+                return None
+
+        # 3) Miss
+        return None
             
     def save_cache(self, key: str, data: Dict) -> None:
         """
@@ -177,9 +221,25 @@ class CacheManager:
             # Save to file if a cache directory is available
             cache_path = self._get_cache_path(key)
             if cache_path:
+                # Atomic write to avoid partial/corrupt files
                 with self._cache_lock:
-                    with open(cache_path, 'w') as f:
-                        json.dump(data, f, indent=4, cls=DateTimeEncoder)
+                    tmp_dir = os.path.dirname(cache_path)
+                    try:
+                        fd, tmp_path = tempfile.mkstemp(prefix=f".{os.path.basename(cache_path)}.", dir=tmp_dir)
+                        try:
+                            with os.fdopen(fd, 'w') as tmp_file:
+                                json.dump(data, tmp_file, indent=4, cls=DateTimeEncoder)
+                                tmp_file.flush()
+                                os.fsync(tmp_file.fileno())
+                            os.replace(tmp_path, cache_path)
+                        finally:
+                            if os.path.exists(tmp_path):
+                                try:
+                                    os.remove(tmp_path)
+                                except OSError:
+                                    pass
+                    except Exception as e:
+                        self.logger.error(f"Atomic write failed for key '{key}': {e}")
             
         except (IOError, OSError) as e:
             self.logger.error(f"Failed to save cache for key '{key}': {e}")
@@ -457,6 +517,20 @@ class CacheManager:
         if sport_key and data_type in ['sports_live', 'live_scores']:
             live_interval = self.get_sport_live_interval(sport_key)
         
+        # Try to read sport-specific config for recent/upcoming
+        recent_interval = None
+        upcoming_interval = None
+        if self.config_manager and sport_key:
+            try:
+                if sport_key == 'milb':
+                    sport_cfg = self.config_manager.config.get('milb', {})
+                else:
+                    sport_cfg = self.config_manager.config.get(f"{sport_key}_scoreboard", {})
+                recent_interval = sport_cfg.get('recent_update_interval')
+                upcoming_interval = sport_cfg.get('upcoming_update_interval')
+            except Exception as e:
+                self.logger.debug(f"Could not read sport-specific recent/upcoming intervals for {sport_key}: {e}")
+
         strategies = {
             # Ultra time-sensitive data (live scores, current weather)
             'live_scores': {
@@ -490,13 +564,13 @@ class CacheManager:
             
             # Sports data
             'sports_recent': {
-                'max_age': 300,  # 5 minutes
-                'memory_ttl': 600,
+                'max_age': recent_interval or 1800,  # 30 minutes default; override by config
+                'memory_ttl': (recent_interval or 1800) * 2,
                 'force_refresh': False
             },
             'sports_upcoming': {
-                'max_age': 3600,  # 1 hour
-                'memory_ttl': 7200,
+                'max_age': upcoming_interval or 10800,  # 3 hours default; override by config
+                'memory_ttl': (upcoming_interval or 10800) * 2,
                 'force_refresh': False
             },
             'sports_schedules': {
@@ -605,11 +679,11 @@ class CacheManager:
         
         # Map cache key patterns to sport keys
         sport_patterns = {
-            'nfl': ['nfl', 'football'],
+            'nfl': ['nfl'],
             'nba': ['nba', 'basketball'],
             'mlb': ['mlb', 'baseball'],
             'nhl': ['nhl', 'hockey'],
-            'soccer': ['soccer', 'football'],
+            'soccer': ['soccer'],
             'ncaa_fb': ['ncaa_fb', 'ncaafb', 'college_football'],
             'ncaa_baseball': ['ncaa_baseball', 'college_baseball'],
             'ncaam_basketball': ['ncaam_basketball', 'college_basketball'],
@@ -634,13 +708,18 @@ class CacheManager:
         
         strategy = self.get_cache_strategy(data_type, sport_key)
         max_age = strategy['max_age']
+        memory_ttl = strategy.get('memory_ttl', max_age)
         
         # For market data, check if market is open
         if strategy.get('market_hours_only', False) and not self._is_market_open():
             # During off-hours, extend cache duration
             max_age *= 4  # 4x longer cache during off-hours
         
-        return self.get_cached_data(key, max_age)
+        record = self.get_cached_data(key, max_age, memory_ttl)
+        # Unwrap if stored in { 'data': ..., 'timestamp': ... }
+        if isinstance(record, dict) and 'data' in record:
+            return record['data']
+        return record
 
     def get_with_auto_strategy(self, key: str) -> Optional[Dict]:
         """
@@ -648,4 +727,4 @@ class CacheManager:
         Now respects sport-specific live_update_interval configurations.
         """
         data_type = self.get_data_type_from_key(key)
-        return self.get_cached_data_with_strategy(key, data_type) 
+        return self.get_cached_data_with_strategy(key, data_type)
