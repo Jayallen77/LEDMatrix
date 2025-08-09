@@ -102,12 +102,9 @@ class BaseSoccerManager:
         else:
             self.logger.info("Favorite teams filtering disabled. Showing all teams.")
 
-        self.config_manager = ConfigManager()
-
     def _get_timezone(self):
         try:
-            timezone_str = self.config_manager.get_timezone()
-            self.logger.debug(f"[Soccer] Config timezone: {timezone_str}")
+            timezone_str = self.config.get('timezone', 'UTC')
             return pytz.timezone(timezone_str)
         except pytz.UnknownTimeZoneError:
             self.logger.warning(f"[Soccer] Unknown timezone: {timezone_str}, falling back to UTC")
@@ -508,7 +505,6 @@ class BaseSoccerManager:
             if start_time_utc:
                 local_time = start_time_utc.astimezone(self._get_timezone())
                 game_time = local_time.strftime("%I:%M%p").lower().lstrip('0') # e.g., 2:30pm
-                self.logger.debug(f"[Soccer] Timezone conversion - UTC: {start_time_utc}, Local: {local_time}, Formatted: {game_time}")
                 
                 # Check date format from config
                 use_short_date_format = self.config.get('display', {}).get('use_short_date_format', False)
