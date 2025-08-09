@@ -94,13 +94,26 @@ class BaseSoccerManager:
         self.logger.info(f"Upcoming fetch days: {self.upcoming_fetch_days}") # Log new setting
         self.logger.info(f"Team map file: {self.team_map_file}")
         self.logger.info(f"Team map update interval: {self.team_map_update_days} days")
+        
+        # Log favorite teams configuration
+        show_favorites_only = self.soccer_config.get("show_favorite_teams_only", False)
+        if show_favorites_only:
+            self.logger.info(f"Favorite teams filtering enabled. Favorite teams: {self.favorite_teams}")
+        else:
+            self.logger.info("Favorite teams filtering disabled. Showing all teams.")
 
-        self.config_manager = ConfigManager(config)
+        self.config_manager = ConfigManager()
 
     def _get_timezone(self):
         try:
-            return pytz.timezone(self.config_manager.get_timezone())
+            timezone_str = self.config_manager.get_timezone()
+            self.logger.debug(f"[Soccer] Config timezone: {timezone_str}")
+            return pytz.timezone(timezone_str)
         except pytz.UnknownTimeZoneError:
+            self.logger.warning(f"[Soccer] Unknown timezone: {timezone_str}, falling back to UTC")
+            return pytz.utc
+        except Exception as e:
+            self.logger.error(f"[Soccer] Error getting timezone: {e}, falling back to UTC")
             return pytz.utc
 
     def _fetch_odds(self, game: Dict) -> None:
@@ -327,7 +340,7 @@ class BaseSoccerManager:
         if team_abbrev in self._logo_cache:
             return self._logo_cache[team_abbrev]
 
-        # Try to find the logo file with case-insensitive matching
+        # Try to find the logo file with case-insensitive matching and common variations
         logo_path = None
         expected_path = os.path.join(self.logo_dir, f"{team_abbrev}.png")
         
@@ -335,13 +348,38 @@ class BaseSoccerManager:
         if os.path.exists(expected_path):
             logo_path = expected_path
         else:
-            # Try case-insensitive matching
+            # Try case-insensitive matching and common variations
             try:
                 for filename in os.listdir(self.logo_dir):
-                    if filename.lower() == f"{team_abbrev.lower()}.png":
+                    filename_lower = filename.lower()
+                    team_abbrev_lower = team_abbrev.lower()
+                    
+                    # Exact case-insensitive match
+                    if filename_lower == f"{team_abbrev_lower}.png":
                         logo_path = os.path.join(self.logo_dir, filename)
                         self.logger.debug(f"Found case-insensitive match: {filename} for {team_abbrev}")
                         break
+                    
+                    # Handle common team abbreviation variations
+                    if team_abbrev == "MTL":
+                        # Montreal variations
+                        if filename_lower in ["cf_montral.png", "mon.png", "montreal.png"]:
+                            logo_path = os.path.join(self.logo_dir, filename)
+                            self.logger.debug(f"Found Montreal variation: {filename} for {team_abbrev}")
+                            break
+                    elif team_abbrev == "LAFC":
+                        # LAFC variations
+                        if filename_lower in ["lafc.png", "la_fc.png"]:
+                            logo_path = os.path.join(self.logo_dir, filename)
+                            self.logger.debug(f"Found LAFC variation: {filename} for {team_abbrev}")
+                            break
+                    elif team_abbrev == "NY":
+                        # New York variations
+                        if filename_lower in ["ny.png", "nycfc.png", "nyrb.png"]:
+                            logo_path = os.path.join(self.logo_dir, filename)
+                            self.logger.debug(f"Found NY variation: {filename} for {team_abbrev}")
+                            break
+                            
             except (OSError, PermissionError) as e:
                 self.logger.warning(f"Error listing directory {self.logo_dir}: {e}")
         
@@ -470,6 +508,7 @@ class BaseSoccerManager:
             if start_time_utc:
                 local_time = start_time_utc.astimezone(self._get_timezone())
                 game_time = local_time.strftime("%I:%M%p").lower().lstrip('0') # e.g., 2:30pm
+                self.logger.debug(f"[Soccer] Timezone conversion - UTC: {start_time_utc}, Local: {local_time}, Formatted: {game_time}")
                 
                 # Check date format from config
                 use_short_date_format = self.config.get('display', {}).get('use_short_date_format', False)
@@ -759,10 +798,14 @@ class SoccerLiveManager(BaseSoccerManager):
                 if data and "events" in data:
                     for event in data["events"]:
                         details = self._extract_game_details(event)
-                        # Ensure it's live and involves a favorite team (if specified)
+                        # Ensure it's live
                         if details and details["is_live"]:
                             self._fetch_odds(details)
                             new_live_games.append(details)
+                    
+                    # Filter for favorite teams only if the config is set
+                    if self.soccer_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+                        new_live_games = [game for game in new_live_games if game['home_abbr'] in self.favorite_teams or game['away_abbr'] in self.favorite_teams]
 
                     # Logging
                     should_log = (current_time - self.last_log_time >= self.log_interval or
@@ -770,11 +813,13 @@ class SoccerLiveManager(BaseSoccerManager):
                                   not self.live_games)
                     if should_log:
                         if new_live_games:
-                            self.logger.info(f"[Soccer] Found {len(new_live_games)} live games involving favorite teams / all teams.")
+                            filter_text = "favorite teams" if self.soccer_config.get("show_favorite_teams_only", False) and self.favorite_teams else "all teams"
+                            self.logger.info(f"[Soccer] Found {len(new_live_games)} live games involving {filter_text}.")
                             for game in new_live_games:
                                 self.logger.info(f"[Soccer] Live game: {game['away_abbr']} vs {game['home_abbr']} ({game['game_clock_display']}) - {game['league']}")
                         else:
-                            self.logger.info("[Soccer] No live games found matching criteria.")
+                            filter_text = "favorite teams" if self.soccer_config.get("show_favorite_teams_only", False) and self.favorite_teams else "criteria"
+                            self.logger.info(f"[Soccer] No live games found matching {filter_text}.")
                         self.last_log_time = current_time
 
                     # Update game list and current game
@@ -825,7 +870,8 @@ class SoccerLiveManager(BaseSoccerManager):
                     else:
                         # No live games found
                         if self.live_games: # Log only if previously had games
-                            self.logger.info("[Soccer] All live games have ended or no longer match criteria.")
+                            filter_text = "favorite teams" if self.soccer_config.get("show_favorite_teams_only", False) and self.favorite_teams else "criteria"
+                            self.logger.info(f"[Soccer] All live games have ended or no longer match {filter_text}.")
                         self.live_games = []
                         self.current_game = None
 
