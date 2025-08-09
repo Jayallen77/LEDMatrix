@@ -368,9 +368,9 @@
         "scroll_gap_width": 32
     },
     "soccer_scoreboard": {
-        "enabled": false,
+        "enabled": true,
         "live_priority": true,
-        "live_game_duration": 20,
+        "live_game_duration": 30,
         "show_odds": true,
         "test_mode": false,
         "update_interval_seconds": 3600,
