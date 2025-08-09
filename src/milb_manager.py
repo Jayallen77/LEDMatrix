@@ -920,8 +920,19 @@ class MiLBLiveManager(BaseMiLBManager):
                     future_seconds = (start_dt - now_utc).total_seconds()
                     if future_seconds > 5 * 60:
                         should_probe = True
+                # Always probe favorite team games in a sensible time window (captures unreliable flags)
+                is_favorite_game = (game['home_team'] in self.favorite_teams or game['away_team'] in self.favorite_teams)
+                if is_favorite_game:
+                    if start_dt is None:
+                        # If start time missing, still probe favorites
+                        should_probe = True
+                    else:
+                        delta_sec = (now_utc - start_dt).total_seconds()
+                        # Within -12h..+12h window relative to start to be robust to TZ/skew
+                        if -12 * 3600 <= delta_sec <= 12 * 3600:
+                            should_probe = True
 
-                # Also bound probe window to +/- 12 hours from now
+                # Also bound probe window to +/- 12 hours from now (failsafe)
                 if should_probe and start_dt is not None:
                     if abs((now_utc - start_dt).total_seconds()) > 12 * 3600:
                         should_probe = False
@@ -939,6 +950,19 @@ class MiLBLiveManager(BaseMiLBManager):
                     if future_seconds > 5 * 60:
                         self.logger.info(f"[MiLB] Rejecting schedule-live future game without feed confirmation: {game['away_team']} @ {game['home_team']} (starts in {future_seconds/60:.1f}m)")
                         is_live = False
+
+                # Decision trace for debugging
+                try:
+                    delta_sec = None
+                    if start_dt is not None:
+                        delta_sec = (now_utc - start_dt).total_seconds()
+                    self.logger.debug(
+                        f"[MiLB] Live decision: {game['away_team']}@{game['home_team']} flags={is_live_by_flags} "
+                        f"detail_hint={is_live_by_detail_hint} feed={feed_confirmed} probe={should_probe} "
+                        f"start_delta_s={delta_sec if delta_sec is not None else 'NA'} result={is_live}"
+                    )
+                except Exception:
+                    pass
 
                 if is_live:
                     # Sanity check on time
