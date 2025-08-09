@@ -80,13 +80,7 @@ class BaseMiLBManager:
             abstract_state = str(status_obj.get('abstractGameState', '')).lower()
 
             is_live = (status_code == 'I') or (abstract_state == 'live')
-            if not is_live:
-                # Some feeds report via liveData/linescore even when abstractGameState lags
-                live_data = payload.get('liveData', {})
-                linescore = live_data.get('linescore', {})
-                if linescore.get('currentInning'):
-                    is_live = True
-
+            # Only treat as live if feed status says in-progress
             if not is_live:
                 return False
 
@@ -128,9 +122,10 @@ class BaseMiLBManager:
                 'third' in offense
             ]
 
-            # Set status to in-progress
+            # Set status to in-progress and record feed status code
             game_data['status'] = 'status_in_progress'
             game_data['status_state'] = 'in'
+            game_data['_status_code'] = status_code
             return True
         except Exception as e:
             self.logger.debug(f"[MiLB] Live feed probe failed for {game_pk}: {e}")
