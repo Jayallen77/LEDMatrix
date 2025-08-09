@@ -882,19 +882,21 @@ class MiLBLiveManager(BaseMiLBManager):
                 self.logger.debug(f"[MiLB] Game {game_id}: {game['away_team']} @ {game['home_team']} - Status: {game['status']}, State: {game['status_state']}, Date: {game_date_str}")
 
             # Find all live games (optionally filtering to favorites)
-            new_live_games = []
+            new_live_games_map: Dict[str, Dict[str, Any]] = {}
             for game in games.values():
                 self.logger.debug(f"[MiLB] Game status check: {game['away_team']} @ {game['home_team']} - status_state='{game['status_state']}', status='{game['status']}', detailed_state='{game.get('detailed_state','')}'")
                 is_live_by_flags = (game['status_state'] == 'in' and game['status'] == 'status_in_progress')
                 detailed = str(game.get('detailed_state','')).lower()
-                is_live_by_detail = any(
+                is_live_by_detail_hint = any(
                     token in detailed for token in [
-                        'in progress', 'game in progress', 'top of the', 'bottom of the', 'middle of the', 'end of the', 'warmup', 'delayed start', 'delayed'
+                        'in progress', 'game in progress', 'top of the', 'bottom of the', 'middle of the', 'end of the'
                     ]
                 )
-                is_live = is_live_by_flags or is_live_by_detail
 
-                # Fallback: probe live feed if not already considered live and game near today
+                # Determine liveness: prefer explicit flags; otherwise require a successful feed probe
+                is_live = is_live_by_flags
+                feed_confirmed = False
+
                 if not is_live:
                     try:
                         game_pk = game.get('id') or game.get('game_pk')
@@ -909,9 +911,10 @@ class MiLBLiveManager(BaseMiLBManager):
                                     should_probe = False
                             except Exception:
                                 pass
-                        if game_pk and should_probe:
+                        if game_pk and should_probe and is_live_by_detail_hint:
                             if self._probe_and_update_from_live_feed(str(game_pk), game):
                                 is_live = True
+                                feed_confirmed = True
                                 self.logger.info(f"[MiLB] Live confirmed via feed: {game['away_team']} @ {game['home_team']}")
                     except Exception:
                         pass
@@ -947,10 +950,22 @@ class MiLBLiveManager(BaseMiLBManager):
                     try:
                         game['home_score'] = int(game['home_score'])
                         game['away_score'] = int(game['away_score'])
-                        new_live_games.append(game)
+                        # Deduplicate by game id; prefer feed-confirmed version
+                        unique_id = str(game.get('id') or f"{game['away_team']}@{game['home_team']}")
+                        if unique_id in new_live_games_map:
+                            prev = new_live_games_map[unique_id]
+                            prev_confirmed = prev.get('_feed_confirmed', False)
+                            if feed_confirmed and not prev_confirmed:
+                                game['_feed_confirmed'] = True
+                                new_live_games_map[unique_id] = game
+                        else:
+                            if feed_confirmed:
+                                game['_feed_confirmed'] = True
+                            new_live_games_map[unique_id] = game
                     except (ValueError, TypeError):
                         self.logger.warning(f"Invalid score format for game {game['away_team']} @ {game['home_team']}")
 
+            new_live_games = list(new_live_games_map.values())
             should_log = (
                 current_time - self.last_log_time >= self.log_interval or
                 len(new_live_games) != len(self.live_games) or
