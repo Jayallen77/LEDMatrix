@@ -897,27 +897,48 @@ class MiLBLiveManager(BaseMiLBManager):
                 is_live = is_live_by_flags
                 feed_confirmed = False
 
-                if not is_live:
+                # Compute timing window relative to now
+                game_pk = game.get('id') or game.get('game_pk')
+                start_time_str = game.get('start_time')
+                start_dt = None
+                now_utc = datetime.now(timezone.utc)
+                if start_time_str:
                     try:
-                        game_pk = game.get('id') or game.get('game_pk')
-                        start_time_str = game.get('start_time')
-                        should_probe = True
-                        if start_time_str:
-                            try:
-                                start_dt = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
-                                now_utc = datetime.now(timezone.utc)
-                                # Probe only if within +/- 12 hours of now
-                                if abs((now_utc - start_dt).total_seconds()) > 12 * 3600:
-                                    should_probe = False
-                            except Exception:
-                                pass
-                        if game_pk and should_probe and is_live_by_detail_hint:
-                            if self._probe_and_update_from_live_feed(str(game_pk), game):
-                                is_live = True
-                                feed_confirmed = True
-                                self.logger.info(f"[MiLB] Live confirmed via feed: {game['away_team']} @ {game['home_team']}")
+                        start_dt = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+                        if start_dt.tzinfo is None:
+                            start_dt = start_dt.replace(tzinfo=timezone.utc)
                     except Exception:
-                        pass
+                        start_dt = None
+
+                # Decide whether to probe live feed
+                should_probe = False
+                # Probe if detail hints suggest activity
+                if is_live_by_detail_hint:
+                    should_probe = True
+                # Probe if schedule flags say live BUT the game starts >5 minutes in the future
+                if is_live_by_flags and start_dt is not None:
+                    future_seconds = (start_dt - now_utc).total_seconds()
+                    if future_seconds > 5 * 60:
+                        should_probe = True
+
+                # Also bound probe window to +/- 12 hours from now
+                if should_probe and start_dt is not None:
+                    if abs((now_utc - start_dt).total_seconds()) > 12 * 3600:
+                        should_probe = False
+
+                # Perform probe if needed
+                if should_probe and game_pk:
+                    if self._probe_and_update_from_live_feed(str(game_pk), game):
+                        is_live = True
+                        feed_confirmed = True
+                        self.logger.info(f"[MiLB] Live confirmed via feed: {game['away_team']} @ {game['home_team']}")
+
+                # If schedule flags claim live but start is >5 minutes in the future AND feed did not confirm, reject
+                if is_live and not feed_confirmed and start_dt is not None:
+                    future_seconds = (start_dt - now_utc).total_seconds()
+                    if future_seconds > 5 * 60:
+                        self.logger.info(f"[MiLB] Rejecting schedule-live future game without feed confirmation: {game['away_team']} @ {game['home_team']} (starts in {future_seconds/60:.1f}m)")
+                        is_live = False
 
                 if is_live:
                     # Sanity check on time
