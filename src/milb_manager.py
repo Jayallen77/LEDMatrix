@@ -756,6 +756,11 @@ class MiLBLiveManager(BaseMiLBManager):
         
         if current_time - self.last_update >= interval:
             self.last_update = current_time
+            self.logger.info(f"[MiLB] Update interval reached ({interval}s), fetching fresh data")
+        else:
+            time_remaining = interval - (current_time - self.last_update)
+            self.logger.debug(f"[MiLB] Update interval not reached yet ({time_remaining:.1f}s remaining)")
+            return
             
             if self.test_mode:
                 # For testing, we'll just update the game state to show it's working
@@ -791,6 +796,8 @@ class MiLBLiveManager(BaseMiLBManager):
                 games = self._fetch_milb_api_data(use_cache=False)
                 if not games:
                     self.logger.debug("[MiLB] No games returned from API")
+                else:
+                    self.logger.info(f"[MiLB] Fetched {len(games)} games from API")
                 if games:
                     # Debug: Log all games found
                     self.logger.debug(f"[MiLB] Found {len(games)} total games from API")
@@ -838,7 +845,7 @@ class MiLBLiveManager(BaseMiLBManager):
                                 game['home_team'] in self.favorite_teams or 
                                 game['away_team'] in self.favorite_teams
                             ):
-                                self.logger.debug(f"[MiLB] Processing favorite team game: {game['away_team']} @ {game['home_team']}")
+                                self.logger.info(f"[MiLB] Processing favorite team game: {game['away_team']} @ {game['home_team']} - Inning: {game.get('inning', 'N/A')}, Half: {game.get('inning_half', 'N/A')}, Count: {game.get('balls', 0)}-{game.get('strikes', 0)}, Outs: {game.get('outs', 0)}, Scores: {game.get('away_score', 0)}-{game.get('home_score', 0)}")
                                 # Ensure scores are valid numbers
                                 try:
                                     game['home_score'] = int(game['home_score'])
@@ -878,7 +885,10 @@ class MiLBLiveManager(BaseMiLBManager):
                                 (new_game['home_team'] == self.current_game['away_team'] and 
                                  new_game['away_team'] == self.current_game['home_team'])
                             ):
+                                old_data = f"inning={self.current_game.get('inning')}, half={self.current_game.get('inning_half')}, count={self.current_game.get('balls')}-{self.current_game.get('strikes')}, outs={self.current_game.get('outs')}, scores={self.current_game.get('away_score')}-{self.current_game.get('home_score')}"
                                 self.current_game = new_game
+                                new_data = f"inning={new_game.get('inning')}, half={new_game.get('inning_half')}, count={new_game.get('balls')}-{new_game.get('strikes')}, outs={new_game.get('outs')}, scores={new_game.get('away_score')}-{new_game.get('home_score')}"
+                                self.logger.info(f"[MiLB] Updated current game data: {old_data} -> {new_data}")
                                 break
                         
                         # Only update the games list if we have new games
@@ -1142,8 +1152,12 @@ class MiLBLiveManager(BaseMiLBManager):
             return
             
         try:
-            logger.info(f"[MiLB] Displaying live game: {self.current_game.get('away_team')} @ {self.current_game.get('home_team')}")
-            logger.info(f"[MiLB] Game data for display: inning={self.current_game.get('inning')}, half={self.current_game.get('inning_half')}, count={self.current_game.get('balls')}-{self.current_game.get('strikes')}, outs={self.current_game.get('outs')}, scores={self.current_game.get('away_score')}-{self.current_game.get('home_score')}")
+            # Only log display calls occasionally to reduce spam
+            current_time = time.time()
+            if not hasattr(self, '_last_display_log_time') or current_time - getattr(self, '_last_display_log_time', 0) >= 30:
+                logger.info(f"[MiLB] Displaying live game: {self.current_game.get('away_team')} @ {self.current_game.get('home_team')}")
+                logger.info(f"[MiLB] Game data for display: inning={self.current_game.get('inning')}, half={self.current_game.get('inning_half')}, count={self.current_game.get('balls')}-{self.current_game.get('strikes')}, outs={self.current_game.get('outs')}, scores={self.current_game.get('away_score')}-{self.current_game.get('home_score')}")
+                self._last_display_log_time = current_time
             # Create and display the game image using the new method
             game_image = self._create_live_game_display(self.current_game)
             # Set the image in the display manager
