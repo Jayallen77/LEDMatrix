@@ -607,6 +607,11 @@ class NCAABaseballLiveManager(BaseNCAABaseballManager):
                     new_live_games = []
                     for game in games.values():
                         if game['status_state'] == 'in':
+                            # Filter for favorite teams only if the config is set
+                            if self.ncaa_baseball_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+                                if not (game['home_team'] in self.favorite_teams or game['away_team'] in self.favorite_teams):
+                                    continue
+                            
                             self._fetch_odds(game)
                             try:
                                 game['home_score'] = int(game['home_score'])
@@ -623,11 +628,13 @@ class NCAABaseballLiveManager(BaseNCAABaseballManager):
                     
                     if should_log:
                         if new_live_games:
-                            logger.info(f"[NCAABaseball] Found {len(new_live_games)} live games")
+                            filter_text = "favorite teams" if self.ncaa_baseball_config.get("show_favorite_teams_only", False) and self.favorite_teams else "all teams"
+                            logger.info(f"[NCAABaseball] Found {len(new_live_games)} live games involving {filter_text}")
                             for game in new_live_games:
                                 logger.info(f"[NCAABaseball] Live game: {game['away_team']} vs {game['home_team']} - {game['inning_half']}{game['inning']}, {game['balls']}-{game['strikes']}")
                         else:
-                            logger.info("[NCAABaseball] No live games found")
+                            filter_text = "favorite teams" if self.ncaa_baseball_config.get("show_favorite_teams_only", False) and self.favorite_teams else "criteria"
+                            logger.info(f"[NCAABaseball] No live games found matching {filter_text}")
                         self.last_log_time = current_time
                     
                     if new_live_games:
@@ -844,7 +851,7 @@ class NCAABaseballRecentManager(BaseNCAABaseballManager):
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = self.ncaa_baseball_config.get('recent_update_interval', 3600)
-        self.recent_hours = self.ncaa_baseball_config.get('recent_game_hours', 72)
+        self.recent_games_to_show = self.ncaa_baseball_config.get('recent_games_to_show', 5)  # Number of most recent games to display
         self.last_game_switch = 0
         self.game_display_duration = 10
         self.last_warning_time = 0
@@ -866,10 +873,6 @@ class NCAABaseballRecentManager(BaseNCAABaseballManager):
                 return
             
             new_recent_games = []
-            now = datetime.now(timezone.utc)
-            recent_cutoff = now - timedelta(hours=self.recent_hours)
-            
-            logger.info(f"[NCAABaseball] Time window: {recent_cutoff} to {now}")
             
             for game_id, game in games.items():
                 game_time_str = game['start_time'].replace('Z', '+00:00')
@@ -884,12 +887,10 @@ class NCAABaseballRecentManager(BaseNCAABaseballManager):
                 logger.info(f"[NCAABaseball] Game status: {game['status']}, State: {game['status_state']}")
                 
                 is_final = game['status_state'] in ['post', 'final', 'completed']
-                is_within_time = recent_cutoff <= game_time <= now
                 
                 logger.info(f"[NCAABaseball] Is final: {is_final}")
-                logger.info(f"[NCAABaseball] Is within time window: {is_within_time}")
                 
-                if is_final and is_within_time:
+                if is_final:
                     self._fetch_odds(game)
                     new_recent_games.append(game)
                     logger.info(f"[NCAABaseball] Added favorite team game to recent list: {game['away_team']} @ {game['home_team']}")
@@ -901,8 +902,11 @@ class NCAABaseballRecentManager(BaseNCAABaseballManager):
                 team_games = new_recent_games
 
             if team_games:
-                logger.info(f"[NCAABaseball] Found {len(team_games)} recent games for favorite teams: {self.favorite_teams}")
-                self.recent_games = sorted(team_games, key=lambda g: g.get('start_time'), reverse=True)
+                # Sort by game time (most recent first), then limit to recent_games_to_show
+                team_games = sorted(team_games, key=lambda g: g.get('start_time'), reverse=True)
+                team_games = team_games[:self.recent_games_to_show]
+                logger.info(f"[NCAABaseball] Found {len(team_games)} recent games for favorite teams (limited to {self.recent_games_to_show}): {self.favorite_teams}")
+                self.recent_games = team_games
                 if not self.current_game or self.current_game.get('id') not in [g.get('id') for g in self.recent_games]:
                     self.current_game_index = 0
                     self.current_game = self.recent_games[0] if self.recent_games else None
@@ -951,6 +955,7 @@ class NCAABaseballUpcomingManager(BaseNCAABaseballManager):
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = self.ncaa_baseball_config.get('upcoming_update_interval', 3600)
+        self.upcoming_games_to_show = self.ncaa_baseball_config.get('upcoming_games_to_show', 5)  # Number of upcoming games to display
         self.last_warning_time = 0
         self.warning_cooldown = 300
         self.last_game_switch = 0
@@ -968,9 +973,6 @@ class NCAABaseballUpcomingManager(BaseNCAABaseballManager):
             if games:
                 new_upcoming_games = []
                 now = datetime.now(timezone.utc)
-                upcoming_cutoff = now + timedelta(hours=24)
-                
-                logger.info(f"[NCAABaseball] Looking for games between {now} and {upcoming_cutoff}")
                 
                 for game in games.values():
                     is_favorite_game = (game['home_team'] in self.favorite_teams or game['away_team'] in self.favorite_teams)
@@ -982,13 +984,13 @@ class NCAABaseballUpcomingManager(BaseNCAABaseballManager):
                     logger.info(f"[NCAABaseball] Checking favorite upcoming game: {game['away_team']} @ {game['home_team']} at {game_time}")
                     logger.info(f"[NCAABaseball] Game status: {game['status']}, State: {game['status_state']}")
                     
-                    is_within_time = now <= game_time <= upcoming_cutoff
                     is_upcoming_state = game['status_state'] not in ['post', 'final', 'completed'] and game['status'] == 'status_scheduled'
+                    is_future = game_time > now
                     
-                    logger.info(f"[NCAABaseball] Within time: {is_within_time}")
                     logger.info(f"[NCAABaseball] Is upcoming state: {is_upcoming_state}")
+                    logger.info(f"[NCAABaseball] Is future: {is_future}")
                     
-                    if is_within_time and is_upcoming_state:
+                    if is_upcoming_state and is_future:
                         self._fetch_odds(game)
                         new_upcoming_games.append(game)
                         logger.info(f"[NCAABaseball] Added favorite team game to upcoming list: {game['away_team']} @ {game['home_team']}")
@@ -1000,8 +1002,11 @@ class NCAABaseballUpcomingManager(BaseNCAABaseballManager):
                     team_games = new_upcoming_games
 
                 if team_games:
-                    logger.info(f"[NCAABaseball] Found {len(team_games)} upcoming games for favorite teams")
-                    self.upcoming_games = sorted(team_games, key=lambda g: g.get('start_time'))
+                    # Sort by game time (soonest first), then limit to configured count
+                    team_games = sorted(team_games, key=lambda g: g.get('start_time'))
+                    team_games = team_games[:self.upcoming_games_to_show]
+                    logger.info(f"[NCAABaseball] Found {len(team_games)} upcoming games for favorite teams (limited to {self.upcoming_games_to_show})")
+                    self.upcoming_games = team_games
                     if not self.current_game or self.current_game.get('id') not in [g.get('id') for g in self.upcoming_games]:
                         self.current_game_index = 0
                         self.current_game = self.upcoming_games[0] if self.upcoming_games else None

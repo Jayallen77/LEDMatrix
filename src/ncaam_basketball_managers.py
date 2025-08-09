@@ -51,7 +51,6 @@ class BaseNCAAMBasketballManager:
         self.current_game = None
         self.fonts = self._load_fonts()
         self.favorite_teams = self.ncaam_basketball_config.get("favorite_teams", [])
-        self.recent_hours = self.ncaam_basketball_config.get("recent_game_hours", 72)  # Default 72 hours
         
         # Set logging level to INFO to reduce noise
         self.logger.setLevel(logging.INFO)
@@ -391,13 +390,6 @@ class BaseNCAAMBasketballManager:
                 else:
                     game_date = self.display_manager.format_date_with_ordinal(local_time)
 
-            # Calculate if game is within recent window
-            is_within_window = False
-            if start_time_utc:
-                cutoff_time = datetime.now(self._get_timezone()) - timedelta(hours=self.recent_hours)
-                is_within_window = start_time_utc > cutoff_time
-                self.logger.debug(f"[NCAAMBasketball] Game time: {start_time_utc}, Cutoff time: {cutoff_time}, Within window: {is_within_window}")
-
             details = {
                 "start_time_utc": start_time_utc,
                 "status_text": status["type"]["shortDetail"],
@@ -407,7 +399,6 @@ class BaseNCAAMBasketballManager:
                 "is_halftime": status["type"]["state"] == "halftime",
                 "is_final": status["type"]["state"] == "post",
                 "is_upcoming": status["type"]["state"] == "pre",
-                "is_within_window": is_within_window,
                 "home_abbr": home_team["team"]["abbreviation"],
                 "home_score": home_team.get("score", "0"),
                 "home_record": home_record,
@@ -683,6 +674,11 @@ class NCAAMBasketballLiveManager(BaseNCAAMBasketballManager):
                     for event in data["events"]:
                         details = self._extract_game_details(event)
                         if details and details["is_live"]: # is_live includes 'in' and 'halftime'
+                            # Filter for favorite teams only if the config is set
+                            if self.ncaam_basketball_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+                                if not (details["home_abbr"] in self.favorite_teams or details["away_abbr"] in self.favorite_teams):
+                                    continue
+                            
                             self._fetch_odds(details)
                             new_live_games.append(details)
                             if self.favorite_teams and (
@@ -704,7 +700,8 @@ class NCAAMBasketballLiveManager(BaseNCAAMBasketballManager):
                     
                     if should_log:
                         if new_live_games:
-                            self.logger.info(f"[NCAAMBasketball] Found {len(new_live_games)} live games")
+                            filter_text = "favorite teams" if self.ncaam_basketball_config.get("show_favorite_teams_only", False) and self.favorite_teams else "all teams"
+                            self.logger.info(f"[NCAAMBasketball] Found {len(new_live_games)} live games involving {filter_text}")
                             for game in new_live_games:
                                 period = game.get('period', 0)
                                 if game.get('is_halftime'):
@@ -723,7 +720,8 @@ class NCAAMBasketballLiveManager(BaseNCAAMBasketballManager):
                             if has_favorite_team:
                                 self.logger.info("[NCAAMBasketball] Found live game(s) for favorite team(s)")
                         else:
-                            self.logger.info("[NCAAMBasketball] No live games found")
+                            filter_text = "favorite teams" if self.ncaam_basketball_config.get("show_favorite_teams_only", False) and self.favorite_teams else "criteria"
+                            self.logger.info(f"[NCAAMBasketball] No live games found matching {filter_text}")
                         self.last_log_time = current_time
                     
                     if new_live_games:
@@ -783,7 +781,7 @@ class NCAAMBasketballRecentManager(BaseNCAAMBasketballManager):
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = 3600  # 1 hour for recent games
-        self.recent_hours = self.ncaam_basketball_config.get("recent_game_hours", 48)
+        self.recent_games_to_show = self.ncaam_basketball_config.get("recent_games_to_show", 5)  # Number of most recent games to display
         self.last_game_switch = 0
         self.game_display_duration = self.ncaam_basketball_config.get("recent_game_duration", 15) # Configurable duration
         self.last_log_time = 0
@@ -815,8 +813,8 @@ class NCAAMBasketballRecentManager(BaseNCAAMBasketballManager):
             new_recent_games = []
             for event in events:
                 game = self._extract_game_details(event)
-                # Filter for recent games: must be final and within the time window
-                if game and game['is_final'] and game['is_within_window']:
+                # Filter for recent games: must be final
+                if game and game['is_final']:
                     self._fetch_odds(game)
                     new_recent_games.append(game)
 
@@ -828,8 +826,9 @@ class NCAAMBasketballRecentManager(BaseNCAAMBasketballManager):
             else:
                 new_team_games = new_recent_games
 
-            # Sort by game time (most recent first)
+            # Sort by game time (most recent first), then limit to recent_games_to_show
             new_team_games.sort(key=lambda g: g.get('start_time_utc', datetime.min.replace(tzinfo=timezone.utc)), reverse=True)
+            new_team_games = new_team_games[:self.recent_games_to_show]
 
             # Only log if there's a change in games or enough time has passed
             should_log = (
@@ -840,7 +839,7 @@ class NCAAMBasketballRecentManager(BaseNCAAMBasketballManager):
 
             if should_log:
                 if new_team_games:
-                    self.logger.info(f"[NCAAMBasketball] Found {len(new_team_games)} recent games for favorite teams")
+                    self.logger.info(f"[NCAAMBasketball] Found {len(new_team_games)} recent games for favorite teams (limited to {self.recent_games_to_show})")
                 elif self.favorite_teams: # Only log "none found" if favorites are configured
                     self.logger.info("[NCAAMBasketball] No recent games found for favorite teams")
                 self.last_log_time = current_time
@@ -918,6 +917,7 @@ class NCAAMBasketballUpcomingManager(BaseNCAAMBasketballManager):
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = 3600  # 1 hour for upcoming games
+        self.upcoming_games_to_show = self.ncaam_basketball_config.get("upcoming_games_to_show", 5)  # Number of upcoming games to display
         self.last_warning_time = 0
         self.warning_cooldown = 300  # Only show warning every 5 minutes
         self.last_game_switch = 0
@@ -962,13 +962,14 @@ class NCAAMBasketballUpcomingManager(BaseNCAAMBasketballManager):
             else:
                 team_games = new_upcoming_games
 
-             # Sort by game time (soonest first)
+             # Sort by game time (soonest first), then limit to configured count
             team_games.sort(key=lambda g: g.get('start_time_utc', datetime.max.replace(tzinfo=timezone.utc)))
+            team_games = team_games[:self.upcoming_games_to_show]
 
 
             if self._should_log("team_games_upcoming", 300):
                  if team_games:
-                    self.logger.info(f"[NCAAMBasketball] Found {len(team_games)} upcoming games for favorite teams")
+                    self.logger.info(f"[NCAAMBasketball] Found {len(team_games)} upcoming games for favorite teams (limited to {self.upcoming_games_to_show})")
                  elif self.favorite_teams: # Only log "none found" if favorites configured
                      self.logger.info("[NCAAMBasketball] No upcoming games found for favorite teams")
 

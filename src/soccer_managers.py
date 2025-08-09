@@ -69,7 +69,8 @@ class BaseSoccerManager:
         self.fonts = self._load_fonts()
         self.favorite_teams = self.soccer_config.get("favorite_teams", [])
         self.target_leagues_config = self.soccer_config.get("leagues", list(LEAGUE_SLUGS.keys())) # Get target leagues from config
-        self.recent_hours = self.soccer_config.get("recent_game_hours", 168) # Used for recent past AND upcoming future display window
+        self.recent_games_to_show = self.soccer_config.get("recent_games_to_show", 5) # Number of most recent games to display
+        self.upcoming_games_to_show = self.soccer_config.get("upcoming_games_to_show", 5) # Number of upcoming games to display
         self.upcoming_fetch_days = self.soccer_config.get("upcoming_fetch_days", 7) # Days ahead to fetch (default: tomorrow)
         self.team_map_file = self.soccer_config.get("team_map_file", "assets/data/team_league_map.json")
         self.team_map_update_days = self.soccer_config.get("team_map_update_days", 7) # How often to update the map
@@ -92,6 +93,7 @@ class BaseSoccerManager:
         self.logger.info(f"Logo directory: {self.logo_dir}")
         self.logger.info(f"Configured target leagues: {self.target_leagues_config}")
         self.logger.info(f"Upcoming fetch days: {self.upcoming_fetch_days}") # Log new setting
+        self.logger.info(f"Recent games to show: {self.recent_games_to_show}") # Log new setting
         self.logger.info(f"Team map file: {self.team_map_file}")
         self.logger.info(f"Team map update interval: {self.team_map_update_days} days")
         
@@ -519,12 +521,8 @@ class BaseSoccerManager:
             is_upcoming = status_type == "STATUS_SCHEDULED"
             is_halftime = status_type == "STATUS_HALFTIME"
 
-            # Calculate if game is within recent window
-            is_within_window = False
-            if start_time_utc:
-                cutoff_time = datetime.now(self._get_timezone()) - timedelta(hours=self.recent_hours)
-                is_within_window = start_time_utc > cutoff_time
-                self.logger.debug(f"[Soccer] Game time: {start_time_utc}, Cutoff time: {cutoff_time}, Within window: {is_within_window}")
+                    # Note: is_within_window calculation removed as it's no longer used for filtering
+        # Recent games are now filtered by count instead of time window
 
             details = {
                 "id": game_event["id"],
@@ -535,7 +533,6 @@ class BaseSoccerManager:
                 "is_live": is_live or is_halftime, # Treat halftime as live for display purposes
                 "is_final": is_final,
                 "is_upcoming": is_upcoming,
-                "is_within_window": is_within_window,
                 "home_abbr": home_team["team"]["abbreviation"],
                 "home_score": home_team.get("score", "0"),
                 "home_record": home_record,
@@ -550,7 +547,7 @@ class BaseSoccerManager:
                 "league_slug": league_slug
             }
 
-            self.logger.debug(f"[Soccer] Extracted game: {details['away_abbr']} {details['away_score']} @ {details['home_abbr']} {details['home_score']} ({details['game_clock_display']}) - League: {details['league']} - Final: {details['is_final']}, Upcoming: {details['is_upcoming']}, Live: {details['is_live']}, Within Window: {details['is_within_window']}")
+            self.logger.debug(f"[Soccer] Extracted game: {details['away_abbr']} {details['away_score']} @ {details['home_abbr']} {details['home_score']} ({details['game_clock_display']}) - League: {details['league']} - Final: {details['is_final']}, Upcoming: {details['is_upcoming']}, Live: {details['is_live']}")
 
             # Basic validation (logos handled in loading)
             if not details["home_abbr"] or not details["away_abbr"]:
@@ -924,12 +921,10 @@ class SoccerRecentManager(BaseSoccerManager):
 
             # Process and filter games
             new_recent_games = []
-            now_utc = datetime.now(pytz.utc)
-            cutoff_time = now_utc - timedelta(hours=self.recent_hours)
 
             for event in data['events']:
                 game = self._extract_game_details(event)
-                if game and game['is_final'] and game.get('start_time_utc') and game['start_time_utc'] >= cutoff_time:
+                if game and game['is_final'] and game.get('start_time_utc'):
                     self._fetch_odds(game)
                     new_recent_games.append(game)
 
@@ -939,15 +934,16 @@ class SoccerRecentManager(BaseSoccerManager):
             else:
                 team_games = new_recent_games
             
-            # Sort games by start time, most recent first
+            # Sort games by start time, most recent first, and limit to recent_games_to_show
             team_games.sort(key=lambda x: x['start_time_utc'], reverse=True)
+            team_games = team_games[:self.recent_games_to_show]
 
             # Update only if the list content changes
             new_ids = {g['id'] for g in team_games}
             current_ids = {g['id'] for g in self.games_list}
 
             if new_ids != current_ids:
-                self.logger.info(f"[Soccer] Found {len(team_games)} recent games matching criteria.")
+                self.logger.info(f"[Soccer] Found {len(team_games)} recent games (showing {self.recent_games_to_show} most recent).")
                 self.recent_games = team_games
                 self.games_list = team_games
                 
@@ -1030,13 +1026,12 @@ class SoccerUpcomingManager(BaseSoccerManager):
             # Process and filter games
             new_upcoming_games = []
             now_utc = datetime.now(pytz.utc)
-            cutoff_time = now_utc + timedelta(hours=self.recent_hours) # Use recent_hours as upcoming window
 
             for event in data['events']:
                 game = self._extract_game_details(event)
-                # Must be upcoming, have a start time, and be within the window
+                # Must be upcoming and have a start time
                 if game and game['is_upcoming'] and game.get('start_time_utc') and \
-                   game['start_time_utc'] >= now_utc and game['start_time_utc'] <= cutoff_time:
+                   game['start_time_utc'] >= now_utc:
                     self._fetch_odds(game)
                     new_upcoming_games.append(game)
             
@@ -1046,8 +1041,9 @@ class SoccerUpcomingManager(BaseSoccerManager):
             else:
                 team_games = new_upcoming_games
 
-            # Sort games by start time, soonest first
+            # Sort games by start time, soonest first, then limit to configured count
             team_games.sort(key=lambda x: x['start_time_utc'])
+            team_games = team_games[:self.upcoming_games_to_show]
 
              # Update only if the list content changes
             new_ids = {g['id'] for g in team_games}

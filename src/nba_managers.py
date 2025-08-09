@@ -51,7 +51,6 @@ class BaseNBAManager:
         self.current_game = None
         self.fonts = self._load_fonts()
         self.favorite_teams = self.nba_config.get("favorite_teams", [])
-        self.recent_hours = self.nba_config.get("recent_game_hours", 72)  # Default 72 hours
         
         # Set logging level to INFO to reduce noise
         self.logger.setLevel(logging.INFO)
@@ -691,6 +690,12 @@ class NBALiveManager(BaseNBAManager):
                         self._fetch_odds(details)
                         new_live_games.append(details)
 
+                # Filter for favorite teams only if the config is set
+                if self.nba_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+                    new_live_games = [game for game in new_live_games 
+                                     if game['home_abbr'] in self.favorite_teams or 
+                                        game['away_abbr'] in self.favorite_teams]
+
                 # Update game list and current game
                 if new_live_games:
                     self.live_games = new_live_games
@@ -720,6 +725,7 @@ class NBARecentManager(BaseNBAManager):
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = 3600  # 1 hour for recent games
+        self.recent_games_to_show = self.nba_config.get("recent_games_to_show", 5)  # Number of most recent games to display
         self.last_game_switch = 0
         self.game_display_duration = 15  # Display each game for 15 seconds
 
@@ -750,7 +756,9 @@ class NBARecentManager(BaseNBAManager):
             else:
                 team_games = new_recent_games
 
+            # Sort games by start time, most recent first, then limit to recent_games_to_show
             team_games.sort(key=lambda x: x.get('start_time_utc') or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+            team_games = team_games[:self.recent_games_to_show]
             self.recent_games = team_games
 
             if self.recent_games:
@@ -796,6 +804,7 @@ class NBAUpcomingManager(BaseNBAManager):
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = 3600  # 1 hour for upcoming games
+        self.upcoming_games_to_show = self.nba_config.get("upcoming_games_to_show", 5)  # Number of upcoming games to display
 
     def update(self):
         """Update upcoming games data."""
@@ -824,7 +833,9 @@ class NBAUpcomingManager(BaseNBAManager):
             else:
                 team_games = new_upcoming_games
 
+            # Sort games by start time, soonest first, then limit to configured count
             team_games.sort(key=lambda x: x.get('start_time_utc') or datetime.max.replace(tzinfo=timezone.utc))
+            team_games = team_games[:self.upcoming_games_to_show]
             self.upcoming_games = team_games
 
             if self.upcoming_games:

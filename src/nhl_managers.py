@@ -539,10 +539,10 @@ class NHLLiveManager(BaseNHLManager):
 
     def update(self):
         """Update live game data."""
+        if not self.is_enabled: return
         current_time = time.time()
-        # Use longer interval if no game data
         interval = self.no_data_interval if not self.live_games else self.update_interval
-        
+
         if current_time - self.last_update >= interval:
             self.last_update = current_time
             
@@ -576,6 +576,12 @@ class NHLLiveManager(BaseNHLManager):
                             self._fetch_odds(details)
                             new_live_games.append(details)
                     
+                    # Filter for favorite teams only if the config is set
+                    if self.nhl_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+                        new_live_games = [game for game in new_live_games 
+                                         if game['home_abbr'] in self.favorite_teams or 
+                                            game['away_abbr'] in self.favorite_teams]
+                    
                     # Only log if there's a change in games or enough time has passed
                     should_log = (
                         current_time - self.last_log_time >= self.log_interval or
@@ -585,11 +591,13 @@ class NHLLiveManager(BaseNHLManager):
                     
                     if should_log:
                         if new_live_games:
-                            self.logger.info(f"[NHL] Found {len(new_live_games)} live games")
+                            filter_text = "favorite teams" if self.nhl_config.get("show_favorite_teams_only", False) and self.favorite_teams else "all teams"
+                            self.logger.info(f"[NHL] Found {len(new_live_games)} live games involving {filter_text}")
                             for game in new_live_games:
                                 self.logger.info(f"[NHL] Live game: {game['away_abbr']} vs {game['home_abbr']} - Period {game['period']}, {game['clock']}")
                         else:
-                            self.logger.info("[NHL] No live games found")
+                            filter_text = "favorite teams" if self.nhl_config.get("show_favorite_teams_only", False) and self.favorite_teams else "criteria"
+                            self.logger.info(f"[NHL] No live games found matching {filter_text}")
                         self.last_log_time = current_time
                     
                     if new_live_games:
@@ -631,7 +639,7 @@ class NHLLiveManager(BaseNHLManager):
                     # self.display(force_clear=True) # REMOVED: DisplayController handles this
                     self.last_display_update = current_time # Track time for potential display update
 
-    def display(self, force_clear: bool = False):
+    def display(self, force_clear=False):
         """Display live game information."""
         if not self.current_game:
             return
@@ -645,7 +653,7 @@ class NHLRecentManager(BaseNHLManager):
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = 300  # 5 minutes
-        self.recent_hours = self.nhl_config.get("recent_game_hours", 48)
+        self.recent_games_to_show = self.nhl_config.get("recent_games_to_show", 5)  # Number of most recent games to display
         self.last_game_switch = 0
         self.game_display_duration = 15  # Display each game for 15 seconds
         self.logger.info(f"Initialized NHLRecentManager with {len(self.favorite_teams)} favorite teams")
@@ -685,9 +693,11 @@ class NHLRecentManager(BaseNHLManager):
             else:
                 team_games = processed_games
             
+            # Sort games by start time, most recent first, then limit to recent_games_to_show
             team_games.sort(key=lambda x: x.get('start_time_utc') or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+            team_games = team_games[:self.recent_games_to_show]
 
-            self.logger.info(f"[NHL] Found {len(team_games)} recent games for favorite teams")
+            self.logger.info(f"[NHL] Found {len(team_games)} recent games for favorite teams (limited to {self.recent_games_to_show})")
             
             new_game_ids = {g['id'] for g in team_games}
             current_game_ids = {g['id'] for g in getattr(self, 'games_list', [])}
@@ -740,6 +750,7 @@ class NHLUpcomingManager(BaseNHLManager):
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = 300  # 5 minutes
+        self.upcoming_games_to_show = self.nhl_config.get("upcoming_games_to_show", 5)  # Number of upcoming games to display
         self.last_log_time = 0
         self.log_interval = 300  # Only log status every 5 minutes
         self.last_warning_time = 0
@@ -787,7 +798,9 @@ class NHLUpcomingManager(BaseNHLManager):
             else:
                 team_games = new_upcoming_games
             
+            # Sort games by start time, soonest first, then limit to configured count
             team_games.sort(key=lambda x: x.get('start_time_utc') or datetime.max.replace(tzinfo=timezone.utc))
+            team_games = team_games[:self.upcoming_games_to_show]
 
             # Only log if there's a change in games or enough time has passed
             should_log = (
@@ -798,7 +811,7 @@ class NHLUpcomingManager(BaseNHLManager):
             
             if should_log:
                 if team_games:
-                    self.logger.info(f"[NHL] Found {len(team_games)} upcoming games for favorite teams")
+                    self.logger.info(f"[NHL] Found {len(team_games)} upcoming games for favorite teams (limited to {self.upcoming_games_to_show})")
                     for game in team_games:
                         self.logger.info(f"[NHL] Upcoming game: {game['away_abbr']} vs {game['home_abbr']} - {game['game_date']} {game['game_time']}")
                 else:

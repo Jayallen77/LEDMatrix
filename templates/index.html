@@ -1135,11 +1135,16 @@
                         </div>
                         <div class="description">Display betting odds for games</div>
                     </div>
-                    <div class="form-group">
-                        <label for="nba_recent_game_hours">Recent Game Hours:</label>
-                        <input type="number" id="nba_recent_game_hours" name="nba_recent_game_hours" value="{{ main_config.nba_scoreboard.recent_game_hours }}" min="1" max="168">
-                        <div class="description">How many hours back to show recent games (default: 72)</div>
-                    </div>
+                                            <div class="form-group">
+                            <label for="nba_recent_games_to_show">Recent Games to Show:</label>
+                            <input type="number" id="nba_recent_games_to_show" name="nba_recent_games_to_show" value="{{ main_config.nba_scoreboard.recent_games_to_show }}" min="1" max="10">
+                            <div class="description">Number of most recent games to display (default: 5)</div>
+                        </div>
+                        <div class="form-group">
+                            <label for="nba_upcoming_games_to_show">Upcoming Games to Show:</label>
+                            <input type="number" id="nba_upcoming_games_to_show" name="nba_upcoming_games_to_show" value="{{ main_config.nba_scoreboard.upcoming_games_to_show }}" min="1" max="10">
+                            <div class="description">Number of upcoming games to display (default: 5)</div>
+                        </div>
                     <div class="form-group">
                         <label for="nba_show_favorite_teams_only">Show Favorite Teams Only:</label>
                         <div class="toggle-container">
@@ -1205,6 +1210,16 @@
                             </label>
                         </div>
                         <div class="description">Only display games involving your favorite teams</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="nhl_recent_games_to_show">Recent Games to Show:</label>
+                        <input type="number" id="nhl_recent_games_to_show" name="nhl_recent_games_to_show" value="{{ main_config.nhl_scoreboard.recent_games_to_show }}" min="1" max="10">
+                        <div class="description">Number of most recent games to display (default: 5)</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="nhl_upcoming_games_to_show">Upcoming Games to Show:</label>
+                        <input type="number" id="nhl_upcoming_games_to_show" name="nhl_upcoming_games_to_show" value="{{ main_config.nhl_scoreboard.upcoming_games_to_show }}" min="1" max="10">
+                        <div class="description">Number of upcoming games to display (default: 5)</div>
                     </div>
                 </div>
 
@@ -1308,11 +1323,16 @@
                         </div>
                         <div class="description">Display betting odds for games</div>
                     </div>
-                    <div class="form-group">
-                        <label for="ncaa_baseball_recent_game_hours">Recent Game Hours:</label>
-                        <input type="number" id="ncaa_baseball_recent_game_hours" name="ncaa_baseball_recent_game_hours" value="{{ main_config.ncaa_baseball_scoreboard.recent_game_hours }}" min="1" max="168">
-                        <div class="description">How many hours back to show recent games (default: 72)</div>
-                    </div>
+                                            <div class="form-group">
+                            <label for="ncaa_baseball_recent_games_to_show">Recent Games to Show:</label>
+                            <input type="number" id="ncaa_baseball_recent_games_to_show" name="ncaa_baseball_recent_games_to_show" value="{{ main_config.ncaa_baseball_scoreboard.recent_games_to_show }}" min="1" max="10">
+                            <div class="description">Number of most recent games to display (default: 5)</div>
+                        </div>
+                        <div class="form-group">
+                            <label for="ncaa_baseball_upcoming_games_to_show">Upcoming Games to Show:</label>
+                            <input type="number" id="ncaa_baseball_upcoming_games_to_show" name="ncaa_baseball_upcoming_games_to_show" value="{{ main_config.ncaa_baseball_scoreboard.upcoming_games_to_show }}" min="1" max="10">
+                            <div class="description">Number of upcoming games to display (default: 5)</div>
+                        </div>
                     <div class="form-group">
                         <label for="ncaa_baseball_show_favorite_teams_only">Show Favorite Teams Only:</label>
                         <div class="toggle-container">
@@ -1369,11 +1389,16 @@
                         </div>
                         <div class="description">Display betting odds for games</div>
                     </div>
-                    <div class="form-group">
-                        <label for="ncaam_basketball_recent_game_hours">Recent Game Hours:</label>
-                        <input type="number" id="ncaam_basketball_recent_game_hours" name="ncaam_basketball_recent_game_hours" value="{{ main_config.ncaam_basketball_scoreboard.recent_game_hours }}" min="1" max="168">
-                        <div class="description">How many hours back to show recent games (default: 72)</div>
-                    </div>
+                                            <div class="form-group">
+                            <label for="ncaam_basketball_recent_games_to_show">Recent Games to Show:</label>
+                            <input type="number" id="ncaam_basketball_recent_games_to_show" name="ncaam_basketball_recent_games_to_show" value="{{ main_config.ncaam_basketball_scoreboard.recent_games_to_show }}" min="1" max="10">
+                            <div class="description">Number of most recent games to display (default: 5)</div>
+                        </div>
+                        <div class="form-group">
+                            <label for="ncaam_basketball_upcoming_games_to_show">Upcoming Games to Show:</label>
+                            <input type="number" id="ncaam_basketball_upcoming_games_to_show" name="ncaam_basketball_upcoming_games_to_show" value="{{ main_config.ncaam_basketball_scoreboard.upcoming_games_to_show }}" min="1" max="10">
+                            <div class="description">Number of upcoming games to display (default: 5)</div>
+                        </div>
                     <div class="form-group">
                         <label for="ncaam_basketball_show_favorite_teams_only">Show Favorite Teams Only:</label>
                         <div class="toggle-container">
@@ -1539,9 +1564,14 @@
                         <div class="description">Display betting odds for games</div>
                     </div>
                     <div class="form-group">
-                        <label for="soccer_recent_game_hours">Recent Game Hours:</label>
-                        <input type="number" id="soccer_recent_game_hours" name="soccer_recent_game_hours" value="{{ main_config.soccer_scoreboard.recent_game_hours }}" min="1" max="336">
-                        <div class="description">How many hours back to show recent games (default: 168)</div>
+                        <label for="soccer_recent_games_to_show">Recent Games to Show:</label>
+                        <input type="number" id="soccer_recent_games_to_show" name="soccer_recent_games_to_show" value="{{ main_config.soccer_scoreboard.recent_games_to_show }}" min="1" max="10">
+                        <div class="description">Number of most recent games to display (default: 5)</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="soccer_upcoming_games_to_show">Upcoming Games to Show:</label>
+                        <input type="number" id="soccer_upcoming_games_to_show" name="soccer_upcoming_games_to_show" value="{{ main_config.soccer_scoreboard.upcoming_games_to_show }}" min="1" max="10">
+                        <div class="description">Number of upcoming games to display (default: 5)</div>
                     </div>
                     <div class="form-group">
                         <label for="soccer_show_favorite_teams_only">Show Favorite Teams Only:</label>
@@ -2844,7 +2874,8 @@
                 live_priority: document.getElementById('nba_live_priority').checked,
                 live_game_duration: parseInt(document.getElementById('nba_live_game_duration').value),
                 show_odds: document.getElementById('nba_show_odds').checked,
-                recent_game_hours: parseInt(document.getElementById('nba_recent_game_hours').value),
+                recent_games_to_show: parseInt(document.getElementById('nba_recent_games_to_show').value),
+                upcoming_games_to_show: parseInt(document.getElementById('nba_upcoming_games_to_show').value),
                 show_favorite_teams_only: document.getElementById('nba_show_favorite_teams_only').checked
             },
             nhl_scoreboard: {
@@ -2853,6 +2884,8 @@
                 live_priority: document.getElementById('nhl_live_priority').checked,
                 live_game_duration: parseInt(document.getElementById('nhl_live_game_duration').value),
                 show_odds: document.getElementById('nhl_show_odds').checked,
+                recent_games_to_show: parseInt(document.getElementById('nhl_recent_games_to_show').value),
+                upcoming_games_to_show: parseInt(document.getElementById('nhl_upcoming_games_to_show').value),
                 show_favorite_teams_only: document.getElementById('nhl_show_favorite_teams_only').checked
             },
             ncaa_fb_scoreboard: {
@@ -2869,7 +2902,8 @@
                 live_priority: document.getElementById('ncaa_baseball_live_priority').checked,
                 live_game_duration: parseInt(document.getElementById('ncaa_baseball_live_game_duration').value),
                 show_odds: document.getElementById('ncaa_baseball_show_odds').checked,
-                recent_game_hours: parseInt(document.getElementById('ncaa_baseball_recent_game_hours').value),
+                recent_games_to_show: parseInt(document.getElementById('ncaa_baseball_recent_games_to_show').value),
+                upcoming_games_to_show: parseInt(document.getElementById('ncaa_baseball_upcoming_games_to_show').value),
                 show_favorite_teams_only: document.getElementById('ncaa_baseball_show_favorite_teams_only').checked
             },
             ncaam_basketball_scoreboard: {
@@ -2878,7 +2912,8 @@
                 live_priority: document.getElementById('ncaam_basketball_live_priority').checked,
                 live_game_duration: parseInt(document.getElementById('ncaam_basketball_live_game_duration').value),
                 show_odds: document.getElementById('ncaam_basketball_show_odds').checked,
-                recent_game_hours: parseInt(document.getElementById('ncaam_basketball_recent_game_hours').value),
+                recent_games_to_show: parseInt(document.getElementById('ncaam_basketball_recent_games_to_show').value),
+                upcoming_games_to_show: parseInt(document.getElementById('ncaam_basketball_upcoming_games_to_show').value),
                 show_favorite_teams_only: document.getElementById('ncaam_basketball_show_favorite_teams_only').checked
             },
             milb: {
@@ -2894,7 +2929,8 @@
                 live_priority: document.getElementById('soccer_live_priority').checked,
                 live_game_duration: parseInt(document.getElementById('soccer_live_game_duration').value),
                 show_odds: document.getElementById('soccer_show_odds').checked,
-                recent_game_hours: parseInt(document.getElementById('soccer_recent_game_hours').value),
+                recent_games_to_show: parseInt(document.getElementById('soccer_recent_games_to_show').value),
+                upcoming_games_to_show: parseInt(document.getElementById('soccer_upcoming_games_to_show').value),
                 show_favorite_teams_only: document.getElementById('soccer_show_favorite_teams_only').checked
             }
         };
