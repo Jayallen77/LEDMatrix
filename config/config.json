@@ -218,7 +218,7 @@
         "show_records": true,
         "display_modes": {
             "nfl_live": true,
-            "nfl_recent": false,
+            "nfl_recent": true,
             "nfl_upcoming": true
         }
     },
