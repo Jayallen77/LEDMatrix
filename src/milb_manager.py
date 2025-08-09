@@ -507,7 +507,32 @@ class BaseMiLBManager:
             return {}
 
     def _extract_game_details(self, game) -> Dict:
+        # Validate basic game structure
+        if not isinstance(game, dict):
+            self.logger.error(f"[MiLB] Game is not a dictionary. Type: {type(game)}, Value: {game}")
+            return {}
+        
         game_pk = game.get('id')
+        
+        # Validate home team structure
+        if 'home' not in game or not isinstance(game['home'], dict):
+            self.logger.error(f"[MiLB] Invalid home team structure: {game.get('home', 'missing')}")
+            return {}
+        
+        # Validate away team structure
+        if 'away' not in game or not isinstance(game['away'], dict):
+            self.logger.error(f"[MiLB] Invalid away team structure: {game.get('away', 'missing')}")
+            return {}
+        
+        # Validate team name structure
+        if 'team' not in game['home'] or 'name' not in game['home']['team']:
+            self.logger.error(f"[MiLB] Invalid home team name structure: {game['home']}")
+            return {}
+        
+        if 'team' not in game['away'] or 'name' not in game['away']['team']:
+            self.logger.error(f"[MiLB] Invalid away team name structure: {game['away']}")
+            return {}
+        
         home_team_name = game['home']['team']['name']
         away_team_name = game['away']['team']['name']
         
@@ -532,6 +557,11 @@ class BaseMiLBManager:
         is_favorite_game = (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams)
         
         if not self.favorite_teams or is_favorite_game:
+            # Validate status object
+            if 'status' not in game or not isinstance(game['status'], dict):
+                self.logger.error(f"[MiLB] Invalid status structure for {away_abbr} @ {home_abbr}: {game.get('status', 'missing')}")
+                return {}
+            
             status_obj = game['status']
             status_state = status_obj.get('abstractGameState', 'Final')
             
@@ -575,6 +605,23 @@ class BaseMiLBManager:
             
             self.logger.debug(f"Final scores for {away_abbr} @ {home_abbr}: away={away_score}, home={home_score}")
             
+            # Validate and extract date
+            game_date = game.get('date')
+            if not game_date:
+                self.logger.warning(f"[MiLB] Skipping game data due to missing or empty 'date' field for {away_abbr} @ {home_abbr}")
+                return {}
+            
+            # Handle case where date might be a timestamp instead of ISO string
+            if isinstance(game_date, (int, float)):
+                try:
+                    # Convert timestamp to ISO string
+                    from datetime import datetime
+                    game_date = datetime.fromtimestamp(game_date).isoformat()
+                    self.logger.debug(f"[MiLB] Converted timestamp {game_date} to ISO format for {away_abbr} @ {home_abbr}")
+                except Exception as e:
+                    self.logger.error(f"[MiLB] Could not convert timestamp {game_date} to date for {away_abbr} @ {home_abbr}: {e}")
+                    return {}
+            
             game_data = {
                 'away_team': away_abbr,
                 'home_team': home_abbr,
@@ -582,7 +629,7 @@ class BaseMiLBManager:
                 'home_score': home_score,
                 'status': mapped_status,
                 'status_state': mapped_status_state,
-                'start_time': game['date'],
+                'start_time': game_date,
                 'away_record': f"{game['away'].get('record', {}).get('wins', 0)}-{game['away'].get('record', {}).get('losses', 0)}",
                 'home_record': f"{game['home'].get('record', {}).get('wins', 0)}-{game['home'].get('record', {}).get('losses', 0)}"
             }
@@ -593,50 +640,60 @@ class BaseMiLBManager:
                 inning_state = linescore.get('inningState', 'Top').lower()
                 game_data['inning_half'] = 'bottom' if 'bottom' in inning_state else 'top'
                 
-                if is_favorite_game:
-                    try:
-                        live_url = f"http://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
-                        live_response = self.session.get(live_url, headers=self.headers, timeout=5)
-                        live_response.raise_for_status()
-                        live_data = live_response.json().get('liveData', {})
-                        
-                        linescore_live = live_data.get('linescore', {})
+                # Fetch live data for ALL live games, not just favorite teams
+                try:
+                    live_url = f"http://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
+                    self.logger.debug(f"[MiLB] Fetching live data for {away_abbr} @ {home_abbr} from: {live_url}")
+                    live_response = self.session.get(live_url, headers=self.headers, timeout=5)
+                    live_response.raise_for_status()
+                    live_data = live_response.json().get('liveData', {})
+                    
+                    linescore_live = live_data.get('linescore', {})
+                    self.logger.debug(f"[MiLB] Live data response for {away_abbr} @ {home_abbr}: {linescore_live}")
 
-                        # Overwrite score and inning data with more accurate live data from the live feed
-                        if linescore_live:
-                            # Extract scores from live feed with fallback
-                            away_runs = linescore_live.get('teams', {}).get('away', {}).get('runs')
-                            home_runs = linescore_live.get('teams', {}).get('home', {}).get('runs')
-                            
-                            # Only update if we got valid scores from live feed
-                            if away_runs is not None:
-                                game_data['away_score'] = away_runs
-                            if home_runs is not None:
-                                game_data['home_score'] = home_runs
-                            
-                            # Update inning info
-                            current_inning = linescore_live.get('currentInning')
-                            if current_inning is not None:
-                                game_data['inning'] = current_inning
-                            
-                            inning_state_live = linescore_live.get('inningState', '').lower()
-                            if inning_state_live:
-                                game_data['inning_half'] = 'bottom' if 'bottom' in inning_state_live else 'top'
-
-                        game_data['balls'] = linescore_live.get('balls', 0)
-                        game_data['strikes'] = linescore_live.get('strikes', 0)
-                        game_data['outs'] = linescore_live.get('outs', 0)
+                    # Overwrite score and inning data with more accurate live data from the live feed
+                    if linescore_live:
+                        # Extract scores from live feed with fallback
+                        away_runs = linescore_live.get('teams', {}).get('away', {}).get('runs')
+                        home_runs = linescore_live.get('teams', {}).get('home', {}).get('runs')
                         
-                        offense = linescore_live.get('offense', {})
-                        game_data['bases_occupied'] = [
-                            'first' in offense,
-                            'second' in offense,
-                            'third' in offense
-                        ]
-                    except Exception as e:
-                        self.logger.warning(f"Could not fetch live details for game {game_pk}: {e}")
-                        game_data.update({'balls': 0, 'strikes': 0, 'outs': 0, 'bases_occupied': [False]*3})
-                else:
+                        # Only update if we got valid scores from live feed
+                        if away_runs is not None:
+                            game_data['away_score'] = away_runs
+                        if home_runs is not None:
+                            game_data['home_score'] = home_runs
+                        
+                        # Update inning info
+                        current_inning = linescore_live.get('currentInning')
+                        if current_inning is not None:
+                            game_data['inning'] = current_inning
+                        
+                        inning_state_live = linescore_live.get('inningState', '').lower()
+                        if inning_state_live:
+                            game_data['inning_half'] = 'bottom' if 'bottom' in inning_state_live else 'top'
+
+                    # Always try to get balls, strikes, and outs from live feed
+                    balls = linescore_live.get('balls')
+                    strikes = linescore_live.get('strikes')
+                    outs = linescore_live.get('outs')
+                    
+                    self.logger.debug(f"[MiLB] Live count data for {away_abbr} @ {home_abbr}: balls={balls}, strikes={strikes}, outs={outs}")
+                    
+                    game_data['balls'] = balls if balls is not None else 0
+                    game_data['strikes'] = strikes if strikes is not None else 0
+                    game_data['outs'] = outs if outs is not None else 0
+                    
+                    offense = linescore_live.get('offense', {})
+                    game_data['bases_occupied'] = [
+                        'first' in offense,
+                        'second' in offense,
+                        'third' in offense
+                    ]
+                    
+                    self.logger.debug(f"[MiLB] Final live data for {away_abbr} @ {home_abbr}: inning={game_data['inning']}, half={game_data['inning_half']}, count={game_data['balls']}-{game_data['strikes']}, outs={game_data['outs']}")
+                    
+                except Exception as e:
+                    self.logger.warning(f"Could not fetch live details for game {game_pk} ({away_abbr} @ {home_abbr}): {e}")
                     game_data.update({'balls': 0, 'strikes': 0, 'outs': 0, 'bases_occupied': [False]*3})
             else:
                 game_data.update({'inning': 1, 'inning_half': 'top', 'balls': 0, 'strikes': 0, 'outs': 0, 'bases_occupied': [False]*3})
