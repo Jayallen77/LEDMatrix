@@ -379,6 +379,11 @@ class BaseMiLBManager:
 
                     for event in data['dates'][0]['games']:
                         game_pk = event['gamePk']
+                        # Debug: Check game_pk type
+                        if not isinstance(game_pk, (int, str)):
+                            self.logger.warning(f"[MiLB] Unexpected game_pk type: {type(game_pk)}, value: {game_pk}")
+                            # Convert to string to ensure it's usable as a key
+                            game_pk = str(game_pk)
                         
                         home_team_name = event['teams']['home']['team']['name']
                         away_team_name = event['teams']['away']['team']['name']
@@ -409,14 +414,9 @@ class BaseMiLBManager:
                         else:
                             home_record_str = ''
 
-                        # --- TEMP: Comprehensive Debugging ---
-                        self.logger.info(f"[MiLB DEBUG] Raw event data for game {game_pk}:\n{json.dumps(event, indent=2)}")
-                        
-                        game_date = event.get('gameDate')
-                        if not game_date:
+                        if not event.get('gameDate'):
                             self.logger.warning(f"Skipping game {game_pk} due to missing 'gameDate'.")
                             continue
-                        # --- End of TEMP Debugging ---
 
                         is_favorite_game = (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams)
                         
@@ -468,10 +468,38 @@ class BaseMiLBManager:
                                 # For non-live games, set defaults
                                 game_data.update({'inning': 1, 'inning_half': 'top', 'balls': 0, 'strikes': 0, 'outs': 0, 'bases_occupied': [False]*3})
                             
-                            all_games[game_pk] = game_data
+                            # Validate game_data before adding to all_games
+                            if isinstance(game_data, dict):
+                                all_games[game_pk] = game_data
+                            else:
+                                self.logger.error(f"[MiLB] Invalid game_data type for game {game_pk}: {type(game_data)}")
 
+            # Filter out any invalid games before returning
+            if isinstance(all_games, dict):
+                valid_games = {}
+                for game_id, game_data in all_games.items():
+                    if isinstance(game_data, dict):
+                        valid_games[game_id] = game_data
+                    else:
+                        self.logger.warning(f"[MiLB] Skipping invalid game {game_id} with type {type(game_data)}")
+                all_games = valid_games
+            
             if use_cache:
-                self.cache_manager.set(cache_key, all_games)
+                # Validate that all_games is a dictionary before caching
+                if isinstance(all_games, dict):
+                    # Validate that all values in the dictionary are also dictionaries
+                    invalid_games = []
+                    for game_id, game_data in all_games.items():
+                        if not isinstance(game_data, dict):
+                            invalid_games.append((game_id, type(game_data)))
+                    
+                    if invalid_games:
+                        self.logger.error(f"[MiLB] Found invalid game data types: {invalid_games}")
+                        # Don't cache corrupted data
+                    else:
+                        self.cache_manager.set(cache_key, all_games)
+                else:
+                    self.logger.error(f"[MiLB] Cannot cache invalid data type: {type(all_games)}")
             return all_games
             
         except Exception as e:
@@ -1235,9 +1263,39 @@ class MiLBUpcomingManager(BaseMiLBManager):
         try:
             # Fetch data from MiLB API
             games = self._fetch_milb_api_data(use_cache=True)
+            
+            # Debug: Check the structure of returned data
+            if games is not None:
+                self.logger.debug(f"[MiLB] Games data type: {type(games)}")
+                if isinstance(games, dict):
+                    self.logger.debug(f"[MiLB] Number of games: {len(games)}")
+                    if games:
+                        sample_key = next(iter(games))
+                        sample_value = games[sample_key]
+                        self.logger.debug(f"[MiLB] Sample game key: {sample_key}, type: {type(sample_value)}, value: {sample_value}")
+                        
+                        # Check if the data structure is corrupted
+                        if not isinstance(sample_value, dict):
+                            self.logger.error(f"[MiLB] Cache data appears corrupted. Clearing cache and refetching.")
+                            self.cache_manager.clear_cache("milb_live_api_data")
+                            games = self._fetch_milb_api_data(use_cache=False)
+                else:
+                    self.logger.error(f"[MiLB] Games is not a dictionary: {type(games)}, value: {games}")
+                    # Clear cache and try again without cache
+                    self.cache_manager.clear_cache("milb_live_api_data")
+                    games = self._fetch_milb_api_data(use_cache=False)
+            
             if not games:
                 self.logger.warning("[MiLB] No games returned from API for upcoming games update.")
                 if self.upcoming_games: # Clear games if API returns nothing
+                    self.upcoming_games = []
+                    self.current_game = None
+                return
+            
+            # Final validation that games is a dictionary
+            if not isinstance(games, dict):
+                self.logger.error(f"[MiLB] Final validation failed - games is not a dictionary: {type(games)}")
+                if self.upcoming_games: # Clear games if data is invalid
                     self.upcoming_games = []
                     self.current_game = None
                 return
@@ -1258,6 +1316,11 @@ class MiLBUpcomingManager(BaseMiLBManager):
             now_utc = datetime.now(timezone.utc)
             for game_id, game in games.items():
                 self.logger.debug(f"[MiLB] Processing game {game_id} for upcoming games...")
+                
+                # Debug: Check the type of game data
+                if not isinstance(game, dict):
+                    self.logger.error(f"[MiLB] Game {game_id} is not a dictionary. Type: {type(game)}, Value: {game}")
+                    continue
                 
                 # Ensure start_time exists before processing
                 if 'start_time' not in game or not game['start_time']:
