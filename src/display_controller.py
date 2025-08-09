@@ -1104,7 +1104,13 @@ class DisplayController:
                             logger.debug(f"[DisplayController] Calling MiLB live display with {len(self.milb_live.live_games)} live games")
                             self.milb_live.display(force_clear=self.force_clear)
                         elif self.current_display_mode == 'milb_live' and self.milb_live:
-                            logger.debug(f"[DisplayController] MiLB live manager exists but has {len(self.milb_live.live_games)} live games, skipping display")
+                            logger.debug(f"[DisplayController] MiLB live manager exists but has {len(self.milb_live.live_games)} live games, switching to next mode")
+                            # Switch to next mode since there are no live games
+                            self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
+                            self.current_display_mode = self.available_modes[self.current_mode_index]
+                            self.force_clear = True
+                            self.last_switch = current_time
+                            logger.info(f"[DisplayController] Switched from milb_live (no games) to {self.current_display_mode}")
                         elif self.current_display_mode == 'ncaa_fb_upcoming' and self.ncaa_fb_upcoming:
                             self.ncaa_fb_upcoming.display(force_clear=self.force_clear)
                         elif self.current_display_mode == 'ncaam_basketball_recent' and self.ncaam_basketball_recent:

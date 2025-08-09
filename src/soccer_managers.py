@@ -97,6 +97,12 @@ class BaseSoccerManager:
 
         self.config_manager = ConfigManager(config)
 
+    def _get_timezone(self):
+        try:
+            return pytz.timezone(self.config_manager.get_timezone())
+        except pytz.UnknownTimeZoneError:
+            return pytz.utc
+
     def _fetch_odds(self, game: Dict) -> None:
         """Fetch odds for a game and attach it to the game dictionary."""
         # Check if odds should be shown for this sport

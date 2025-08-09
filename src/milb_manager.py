@@ -534,6 +534,9 @@ class BaseMiLBManager:
         if not self.favorite_teams or is_favorite_game:
             status_obj = game['status']
             status_state = status_obj.get('abstractGameState', 'Final')
+            
+            # Debug: Log the original status information
+            self.logger.debug(f"[MiLB] Status mapping for {away_abbr} @ {home_abbr}: original abstractGameState='{status_state}', full status_obj={status_obj}")
 
             mapped_status = 'unknown'
             mapped_status_state = 'unknown'
@@ -737,8 +740,29 @@ class MiLBLiveManager(BaseMiLBManager):
                     # Find all live games involving favorite teams
                     new_live_games = []
                     for game in games.values():
+                        # Debug: Log the status for all games to understand what's happening
+                        self.logger.debug(f"[MiLB] Game status check: {game['away_team']} @ {game['home_team']} - status_state='{game['status_state']}', status='{game['status']}', abstractGameState='{game.get('abstractGameState', 'N/A')}'")
+                        
                         # Only process games that are actually in progress
                         if game['status_state'] == 'in' and game['status'] == 'status_in_progress':
+                            # Additional check: Verify the game is from today or very recent
+                            game_date_str = game.get('start_time', '')
+                            if game_date_str:
+                                try:
+                                    # Parse the game date (assuming it's in ISO format)
+                                    game_date = datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
+                                    current_utc = datetime.now(timezone.utc)
+                                    hours_diff = (current_utc - game_date).total_seconds() / 3600
+                                    
+                                    # If game is more than 6 hours old, it's probably not actually live
+                                    if hours_diff > 6:
+                                        self.logger.warning(f"[MiLB] Skipping potentially stale live game: {game['away_team']} @ {game['home_team']} - game date: {game_date_str}, hours old: {hours_diff:.1f}")
+                                        continue
+                                    else:
+                                        self.logger.debug(f"[MiLB] Game time check passed: {game['away_team']} @ {game['home_team']} - hours old: {hours_diff:.1f}")
+                                except Exception as e:
+                                    self.logger.warning(f"[MiLB] Could not parse game date {game_date_str}: {e}")
+                            
                             self.logger.debug(f"[MiLB] Found live game: {game['away_team']} @ {game['home_team']}")
                             if not self.favorite_teams or (
                                 game['home_team'] in self.favorite_teams or 
