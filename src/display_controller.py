@@ -462,6 +462,48 @@ class DisplayController:
                 # Fall back to configured duration
                 return self.display_durations.get(mode_key, 60)
 
+        # Handle dynamic duration for stocks
+        if mode_key == 'stocks' and self.stocks:
+            try:
+                dynamic_duration = self.stocks.get_dynamic_duration()
+                # Only log if duration has changed or we haven't logged this duration yet
+                if not hasattr(self, '_last_logged_duration') or self._last_logged_duration != dynamic_duration:
+                    logger.info(f"Using dynamic duration for stocks: {dynamic_duration} seconds")
+                    self._last_logged_duration = dynamic_duration
+                return dynamic_duration
+            except Exception as e:
+                logger.error(f"Error getting dynamic duration for stocks: {e}")
+                # Fall back to configured duration
+                return self.display_durations.get(mode_key, 60)
+
+        # Handle dynamic duration for stock_news
+        if mode_key == 'stock_news' and self.news:
+            try:
+                dynamic_duration = self.news.get_dynamic_duration()
+                # Only log if duration has changed or we haven't logged this duration yet
+                if not hasattr(self, '_last_logged_duration') or self._last_logged_duration != dynamic_duration:
+                    logger.info(f"Using dynamic duration for stock_news: {dynamic_duration} seconds")
+                    self._last_logged_duration = dynamic_duration
+                return dynamic_duration
+            except Exception as e:
+                logger.error(f"Error getting dynamic duration for stock_news: {e}")
+                # Fall back to configured duration
+                return self.display_durations.get(mode_key, 60)
+
+        # Handle dynamic duration for odds_ticker
+        if mode_key == 'odds_ticker' and self.odds_ticker:
+            try:
+                dynamic_duration = self.odds_ticker.get_dynamic_duration()
+                # Only log if duration has changed or we haven't logged this duration yet
+                if not hasattr(self, '_last_logged_duration') or self._last_logged_duration != dynamic_duration:
+                    logger.info(f"Using dynamic duration for odds_ticker: {dynamic_duration} seconds")
+                    self._last_logged_duration = dynamic_duration
+                return dynamic_duration
+            except Exception as e:
+                logger.error(f"Error getting dynamic duration for odds_ticker: {e}")
+                # Fall back to configured duration
+                return self.display_durations.get(mode_key, 60)
+
         # Simplify weather key handling
         if mode_key.startswith('weather_'):
             return self.display_durations.get(mode_key, 15)

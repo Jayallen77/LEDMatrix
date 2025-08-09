@@ -39,6 +39,14 @@ class StockManager:
         # Get chart toggle setting from config
         self.toggle_chart = self.stocks_config.get('toggle_chart', False)
         
+        # Dynamic duration settings
+        self.dynamic_duration_enabled = self.stocks_config.get('dynamic_duration', True)
+        self.min_duration = self.stocks_config.get('min_duration', 30)
+        self.max_duration = self.stocks_config.get('max_duration', 300)
+        self.duration_buffer = self.stocks_config.get('duration_buffer', 0.1)
+        self.dynamic_duration = 60  # Default duration in seconds
+        self.total_scroll_width = 0  # Track total width for dynamic duration calculation
+        
         # Initialize frame rate tracking
         self.frame_count = 0
         self.last_frame_time = time.time()
@@ -659,6 +667,10 @@ class StockManager:
             self.cached_text_image = full_image
             self.scroll_position = 0
             self.last_update = time.time()
+            
+            # Calculate total scroll width for dynamic duration
+            self.total_scroll_width = total_width
+            self.calculate_dynamic_duration()
         
         # Clear the display if requested
         if force_clear:
@@ -693,6 +705,63 @@ class StockManager:
             return True
             
         return False
+
+    def calculate_dynamic_duration(self):
+        """Calculate the exact time needed to display all stocks"""
+        # If dynamic duration is disabled, use fixed duration from config
+        if not self.dynamic_duration_enabled:
+            self.dynamic_duration = self.stocks_config.get('fixed_duration', 60)
+            logger.debug(f"Dynamic duration disabled, using fixed duration: {self.dynamic_duration}s")
+            return
+            
+        if not self.total_scroll_width:
+            self.dynamic_duration = self.min_duration  # Use configured minimum
+            return
+            
+        try:
+            # Get display width (assume full width of display)
+            display_width = getattr(self.display_manager, 'width', 128)  # Default to 128 if not available
+            
+            # Calculate total scroll distance needed
+            # Text needs to scroll from right edge to completely off left edge
+            total_scroll_distance = display_width + self.total_scroll_width
+            
+            # Calculate time based on scroll speed and delay
+            # scroll_speed = pixels per frame, scroll_delay = seconds per frame
+            frames_needed = total_scroll_distance / self.scroll_speed
+            total_time = frames_needed * self.scroll_delay
+            
+            # Add buffer time for smooth cycling (configurable %)
+            buffer_time = total_time * self.duration_buffer
+            calculated_duration = int(total_time + buffer_time)
+            
+            # Apply configured min/max limits
+            if calculated_duration < self.min_duration:
+                self.dynamic_duration = self.min_duration
+                logger.debug(f"Duration capped to minimum: {self.min_duration}s")
+            elif calculated_duration > self.max_duration:
+                self.dynamic_duration = self.max_duration
+                logger.debug(f"Duration capped to maximum: {self.max_duration}s")
+            else:
+                self.dynamic_duration = calculated_duration
+                
+            logger.debug(f"Stock dynamic duration calculation:")
+            logger.debug(f"  Display width: {display_width}px")
+            logger.debug(f"  Text width: {self.total_scroll_width}px")
+            logger.debug(f"  Total scroll distance: {total_scroll_distance}px")
+            logger.debug(f"  Frames needed: {frames_needed:.1f}")
+            logger.debug(f"  Base time: {total_time:.2f}s")
+            logger.debug(f"  Buffer time: {buffer_time:.2f}s ({self.duration_buffer*100}%)")
+            logger.debug(f"  Calculated duration: {calculated_duration}s")
+            logger.debug(f"  Final duration: {self.dynamic_duration}s")
+            
+        except Exception as e:
+            logger.error(f"Error calculating dynamic duration: {e}")
+            self.dynamic_duration = self.min_duration  # Use configured minimum as fallback
+
+    def get_dynamic_duration(self) -> int:
+        """Get the calculated dynamic duration for display"""
+        return self.dynamic_duration
         
     def set_toggle_chart(self, enabled: bool):
         """Enable or disable chart display in the scrolling ticker."""
