@@ -536,7 +536,7 @@ class BaseMiLBManager:
             status_state = status_obj.get('abstractGameState', 'Final')
             
             # Debug: Log the original status information
-            self.logger.debug(f"[MiLB] Status mapping for {away_abbr} @ {home_abbr}: original abstractGameState='{status_state}', full status_obj={status_obj}")
+            self.logger.debug(f"[MiLB] Status mapping for {away_abbr} @ {home_abbr}: original abstractGameState='{status_state}', full status_obj={status_obj}, game_date={game.get('date', 'N/A')}")
 
             mapped_status = 'unknown'
             mapped_status_state = 'unknown'
@@ -735,7 +735,8 @@ class MiLBLiveManager(BaseMiLBManager):
                     # Debug: Log all games found
                     self.logger.debug(f"[MiLB] Found {len(games)} total games from API")
                     for game_id, game in games.items():
-                        self.logger.debug(f"[MiLB] Game {game_id}: {game['away_team']} @ {game['home_team']} - Status: {game['status']}, State: {game['status_state']}")
+                        game_date_str = game.get('start_time', 'N/A')
+                        self.logger.debug(f"[MiLB] Game {game_id}: {game['away_team']} @ {game['home_team']} - Status: {game['status']}, State: {game['status_state']}, Date: {game_date_str}")
                     
                     # Find all live games involving favorite teams
                     new_live_games = []
@@ -745,23 +746,10 @@ class MiLBLiveManager(BaseMiLBManager):
                         
                         # Only process games that are actually in progress
                         if game['status_state'] == 'in' and game['status'] == 'status_in_progress':
-                            # Additional check: Verify the game is from today or very recent
-                            game_date_str = game.get('start_time', '')
-                            if game_date_str:
-                                try:
-                                    # Parse the game date (assuming it's in ISO format)
-                                    game_date = datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
-                                    current_utc = datetime.now(timezone.utc)
-                                    hours_diff = (current_utc - game_date).total_seconds() / 3600
-                                    
-                                    # If game is more than 6 hours old, it's probably not actually live
-                                    if hours_diff > 6:
-                                        self.logger.warning(f"[MiLB] Skipping potentially stale live game: {game['away_team']} @ {game['home_team']} - game date: {game_date_str}, hours old: {hours_diff:.1f}")
-                                        continue
-                                    else:
-                                        self.logger.debug(f"[MiLB] Game time check passed: {game['away_team']} @ {game['home_team']} - hours old: {hours_diff:.1f}")
-                                except Exception as e:
-                                    self.logger.warning(f"[MiLB] Could not parse game date {game_date_str}: {e}")
+                            # Additional check: Verify the game has actual live data (inning info)
+                            if 'inning' not in game or game['inning'] is None:
+                                self.logger.warning(f"[MiLB] Skipping game without inning data: {game['away_team']} @ {game['home_team']}")
+                                continue
                             
                             self.logger.debug(f"[MiLB] Found live game: {game['away_team']} @ {game['home_team']}")
                             if not self.favorite_teams or (
