@@ -91,7 +91,7 @@
         "update_interval": 600,
         "scroll_speed": 1,
         "scroll_delay": 0.01,
-        "toggle_chart": false,
+        "toggle_chart": true,
         "symbols": [
             "ASTS",
             "SCHD",
