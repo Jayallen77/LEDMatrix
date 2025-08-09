@@ -756,172 +756,138 @@ class MiLBLiveManager(BaseMiLBManager):
         current_time = time.time()
         # Use longer interval if no game data
         interval = self.no_data_interval if not self.live_games else self.update_interval
-        
-        if current_time - self.last_update >= interval:
-            self.last_update = current_time
-            self.logger.info(f"[MiLB] Update interval reached ({interval}s), fetching fresh data")
-        else:
+
+        if current_time - self.last_update < interval:
             time_remaining = interval - (current_time - self.last_update)
             self.logger.debug(f"[MiLB] Update interval not reached yet ({time_remaining:.1f}s remaining)")
             return
-            
-            if self.test_mode:
-                # For testing, we'll just update the game state to show it's working
-                if self.current_game:
-                    # Update inning half
-                    if self.current_game["inning_half"] == "top":
-                        self.current_game["inning_half"] = "bottom"
-                    else:
-                        self.current_game["inning_half"] = "top"
-                        self.current_game["inning"] += 1
-                    
-                    # Update count
-                    self.current_game["balls"] = (self.current_game["balls"] + 1) % 4
-                    self.current_game["strikes"] = (self.current_game["strikes"] + 1) % 3
-                    
-                    # Update outs
-                    self.current_game["outs"] = (self.current_game["outs"] + 1) % 3
-                    
-                    # Update bases
-                    self.current_game["bases_occupied"] = [
-                        not self.current_game["bases_occupied"][0],
-                        not self.current_game["bases_occupied"][1],
-                        not self.current_game["bases_occupied"][2]
-                    ]
-                    
-                    # Update score occasionally
-                    if self.current_game["inning"] % 2 == 0:
-                        self.current_game["home_score"] = str(int(self.current_game["home_score"]) + 1)
-                    else:
-                        self.current_game["away_score"] = str(int(self.current_game["away_score"]) + 1)
-            else:
-                # Fetch live game data from MiLB API
-                games = self._fetch_milb_api_data(use_cache=False)
-                if not games:
-                    self.logger.debug("[MiLB] No games returned from API")
-                else:
-                    self.logger.info(f"[MiLB] Fetched {len(games)} games from API")
-                if games:
-                    # Debug: Log all games found
-                    self.logger.debug(f"[MiLB] Found {len(games)} total games from API")
-                    for game_id, game in games.items():
-                        game_date_str = game.get('start_time', 'N/A')
-                        self.logger.debug(f"[MiLB] Game {game_id}: {game['away_team']} @ {game['home_team']} - Status: {game['status']}, State: {game['status_state']}, Date: {game_date_str}")
-                    
-                    # Find all live games involving favorite teams
-                    new_live_games = []
-                    for game in games.values():
-                        # Debug: Log the status for all games to understand what's happening
-                        self.logger.debug(f"[MiLB] Game status check: {game['away_team']} @ {game['home_team']} - status_state='{game['status_state']}', status='{game['status']}', abstractGameState='{game.get('abstractGameState', 'N/A')}'")
-                        
-                        # Only process games that are actually in progress
-                        if game['status_state'] == 'in' and game['status'] == 'status_in_progress':
-                            # Check if the game is from today or very recent (within last 24 hours)
-                            game_date_str = game.get('start_time', '')
-                            if game_date_str:
-                                try:
-                                    # Parse the game date
-                                    game_date = datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
-                                    current_utc = datetime.now(timezone.utc)
-                                    hours_diff = (current_utc - game_date).total_seconds() / 3600
-                                    
-                                    # If game is more than 24 hours old, it's probably not actually live
-                                    if hours_diff > 24:
-                                        self.logger.warning(f"[MiLB] Skipping old game marked as live: {game['away_team']} @ {game['home_team']} - game date: {game_date_str}, hours old: {hours_diff:.1f}")
-                                        continue
-                                    # If game is more than 1 hour in the future, it's not live yet
-                                    elif hours_diff < -1:
-                                        self.logger.warning(f"[MiLB] Skipping future game marked as live: {game['away_team']} @ {game['home_team']} - game date: {game_date_str}, hours until start: {abs(hours_diff):.1f}")
-                                        continue
-                                    else:
-                                        self.logger.debug(f"[MiLB] Game time check passed: {game['away_team']} @ {game['home_team']} - hours old: {hours_diff:.1f}")
-                                except Exception as e:
-                                    self.logger.warning(f"[MiLB] Could not parse game date {game_date_str}: {e}")
-                            
-                            # Respect favorites-only mode if explicitly enabled in config
-                            favorites_only = self.milb_config.get('show_favorite_teams_only', False)
-                            if favorites_only and self.favorite_teams:
-                                is_favorite = (
-                                    game['home_team'] in self.favorite_teams or 
-                                    game['away_team'] in self.favorite_teams
-                                )
-                                if not is_favorite:
-                                    self.logger.debug(f"[MiLB] Skipping non-favorite game in favorites-only mode: {game['away_team']} @ {game['home_team']}")
-                                    continue
 
-                            self.logger.info(f"[MiLB] Processing live game: {game['away_team']} @ {game['home_team']} - Inning: {game.get('inning', 'N/A')}, Half: {game.get('inning_half', 'N/A')}, Count: {game.get('balls', 0)}-{game.get('strikes', 0)}, Outs: {game.get('outs', 0)}, Scores: {game.get('away_score', 0)}-{game.get('home_score', 0)}")
-                            # Ensure scores are valid numbers
-                            try:
-                                game['home_score'] = int(game['home_score'])
-                                game['away_score'] = int(game['away_score'])
-                                new_live_games.append(game)
-                                self.logger.debug(f"[MiLB] Added live game to list: {game['away_team']} @ {game['home_team']}")
-                            except (ValueError, TypeError):
-                                self.logger.warning(f"Invalid score format for game {game['away_team']} @ {game['home_team']}")
-                    
-                    # Only log if there's a change in games or enough time has passed
-                    should_log = (
-                        current_time - self.last_log_time >= self.log_interval or
-                        len(new_live_games) != len(self.live_games) or
-                        not self.live_games  # Log if we had no games before
-                    )
-                    
-                    if should_log:
-                        if new_live_games:
-                            logger.info(f"[MiLB] Found {len(new_live_games)} live games")
-                            for game in new_live_games:
-                                logger.info(f"[MiLB] Live game: {game['away_team']} vs {game['home_team']} - {game['inning_half']}{game['inning']}, {game['balls']}-{game['strikes']}, outs={game['outs']}, scores={game['away_score']}-{game['home_score']}")
-                        else:
-                            logger.info("[MiLB] No live games found")
-                        self.last_log_time = current_time
-                    
-                    # Debug: Log the live_games state for display controller
-                    logger.debug(f"[MiLB] Live games state: {len(new_live_games)} games, live_games list will be: {len(new_live_games) if new_live_games else 0}")
-                    
-                    if new_live_games:
-                        # Update the current game with the latest data
-                        for new_game in new_live_games:
-                            if self.current_game and (
-                                (new_game['home_team'] == self.current_game['home_team'] and 
-                                 new_game['away_team'] == self.current_game['away_team']) or
-                                (new_game['home_team'] == self.current_game['away_team'] and 
-                                 new_game['away_team'] == self.current_game['home_team'])
-                            ):
-                                old_data = f"inning={self.current_game.get('inning')}, half={self.current_game.get('inning_half')}, count={self.current_game.get('balls')}-{self.current_game.get('strikes')}, outs={self.current_game.get('outs')}, scores={self.current_game.get('away_score')}-{self.current_game.get('home_score')}"
-                                self.current_game = new_game
-                                new_data = f"inning={new_game.get('inning')}, half={new_game.get('inning_half')}, count={new_game.get('balls')}-{new_game.get('strikes')}, outs={new_game.get('outs')}, scores={new_game.get('away_score')}-{new_game.get('home_score')}"
-                                self.logger.info(f"[MiLB] Updated current game data: {old_data} -> {new_data}")
-                                break
-                        
-                        # Only update the games list if we have new games
-                        if not self.live_games or set(game['away_team'] + game['home_team'] for game in new_live_games) != set(game['away_team'] + game['home_team'] for game in self.live_games):
-                            self.live_games = new_live_games
-                            logger.debug(f"[MiLB] Updated live_games list to {len(self.live_games)} games")
-                            # If we don't have a current game or it's not in the new list, start from the beginning
-                            if not self.current_game or self.current_game not in self.live_games:
-                                self.current_game_index = 0
-                                self.current_game = self.live_games[0]
-                                self.last_game_switch = current_time
-                        
-                        # Always update display when we have new data, but limit to once per second
-                        if current_time - self.last_display_update >= 1.0:
-                            # self.display(force_clear=True) # REMOVED: DisplayController handles this
-                            self.last_display_update = current_time
-                    else:
-                        # No live games found
-                        self.logger.debug("[MiLB] No live games found in API response")
-                        self.live_games = []
-                        self.current_game = None
-                        logger.debug(f"[MiLB] Set live_games to empty list, length: {len(self.live_games)}")
-                
-                # Check if it's time to switch games
-                if len(self.live_games) > 1 and (current_time - self.last_game_switch) >= self.game_display_duration:
-                    self.current_game_index = (self.current_game_index + 1) % len(self.live_games)
-                    self.current_game = self.live_games[self.current_game_index]
-                    self.last_game_switch = current_time
-                    # Force display update when switching games
-                    # self.display(force_clear=True) # REMOVED: DisplayController handles this
+        self.last_update = current_time
+        self.logger.info(f"[MiLB] Update interval reached ({interval}s), fetching data")
+
+        if self.test_mode:
+            # For testing, we'll just update the game state to show it's working
+            if self.current_game:
+                # Update inning half
+                if self.current_game["inning_half"] == "top":
+                    self.current_game["inning_half"] = "bottom"
+                else:
+                    self.current_game["inning_half"] = "top"
+                    self.current_game["inning"] += 1
+                # Update count
+                self.current_game["balls"] = (self.current_game["balls"] + 1) % 4
+                self.current_game["strikes"] = (self.current_game["strikes"] + 1) % 3
+                # Update outs
+                self.current_game["outs"] = (self.current_game["outs"] + 1) % 3
+                # Update bases
+                self.current_game["bases_occupied"] = [
+                    not self.current_game["bases_occupied"][0],
+                    not self.current_game["bases_occupied"][1],
+                    not self.current_game["bases_occupied"][2]
+                ]
+                # Update score occasionally
+                if self.current_game["inning"] % 2 == 0:
+                    self.current_game["home_score"] = str(int(self.current_game["home_score"]) + 1)
+                else:
+                    self.current_game["away_score"] = str(int(self.current_game["away_score"]) + 1)
+            return
+
+        # Fetch live game data from MiLB API
+        games = self._fetch_milb_api_data(use_cache=False)
+        if not games:
+            self.logger.debug("[MiLB] No games returned from API")
+        else:
+            self.logger.info(f"[MiLB] Fetched {len(games)} games from API")
+
+        if games:
+            # Debug: Log all games found
+            self.logger.debug(f"[MiLB] Found {len(games)} total games from API")
+            for game_id, game in games.items():
+                game_date_str = game.get('start_time', 'N/A')
+                self.logger.debug(f"[MiLB] Game {game_id}: {game['away_team']} @ {game['home_team']} - Status: {game['status']}, State: {game['status_state']}, Date: {game_date_str}")
+
+            # Find all live games (optionally filtering to favorites)
+            new_live_games = []
+            for game in games.values():
+                self.logger.debug(f"[MiLB] Game status check: {game['away_team']} @ {game['home_team']} - status_state='{game['status_state']}', status='{game['status']}'")
+                if game['status_state'] == 'in' and game['status'] == 'status_in_progress':
+                    # Sanity check on time
+                    game_date_str = game.get('start_time', '')
+                    if game_date_str:
+                        try:
+                            game_date = datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
+                            current_utc = datetime.now(timezone.utc)
+                            hours_diff = (current_utc - game_date).total_seconds() / 3600
+                            if hours_diff > 24:
+                                self.logger.warning(f"[MiLB] Skipping old game marked live: {game['away_team']} @ {game['home_team']}")
+                                continue
+                            elif hours_diff < -1:
+                                self.logger.warning(f"[MiLB] Skipping future game marked live: {game['away_team']} @ {game['home_team']}")
+                                continue
+                        except Exception as e:
+                            self.logger.warning(f"[MiLB] Could not parse game date {game_date_str}: {e}")
+
+                    # Favorites-only filter if enabled
+                    favorites_only = self.milb_config.get('show_favorite_teams_only', False)
+                    if favorites_only and self.favorite_teams:
+                        is_favorite = (
+                            game['home_team'] in self.favorite_teams or
+                            game['away_team'] in self.favorite_teams
+                        )
+                        if not is_favorite:
+                            self.logger.debug(f"[MiLB] Skipping non-favorite game in favorites-only mode: {game['away_team']} @ {game['home_team']}")
+                            continue
+
+                    self.logger.info(f"[MiLB] Processing live game: {game['away_team']} @ {game['home_team']} - Inning: {game.get('inning', 'N/A')}, Half: {game.get('inning_half', 'N/A')}, Count: {game.get('balls', 0)}-{game.get('strikes', 0)}, Outs: {game.get('outs', 0)}, Scores: {game.get('away_score', 0)}-{game.get('home_score', 0)}")
+                    try:
+                        game['home_score'] = int(game['home_score'])
+                        game['away_score'] = int(game['away_score'])
+                        new_live_games.append(game)
+                    except (ValueError, TypeError):
+                        self.logger.warning(f"Invalid score format for game {game['away_team']} @ {game['home_team']}")
+
+            should_log = (
+                current_time - self.last_log_time >= self.log_interval or
+                len(new_live_games) != len(self.live_games) or
+                not self.live_games
+            )
+            if should_log:
+                if new_live_games:
+                    logger.info(f"[MiLB] Found {len(new_live_games)} live games")
+                    for game in new_live_games:
+                        logger.info(f"[MiLB] Live game: {game['away_team']} vs {game['home_team']} - {game.get('inning_half','?')}{game.get('inning','?')}, {game.get('balls',0)}-{game.get('strikes',0)}, outs={game.get('outs',0)}, scores={game.get('away_score',0)}-{game.get('home_score',0)}")
+                else:
+                    logger.info("[MiLB] No live games found")
+                self.last_log_time = current_time
+
+            logger.debug(f"[MiLB] Live games state: {len(new_live_games)} new; previous: {len(self.live_games)}")
+
+            if new_live_games:
+                for new_game in new_live_games:
+                    if self.current_game and (
+                        (new_game['home_team'] == self.current_game['home_team'] and new_game['away_team'] == self.current_game['away_team']) or
+                        (new_game['home_team'] == self.current_game['away_team'] and new_game['away_team'] == self.current_game['home_team'])
+                    ):
+                        self.current_game = new_game
+                        break
+                if not self.live_games or set(g['away_team'] + g['home_team'] for g in new_live_games) != set(g['away_team'] + g['home_team'] for g in self.live_games):
+                    self.live_games = new_live_games
+                    if not self.current_game or self.current_game not in self.live_games:
+                        self.current_game_index = 0
+                        self.current_game = self.live_games[0]
+                        self.last_game_switch = current_time
+                if current_time - self.last_display_update >= 1.0:
                     self.last_display_update = current_time
+            else:
+                self.live_games = []
+                self.current_game = None
+
+        # Rotate if multiple live games
+        if len(self.live_games) > 1 and (current_time - self.last_game_switch) >= self.game_display_duration:
+            self.current_game_index = (self.current_game_index + 1) % len(self.live_games)
+            self.current_game = self.live_games[self.current_game_index]
+            self.last_game_switch = current_time
+            self.last_display_update = current_time
 
     def _create_live_game_display(self, game_data: Dict[str, Any]) -> Image.Image:
         """Create a display image for a live MiLB game."""
