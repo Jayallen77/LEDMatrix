@@ -716,8 +716,8 @@ class MiLBLiveManager(BaseMiLBManager):
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = self.milb_config.get('live_update_interval', 20)
-        # Poll at least every 300s when no live games to detect new live starts sooner
-        self.no_data_interval = max(300, self.update_interval)
+        # Poll at least every 60s when no live games to detect new live starts sooner
+        self.no_data_interval = max(60, self.update_interval)
         self.last_game_switch = 0  # Track when we last switched games
         self.game_display_duration = self.milb_config.get('live_game_duration', 30)  # Display each live game for 30 seconds
         self.last_display_update = 0  # Track when we last updated the display
