@@ -48,6 +48,8 @@ class BaseSoccerManager:
     _soccer_config_shared = {} 
     _team_league_map = {} # In-memory cache for the map
     _map_last_updated = 0
+    logger = logging.getLogger(__name__)  # Class-level logger for class methods
+    logger.setLevel(logging.DEBUG)  # Set log level at class level
 
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
         self.display_manager = display_manager
@@ -56,7 +58,6 @@ class BaseSoccerManager:
         BaseSoccerManager._soccer_config_shared = self.soccer_config # Store for class methods
         self.cache_manager = cache_manager
         self.odds_manager = OddsManager(self.cache_manager, self.config)
-        self.logger = logging.getLogger(__name__)
         self.is_enabled = self.soccer_config.get("enabled", False)
         self.show_odds = self.soccer_config.get("show_odds", False)
         self.test_mode = self.soccer_config.get("test_mode", False)
@@ -73,8 +74,6 @@ class BaseSoccerManager:
         self.team_map_file = self.soccer_config.get("team_map_file", "assets/data/team_league_map.json")
         self.team_map_update_days = self.soccer_config.get("team_map_update_days", 7) # How often to update the map
 
-        self.logger.setLevel(logging.DEBUG)
-        
         display_config = config.get("display", {})
         hardware_config = display_config.get("hardware", {})
         cols = hardware_config.get("cols", 64)
