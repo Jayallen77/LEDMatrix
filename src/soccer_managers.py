@@ -327,7 +327,27 @@ class BaseSoccerManager:
         if team_abbrev in self._logo_cache:
             return self._logo_cache[team_abbrev]
 
-        logo_path = os.path.join(self.logo_dir, f"{team_abbrev}.png")
+        # Try to find the logo file with case-insensitive matching
+        logo_path = None
+        expected_path = os.path.join(self.logo_dir, f"{team_abbrev}.png")
+        
+        # First try the exact path
+        if os.path.exists(expected_path):
+            logo_path = expected_path
+        else:
+            # Try case-insensitive matching
+            try:
+                for filename in os.listdir(self.logo_dir):
+                    if filename.lower() == f"{team_abbrev.lower()}.png":
+                        logo_path = os.path.join(self.logo_dir, filename)
+                        self.logger.debug(f"Found case-insensitive match: {filename} for {team_abbrev}")
+                        break
+            except (OSError, PermissionError) as e:
+                self.logger.warning(f"Error listing directory {self.logo_dir}: {e}")
+        
+        if logo_path is None:
+            logo_path = expected_path  # Use original path for creation attempts
+        
         self.logger.debug(f"Logo path: {logo_path}")
 
         try:
