@@ -181,6 +181,8 @@ class BaseMiLBManager:
         
         # For upcoming games, show date and time stacked in the center
         if game_data['status'] == 'status_scheduled':
+            # Ensure game_time_str is defined before use
+            game_time_str = game_data.get('start_time', '')
             # Show "Next Game" at the top using NHL-style font
             status_text = "Next Game"
             # Set font size for BDF font
