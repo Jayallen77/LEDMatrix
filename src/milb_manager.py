@@ -643,13 +643,16 @@ class BaseMiLBManager:
                 # Fetch live data for ALL live games, not just favorite teams
                 try:
                     live_url = f"http://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
-                    self.logger.debug(f"[MiLB] Fetching live data for {away_abbr} @ {home_abbr} from: {live_url}")
+                    self.logger.info(f"[MiLB] Fetching live data for {away_abbr} @ {home_abbr} from: {live_url}")
                     live_response = self.session.get(live_url, headers=self.headers, timeout=5)
                     live_response.raise_for_status()
                     live_data = live_response.json().get('liveData', {})
                     
                     linescore_live = live_data.get('linescore', {})
-                    self.logger.debug(f"[MiLB] Live data response for {away_abbr} @ {home_abbr}: {linescore_live}")
+                    self.logger.info(f"[MiLB] Live data response for {away_abbr} @ {home_abbr}: {linescore_live}")
+                    
+                    # Log the full live data structure for debugging
+                    self.logger.debug(f"[MiLB] Full live data structure for {away_abbr} @ {home_abbr}: {json.dumps(live_data, indent=2)}")
 
                     # Overwrite score and inning data with more accurate live data from the live feed
                     if linescore_live:
@@ -690,7 +693,7 @@ class BaseMiLBManager:
                         'third' in offense
                     ]
                     
-                    self.logger.debug(f"[MiLB] Final live data for {away_abbr} @ {home_abbr}: inning={game_data['inning']}, half={game_data['inning_half']}, count={game_data['balls']}-{game_data['strikes']}, outs={game_data['outs']}")
+                    self.logger.info(f"[MiLB] Final live data for {away_abbr} @ {home_abbr}: inning={game_data['inning']}, half={game_data['inning_half']}, count={game_data['balls']}-{game_data['strikes']}, outs={game_data['outs']}, scores={game_data['away_score']}-{game_data['home_score']}")
                     
                 except Exception as e:
                     self.logger.warning(f"Could not fetch live details for game {game_pk} ({away_abbr} @ {home_abbr}): {e}")
@@ -858,7 +861,7 @@ class MiLBLiveManager(BaseMiLBManager):
                         if new_live_games:
                             logger.info(f"[MiLB] Found {len(new_live_games)} live games")
                             for game in new_live_games:
-                                logger.info(f"[MiLB] Live game: {game['away_team']} vs {game['home_team']} - {game['inning_half']}{game['inning']}, {game['balls']}-{game['strikes']}")
+                                logger.info(f"[MiLB] Live game: {game['away_team']} vs {game['home_team']} - {game['inning_half']}{game['inning']}, {game['balls']}-{game['strikes']}, outs={game['outs']}, scores={game['away_score']}-{game['home_score']}")
                         else:
                             logger.info("[MiLB] No live games found")
                         self.last_log_time = current_time
@@ -1139,7 +1142,8 @@ class MiLBLiveManager(BaseMiLBManager):
             return
             
         try:
-            logger.debug(f"[MiLB] Displaying live game: {self.current_game.get('away_team')} @ {self.current_game.get('home_team')}")
+            logger.info(f"[MiLB] Displaying live game: {self.current_game.get('away_team')} @ {self.current_game.get('home_team')}")
+            logger.info(f"[MiLB] Game data for display: inning={self.current_game.get('inning')}, half={self.current_game.get('inning_half')}, count={self.current_game.get('balls')}-{self.current_game.get('strikes')}, outs={self.current_game.get('outs')}, scores={self.current_game.get('away_score')}-{self.current_game.get('home_score')}")
             # Create and display the game image using the new method
             game_image = self._create_live_game_display(self.current_game)
             # Set the image in the display manager
