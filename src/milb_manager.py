@@ -716,7 +716,8 @@ class MiLBLiveManager(BaseMiLBManager):
         self.current_game_index = 0
         self.last_update = 0
         self.update_interval = self.milb_config.get('live_update_interval', 20)
-        self.no_data_interval = self.update_interval
+        # Poll at least every 300s when no live games to detect new live starts sooner
+        self.no_data_interval = max(300, self.update_interval)
         self.last_game_switch = 0  # Track when we last switched games
         self.game_display_duration = self.milb_config.get('live_game_duration', 30)  # Display each live game for 30 seconds
         self.last_display_update = 0  # Track when we last updated the display
@@ -837,27 +838,26 @@ class MiLBLiveManager(BaseMiLBManager):
                                 except Exception as e:
                                     self.logger.warning(f"[MiLB] Could not parse game date {game_date_str}: {e}")
                             
-                            # Additional check: Verify the game has actual live data (inning info)
-                            if 'inning' not in game or game['inning'] is None:
-                                self.logger.warning(f"[MiLB] Skipping game without inning data: {game['away_team']} @ {game['home_team']}")
-                                continue
-                            
-                            self.logger.debug(f"[MiLB] Found live game: {game['away_team']} @ {game['home_team']}")
-                            if not self.favorite_teams or (
-                                game['home_team'] in self.favorite_teams or 
-                                game['away_team'] in self.favorite_teams
-                            ):
-                                self.logger.info(f"[MiLB] Processing favorite team game: {game['away_team']} @ {game['home_team']} - Inning: {game.get('inning', 'N/A')}, Half: {game.get('inning_half', 'N/A')}, Count: {game.get('balls', 0)}-{game.get('strikes', 0)}, Outs: {game.get('outs', 0)}, Scores: {game.get('away_score', 0)}-{game.get('home_score', 0)}")
-                                # Ensure scores are valid numbers
-                                try:
-                                    game['home_score'] = int(game['home_score'])
-                                    game['away_score'] = int(game['away_score'])
-                                    new_live_games.append(game)
-                                    self.logger.debug(f"[MiLB] Added live game to list: {game['away_team']} @ {game['home_team']}")
-                                except (ValueError, TypeError):
-                                    self.logger.warning(f"Invalid score format for game {game['away_team']} @ {game['home_team']}")
-                            else:
-                                self.logger.debug(f"[MiLB] Skipping non-favorite team game: {game['away_team']} @ {game['home_team']}")
+                            # Respect favorites-only mode if explicitly enabled in config
+                            favorites_only = self.milb_config.get('show_favorite_teams_only', False)
+                            if favorites_only and self.favorite_teams:
+                                is_favorite = (
+                                    game['home_team'] in self.favorite_teams or 
+                                    game['away_team'] in self.favorite_teams
+                                )
+                                if not is_favorite:
+                                    self.logger.debug(f"[MiLB] Skipping non-favorite game in favorites-only mode: {game['away_team']} @ {game['home_team']}")
+                                    continue
+
+                            self.logger.info(f"[MiLB] Processing live game: {game['away_team']} @ {game['home_team']} - Inning: {game.get('inning', 'N/A')}, Half: {game.get('inning_half', 'N/A')}, Count: {game.get('balls', 0)}-{game.get('strikes', 0)}, Outs: {game.get('outs', 0)}, Scores: {game.get('away_score', 0)}-{game.get('home_score', 0)}")
+                            # Ensure scores are valid numbers
+                            try:
+                                game['home_score'] = int(game['home_score'])
+                                game['away_score'] = int(game['away_score'])
+                                new_live_games.append(game)
+                                self.logger.debug(f"[MiLB] Added live game to list: {game['away_team']} @ {game['home_team']}")
+                            except (ValueError, TypeError):
+                                self.logger.warning(f"Invalid score format for game {game['away_team']} @ {game['home_team']}")
                     
                     # Only log if there's a change in games or enough time has passed
                     should_log = (
