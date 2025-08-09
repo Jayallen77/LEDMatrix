@@ -333,37 +333,54 @@ class BaseSoccerManager:
         try:
             if not os.path.exists(logo_path):
                 self.logger.info(f"Creating placeholder logo for {team_abbrev}")
-                os.makedirs(os.path.dirname(logo_path), exist_ok=True)
-                logo = Image.new('RGBA', (36, 36), (random.randint(50, 200), random.randint(50, 200), random.randint(50, 200), 255))
-                draw = ImageDraw.Draw(logo)
-                # Optionally add text to placeholder
                 try:
-                    placeholder_font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 12)
-                    text_width = draw.textlength(team_abbrev, font=placeholder_font)
-                    text_x = (36 - text_width) // 2
-                    text_y = 10
-                    draw.text((text_x, text_y), team_abbrev, fill=(0,0,0,255), font=placeholder_font)
-                except IOError:
-                    pass # Font not found, skip text
-                logo.save(logo_path)
-                self.logger.info(f"Created placeholder logo at {logo_path}")
+                    os.makedirs(os.path.dirname(logo_path), exist_ok=True)
+                    logo = Image.new('RGBA', (36, 36), (random.randint(50, 200), random.randint(50, 200), random.randint(50, 200), 255))
+                    draw = ImageDraw.Draw(logo)
+                    # Optionally add text to placeholder
+                    try:
+                        placeholder_font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 12)
+                        text_width = draw.textlength(team_abbrev, font=placeholder_font)
+                        text_x = (36 - text_width) // 2
+                        text_y = 10
+                        draw.text((text_x, text_y), team_abbrev, fill=(0,0,0,255), font=placeholder_font)
+                    except IOError:
+                        pass # Font not found, skip text
+                    logo.save(logo_path)
+                    self.logger.info(f"Created placeholder logo at {logo_path}")
+                except PermissionError as pe:
+                    self.logger.warning(f"Permission denied creating placeholder logo for {team_abbrev}: {pe}")
+                    # Return a simple in-memory placeholder instead
+                    logo = Image.new('RGBA', (36, 36), (random.randint(50, 200), random.randint(50, 200), random.randint(50, 200), 255))
+                    self._logo_cache[team_abbrev] = logo
+                    return logo
 
-            logo = Image.open(logo_path)
-            if logo.mode != 'RGBA':
-                logo = logo.convert('RGBA')
+            try:
+                logo = Image.open(logo_path)
+                if logo.mode != 'RGBA':
+                    logo = logo.convert('RGBA')
 
-            # Resize logo to target size
-            target_size = 36 # Change target size to 36x36
-            # Use resize instead of thumbnail to force size if image is smaller
-            logo = logo.resize((target_size, target_size), Image.Resampling.LANCZOS)
-            self.logger.debug(f"Resized {team_abbrev} logo to {logo.size}")
+                # Resize logo to target size
+                target_size = 36 # Change target size to 36x36
+                # Use resize instead of thumbnail to force size if image is smaller
+                logo = logo.resize((target_size, target_size), Image.Resampling.LANCZOS)
+                self.logger.debug(f"Resized {team_abbrev} logo to {logo.size}")
 
-            self._logo_cache[team_abbrev] = logo
-            return logo
+                self._logo_cache[team_abbrev] = logo
+                return logo
+            except PermissionError as pe:
+                self.logger.warning(f"Permission denied accessing logo for {team_abbrev}: {pe}")
+                # Return a simple in-memory placeholder instead
+                logo = Image.new('RGBA', (36, 36), (random.randint(50, 200), random.randint(50, 200), random.randint(50, 200), 255))
+                self._logo_cache[team_abbrev] = logo
+                return logo
 
         except Exception as e:
             self.logger.error(f"Error loading logo for {team_abbrev}: {e}", exc_info=True)
-            return None
+            # Return a simple in-memory placeholder as fallback
+            logo = Image.new('RGBA', (36, 36), (random.randint(50, 200), random.randint(50, 200), random.randint(50, 200), 255))
+            self._logo_cache[team_abbrev] = logo
+            return logo
 
     def _format_game_time(self, status: Dict) -> str:
         """Format game time display for soccer (e.g., HT, FT, 45', 90+2')."""
@@ -447,6 +464,13 @@ class BaseSoccerManager:
             is_upcoming = status_type == "STATUS_SCHEDULED"
             is_halftime = status_type == "STATUS_HALFTIME"
 
+            # Calculate if game is within recent window
+            is_within_window = False
+            if start_time_utc:
+                cutoff_time = datetime.now(self._get_timezone()) - timedelta(hours=self.recent_hours)
+                is_within_window = start_time_utc > cutoff_time
+                self.logger.debug(f"[Soccer] Game time: {start_time_utc}, Cutoff time: {cutoff_time}, Within window: {is_within_window}")
+
             details = {
                 "id": game_event["id"],
                 "start_time_utc": start_time_utc,
@@ -456,6 +480,7 @@ class BaseSoccerManager:
                 "is_live": is_live or is_halftime, # Treat halftime as live for display purposes
                 "is_final": is_final,
                 "is_upcoming": is_upcoming,
+                "is_within_window": is_within_window,
                 "home_abbr": home_team["team"]["abbreviation"],
                 "home_score": home_team.get("score", "0"),
                 "home_record": home_record,
