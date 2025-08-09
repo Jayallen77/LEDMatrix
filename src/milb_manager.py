@@ -425,6 +425,7 @@ class BaseMiLBManager:
                         if not self.favorite_teams or is_favorite_game:
                             status_obj = event['status']
                             status_state = status_obj.get('abstractGameState', 'Preview') # Changed default to 'Preview'
+                            detailed_state = status_obj.get('detailedState', '')
 
                             # Map status to a consistent format using abstractGameState
                             mapped_status = 'status_other'
@@ -448,6 +449,7 @@ class BaseMiLBManager:
                                 'home_score': event['teams']['home'].get('score', 0),
                                 'status': mapped_status,
                                 'status_state': mapped_status_state,
+                                'detailed_state': detailed_state,
                                 'start_time': event.get('gameDate'),
                                 'away_record': away_record_str,
                                 'home_record': home_record_str
@@ -809,8 +811,15 @@ class MiLBLiveManager(BaseMiLBManager):
             # Find all live games (optionally filtering to favorites)
             new_live_games = []
             for game in games.values():
-                self.logger.debug(f"[MiLB] Game status check: {game['away_team']} @ {game['home_team']} - status_state='{game['status_state']}', status='{game['status']}'")
-                if game['status_state'] == 'in' and game['status'] == 'status_in_progress':
+                self.logger.debug(f"[MiLB] Game status check: {game['away_team']} @ {game['home_team']} - status_state='{game['status_state']}', status='{game['status']}', detailed_state='{game.get('detailed_state','')}'")
+                is_live_by_flags = (game['status_state'] == 'in' and game['status'] == 'status_in_progress')
+                detailed = str(game.get('detailed_state','')).lower()
+                is_live_by_detail = any(
+                    token in detailed for token in [
+                        'in progress', 'game in progress', 'top of the', 'bottom of the', 'warmup'
+                    ]
+                )
+                if is_live_by_flags or is_live_by_detail:
                     # Sanity check on time
                     game_date_str = game.get('start_time', '')
                     if game_date_str:
@@ -818,11 +827,13 @@ class MiLBLiveManager(BaseMiLBManager):
                             game_date = datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
                             current_utc = datetime.now(timezone.utc)
                             hours_diff = (current_utc - game_date).total_seconds() / 3600
+                            # Accept slightly future-started games as live if detailed_state indicates in progress/warmup
+                            future_grace_hours = 1.0 if is_live_by_detail else 0.0
                             if hours_diff > 24:
                                 self.logger.warning(f"[MiLB] Skipping old game marked live: {game['away_team']} @ {game['home_team']}")
                                 continue
-                            elif hours_diff < -1:
-                                self.logger.warning(f"[MiLB] Skipping future game marked live: {game['away_team']} @ {game['home_team']}")
+                            elif hours_diff < -future_grace_hours:
+                                self.logger.warning(f"[MiLB] Skipping future game marked live: {game['away_team']} @ {game['home_team']} (starts in {abs(hours_diff):.2f}h)")
                                 continue
                         except Exception as e:
                             self.logger.warning(f"[MiLB] Could not parse game date {game_date_str}: {e}")
