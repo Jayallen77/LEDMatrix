@@ -934,7 +934,7 @@ class NFLRecentManager(BaseNFLManager): # Renamed class
             # Final Scores (Centered, same position as live)
             home_score = str(game.get("home_score", "0"))
             away_score = str(game.get("away_score", "0"))
-            score_text = f"{away_score} - {home_score}"
+            score_text = f"{away_score}-{home_score}"
             score_width = draw_overlay.textlength(score_text, font=self.fonts['score'])
             score_x = (self.display_width - score_width) // 2
             score_y = self.display_height - 14
