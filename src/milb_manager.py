@@ -63,6 +63,79 @@ class BaseMiLBManager:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
 
+    def _probe_and_update_from_live_feed(self, game_pk: str, game_data: Dict[str, Any]) -> bool:
+        """Probe MLB Stats live feed for a game and update game_data in-place if live.
+
+        Returns True if the feed indicates the game is in progress; False otherwise.
+        """
+        try:
+            live_url = f"http://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
+            self.logger.debug(f"[MiLB] Probing live feed for game {game_pk}: {live_url}")
+            resp = self.session.get(live_url, headers=self.headers, timeout=6)
+            resp.raise_for_status()
+            payload = resp.json()
+            game_data_obj = payload.get('gameData', {})
+            status_obj = game_data_obj.get('status', {})
+            status_code = str(status_obj.get('statusCode', '')).upper()
+            abstract_state = str(status_obj.get('abstractGameState', '')).lower()
+
+            is_live = (status_code == 'I') or (abstract_state == 'live')
+            if not is_live:
+                # Some feeds report via liveData/linescore even when abstractGameState lags
+                live_data = payload.get('liveData', {})
+                linescore = live_data.get('linescore', {})
+                if linescore.get('currentInning'):
+                    is_live = True
+
+            if not is_live:
+                return False
+
+            # Update primary fields from live feed
+            live_data = payload.get('liveData', {})
+            linescore = live_data.get('linescore', {})
+
+            # Scores
+            away_runs = linescore.get('teams', {}).get('away', {}).get('runs')
+            home_runs = linescore.get('teams', {}).get('home', {}).get('runs')
+            if away_runs is not None:
+                game_data['away_score'] = away_runs
+            if home_runs is not None:
+                game_data['home_score'] = home_runs
+
+            # Inning and half
+            inning = linescore.get('currentInning')
+            if inning is not None:
+                game_data['inning'] = inning
+            inning_state_live = str(linescore.get('inningState', '')).lower()
+            if inning_state_live:
+                game_data['inning_half'] = 'bottom' if 'bottom' in inning_state_live else 'top'
+
+            # Count and outs
+            balls = linescore.get('balls')
+            strikes = linescore.get('strikes')
+            outs = linescore.get('outs')
+            if balls is not None:
+                game_data['balls'] = balls
+            if strikes is not None:
+                game_data['strikes'] = strikes
+            if outs is not None:
+                game_data['outs'] = outs
+
+            offense = linescore.get('offense', {})
+            game_data['bases_occupied'] = [
+                'first' in offense,
+                'second' in offense,
+                'third' in offense
+            ]
+
+            # Set status to in-progress
+            game_data['status'] = 'status_in_progress'
+            game_data['status_state'] = 'in'
+            return True
+        except Exception as e:
+            self.logger.debug(f"[MiLB] Live feed probe failed for {game_pk}: {e}")
+            return False
+
     def _get_team_logo(self, team_abbr: str) -> Optional[Image.Image]:
         """Get team logo from the configured directory."""
         try:
@@ -816,10 +889,34 @@ class MiLBLiveManager(BaseMiLBManager):
                 detailed = str(game.get('detailed_state','')).lower()
                 is_live_by_detail = any(
                     token in detailed for token in [
-                        'in progress', 'game in progress', 'top of the', 'bottom of the', 'warmup'
+                        'in progress', 'game in progress', 'top of the', 'bottom of the', 'middle of the', 'end of the', 'warmup', 'delayed start', 'delayed'
                     ]
                 )
-                if is_live_by_flags or is_live_by_detail:
+                is_live = is_live_by_flags or is_live_by_detail
+
+                # Fallback: probe live feed if not already considered live and game near today
+                if not is_live:
+                    try:
+                        game_pk = game.get('id') or game.get('game_pk')
+                        start_time_str = game.get('start_time')
+                        should_probe = True
+                        if start_time_str:
+                            try:
+                                start_dt = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+                                now_utc = datetime.now(timezone.utc)
+                                # Probe only if within +/- 12 hours of now
+                                if abs((now_utc - start_dt).total_seconds()) > 12 * 3600:
+                                    should_probe = False
+                            except Exception:
+                                pass
+                        if game_pk and should_probe:
+                            if self._probe_and_update_from_live_feed(str(game_pk), game):
+                                is_live = True
+                                self.logger.info(f"[MiLB] Live confirmed via feed: {game['away_team']} @ {game['home_team']}")
+                    except Exception:
+                        pass
+
+                if is_live:
                     # Sanity check on time
                     game_date_str = game.get('start_time', '')
                     if game_date_str:
@@ -827,14 +924,11 @@ class MiLBLiveManager(BaseMiLBManager):
                             game_date = datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
                             current_utc = datetime.now(timezone.utc)
                             hours_diff = (current_utc - game_date).total_seconds() / 3600
-                            # Accept slightly future-started games as live if detailed_state indicates in progress/warmup
-                            future_grace_hours = 1.0 if is_live_by_detail else 0.0
-                            if hours_diff > 24:
+                            # If a game is flagged live, do NOT exclude for future start; only guard against stale past
+                            if hours_diff > 48:
                                 self.logger.warning(f"[MiLB] Skipping old game marked live: {game['away_team']} @ {game['home_team']}")
                                 continue
-                            elif hours_diff < -future_grace_hours:
-                                self.logger.warning(f"[MiLB] Skipping future game marked live: {game['away_team']} @ {game['home_team']} (starts in {abs(hours_diff):.2f}h)")
-                                continue
+                            # Note: We intentionally allow future games if API reports live/detailed live
                         except Exception as e:
                             self.logger.warning(f"[MiLB] Could not parse game date {game_date_str}: {e}")
 
