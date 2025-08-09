@@ -868,10 +868,17 @@ class DisplayController:
                     manager = getattr(self, attr, None)
                     # Only consider sports that are enabled (manager is not None) and have actual live games
                     live_games = getattr(manager, 'live_games', None) if manager is not None else None
-                    if manager is not None and priority and live_games and len(live_games) > 0:
+                    # Check that manager exists, has live_priority enabled, has live_games attribute, and has at least one live game
+                    if (manager is not None and 
+                        priority and 
+                        live_games is not None and 
+                        len(live_games) > 0):
                         live_priority_takeover = True
                         live_priority_sport = sport
+                        logger.debug(f"Live priority takeover triggered by {sport} with {len(live_games)} live games")
                         break
+                    elif manager is not None and priority and live_games is not None:
+                        logger.debug(f"{sport} has live_priority=True but {len(live_games)} live games (not taking over)")
                 manager_to_display = None
                 # --- State Machine for Display Logic ---
                 if is_currently_live:
@@ -902,16 +909,23 @@ class DisplayController:
                     if live_priority_takeover:
                         new_mode = f"{live_priority_sport}_live"
                         if self.current_display_mode != new_mode:
-                            logger.info(f"Live priority takeover: Switching to {new_mode} from {self.current_display_mode}")
-                            if previous_mode_before_switch == 'music' and self.music_manager:
-                                self.music_manager.deactivate_music_display()
-                            self.current_display_mode = new_mode
-                            # Reset logged duration when mode changes
-                            if hasattr(self, '_last_logged_duration'):
-                                delattr(self, '_last_logged_duration')
-                            self.force_clear = True
-                            self.last_switch = current_time
-                            manager_to_display = getattr(self, f"{live_priority_sport}_live", None)
+                            # Double-check that the manager actually has live games before switching
+                            target_manager = getattr(self, f"{live_priority_sport}_live", None)
+                            if target_manager and hasattr(target_manager, 'live_games') and len(target_manager.live_games) > 0:
+                                logger.info(f"Live priority takeover: Switching to {new_mode} from {self.current_display_mode}")
+                                logger.debug(f"[DisplayController] Live priority takeover details: sport={live_priority_sport}, manager={target_manager}, live_games={target_manager.live_games}")
+                                if previous_mode_before_switch == 'music' and self.music_manager:
+                                    self.music_manager.deactivate_music_display()
+                                self.current_display_mode = new_mode
+                                # Reset logged duration when mode changes
+                                if hasattr(self, '_last_logged_duration'):
+                                    delattr(self, '_last_logged_duration')
+                                self.force_clear = True
+                                self.last_switch = current_time
+                                manager_to_display = target_manager
+                            else:
+                                logger.warning(f"[DisplayController] Live priority takeover attempted for {new_mode} but manager has no live games, skipping takeover")
+                                live_priority_takeover = False
                         else:
                             self.force_clear = False
                             self.last_switch = current_time
@@ -1086,8 +1100,11 @@ class DisplayController:
                             self.ncaa_baseball_live.display(force_clear=self.force_clear)
                         elif self.current_display_mode == 'mlb_live' and self.mlb_live:
                             self.mlb_live.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'milb_live' and self.milb_live:
+                        elif self.current_display_mode == 'milb_live' and self.milb_live and len(self.milb_live.live_games) > 0:
+                            logger.debug(f"[DisplayController] Calling MiLB live display with {len(self.milb_live.live_games)} live games")
                             self.milb_live.display(force_clear=self.force_clear)
+                        elif self.current_display_mode == 'milb_live' and self.milb_live:
+                            logger.debug(f"[DisplayController] MiLB live manager exists but has {len(self.milb_live.live_games)} live games, skipping display")
                         elif self.current_display_mode == 'ncaa_fb_upcoming' and self.ncaa_fb_upcoming:
                             self.ncaa_fb_upcoming.display(force_clear=self.force_clear)
                         elif self.current_display_mode == 'ncaam_basketball_recent' and self.ncaam_basketball_recent:

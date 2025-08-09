@@ -772,6 +772,9 @@ class MiLBLiveManager(BaseMiLBManager):
                             logger.info("[MiLB] No live games found")
                         self.last_log_time = current_time
                     
+                    # Debug: Log the live_games state for display controller
+                    logger.debug(f"[MiLB] Live games state: {len(new_live_games)} games, live_games list will be: {len(new_live_games) if new_live_games else 0}")
+                    
                     if new_live_games:
                         # Update the current game with the latest data
                         for new_game in new_live_games:
@@ -787,6 +790,7 @@ class MiLBLiveManager(BaseMiLBManager):
                         # Only update the games list if we have new games
                         if not self.live_games or set(game['away_team'] + game['home_team'] for game in new_live_games) != set(game['away_team'] + game['home_team'] for game in self.live_games):
                             self.live_games = new_live_games
+                            logger.debug(f"[MiLB] Updated live_games list to {len(self.live_games)} games")
                             # If we don't have a current game or it's not in the new list, start from the beginning
                             if not self.current_game or self.current_game not in self.live_games:
                                 self.current_game_index = 0
@@ -802,6 +806,7 @@ class MiLBLiveManager(BaseMiLBManager):
                         self.logger.debug("[MiLB] No live games found in API response")
                         self.live_games = []
                         self.current_game = None
+                        logger.debug(f"[MiLB] Set live_games to empty list, length: {len(self.live_games)}")
                 
                 # Check if it's time to switch games
                 if len(self.live_games) > 1 and (current_time - self.last_game_switch) >= self.game_display_duration:
@@ -1039,9 +1044,11 @@ class MiLBLiveManager(BaseMiLBManager):
     def display(self, force_clear: bool = False):
         """Display live game information."""
         if not self.current_game:
+            logger.debug("[MiLB] Display called but no current game, returning early")
             return
             
         try:
+            logger.debug(f"[MiLB] Displaying live game: {self.current_game.get('away_team')} @ {self.current_game.get('home_team')}")
             # Create and display the game image using the new method
             game_image = self._create_live_game_display(self.current_game)
             # Set the image in the display manager

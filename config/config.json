@@ -223,7 +223,7 @@
         }
     },
     "ncaa_fb_scoreboard": {
-        "enabled": true,
+        "enabled": false,
         "live_priority": true,
         "live_game_duration": 20,
         "show_odds": true,
@@ -368,7 +368,7 @@
         "scroll_gap_width": 32
     },
     "soccer_scoreboard": {
-        "enabled": false,
+        "enabled": true,
         "live_priority": true,
         "live_game_duration": 20,
         "show_odds": true,
@@ -380,15 +380,9 @@
         "recent_game_hours": 168,
         "show_favorite_teams_only": true,
         "favorite_teams": [
-            "LIV"
+            "DAL"
         ],
         "leagues": [
-            "eng.1",
-            "esp.1",
-            "ger.1",
-            "ita.1",
-            "fra.1",
-            "uefa.champions",
             "usa.1"
         ],
         "logo_dir": "assets/sports/soccer_logos",
