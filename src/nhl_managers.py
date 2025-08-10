@@ -318,7 +318,11 @@ class BaseNHLManager:
 
             # Log game details for debugging
             self.logger.debug(f"[NHL] Extracted game details: {details['away_abbr']} vs {details['home_abbr']}")
-            self.logger.debug(f"[NHL] Game status: is_final={details['is_final']}, is_within_window={details['is_within_window']}")
+            # Use .get() to avoid KeyError if optional keys are missing
+            self.logger.debug(
+                f"[NHL] Game status: is_final={details.get('is_final')}, "
+                f"is_upcoming={details.get('is_upcoming')}, is_live={details.get('is_live')}"
+            )
 
             # Validate logo files
             for team in ["home", "away"]:

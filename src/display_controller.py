@@ -347,6 +347,16 @@ class DisplayController:
         
         # Update display durations to include all modes
         self.display_durations = self.config['display'].get('display_durations', {})
+        # Backward-compatibility: map legacy weather keys to current keys if provided in config
+        try:
+            if 'weather' in self.display_durations and 'weather_current' not in self.display_durations:
+                self.display_durations['weather_current'] = self.display_durations['weather']
+            if 'hourly_forecast' in self.display_durations and 'weather_hourly' not in self.display_durations:
+                self.display_durations['weather_hourly'] = self.display_durations['hourly_forecast']
+            if 'daily_forecast' in self.display_durations and 'weather_daily' not in self.display_durations:
+                self.display_durations['weather_daily'] = self.display_durations['daily_forecast']
+        except Exception:
+            pass
         # Add defaults for soccer if missing
         default_durations = {
             'clock': 15,

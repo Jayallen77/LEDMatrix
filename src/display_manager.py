@@ -108,7 +108,7 @@ class DisplayManager:
             self.draw = ImageDraw.Draw(self.image)
             self.draw.text((10, 10), "Matrix Error", fill=(255, 0, 0))
             logger.error(f"Matrix initialization failed, using fallback mode. Error: {e}")
-            raise
+            # Do not raise here; allow fallback mode so web preview and non-hardware environments work
 
     @property
     def width(self):
@@ -229,8 +229,8 @@ class DisplayManager:
                                 pixel_x = x + glyph_left + j
                                 pixel_y = y - glyph_top + i
                                 # Only draw if within bounds
-                                if (0 <= pixel_x < self.matrix.width and 
-                                    0 <= pixel_y < self.matrix.height):
+                if (0 <= pixel_x < self.width and 
+                                    0 <= pixel_y < self.height):
                                     self.draw.point((pixel_x, pixel_y), fill=color)
                 
                 # Move to next character
@@ -353,7 +353,7 @@ class DisplayManager:
             # Calculate x position if not provided (center text)
             if x is None:
                 text_width = self.get_text_width(text, current_font)
-                x = (self.matrix.width - text_width) // 2
+                x = (self.width - text_width) // 2
             
             # Set default y position if not provided
             if y is None:
@@ -567,7 +567,18 @@ class DisplayManager:
 
     def cleanup(self):
         """Clean up resources."""
-        self.matrix.Clear()
+        if hasattr(self, 'matrix') and self.matrix is not None:
+            try:
+                self.matrix.Clear()
+            except Exception as e:
+                logger.warning(f"Error clearing matrix during cleanup: {e}")
+        # Ensure image/draw are reset to a blank state
+        if hasattr(self, 'image') and hasattr(self, 'draw'):
+            try:
+                self.image = Image.new('RGB', (self.width, self.height))
+                self.draw = ImageDraw.Draw(self.image)
+            except Exception:
+                pass
         # Reset the singleton state when cleaning up
         DisplayManager._instance = None
         DisplayManager._initialized = False

@@ -393,8 +393,10 @@ def system_action():
             result = subprocess.run(['sudo', 'reboot'], 
                                   capture_output=True, text=True)
         elif action == 'git_pull':
+            home_dir = str(Path.home())
+            project_dir = os.path.join(home_dir, 'LEDMatrix')
             result = subprocess.run(['git', 'pull'], 
-                                  capture_output=True, text=True, cwd='/workspace')
+                                  capture_output=True, text=True, cwd=project_dir, check=False)
         else:
             return jsonify({
                 'status': 'error',

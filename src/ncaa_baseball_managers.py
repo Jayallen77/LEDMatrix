@@ -337,7 +337,11 @@ class BaseNCAABaseballManager:
                 away_spread = f"+{away_spread}"
 
             # Define colors for odds text
-            odds_font = self.display_manager.status_font
+            # Use a small readable font for odds; fall back to default if not available
+            try:
+                odds_font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6)
+            except IOError:
+                odds_font = ImageFont.load_default()
             odds_color = (255, 0, 0)  # Red text
             outline_color = (0, 0, 0)   # Black outline
 
