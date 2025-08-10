@@ -403,16 +403,16 @@ def system_action():
         action = data.get('action')
         
         if action == 'restart_service':
-            result = subprocess.run(['sudo', 'systemctl', 'restart', 'ledmatrix'], 
+            result = subprocess.run(['sudo', '-n', 'systemctl', 'restart', 'ledmatrix'], 
                                   capture_output=True, text=True)
         elif action == 'stop_service':
-            result = subprocess.run(['sudo', 'systemctl', 'stop', 'ledmatrix'], 
+            result = subprocess.run(['sudo', '-n', 'systemctl', 'stop', 'ledmatrix'], 
                                   capture_output=True, text=True)
         elif action == 'start_service':
-            result = subprocess.run(['sudo', 'systemctl', 'start', 'ledmatrix'], 
+            result = subprocess.run(['sudo', '-n', 'systemctl', 'start', 'ledmatrix'], 
                                   capture_output=True, text=True)
         elif action == 'reboot_system':
-            result = subprocess.run(['sudo', 'reboot'], 
+            result = subprocess.run(['sudo', '-n', 'reboot'], 
                                   capture_output=True, text=True)
         elif action == 'git_pull':
             # Run git pull from the repository directory where this file lives
@@ -440,7 +440,7 @@ def system_action():
     except Exception as e:
         return jsonify({
             'status': 'error',
-            'message': f'Error executing action: {e}'
+            'message': f'Error executing action: {e}. If this action requires sudo, ensure NOPASSWD is configured or run the command manually.'
         }), 500
 
 @app.route('/api/system/status')
@@ -569,19 +569,19 @@ def run_action_route():
         action = data.get('action')
         
         if action == 'start_display':
-            result = subprocess.run(['sudo', 'systemctl', 'start', 'ledmatrix'], 
+            result = subprocess.run(['sudo', '-n', 'systemctl', 'start', 'ledmatrix'], 
                                  capture_output=True, text=True)
         elif action == 'stop_display':
-            result = subprocess.run(['sudo', 'systemctl', 'stop', 'ledmatrix'], 
+            result = subprocess.run(['sudo', '-n', 'systemctl', 'stop', 'ledmatrix'], 
                                  capture_output=True, text=True)
         elif action == 'enable_autostart':
-            result = subprocess.run(['sudo', 'systemctl', 'enable', 'ledmatrix'], 
+            result = subprocess.run(['sudo', '-n', 'systemctl', 'enable', 'ledmatrix'], 
                                  capture_output=True, text=True)
         elif action == 'disable_autostart':
-            result = subprocess.run(['sudo', 'systemctl', 'disable', 'ledmatrix'], 
+            result = subprocess.run(['sudo', '-n', 'systemctl', 'disable', 'ledmatrix'], 
                                  capture_output=True, text=True)
         elif action == 'reboot_system':
-            result = subprocess.run(['sudo', 'reboot'], 
+            result = subprocess.run(['sudo', '-n', 'reboot'], 
                                  capture_output=True, text=True)
         elif action == 'git_pull':
             repo_dir = Path(__file__).resolve().parent
@@ -616,7 +616,7 @@ def get_logs():
     try:
         # Get logs from journalctl for the ledmatrix service
         result = subprocess.run(
-            ['sudo', 'journalctl', '-u', 'ledmatrix.service', '-n', '500', '--no-pager'],
+            ['sudo', '-n', 'journalctl', '-u', 'ledmatrix.service', '-n', '500', '--no-pager'],
             capture_output=True, text=True, check=True
         )
         logs = result.stdout
@@ -831,7 +831,7 @@ def view_logs():
     """View system logs."""
     try:
         result = subprocess.run(
-            ['sudo', 'journalctl', '-u', 'ledmatrix.service', '-n', '500', '--no-pager'],
+            ['sudo', '-n', 'journalctl', '-u', 'ledmatrix.service', '-n', '500', '--no-pager'],
             capture_output=True, text=True, check=True
         )
         logs = result.stdout
