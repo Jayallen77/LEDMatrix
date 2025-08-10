@@ -768,7 +768,7 @@
                             Show pixel grid
                         </label>
                         <label style="color:#333; background:#f3f3f3; padding:6px 10px; border-radius:8px; display:inline-flex; align-items:center; gap:8px;">
-                            <input type="checkbox" id="toggleLedDots">
+                            <input type="checkbox" id="toggleLedDots" checked>
                             LED dot mode
                         </label>
                         <label style="color:#333; background:#f3f3f3; padding:6px 10px; border-radius:8px; display:inline-flex; align-items:center; gap:8px;">
@@ -1411,6 +1411,7 @@
                     <h4>API Calls (24h window)</h4>
                     <div id="api-metrics" class="stat-card" style="text-align:left;">
                         <div>Loading API metrics...</div>
+                        <div style="margin-top:10px; font-size:12px; color:#666;">If empty, ensure the server is running and /api/metrics is reachable.</div>
                     </div>
                 </div>
 
@@ -1838,6 +1839,10 @@
             }
             if (toggleLedDots) {
                 toggleLedDots.addEventListener('change', renderLedDots);
+                // Ensure dot mode is rendered on load if enabled by default
+                if (toggleLedDots.checked) {
+                    setTimeout(renderLedDots, 200);
+                }
             }
             
             // Update stats every 30 seconds

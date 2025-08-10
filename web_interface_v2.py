@@ -62,8 +62,17 @@ class DisplayMonitor:
             try:
                 # Prefer service-provided snapshot if available (works when ledmatrix service is running)
                 if os.path.exists(snapshot_path):
-                    with open(snapshot_path, 'rb') as f:
-                        img_bytes = f.read()
+                    # Read atomically by reopening; ignore partials by retrying once
+                    img_bytes = None
+                    for _ in range(2):
+                        try:
+                            with open(snapshot_path, 'rb') as f:
+                                img_bytes = f.read()
+                            break
+                        except Exception:
+                            socketio.sleep(0.02)
+                    if not img_bytes:
+                        raise RuntimeError('Snapshot read failed')
                     img_str = base64.b64encode(img_bytes).decode()
                     # If we can infer dimensions from display_manager, include them; else leave 0
                     width = display_manager.width if display_manager else 0

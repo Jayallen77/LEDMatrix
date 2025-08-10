@@ -394,12 +394,9 @@ class DisplayManager:
             
             # Draw the text
             if isinstance(current_font, freetype.Face):
-                # For BDF fonts, we need to adjust the y-coordinate.
-                # The passed 'y' is the top of the text, but our drawing function
-                # expects the baseline. The 'ascender' is the distance from the
-                # baseline to the top of the glyphs.
-                baseline_y = y + (current_font.size.ascender >> 6)
-                self._draw_bdf_text(text, x, baseline_y, color, current_font)
+                # For BDF fonts, _draw_bdf_text will compute the baseline from the
+                # provided top-left y using the font ascender. Do not adjust here.
+                self._draw_bdf_text(text, x, y, color, current_font)
             else:
                 # For TTF fonts, use PIL's text drawing which expects top-left.
                 self.draw.text((x, y), text, font=current_font, fill=color)
@@ -636,8 +633,14 @@ class DisplayManager:
             snapshot_dir = os.path.dirname(self._snapshot_path)
             if snapshot_dir and not os.path.exists(snapshot_dir):
                 os.makedirs(snapshot_dir, exist_ok=True)
-            # Write PNG snapshot
-            self.image.save(self._snapshot_path, format='PNG')
+            # Write atomically: temp then replace
+            tmp_path = f"{self._snapshot_path}.tmp"
+            self.image.save(tmp_path, format='PNG')
+            try:
+                os.replace(tmp_path, self._snapshot_path)
+            except Exception:
+                # Fallback to direct save if replace not supported
+                self.image.save(self._snapshot_path, format='PNG')
             self._last_snapshot_ts = now
         except Exception as e:
             # Snapshot failures should never break display; log at debug to avoid noise
