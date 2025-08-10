@@ -49,7 +49,7 @@ class BaseSoccerManager:
     _team_league_map = {} # In-memory cache for the map
     _map_last_updated = 0
     logger = logging.getLogger(__name__)  # Class-level logger for class methods
-    logger.setLevel(logging.DEBUG)  # Set log level at class level
+    logger.setLevel(logging.INFO)  # Set log level at class level
 
     def __init__(self, config: Dict[str, Any], display_manager: DisplayManager, cache_manager: CacheManager):
         self.display_manager = display_manager
