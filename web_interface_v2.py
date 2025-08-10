@@ -19,7 +19,15 @@ import logging
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
-socketio = SocketIO(app, cors_allowed_origins="*")
+# Prefer eventlet if available for stable websockets on Pi; fall back gracefully
+async_mode = None
+try:
+    import eventlet  # noqa: F401
+    async_mode = 'eventlet'
+except Exception:
+    async_mode = 'threading'
+
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode=async_mode)
 
 # Global variables
 config_manager = ConfigManager()
@@ -36,48 +44,45 @@ class DisplayMonitor:
     def __init__(self):
         self.running = False
         self.thread = None
-        
+
     def start(self):
         if not self.running:
             self.running = True
-            self.thread = threading.Thread(target=self._monitor_loop)
-            self.thread.daemon = True
-            self.thread.start()
-            
+            # Use SocketIO background task for better async compatibility
+            self.thread = socketio.start_background_task(self._monitor_loop)
+
     def stop(self):
         self.running = False
-        if self.thread:
-            self.thread.join()
-            
+        # Background task will exit on next loop; no join needed
+
     def _monitor_loop(self):
         global display_manager, current_display_data
         while self.running:
             try:
                 if display_manager and hasattr(display_manager, 'image'):
-                    # Convert PIL image to base64 for web display
+                    # Convert raw image to base64 (no server-side scaling; client scales visually)
                     img_buffer = io.BytesIO()
-                    # Scale up the image for better visibility (8x instead of 4x for better clarity)
-                    scaled_img = display_manager.image.resize((
-                        display_manager.image.width * 8,
-                        display_manager.image.height * 8
-                    ), Image.NEAREST)
-                    scaled_img.save(img_buffer, format='PNG')
+                    display_manager.image.save(img_buffer, format='PNG')
                     img_str = base64.b64encode(img_buffer.getvalue()).decode()
-                    
+
                     current_display_data = {
                         'image': img_str,
                         'width': display_manager.width,
                         'height': display_manager.height,
                         'timestamp': time.time()
                     }
-                    
+
                     # Emit to all connected clients
                     socketio.emit('display_update', current_display_data)
-                    
+
             except Exception as e:
                 logger.error(f"Display monitor error: {e}", exc_info=True)
-                
-            time.sleep(0.05)  # Update 20 times per second for smoother display
+
+            # Yield to the async loop; target ~10 FPS to reduce load
+            try:
+                socketio.sleep(0.1)
+            except Exception:
+                time.sleep(0.1)
 
 display_monitor = DisplayMonitor()
 
@@ -126,7 +131,7 @@ def get_system_status():
     """Get current system status including display state, performance metrics, and CPU utilization."""
     try:
         # Check if display service is running
-        result = subprocess.run(['sudo', 'systemctl', 'is-active', 'ledmatrix'], 
+        result = subprocess.run(['systemctl', 'is-active', 'ledmatrix'], 
                               capture_output=True, text=True)
         service_active = result.stdout.strip() == 'active'
         
@@ -134,8 +139,8 @@ def get_system_status():
         memory = psutil.virtual_memory()
         mem_used_percent = round(memory.percent, 1)
         
-        # Get CPU utilization
-        cpu_percent = round(psutil.cpu_percent(interval=0.1), 1)
+        # Get CPU utilization (non-blocking to avoid stalling the event loop)
+        cpu_percent = round(psutil.cpu_percent(interval=None), 1)
         
         # Get CPU temperature
         try:
@@ -191,8 +196,8 @@ def start_display():
                 logger.info("DisplayManager initialized successfully")
             except Exception as dm_error:
                 logger.error(f"Failed to initialize DisplayManager: {dm_error}")
-                # Create a fallback display manager for web simulation
-                display_manager = DisplayManager(config)
+                # Re-attempt with minimal config to enable fallback simulation
+                display_manager = DisplayManager({'display': {'hardware': {}}})
                 logger.info("Using fallback DisplayManager for web simulation")
             
             display_monitor.start()
@@ -871,4 +876,5 @@ if __name__ == '__main__':
     display_monitor.start()
     
     # Run the app
-    socketio.run(app, host='0.0.0.0', port=5001, debug=False, allow_unsafe_werkzeug=True)
+    # eventlet/gevent provide a proper WSGI server; Werkzeug is fine for dev
+    socketio.run(app, host='0.0.0.0', port=5001, debug=False)

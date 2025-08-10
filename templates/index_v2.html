@@ -1779,7 +1779,7 @@
 
         // Socket.IO connection
         function initializeSocket() {
-            socket = io();
+            socket = io({ transports: ['websocket', 'polling'] });
             
             socket.on('connect', function() {
                 updateConnectionStatus(true);
@@ -1789,6 +1789,17 @@
             socket.on('disconnect', function() {
                 updateConnectionStatus(false);
                 showNotification('Disconnected from LED Matrix', 'error');
+                // Try to reconnect with exponential backoff
+                let attempt = 0;
+                const retry = () => {
+                    attempt++;
+                    const delay = Math.min(30000, 1000 * Math.pow(2, attempt));
+                    setTimeout(() => {
+                        if (socket.connected) return;
+                        socket.connect();
+                    }, delay);
+                };
+                retry();
             });
             
             socket.on('display_update', function(data) {
