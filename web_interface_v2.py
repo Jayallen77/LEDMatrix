@@ -264,7 +264,7 @@ def stop_display():
 @app.route('/api/editor/toggle', methods=['POST'])
 def toggle_editor_mode():
     """Toggle display editor mode."""
-    global editor_mode, display_running
+    global editor_mode, display_running, display_manager
     
     try:
         editor_mode = not editor_mode
@@ -281,7 +281,7 @@ def toggle_editor_mode():
                 except Exception as dm_error:
                     logger.error(f"Failed to initialize DisplayManager for editor: {dm_error}")
                     # Create a fallback display manager for web simulation
-                    display_manager = DisplayManager(config)
+                    display_manager = DisplayManager(config, force_fallback=True)
                     logger.info("Using fallback DisplayManager for editor simulation")
                 display_monitor.start()
         else:
