@@ -13,6 +13,14 @@ from urllib3.util.retry import Retry
 import pytz
 from src.odds_manager import OddsManager
 
+# Import the API counter function from web interface
+try:
+    from web_interface_v2 import increment_api_counter
+except ImportError:
+    # Fallback if web interface is not available
+    def increment_api_counter(kind: str, count: int = 1):
+        pass
+
 # Get logger
 logger = logging.getLogger(__name__)
 
@@ -447,6 +455,10 @@ class BaseMLBManager:
                 response.raise_for_status()
                 
                 data = response.json()
+                
+                # Increment API counter for sports data call
+                increment_api_counter('sports', 1)
+                
                 self.logger.info(f"Found {len(data.get('events', []))} total games for date {date}")
                 
                 for event in data.get('events', []):

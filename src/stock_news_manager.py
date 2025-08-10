@@ -14,6 +14,14 @@ from .cache_manager import CacheManager
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+# Import the API counter function from web interface
+try:
+    from web_interface_v2 import increment_api_counter
+except ImportError:
+    # Fallback if web interface is not available
+    def increment_api_counter(kind: str, count: int = 1):
+        pass
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -125,6 +133,9 @@ class StockNewsManager:
                 return []
                 
             data = response.json()
+            
+            # Increment API counter for news data call
+            increment_api_counter('news', 1)
             news_items = data.get('news', [])
             
             processed_news = []

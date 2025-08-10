@@ -12,6 +12,13 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import pytz
 
+# Import API counter function
+try:
+    from web_interface_v2 import increment_api_counter
+except ImportError:
+    def increment_api_counter(kind: str, count: int = 1):
+        pass
+
 # Get logger
 logger = logging.getLogger(__name__)
 
@@ -248,6 +255,8 @@ class BaseMiLBManager:
         draw = ImageDraw.Draw(image)
         
         # For upcoming games, show date and time stacked in the center
+        self.logger.debug(f"[MiLB] Game status: {game_data.get('status')}, status_state: {game_data.get('status_state')}")
+        self.logger.debug(f"[MiLB] Full game data: {game_data}")
         if game_data['status'] == 'status_scheduled':
             # Ensure game_time_str is defined before use
             game_time_str = game_data.get('start_time', '')
@@ -261,48 +270,72 @@ class BaseMiLBManager:
             # Draw on the current image
             self.display_manager.draw = draw
             self.display_manager._draw_bdf_text(status_text, status_x, status_y, color=(255, 255, 255), font=self.display_manager.calendar_font)
-            # Update the display
-            self.display_manager.update_display()
             
             if not game_time_str or 'TBD' in game_time_str:
                 game_date_str = "TBD"
                 game_time_formatted_str = ""
+                self.logger.debug(f"[MiLB] Game time is TBD or empty: {game_time_str}")
             else:
-                game_time = datetime.fromisoformat(game_time_str.replace('Z', '+00:00'))
-                timezone_str = self.config.get('timezone', 'UTC')
+                self.logger.debug(f"[MiLB] Processing game time: {game_time_str}")
                 try:
-                    tz = pytz.timezone(timezone_str)
-                except pytz.exceptions.UnknownTimeZoneError:
-                    logger.warning(f"Unknown timezone: {timezone_str}, falling back to UTC")
-                    tz = pytz.UTC
-                if game_time.tzinfo is None:
-                    game_time = game_time.replace(tzinfo=pytz.UTC)
-                local_time = game_time.astimezone(tz)
-                
-                # Check date format from config
-                use_short_date_format = self.config.get('display', {}).get('use_short_date_format', False)
-                if use_short_date_format:
-                    game_date_str = local_time.strftime("%-m/%-d")
-                else:
-                    game_date_str = self.display_manager.format_date_with_ordinal(local_time)
+                    game_time = datetime.fromisoformat(game_time_str.replace('Z', '+00:00'))
+                    timezone_str = self.config.get('timezone', 'UTC')
+                    try:
+                        tz = pytz.timezone(timezone_str)
+                    except pytz.exceptions.UnknownTimeZoneError:
+                        logger.warning(f"Unknown timezone: {timezone_str}, falling back to UTC")
+                        tz = pytz.UTC
+                    if game_time.tzinfo is None:
+                        game_time = game_time.replace(tzinfo=pytz.UTC)
+                    local_time = game_time.astimezone(tz)
+                    
+                    self.logger.debug(f"[MiLB] Local time: {local_time}")
+                    
+                    # Check date format from config
+                    use_short_date_format = self.config.get('display', {}).get('use_short_date_format', False)
+                    if use_short_date_format:
+                        game_date_str = local_time.strftime("%-m/%-d")
+                    else:
+                        game_date_str = self.display_manager.format_date_with_ordinal(local_time)
 
-                game_time_formatted_str = self._format_game_time(game_data['start_time'])
+                    game_time_formatted_str = self._format_game_time(game_data['start_time'])
+                    
+                    self.logger.debug(f"[MiLB] Formatted date: {game_date_str}, time: {game_time_formatted_str}")
+                except Exception as e:
+                    self.logger.error(f"[MiLB] Error processing game time: {e}")
+                    game_date_str = "TBD"
+                    game_time_formatted_str = "TBD"
             
             # Draw date and time using NHL-style fonts
-            date_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
-            time_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
+            try:
+                date_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
+                time_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
+                self.logger.debug(f"[MiLB] Fonts loaded successfully")
+            except Exception as e:
+                self.logger.error(f"[MiLB] Failed to load fonts: {e}")
+                # Fallback to default font
+                date_font = ImageFont.load_default()
+                time_font = ImageFont.load_default()
             
             # Draw date in center
             date_width = draw.textlength(game_date_str, font=date_font)
             date_x = (width - date_width) // 2
             date_y = (height - date_font.size) // 2 - 3
+            self.logger.debug(f"[MiLB] Drawing date '{game_date_str}' at ({date_x}, {date_y})")
             self._draw_text_with_outline(draw, game_date_str, (date_x, date_y), date_font)
+            
+            # Draw a simple test rectangle to verify drawing is working
+            draw.rectangle([date_x-2, date_y-2, date_x+date_width+2, date_y+date_font.size+2], outline=(255, 0, 0))
             
             # Draw time below date
             time_width = draw.textlength(game_time_formatted_str, font=time_font)
             time_x = (width - time_width) // 2
             time_y = date_y + 10
+            self.logger.debug(f"[MiLB] Drawing time '{game_time_formatted_str}' at ({time_x}, {time_y})")
             self._draw_text_with_outline(draw, game_time_formatted_str, (time_x, time_y), time_font)
+            
+            # Draw a simple test rectangle to verify drawing is working
+            draw.rectangle([time_x-2, time_y-2, time_x+time_width+2, time_y+time_font.size+2], outline=(0, 255, 0))
         
         # For recent/final games, show scores and status
         elif game_data['status'] in ['status_final', 'final', 'completed']:
@@ -316,8 +349,6 @@ class BaseMiLBManager:
             # Draw on the current image
             self.display_manager.draw = draw
             self.display_manager._draw_bdf_text(status_text, status_x, status_y, color=(255, 255, 255), font=self.display_manager.calendar_font)
-            # Update the display
-            self.display_manager.update_display()
             
             # Draw scores at the bottom using NHL-style font
             away_score = str(game_data['away_score'])
@@ -362,6 +393,7 @@ class BaseMiLBManager:
     def _format_game_time(self, game_time: str) -> str:
         """Format game time for display."""
         try:
+            self.logger.debug(f"[MiLB] Formatting game time: {game_time}")
             # Get timezone from config
             timezone_str = self.config.get('timezone', 'UTC')
             try:
@@ -376,7 +408,9 @@ class BaseMiLBManager:
                 dt = dt.replace(tzinfo=pytz.UTC)
             local_dt = dt.astimezone(tz)
             
-            return local_dt.strftime("%I:%M%p").lstrip('0')
+            formatted_time = local_dt.strftime("%I:%M%p").lstrip('0')
+            self.logger.debug(f"[MiLB] Formatted time: {formatted_time}")
+            return formatted_time
         except Exception as e:
             logger.error(f"Error formatting game time: {e}")
             return "TBD"
@@ -392,7 +426,9 @@ class BaseMiLBManager:
 
         try:
             # Check if test mode is enabled
-            if self.milb_config.get('test_mode', False):
+            test_mode = self.milb_config.get('test_mode', False)
+            self.logger.debug(f"[MiLB] Test mode: {test_mode}")
+            if test_mode:
                 self.logger.info("Using test mode data for MiLB")
                 return {
                     'test_game_1': {
@@ -417,6 +453,8 @@ class BaseMiLBManager:
             current_month = now.month
             in_season = 4 <= current_month <= 9
             
+            self.logger.debug(f"[MiLB] Current month: {current_month}, in_season: {in_season}")
+            
             if not in_season:
                 self.logger.info("MiLB is currently in offseason (October-March). No games expected.")
                 self.logger.info("Consider enabling test_mode for offseason testing.")
@@ -440,6 +478,8 @@ class BaseMiLBManager:
                         response = self.session.get(url, headers=self.headers, timeout=10)
                         response.raise_for_status()
                         data = response.json()
+                        # Increment API counter for successful request
+                        increment_api_counter('sports', 1)
                     except requests.exceptions.RequestException as e:
                         self.logger.error(f"Error fetching data from {url}: {e}")
                         continue
@@ -487,6 +527,8 @@ class BaseMiLBManager:
                         if not event.get('gameDate'):
                             self.logger.warning(f"Skipping game {game_pk} due to missing 'gameDate'.")
                             continue
+                        
+                        self.logger.debug(f"[MiLB] Game {game_pk} gameDate: {event.get('gameDate')}")
 
                         is_favorite_game = (home_abbr in self.favorite_teams or away_abbr in self.favorite_teams)
                         
@@ -522,6 +564,8 @@ class BaseMiLBManager:
                                 'away_record': away_record_str,
                                 'home_record': home_record_str
                             }
+                            
+                            self.logger.debug(f"[MiLB] Created game data for {game_pk}: status={mapped_status}, status_state={mapped_status_state}, start_time={event.get('gameDate')}")
 
                             if status_state == 'Live':
                                 linescore = event.get('linescore', {})
@@ -1545,7 +1589,9 @@ class MiLBUpcomingManager(BaseMiLBManager):
                 return
 
             # --- Optimization: Filter for favorite teams before processing ---
-            if self.milb_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+            show_favorite_only = self.milb_config.get("show_favorite_teams_only", False)
+            self.logger.debug(f"[MiLB] show_favorite_teams_only: {show_favorite_only}, favorite_teams: {self.favorite_teams}")
+            if show_favorite_only and self.favorite_teams:
                 games = {
                     game_id: game for game_id, game in games.items()
                     if game.get('home_team') in self.favorite_teams or game.get('away_team') in self.favorite_teams
@@ -1572,9 +1618,11 @@ class MiLBUpcomingManager(BaseMiLBManager):
                     continue
 
                 try:
+                    self.logger.debug(f"[MiLB] Parsing start_time: {game['start_time']}")
                     game_time = datetime.fromisoformat(game['start_time'].replace('Z', '+00:00'))
                     if game_time.tzinfo is None:
                         game_time = game_time.replace(tzinfo=timezone.utc)
+                    self.logger.debug(f"[MiLB] Parsed game_time: {game_time}")
                 except (ValueError, TypeError) as e:
                     self.logger.error(f"Could not parse start_time for game {game_id}: {game['start_time']}. Error: {e}")
                     continue
@@ -1593,6 +1641,7 @@ class MiLBUpcomingManager(BaseMiLBManager):
                 if is_upcoming:
                     new_upcoming_games.append(game)
                     self.logger.info(f"[MiLB] Added upcoming game: {game.get('away_team')} @ {game.get('home_team')} at {game_time}")
+                    self.logger.debug(f"[MiLB] Game data for upcoming: {game}")
                 
             # Sort by game time (soonest first) and limit to upcoming_games_to_show
             new_upcoming_games.sort(key=lambda x: x.get('start_time', ''))
@@ -1622,6 +1671,7 @@ class MiLBUpcomingManager(BaseMiLBManager):
 
     def display(self, force_clear: bool = False):
         """Display upcoming games."""
+        self.logger.debug(f"[MiLB] Display called with {len(self.upcoming_games)} upcoming games")
         if not self.upcoming_games:
             current_time = time.time()
             if current_time - self.last_warning_time > self.warning_cooldown:
@@ -1639,13 +1689,17 @@ class MiLBUpcomingManager(BaseMiLBManager):
                 self.current_game = self.upcoming_games[self.current_game_index]
                 self.last_game_switch = current_time
                 force_clear = True  # Force clear when switching games
+                self.logger.debug(f"[MiLB] Switched to game {self.current_game_index}: {self.current_game.get('away_team')} @ {self.current_game.get('home_team')}")
             
             # Create and display the game image
             if self.current_game:
+                self.logger.debug(f"[MiLB] Creating display for current game: {self.current_game.get('away_team')} @ {self.current_game.get('home_team')}")
                 game_image = self._create_game_display(self.current_game)
                 self.display_manager.image = game_image
                 self.display_manager.draw = ImageDraw.Draw(self.display_manager.image)
                 self.display_manager.update_display()
+            else:
+                self.logger.debug(f"[MiLB] No current game to display")
             
         except Exception as e:
             self.logger.error(f"[MiLB] Error displaying upcoming game: {e}", exc_info=True) 

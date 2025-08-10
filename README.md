@@ -1033,6 +1033,31 @@ The LEDMatrix system includes a comprehensive scoreboard display system with thr
 - Automatic game switching
 - Built-in caching to reduce API calls
 - Test mode for development
+## API Usage Tracking
+
+The LEDMatrix system includes a built-in API usage counter that tracks API calls made by various managers in a 24-hour rolling window. This feature helps monitor API usage and ensure compliance with rate limits.
+
+### API Counter Features
+- **Real-time Tracking**: Counts API calls for weather, stocks, sports, and news data
+- **24-hour Window**: Rolling window that resets every 24 hours
+- **Web Interface Integration**: View current usage in the Overview tab of the web interface
+- **Forecast Display**: Shows predicted API usage based on current configuration
+- **Automatic Reset**: Counters automatically reset when the 24-hour window expires
+
+### Tracked API Calls
+- **Weather**: OpenWeatherMap API calls (geocoding + weather data)
+- **Stocks**: Yahoo Finance API calls for stock and crypto data
+- **Sports**: ESPN API calls for various sports leagues (NHL, NBA, MLB, NFL, etc.)
+- **News**: RSS feed and news API calls
+
+### Accessing API Metrics
+1. Open the web interface in your browser
+2. Navigate to the **Overview** tab
+3. Scroll down to the "API Calls (24h window)" section
+4. Click "Refresh API Metrics" to update the display
+
+The counter shows both actual usage and forecasted usage based on your current configuration settings.
+
 ## Caching System
 
 The LEDMatrix system includes a robust caching mechanism to optimize API calls and reduce network traffic:

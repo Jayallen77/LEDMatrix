@@ -13,6 +13,14 @@ from src.config_manager import ConfigManager
 from src.odds_manager import OddsManager
 import pytz
 
+# Import the API counter function from web interface
+try:
+    from web_interface_v2 import increment_api_counter
+except ImportError:
+    # Fallback if web interface is not available
+    def increment_api_counter(kind: str, count: int = 1):
+        pass
+
 # Constants
 NHL_API_BASE_URL = "https://api-web.nhle.com/v1/schedule/"
 
@@ -126,6 +134,10 @@ class BaseNHLManager:
             response = requests.get(url)
             response.raise_for_status()
             data = response.json()
+            
+            # Increment API counter for sports data call
+            increment_api_counter('sports', 1)
+            
             self.logger.info(f"[NHL] Successfully fetched data from NHL API for {date_str}")
             
             # Save to cache if caching is enabled

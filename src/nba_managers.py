@@ -13,6 +13,14 @@ from src.config_manager import ConfigManager
 from src.odds_manager import OddsManager
 import pytz
 
+# Import the API counter function from web interface
+try:
+    from web_interface_v2 import increment_api_counter
+except ImportError:
+    # Fallback if web interface is not available
+    def increment_api_counter(kind: str, count: int = 1):
+        pass
+
 # Constants
 ESPN_NBA_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
 
@@ -282,6 +290,9 @@ class BaseNBAManager:
             response = requests.get(url, params=params)
             response.raise_for_status()
             data = response.json()
+            
+            # Increment API counter for sports data call
+            increment_api_counter('sports', 1)
             
             if use_cache:
                 self.cache_manager.set(cache_key, data)

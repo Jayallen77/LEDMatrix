@@ -7,6 +7,14 @@ import freetype
 from .weather_icons import WeatherIcons
 from .cache_manager import CacheManager
 
+# Import the API counter function from web interface
+try:
+    from web_interface_v2 import increment_api_counter
+except ImportError:
+    # Fallback if web interface is not available
+    def increment_api_counter(kind: str, count: int = 1):
+        pass
+
 class WeatherManager:
 
     def __init__(self, config: Dict[str, Any], display_manager):
@@ -108,6 +116,9 @@ class WeatherManager:
             response.raise_for_status()
             geo_data = response.json()
             
+            # Increment API counter for geocoding call
+            increment_api_counter('weather', 1)
+            
             if not geo_data:
                 print(f"Could not find coordinates for {city}, {state}")
                 return
@@ -122,6 +133,9 @@ class WeatherManager:
             response = requests.get(one_call_url)
             response.raise_for_status()
             one_call_data = response.json()
+            
+            # Increment API counter for weather data call
+            increment_api_counter('weather', 1)
             
             # Store current weather data
             self.weather_data = {
