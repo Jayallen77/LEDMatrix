@@ -581,9 +581,8 @@ class NFLLiveManager(BaseNFLManager): # Renamed class
                     for event in events:
                         details = self._extract_game_details(event)
                         if details and (details["is_live"] or details["is_halftime"]): # Include halftime as 'live' display
-                            # This second check is somewhat redundant if show_favorite_teams_only is true, but harmless
-                            # And necessary if show_favorite_teams_only is false but favorite_teams has values
-                            if not self.favorite_teams or (
+                            # Only apply favorite team filtering if show_favorite_teams_only is true
+                            if not self.nfl_config.get("show_favorite_teams_only", False) or (
                                 details["home_abbr"] in self.favorite_teams or
                                 details["away_abbr"] in self.favorite_teams
                             ):
@@ -601,11 +600,13 @@ class NFLLiveManager(BaseNFLManager): # Renamed class
 
                     if should_log:
                         if new_live_games:
-                            self.logger.info(f"[NFL] Found {len(new_live_games)} live/halftime games for fav teams.")
+                            filter_text = "favorite teams" if self.nfl_config.get("show_favorite_teams_only", False) else "all teams"
+                            self.logger.info(f"[NFL] Found {len(new_live_games)} live/halftime games for {filter_text}.")
                             for game in new_live_games:
                                 self.logger.info(f"  - {game['away_abbr']}@{game['home_abbr']} ({game.get('status_text', 'N/A')})")
                         else:
-                            self.logger.info("[NFL] No live/halftime games found for favorite teams.")
+                            filter_text = "favorite teams" if self.nfl_config.get("show_favorite_teams_only", False) else "criteria"
+                            self.logger.info(f"[NFL] No live/halftime games found for {filter_text}.")
                         self.last_log_time = current_time
 
 

@@ -666,11 +666,13 @@ class NCAAFBLiveManager(BaseNCAAFBManager): # Renamed class
 
                     if should_log:
                         if new_live_games:
-                            self.logger.info(f"[NCAAFB] Found {len(new_live_games)} live/halftime games for fav teams.") # Changed log prefix
+                            filter_text = "favorite teams" if self.ncaa_fb_config.get("show_favorite_teams_only", False) else "all teams"
+                            self.logger.info(f"[NCAAFB] Found {len(new_live_games)} live/halftime games for {filter_text}.")
                             for game_info in new_live_games: # Renamed game to game_info
                                 self.logger.info(f"  - {game_info['away_abbr']}@{game_info['home_abbr']} ({game_info.get('status_text', 'N/A')})")
                         else:
-                            self.logger.info("[NCAAFB] No live/halftime games found for favorite teams.") # Changed log prefix
+                            filter_text = "favorite teams" if self.ncaa_fb_config.get("show_favorite_teams_only", False) else "criteria"
+                            self.logger.info(f"[NCAAFB] No live/halftime games found for {filter_text}.")
                         self.last_log_time = current_time_for_log
 
 
