@@ -117,6 +117,30 @@
             border: 2px solid #333;
         }
 
+        /* Mock device frame look */
+        .display-preview::before {
+            content: "";
+            position: absolute;
+            inset: 10px;
+            border-radius: 12px;
+            box-shadow: inset 0 0 0 2px rgba(255,255,255,0.06), inset 0 0 30px rgba(255,255,255,0.05);
+            pointer-events: none;
+        }
+
+        .preview-stage {
+            position: relative;
+            display: inline-block;
+        }
+
+        .grid-overlay {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
         .display-image {
             max-width: 100%;
             max-height: 100%;
@@ -678,7 +702,12 @@
             <div class="display-panel">
                 <h2><i class="fas fa-desktop"></i> Live Display Preview</h2>
                 <div class="display-preview" id="displayPreview">
-                    <div style="color: #666; font-size: 1.2rem;">
+                    <div id="previewStage" class="preview-stage" style="display:none;">
+                        <div id="previewMeta" style="position:absolute; top:-28px; left:0; color:#ddd; font-size:12px; opacity:0.85;"></div>
+                        <img id="displayImage" class="display-image" alt="LED Matrix Display">
+                        <canvas id="gridOverlay" class="grid-overlay"></canvas>
+                    </div>
+                    <div id="displayPlaceholder" style="color: #666; font-size: 1.2rem;">
                         <i class="fas fa-spinner fa-spin"></i>
                         Connecting to display...
                     </div>
@@ -697,6 +726,17 @@
                     <button class="btn btn-primary" onclick="takeScreenshot()">
                         <i class="fas fa-camera"></i> Screenshot
                     </button>
+                    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-left:auto;">
+                        <label style="color:#333; background:#f3f3f3; padding:6px 10px; border-radius:8px;">
+                            Scale
+                            <input type="range" id="scaleRange" min="2" max="16" value="8" style="vertical-align:middle;">
+                            <span id="scaleValue">8x</span>
+                        </label>
+                        <label style="color:#333; background:#f3f3f3; padding:6px 10px; border-radius:8px; display:inline-flex; align-items:center; gap:8px;">
+                            <input type="checkbox" id="toggleGrid">
+                            Show pixel grid
+                        </label>
+                    </div>
                 </div>
             </div>
 
@@ -706,11 +746,20 @@
                     <button class="tab-btn active" onclick="showTab('overview')">
                         <i class="fas fa-tachometer-alt"></i> Overview
                     </button>
+                    <button class="tab-btn" onclick="showTab('general')">
+                        <i class="fas fa-sliders-h"></i> General
+                    </button>
                     <button class="tab-btn" onclick="showTab('schedule')">
                         <i class="fas fa-calendar"></i> Schedule
                     </button>
                     <button class="tab-btn" onclick="showTab('display')">
                         <i class="fas fa-cog"></i> Display
+                    </button>
+                    <button class="tab-btn" onclick="showTab('clock')">
+                        <i class="fas fa-clock"></i> Clock
+                    </button>
+                    <button class="tab-btn" onclick="showTab('durations')">
+                        <i class="fas fa-hourglass-half"></i> Durations
                     </button>
                     <button class="tab-btn" onclick="showTab('sports')">
                         <i class="fas fa-football-ball"></i> Sports
@@ -721,6 +770,15 @@
                     <button class="tab-btn" onclick="showTab('stocks')">
                         <i class="fas fa-chart-line"></i> Stocks
                     </button>
+                    <button class="tab-btn" onclick="showTab('stocknews')">
+                        <i class="fas fa-newspaper"></i> Stock News
+                    </button>
+                    <button class="tab-btn" onclick="showTab('odds')">
+                        <i class="fas fa-ticket-alt"></i> Odds Ticker
+                    </button>
+                    <button class="tab-btn" onclick="showTab('text')">
+                        <i class="fas fa-font"></i> Text
+                    </button>
                     <button class="tab-btn" onclick="showTab('features')">
                         <i class="fas fa-star"></i> Features
                     </button>
@@ -729,6 +787,9 @@
                     </button>
                     <button class="tab-btn" onclick="showTab('calendar')">
                         <i class="fas fa-calendar-alt"></i> Calendar
+                    </button>
+                    <button class="tab-btn" onclick="showTab('youtube')">
+                        <i class="fab fa-youtube"></i> YouTube
                     </button>
                     <button class="tab-btn" onclick="showTab('news')">
                         <i class="fas fa-newspaper"></i> News
@@ -791,6 +852,42 @@
                         <button class="btn btn-danger" onclick="systemAction('reboot_system')">
                             <i class="fas fa-power-off"></i> Reboot System
                         </button>
+                    </div>
+                </div>
+
+                <!-- General Tab -->
+                <div id="general" class="tab-content">
+                    <div class="config-section">
+                        <h3>General Settings</h3>
+                        <form id="general-form">
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="web_display_autostart" name="web_display_autostart" {% if main_config.web_display_autostart %}checked{% endif %}>
+                                    Web Display Autostart
+                                </label>
+                                <div class="description">Start the web interface on boot for easier access.</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="timezone">Timezone</label>
+                                <input type="text" class="form-control" id="timezone" name="timezone" value="{{ main_config.timezone }}" placeholder="e.g., America/Chicago">
+                                <div class="description">IANA timezone, affects time-based features and scheduling.</div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="city">City</label>
+                                    <input type="text" class="form-control" id="city" name="city" value="{{ main_config.location.city }}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="state">State</label>
+                                    <input type="text" class="form-control" id="state" name="state" value="{{ main_config.location.state }}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="country">Country</label>
+                                    <input type="text" class="form-control" id="country" name="country" value="{{ main_config.location.country }}">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-success">Save General Settings</button>
+                        </form>
                     </div>
                 </div>
 
@@ -938,6 +1035,50 @@
                     </div>
                 </div>
 
+                <!-- Clock Tab -->
+                <div id="clock" class="tab-content">
+                    <div class="config-section">
+                        <h3>Clock</h3>
+                        <form id="clock-form">
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="clock_enabled" {% if main_config.clock.enabled %}checked{% endif %}>
+                                    Enable Clock
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label for="clock_format">Format</label>
+                                <input type="text" id="clock_format" class="form-control" value="{{ main_config.clock.format }}">
+                                <div class="description">Python strftime format. Example: %I:%M %p for 12-hour time.</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="clock_update_interval">Update Interval (seconds)</label>
+                                <input type="number" id="clock_update_interval" class="form-control" value="{{ main_config.clock.update_interval }}" min="1" max="60">
+                            </div>
+                            <button type="submit" class="btn btn-success">Save Clock Settings</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Durations Tab -->
+                <div id="durations" class="tab-content">
+                    <div class="config-section">
+                        <h3>Rotation Durations</h3>
+                        <p class="description">How long each screen is shown before switching. Values in seconds.</p>
+                        <form id="durations-form">
+                            <div class="form-row">
+                                {% for key, value in main_config.display.display_durations.items() %}
+                                <div class="form-group">
+                                    <label for="duration_{{ key }}">{{ key | replace('_', ' ') | title }}</label>
+                                    <input type="number" class="form-control duration-input" id="duration_{{ key }}" data-name="{{ key }}" value="{{ value }}" min="5" max="600">
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <button type="submit" class="btn btn-success">Save Durations</button>
+                        </form>
+                    </div>
+                </div>
+
                 <!-- Sports Tab -->
                 <div id="sports" class="tab-content">
                     <div class="config-section">
@@ -981,6 +1122,11 @@
                                 <div class="description">Temperature units</div>
                             </div>
                             <div class="form-group">
+                                <label for="weather_display_format">Display Format</label>
+                                <textarea id="weather_display_format" class="form-control" rows="2">{{ main_config.weather.display_format }}</textarea>
+                                <div class="description">Use tokens like {temp}, {condition}. Supports new lines.</div>
+                            </div>
+                            <div class="form-group">
                                 <label for="weather_update_interval">Update Interval (seconds):</label>
                                 <input type="number" class="form-control" id="weather_update_interval" name="weather_update_interval" value="{{ main_config.weather.update_interval }}" min="300" max="3600">
                                 <div class="description">How often to update weather data (300-3600 seconds)</div>
@@ -1011,12 +1157,50 @@
                                 <input type="number" class="form-control" id="stocks_update_interval" name="stocks_update_interval" value="{{ main_config.stocks.update_interval }}" min="60" max="3600">
                                 <div class="description">How often to update stock data</div>
                             </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="stocks_scroll_speed">Scroll Speed</label>
+                                    <input type="number" step="0.1" class="form-control" id="stocks_scroll_speed" value="{{ main_config.stocks.scroll_speed }}">
+                                    <div class="description">Horizontal scroll pixels per step.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="stocks_scroll_delay">Scroll Delay (seconds)</label>
+                                    <input type="number" step="0.001" class="form-control" id="stocks_scroll_delay" value="{{ main_config.stocks.scroll_delay }}">
+                                    <div class="description">Delay between scroll steps.</div>
+                                </div>
+                            </div>
                             <div class="form-group">
                                 <label>
                                     <input type="checkbox" id="stocks_toggle_chart" name="stocks_toggle_chart" {% if main_config.stocks.toggle_chart %}checked{% endif %}>
                                     Show Charts
                                 </label>
                                 <div class="description">Display mini charts alongside stock ticker data</div>
+                            </div>
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="stocks_dynamic_duration" {% if main_config.stocks.dynamic_duration %}checked{% endif %}>
+                                    Dynamic Duration
+                                </label>
+                                <div class="description">Adjust display duration based on content length.</div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="stocks_min_duration">Min Duration (sec)</label>
+                                    <input type="number" class="form-control" id="stocks_min_duration" value="{{ main_config.stocks.min_duration }}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="stocks_max_duration">Max Duration (sec)</label>
+                                    <input type="number" class="form-control" id="stocks_max_duration" value="{{ main_config.stocks.max_duration }}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="stocks_duration_buffer">Duration Buffer</label>
+                                    <input type="number" step="0.01" class="form-control" id="stocks_duration_buffer" value="{{ main_config.stocks.duration_buffer }}">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="stocks_display_format">Display Format</label>
+                                <input type="text" class="form-control" id="stocks_display_format" value="{{ main_config.stocks.display_format }}">
+                                <div class="description">Use tokens like {symbol}, {price}, {change}.</div>
                             </div>
                             <button type="submit" class="btn btn-success">Save Stocks Settings</button>
                         </form>
@@ -1040,6 +1224,132 @@
                                 <div class="description">How often to update crypto data</div>
                             </div>
                             <button type="submit" class="btn btn-success">Save Crypto Settings</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Stock News Tab -->
+                <div id="stocknews" class="tab-content">
+                    <div class="config-section">
+                        <h3>Stock News</h3>
+                        <form id="stocknews-form">
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="stocknews_enabled" {% if main_config.stock_news.enabled %}checked{% endif %}>
+                                    Enable Stock News
+                                </label>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="stocknews_update_interval">Update Interval (sec)</label>
+                                    <input type="number" class="form-control" id="stocknews_update_interval" value="{{ main_config.stock_news.update_interval }}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="stocknews_scroll_speed">Scroll Speed</label>
+                                    <input type="number" step="0.1" class="form-control" id="stocknews_scroll_speed" value="{{ main_config.stock_news.scroll_speed }}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="stocknews_scroll_delay">Scroll Delay (sec)</label>
+                                    <input type="number" step="0.001" class="form-control" id="stocknews_scroll_delay" value="{{ main_config.stock_news.scroll_delay }}">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="stocknews_max_headlines_per_symbol">Max Headlines per Symbol</label>
+                                    <input type="number" class="form-control" id="stocknews_max_headlines_per_symbol" value="{{ main_config.stock_news.max_headlines_per_symbol }}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="stocknews_headlines_per_rotation">Headlines per Rotation</label>
+                                    <input type="number" class="form-control" id="stocknews_headlines_per_rotation" value="{{ main_config.stock_news.headlines_per_rotation }}">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="stocknews_dynamic_duration" {% if main_config.stock_news.dynamic_duration %}checked{% endif %}>
+                                    Dynamic Duration
+                                </label>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group"><label for="stocknews_min_duration">Min Duration</label><input type="number" class="form-control" id="stocknews_min_duration" value="{{ main_config.stock_news.min_duration }}"></div>
+                                <div class="form-group"><label for="stocknews_max_duration">Max Duration</label><input type="number" class="form-control" id="stocknews_max_duration" value="{{ main_config.stock_news.max_duration }}"></div>
+                                <div class="form-group"><label for="stocknews_duration_buffer">Duration Buffer</label><input type="number" step="0.01" class="form-control" id="stocknews_duration_buffer" value="{{ main_config.stock_news.duration_buffer }}"></div>
+                            </div>
+                            <button type="submit" class="btn btn-success">Save Stock News</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Odds Ticker Tab -->
+                <div id="odds" class="tab-content">
+                    <div class="config-section">
+                        <h3>Odds Ticker</h3>
+                        <form id="odds-form">
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="odds_enabled" {% if main_config.odds_ticker.enabled %}checked{% endif %}>
+                                    Enable Odds Ticker
+                                </label>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group"><label for="odds_update_interval">Update Interval (sec)</label><input type="number" class="form-control" id="odds_update_interval" value="{{ main_config.odds_ticker.update_interval }}"></div>
+                                <div class="form-group"><label for="odds_scroll_speed">Scroll Speed</label><input type="number" step="0.1" class="form-control" id="odds_scroll_speed" value="{{ main_config.odds_ticker.scroll_speed }}"></div>
+                                <div class="form-group"><label for="odds_scroll_delay">Scroll Delay (sec)</label><input type="number" step="0.001" class="form-control" id="odds_scroll_delay" value="{{ main_config.odds_ticker.scroll_delay }}"></div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group"><label for="odds_games_per_favorite_team">Games per Favorite Team</label><input type="number" class="form-control" id="odds_games_per_favorite_team" value="{{ main_config.odds_ticker.games_per_favorite_team }}"></div>
+                                <div class="form-group"><label for="odds_max_games_per_league">Max Games per League</label><input type="number" class="form-control" id="odds_max_games_per_league" value="{{ main_config.odds_ticker.max_games_per_league }}"></div>
+                                <div class="form-group"><label for="odds_future_fetch_days">Future Fetch Days</label><input type="number" class="form-control" id="odds_future_fetch_days" value="{{ main_config.odds_ticker.future_fetch_days }}"></div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="odds_enabled_leagues">Enabled Leagues</label>
+                                    <input type="text" class="form-control" id="odds_enabled_leagues" value="{{ main_config.odds_ticker.enabled_leagues | join(', ') }}">
+                                    <div class="description">Comma-separated list, e.g., nfl, mlb, ncaa_fb, milb</div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="odds_sort_order">Sort Order</label>
+                                    <select id="odds_sort_order" class="form-control">
+                                        <option value="soonest" {% if main_config.odds_ticker.sort_order == 'soonest' %}selected{% endif %}>Soonest</option>
+                                        <option value="league" {% if main_config.odds_ticker.sort_order == 'league' %}selected{% endif %}>By League</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group"><label><input type="checkbox" id="odds_show_favorite_teams_only" {% if main_config.odds_ticker.show_favorite_teams_only %}checked{% endif %}> Show Favorite Teams Only</label></div>
+                                <div class="form-group"><label><input type="checkbox" id="odds_show_odds_only" {% if main_config.odds_ticker.show_odds_only %}checked{% endif %}> Show Odds Only</label></div>
+                                <div class="form-group"><label><input type="checkbox" id="odds_loop" {% if main_config.odds_ticker.loop %}checked{% endif %}> Loop</label></div>
+                                <div class="form-group"><label><input type="checkbox" id="odds_show_channel_logos" {% if main_config.odds_ticker.show_channel_logos %}checked{% endif %}> Show Channel Logos</label></div>
+                            </div>
+                            <div class="form-group"><label><input type="checkbox" id="odds_dynamic_duration" {% if main_config.odds_ticker.dynamic_duration %}checked{% endif %}> Dynamic Duration</label></div>
+                            <div class="form-row">
+                                <div class="form-group"><label for="odds_min_duration">Min Duration</label><input type="number" class="form-control" id="odds_min_duration" value="{{ main_config.odds_ticker.min_duration }}"></div>
+                                <div class="form-group"><label for="odds_max_duration">Max Duration</label><input type="number" class="form-control" id="odds_max_duration" value="{{ main_config.odds_ticker.max_duration }}"></div>
+                                <div class="form-group"><label for="odds_duration_buffer">Duration Buffer</label><input type="number" step="0.01" class="form-control" id="odds_duration_buffer" value="{{ main_config.odds_ticker.duration_buffer }}"></div>
+                            </div>
+                            <button type="submit" class="btn btn-success">Save Odds Settings</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Text Display Tab -->
+                <div id="text" class="tab-content">
+                    <div class="config-section">
+                        <h3>Text Display</h3>
+                        <form id="text-form">
+                            <div class="form-group"><label><input type="checkbox" id="text_enabled" {% if main_config.text_display.enabled %}checked{% endif %}> Enable</label></div>
+                            <div class="form-group"><label for="text_text">Text</label><input type="text" id="text_text" class="form-control" value="{{ main_config.text_display.text }}"></div>
+                            <div class="form-group"><label for="text_font_path">Font Path</label><input type="text" id="text_font_path" class="form-control" value="{{ main_config.text_display.font_path }}"></div>
+                            <div class="form-row">
+                                <div class="form-group"><label for="text_font_size">Font Size</label><input type="number" id="text_font_size" class="form-control" value="{{ main_config.text_display.font_size }}"></div>
+                                <div class="form-group"><label><input type="checkbox" id="text_scroll" {% if main_config.text_display.scroll %}checked{% endif %}> Scroll</label></div>
+                                <div class="form-group"><label for="text_scroll_speed">Scroll Speed</label><input type="number" id="text_scroll_speed" class="form-control" value="{{ main_config.text_display.scroll_speed }}"></div>
+                                <div class="form-group"><label for="text_scroll_gap_width">Scroll Gap Width</label><input type="number" id="text_scroll_gap_width" class="form-control" value="{{ main_config.text_display.scroll_gap_width }}"></div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group"><label for="text_text_color">Text Color</label><input type="color" id="text_text_color" class="form-control" data-rgb='{{ main_config.text_display.text_color | tojson }}'></div>
+                                <div class="form-group"><label for="text_background_color">Background Color</label><input type="color" id="text_background_color" class="form-control" data-rgb='{{ main_config.text_display.background_color | tojson }}'></div>
+                            </div>
+                            <button type="submit" class="btn btn-success">Save Text Settings</button>
                         </form>
                     </div>
                 </div>
@@ -1086,6 +1396,18 @@
                                 <div class="description">How often to check for music updates</div>
                             </div>
                             <button type="submit" class="btn btn-success">Save Music Settings</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- YouTube Tab -->
+                <div id="youtube" class="tab-content">
+                    <div class="config-section">
+                        <h3>YouTube</h3>
+                        <form id="youtube-form">
+                            <div class="form-group"><label><input type="checkbox" id="youtube_enabled" {% if main_config.youtube.enabled %}checked{% endif %}> Enable YouTube</label></div>
+                            <div class="form-group"><label for="youtube_update_interval">Update Interval (sec)</label><input type="number" id="youtube_update_interval" class="form-control" value="{{ main_config.youtube.update_interval }}"></div>
+                            <button type="submit" class="btn btn-success">Save YouTube Settings</button>
                         </form>
                     </div>
                 </div>
@@ -1175,6 +1497,29 @@
                         <div id="news_status" style="margin-top: 20px; padding: 15px; background: #f0f8f0; border-radius: var(--border-radius);">
                             <!-- Status will be populated by JavaScript -->
                         </div>
+
+                        <h4 style="margin-top:20px;">Advanced Settings</h4>
+                        <div class="form-row">
+                            <div class="form-group"><label for="news_update_interval">Update Interval (sec)</label><input type="number" id="news_update_interval" class="form-control" value="{{ main_config.news_manager.update_interval }}"></div>
+                            <div class="form-group"><label for="news_scroll_speed">Scroll Speed</label><input type="number" step="0.1" id="news_scroll_speed" class="form-control" value="{{ main_config.news_manager.scroll_speed }}"></div>
+                            <div class="form-group"><label for="news_scroll_delay">Scroll Delay (sec)</label><input type="number" step="0.001" id="news_scroll_delay" class="form-control" value="{{ main_config.news_manager.scroll_delay }}"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label for="news_rotation_threshold">Rotation Threshold</label><input type="number" id="news_rotation_threshold" class="form-control" value="{{ main_config.news_manager.rotation_threshold }}"></div>
+                            <div class="form-group"><label><input type="checkbox" id="news_dynamic_duration" {% if main_config.news_manager.dynamic_duration %}checked{% endif %}> Dynamic Duration</label></div>
+                            <div class="form-group"><label for="news_min_duration">Min Duration</label><input type="number" id="news_min_duration" class="form-control" value="{{ main_config.news_manager.min_duration }}"></div>
+                            <div class="form-group"><label for="news_max_duration">Max Duration</label><input type="number" id="news_max_duration" class="form-control" value="{{ main_config.news_manager.max_duration }}"></div>
+                            <div class="form-group"><label for="news_duration_buffer">Duration Buffer</label><input type="number" step="0.01" id="news_duration_buffer" class="form-control" value="{{ main_config.news_manager.duration_buffer }}"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label for="news_font_size">Font Size</label><input type="number" id="news_font_size" class="form-control" value="{{ main_config.news_manager.font_size }}"></div>
+                            <div class="form-group"><label for="news_font_path">Font Path</label><input type="text" id="news_font_path" class="form-control" value="{{ main_config.news_manager.font_path }}"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label for="news_text_color">Text Color</label><input type="color" id="news_text_color" class="form-control" data-rgb='{{ main_config.news_manager.text_color | tojson }}'></div>
+                            <div class="form-group"><label for="news_separator_color">Separator Color</label><input type="color" id="news_separator_color" class="form-control" data-rgb='{{ main_config.news_manager.separator_color | tojson }}'></div>
+                        </div>
+                        <button class="btn btn-success" type="button" onclick="saveNewsAdvancedSettings()">Save Advanced News Settings</button>
                     </div>
                 </div>
 
@@ -1362,11 +1707,16 @@
     <!-- Notification -->
     <div id="notification" class="notification"></div>
 
+    <!-- Server-provided data for JS (avoids inline Jinja in JS) -->
+    <script id="serverData" type="application/json">{{ {'main_config': main_config, 'editor_mode': editor_mode} | tojson }}</script>
+
     <script>
         // Global variables
         let socket;
-        let currentConfig = {{ main_config | tojson }};
-        let editorMode = {{ editor_mode | tojson }};
+        const __serverDataEl = document.getElementById('serverData');
+        const __serverData = __serverDataEl ? JSON.parse(__serverDataEl.textContent) : { main_config: {}, editor_mode: false };
+        let currentConfig = __serverData.main_config || {};
+        let editorMode = !!__serverData.editor_mode;
         let currentElements = [];
         let selectedElement = null;
 
@@ -1376,6 +1726,52 @@
             initializeEditor();
             updateSystemStats();
             loadNewsManagerData();
+
+            // UI controls for grid & scale
+            const scaleRange = document.getElementById('scaleRange');
+            const scaleValue = document.getElementById('scaleValue');
+            const toggleGrid = document.getElementById('toggleGrid');
+            const gridCanvas = document.getElementById('gridOverlay');
+
+            if (scaleRange && scaleValue) {
+                scaleRange.addEventListener('input', () => {
+                    scaleValue.textContent = `${scaleRange.value}x`;
+                    // Repaint grid at new scale using latest known dimensions
+                    fetch('/api/display/current')
+                        .then(r => r.json())
+                        .then(data => {
+                            if (!data || !data.width || !data.height) return;
+                            // Resize image and canvas
+                            const img = document.getElementById('displayImage');
+                            const scale = parseInt(scaleRange.value || '8');
+                            img.style.width = `${data.width * scale}px`;
+                            img.style.height = `${data.height * scale}px`;
+                            gridCanvas.width = data.width * scale;
+                            gridCanvas.height = data.height * scale;
+                            drawGrid(gridCanvas, data.width, data.height, scale);
+                        })
+                        .catch(() => {});
+                });
+            }
+
+            if (toggleGrid && gridCanvas) {
+                toggleGrid.addEventListener('change', () => {
+                    gridCanvas.style.display = toggleGrid.checked ? 'block' : 'none';
+                    if (toggleGrid.checked) {
+                        // Redraw grid with current size
+                        fetch('/api/display/current')
+                            .then(r => r.json())
+                            .then(data => {
+                                if (!data || !data.width || !data.height) return;
+                                const scale = parseInt((document.getElementById('scaleRange')?.value) || '8');
+                                drawGrid(gridCanvas, data.width, data.height, scale);
+                            })
+                            .catch(() => {});
+                    }
+                });
+                // default hidden
+                gridCanvas.style.display = 'none';
+            }
             
             // Update stats every 30 seconds
             setInterval(updateSystemStats, 30000);
@@ -1400,6 +1796,34 @@
             });
         }
 
+        // Draw pixel grid lines on top of scaled image
+        function drawGrid(canvas, logicalWidth, logicalHeight, scale) {
+            const show = document.getElementById('toggleGrid')?.checked;
+            if (!canvas || !show) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+            ctx.lineWidth = 1;
+
+            // Vertical lines
+            for (let x = 0; x <= logicalWidth; x++) {
+                const px = Math.floor(x * scale) + 0.5;
+                ctx.beginPath();
+                ctx.moveTo(px, 0);
+                ctx.lineTo(px, logicalHeight * scale);
+                ctx.stroke();
+            }
+
+            // Horizontal lines
+            for (let y = 0; y <= logicalHeight; y++) {
+                const py = Math.floor(y * scale) + 0.5;
+                ctx.beginPath();
+                ctx.moveTo(0, py);
+                ctx.lineTo(logicalWidth * scale, py);
+                ctx.stroke();
+            }
+        }
+
         // Update connection status
         function updateConnectionStatus(connected) {
             const status = document.getElementById('connectionStatus');
@@ -1415,16 +1839,42 @@
         // Update display preview with better scaling and error handling
         function updateDisplayPreview(data) {
             const preview = document.getElementById('displayPreview');
+            const stage = document.getElementById('previewStage');
+            const img = document.getElementById('displayImage');
+            const canvas = document.getElementById('gridOverlay');
+            const placeholder = document.getElementById('displayPlaceholder');
+
             if (data.image) {
-                preview.innerHTML = `<img src="data:image/png;base64,${data.image}" 
-                                           class="display-image" 
-                                           alt="LED Matrix Display"
-                                           style="max-width: 100%; height: auto; image-rendering: pixelated;">`;
+                // Show stage
+                placeholder.style.display = 'none';
+                stage.style.display = 'inline-block';
+
+                // Current scale from slider
+                const scale = parseInt(document.getElementById('scaleRange').value || '8');
+
+                // Update image and meta label
+                img.style.imageRendering = 'pixelated';
+                img.src = `data:image/png;base64,${data.image}`;
+                const meta = document.getElementById('previewMeta');
+                if (meta) {
+                    meta.textContent = `${data.width || 128} x ${data.height || 32} @ ${scale}x`;
+                }
+
+                // Once image loads, size the canvas to match
+                const width = (data.width || 128) * scale;
+                const height = (data.height || 32) * scale;
+                img.style.width = width + 'px';
+                img.style.height = height + 'px';
+                canvas.width = width;
+                canvas.height = height;
+                drawGrid(canvas, data.width || 128, data.height || 32, scale);
             } else {
-                preview.innerHTML = `<div style="color: #666; font-size: 1.2rem;">
-                                       <i class="fas fa-exclamation-triangle"></i>
-                                       No display data available
-                                     </div>`;
+                stage.style.display = 'none';
+                placeholder.style.display = 'block';
+                placeholder.innerHTML = `<div style="color: #666; font-size: 1.2rem;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    No display data available
+                </div>`;
             }
         }
 
@@ -1442,7 +1892,17 @@
             document.getElementById(tabName).classList.add('active');
             
             // Add active class to clicked button
-            event.target.classList.add('active');
+            if (event && event.target) {
+                event.target.classList.add('active');
+            } else {
+                // Fallback: match tabName to button by data
+                const btns = document.querySelectorAll('.tab-btn');
+                btns.forEach(btn => {
+                    if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(`'${tabName}'`)) {
+                        btn.classList.add('active');
+                    }
+                });
+            }
 
             // Load specific data when tabs are opened
             if (tabName === 'news') {
@@ -1561,8 +2021,10 @@
                 e.preventDefault();
                 const elementType = e.dataTransfer.getData('text/plain');
                 const rect = preview.getBoundingClientRect();
-                const x = Math.floor((e.clientX - rect.left) / 8); // Scale down from preview (8x scaling)
-                const y = Math.floor((e.clientY - rect.top) / 8);
+                const scaleInput = document.getElementById('scaleRange');
+                const scale = scaleInput ? parseInt(scaleInput.value || '8') : 8;
+                const x = Math.floor((e.clientX - rect.left) / scale);
+                const y = Math.floor((e.clientY - rect.top) / scale);
                 
                 addElement(elementType, x, y);
             });
@@ -1574,7 +2036,7 @@
                 type: type,
                 x: x,
                 y: y,
-                properties: getDefaultProperties(type)
+                properties: getDefaultProperties(type, x, y)
             };
             
             currentElements.push(element);
@@ -1582,7 +2044,7 @@
             selectElement(element);
         }
 
-        function getDefaultProperties(type) {
+        function getDefaultProperties(type, baseX, baseY) {
             switch (type) {
                 case 'text':
                     return {
@@ -1603,8 +2065,8 @@
                     };
                 case 'line':
                     return {
-                        x2: x + 20,
-                        y2: y,
+                        x2: (baseX || 0) + 20,
+                        y2: baseY || 0,
                         color: [255, 255, 255]
                     };
                 default:
@@ -1775,6 +2237,260 @@
                 showNotification('Error saving display settings: ' + error.message, 'error');
             }
         });
+
+        // General form submit
+        document.getElementById('general-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const payload = {
+                web_display_autostart: document.getElementById('web_display_autostart').checked,
+                timezone: document.getElementById('timezone').value,
+                location: {
+                    city: document.getElementById('city').value,
+                    state: document.getElementById('state').value,
+                    country: document.getElementById('country').value
+                }
+            };
+            await saveConfigJson(payload);
+        });
+
+        // Clock form submit
+        document.getElementById('clock-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const payload = {
+                clock: {
+                    enabled: document.getElementById('clock_enabled').checked,
+                    format: document.getElementById('clock_format').value,
+                    update_interval: parseInt(document.getElementById('clock_update_interval').value)
+                }
+            };
+            await saveConfigJson(payload);
+        });
+
+        // Durations form submit
+        document.getElementById('durations-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const inputs = document.querySelectorAll('.duration-input');
+            const durations = {};
+            inputs.forEach(inp => {
+                durations[inp.dataset.name] = parseInt(inp.value);
+            });
+            const payload = { display: { display_durations: durations } };
+            await saveConfigJson(payload);
+        });
+
+        // Weather form submit augmentation
+        (function augmentWeatherForm(){
+            const form = document.getElementById('weather-form');
+            form.addEventListener('submit', async function(e){
+                e.preventDefault();
+                const payload = {
+                    weather: {
+                        enabled: document.getElementById('weather_enabled').checked,
+                        update_interval: parseInt(document.getElementById('weather_update_interval').value),
+                        units: document.getElementById('weather_units').value,
+                        display_format: document.getElementById('weather_display_format').value
+                    },
+                    location: {
+                        city: document.getElementById('weather_city').value,
+                        state: document.getElementById('weather_state').value
+                    }
+                };
+                await saveConfigJson(payload);
+            });
+        })();
+
+        // Stocks form submit augmentation
+        (function augmentStocksForm(){
+            const form = document.getElementById('stocks-form');
+            form.addEventListener('submit', async function(e){
+                e.preventDefault();
+                const symbols = document.getElementById('stocks_symbols').value.split(',').map(s => s.trim()).filter(Boolean);
+                const payload = {
+                    stocks: {
+                        enabled: document.getElementById('stocks_enabled').checked,
+                        update_interval: parseInt(document.getElementById('stocks_update_interval').value),
+                        scroll_speed: parseFloat(document.getElementById('stocks_scroll_speed').value),
+                        scroll_delay: parseFloat(document.getElementById('stocks_scroll_delay').value),
+                        toggle_chart: document.getElementById('stocks_toggle_chart').checked,
+                        dynamic_duration: document.getElementById('stocks_dynamic_duration').checked,
+                        min_duration: parseInt(document.getElementById('stocks_min_duration').value),
+                        max_duration: parseInt(document.getElementById('stocks_max_duration').value),
+                        duration_buffer: parseFloat(document.getElementById('stocks_duration_buffer').value),
+                        symbols: symbols,
+                        display_format: document.getElementById('stocks_display_format').value
+                    }
+                };
+                await saveConfigJson(payload);
+            });
+        })();
+
+        // Crypto form submit
+        (function augmentCryptoForm(){
+            const form = document.getElementById('crypto-form');
+            form.addEventListener('submit', async function(e){
+                e.preventDefault();
+                const symbols = document.getElementById('crypto_symbols').value.split(',').map(s => s.trim()).filter(Boolean);
+                const payload = {
+                    crypto: {
+                        enabled: document.getElementById('crypto_enabled').checked,
+                        update_interval: parseInt(document.getElementById('crypto_update_interval').value),
+                        symbols: symbols
+                    }
+                };
+                await saveConfigJson(payload);
+            });
+        })();
+
+        // Stock news form submit
+        (function augmentStockNewsForm(){
+            const form = document.getElementById('stocknews-form');
+            form.addEventListener('submit', async function(e){
+                e.preventDefault();
+                const payload = {
+                    stock_news: {
+                        enabled: document.getElementById('stocknews_enabled').checked,
+                        update_interval: parseInt(document.getElementById('stocknews_update_interval').value),
+                        scroll_speed: parseFloat(document.getElementById('stocknews_scroll_speed').value),
+                        scroll_delay: parseFloat(document.getElementById('stocknews_scroll_delay').value),
+                        max_headlines_per_symbol: parseInt(document.getElementById('stocknews_max_headlines_per_symbol').value),
+                        headlines_per_rotation: parseInt(document.getElementById('stocknews_headlines_per_rotation').value),
+                        dynamic_duration: document.getElementById('stocknews_dynamic_duration').checked,
+                        min_duration: parseInt(document.getElementById('stocknews_min_duration').value),
+                        max_duration: parseInt(document.getElementById('stocknews_max_duration').value),
+                        duration_buffer: parseFloat(document.getElementById('stocknews_duration_buffer').value)
+                    }
+                };
+                await saveConfigJson(payload);
+            });
+        })();
+
+        // Odds form submit
+        (function augmentOddsForm(){
+            const form = document.getElementById('odds-form');
+            form.addEventListener('submit', async function(e){
+                e.preventDefault();
+                const leagues = document.getElementById('odds_enabled_leagues').value.split(',').map(s => s.trim()).filter(Boolean);
+                const payload = {
+                    odds_ticker: {
+                        enabled: document.getElementById('odds_enabled').checked,
+                        update_interval: parseInt(document.getElementById('odds_update_interval').value),
+                        scroll_speed: parseFloat(document.getElementById('odds_scroll_speed').value),
+                        scroll_delay: parseFloat(document.getElementById('odds_scroll_delay').value),
+                        games_per_favorite_team: parseInt(document.getElementById('odds_games_per_favorite_team').value),
+                        max_games_per_league: parseInt(document.getElementById('odds_max_games_per_league').value),
+                        future_fetch_days: parseInt(document.getElementById('odds_future_fetch_days').value),
+                        enabled_leagues: leagues,
+                        sort_order: document.getElementById('odds_sort_order').value,
+                        show_favorite_teams_only: document.getElementById('odds_show_favorite_teams_only').checked,
+                        show_odds_only: document.getElementById('odds_show_odds_only').checked,
+                        loop: document.getElementById('odds_loop').checked,
+                        show_channel_logos: document.getElementById('odds_show_channel_logos').checked,
+                        dynamic_duration: document.getElementById('odds_dynamic_duration').checked,
+                        min_duration: parseInt(document.getElementById('odds_min_duration').value),
+                        max_duration: parseInt(document.getElementById('odds_max_duration').value),
+                        duration_buffer: parseFloat(document.getElementById('odds_duration_buffer').value)
+                    }
+                };
+                await saveConfigJson(payload);
+            });
+        })();
+
+        // Text form submit
+        (function augmentTextForm(){
+            const form = document.getElementById('text-form');
+            const initColor = (input) => {
+                try { const rgb = JSON.parse(input.dataset.rgb || '[255,255,255]'); input.value = rgbToHex(rgb); } catch {}
+            };
+            initColor(document.getElementById('text_text_color'));
+            initColor(document.getElementById('text_background_color'));
+            form.addEventListener('submit', async function(e){
+                e.preventDefault();
+                const payload = {
+                    text_display: {
+                        enabled: document.getElementById('text_enabled').checked,
+                        text: document.getElementById('text_text').value,
+                        font_path: document.getElementById('text_font_path').value,
+                        font_size: parseInt(document.getElementById('text_font_size').value),
+                        scroll: document.getElementById('text_scroll').checked,
+                        scroll_speed: parseInt(document.getElementById('text_scroll_speed').value),
+                        scroll_gap_width: parseInt(document.getElementById('text_scroll_gap_width').value),
+                        text_color: hexToRgbArray(document.getElementById('text_text_color').value),
+                        background_color: hexToRgbArray(document.getElementById('text_background_color').value)
+                    }
+                };
+                await saveConfigJson(payload);
+            });
+        })();
+
+        // YouTube form submit
+        (function augmentYouTubeForm(){
+            const form = document.getElementById('youtube-form');
+            form.addEventListener('submit', async function(e){
+                e.preventDefault();
+                const payload = {
+                    youtube: {
+                        enabled: document.getElementById('youtube_enabled').checked,
+                        update_interval: parseInt(document.getElementById('youtube_update_interval').value)
+                    }
+                };
+                await saveConfigJson(payload);
+            });
+        })();
+
+        // News advanced save
+        async function saveNewsAdvancedSettings(){
+            const payload = {
+                news_manager: {
+                    update_interval: parseInt(document.getElementById('news_update_interval').value),
+                    scroll_speed: parseFloat(document.getElementById('news_scroll_speed').value),
+                    scroll_delay: parseFloat(document.getElementById('news_scroll_delay').value),
+                    rotation_threshold: parseInt(document.getElementById('news_rotation_threshold').value),
+                    dynamic_duration: document.getElementById('news_dynamic_duration').checked,
+                    min_duration: parseInt(document.getElementById('news_min_duration').value),
+                    max_duration: parseInt(document.getElementById('news_max_duration').value),
+                    duration_buffer: parseFloat(document.getElementById('news_duration_buffer').value),
+                    font_size: parseInt(document.getElementById('news_font_size').value),
+                    font_path: document.getElementById('news_font_path').value,
+                    text_color: hexToRgbArray(document.getElementById('news_text_color').value),
+                    separator_color: hexToRgbArray(document.getElementById('news_separator_color').value)
+                }
+            };
+            await saveConfigJson(payload);
+        }
+
+        // Helpers for RGB <-> hex
+        function hexToRgbArray(hex){
+            const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return m ? [parseInt(m[1],16), parseInt(m[2],16), parseInt(m[3],16)] : [255,255,255];
+        }
+        function rgbToHex(arr){
+            const [r,g,b] = arr || [255,255,255];
+            const toHex = v => ('0' + Math.max(0, Math.min(255, v)).toString(16)).slice(-2);
+            return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+        }
+
+        // Generic JSON save using existing endpoint
+        async function saveConfigJson(fragment){
+            try {
+                const response = await fetch('/save_config', {
+                    method: 'POST',
+                    body: makeFormData({
+                        config_type: 'main',
+                        config_data: JSON.stringify(fragment)
+                    })
+                });
+                const result = await response.json();
+                showNotification(result.message || 'Saved', result.status || 'success');
+            } catch (error) {
+                showNotification('Error saving configuration: ' + error, 'error');
+            }
+        }
+
+        function makeFormData(obj){
+            const fd = new FormData();
+            Object.entries(obj).forEach(([k,v]) => fd.append(k, v));
+            return fd;
+        }
 
         // JSON validation and formatting functions
         function formatJson(elementId) {

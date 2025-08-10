@@ -102,12 +102,29 @@ class DisplayManager:
             
         except Exception as e:
             logger.error(f"Failed to initialize RGB Matrix: {e}", exc_info=True)
-            # Create a fallback image for web preview
+            # Create a fallback image for web preview using configured dimensions when available
             self.matrix = None
-            self.image = Image.new('RGB', (128, 32))  # Default size
+            try:
+                hardware_config = self.config.get('display', {}).get('hardware', {}) if self.config else {}
+                rows = int(hardware_config.get('rows', 32))
+                cols = int(hardware_config.get('cols', 64))
+                chain_length = int(hardware_config.get('chain_length', 2))
+                fallback_width = max(1, cols * chain_length)
+                fallback_height = max(1, rows)
+            except Exception:
+                fallback_width, fallback_height = 128, 32
+
+            self.image = Image.new('RGB', (fallback_width, fallback_height))
             self.draw = ImageDraw.Draw(self.image)
-            self.draw.text((10, 10), "Matrix Error", fill=(255, 0, 0))
-            logger.error(f"Matrix initialization failed, using fallback mode. Error: {e}")
+            # Simple fallback visualization so web UI shows a realistic canvas
+            try:
+                self.draw.rectangle([0, 0, fallback_width - 1, fallback_height - 1], outline=(255, 0, 0))
+                self.draw.line([0, 0, fallback_width - 1, fallback_height - 1], fill=(0, 255, 0))
+                self.draw.text((2, max(0, (fallback_height // 2) - 4)), "Simulation", fill=(0, 128, 255))
+            except Exception:
+                # Best-effort; ignore drawing errors in fallback
+                pass
+            logger.error(f"Matrix initialization failed, using fallback mode with size {fallback_width}x{fallback_height}. Error: {e}")
             # Do not raise here; allow fallback mode so web preview and non-hardware environments work
 
     @property
