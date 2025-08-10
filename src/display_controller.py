@@ -151,10 +151,12 @@ class DisplayController:
             self.milb_live = MiLBLiveManager(self.config, self.display_manager, self.cache_manager) if milb_display_modes.get('milb_live', True) else None
             self.milb_recent = MiLBRecentManager(self.config, self.display_manager, self.cache_manager) if milb_display_modes.get('milb_recent', True) else None
             self.milb_upcoming = MiLBUpcomingManager(self.config, self.display_manager, self.cache_manager) if milb_display_modes.get('milb_upcoming', True) else None
+            logger.info(f"MiLB managers initialized - live: {self.milb_live is not None}, recent: {self.milb_recent is not None}, upcoming: {self.milb_upcoming is not None}")
         else:
             self.milb_live = None
             self.milb_recent = None
             self.milb_upcoming = None
+            logger.info("MiLB managers disabled")
         logger.info("MiLB managers initialized in %.3f seconds", time.time() - milb_time)
             
         # Initialize Soccer managers if enabled
@@ -1137,6 +1139,7 @@ class DisplayController:
                                 manager_to_display = self.milb_recent
                             elif self.current_display_mode == 'milb_upcoming' and self.milb_upcoming:
                                 manager_to_display = self.milb_upcoming
+                                logger.info("Set manager_to_display to milb_upcoming")
                             elif self.current_display_mode == 'soccer_recent' and self.soccer_recent:
                                 manager_to_display = self.soccer_recent
                             elif self.current_display_mode == 'soccer_upcoming' and self.soccer_upcoming:
@@ -1168,6 +1171,8 @@ class DisplayController:
                     if self.current_display_mode != getattr(self, '_last_logged_mode', None):
                         logger.info(f"Showing {self.current_display_mode}")
                         self._last_logged_mode = self.current_display_mode
+                    
+                    logger.info(f"manager_to_display is {type(manager_to_display).__name__ if manager_to_display else 'None'}")
                     
                     if self.current_display_mode == 'music' and self.music_manager:
                         # Call MusicManager's display method
@@ -1230,6 +1235,7 @@ class DisplayController:
                             # Special handling for live managers that need update before display
                             if self.current_display_mode.endswith('_live') and hasattr(manager_to_display, 'update'):
                                 manager_to_display.update()
+                            logger.info(f"Calling display method for {self.current_display_mode}")
                             manager_to_display.display(force_clear=self.force_clear)
                         else:
                             logger.warning(f"Manager {type(manager_to_display).__name__} for mode {self.current_display_mode} does not have a standard 'display' method.")

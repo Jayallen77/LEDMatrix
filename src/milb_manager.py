@@ -211,6 +211,7 @@ class BaseMiLBManager:
 
     def _create_game_display(self, game_data: Dict[str, Any]) -> Image.Image:
         """Create a display image for an MiLB game with team logos, score, and game state."""
+        self.logger.info(f"[MiLB] Creating game display for: {game_data.get('away_team')} @ {game_data.get('home_team')}")
         width = self.display_manager.matrix.width
         height = self.display_manager.matrix.height
         image = Image.new('RGB', (width, height), color=(0, 0, 0))
@@ -417,6 +418,7 @@ class BaseMiLBManager:
 
     def _fetch_milb_api_data(self, use_cache: bool = True) -> Dict[str, Any]:
         """Fetch MiLB game data from the MLB Stats API."""
+        self.logger.info("[MiLB] _fetch_milb_api_data called")
         cache_key = "milb_live_api_data"
         if use_cache:
             cached_data = self.cache_manager.get_with_auto_strategy(cache_key)
@@ -616,6 +618,7 @@ class BaseMiLBManager:
                         self.cache_manager.set(cache_key, all_games)
                 else:
                     self.logger.error(f"[MiLB] Cannot cache invalid data type: {type(all_games)}")
+            self.logger.info(f"[MiLB] Returning {len(all_games)} games from API")
             return all_games
             
         except Exception as e:
@@ -1531,6 +1534,7 @@ class MiLBUpcomingManager(BaseMiLBManager):
 
     def update(self):
         """Update upcoming games data."""
+        self.logger.info("[MiLB] Update method called")
         current_time = time.time()
         
         # Add a check to see if the manager is enabled
@@ -1602,6 +1606,7 @@ class MiLBUpcomingManager(BaseMiLBManager):
             new_upcoming_games = []
             
             self.logger.info(f"[MiLB] Processing {len(games)} games for upcoming games...")
+            self.logger.info(f"[MiLB] Games keys: {list(games.keys()) if games else 'None'}")
             
             now_utc = datetime.now(timezone.utc)
             for game_id, game in games.items():
@@ -1646,6 +1651,7 @@ class MiLBUpcomingManager(BaseMiLBManager):
             # Sort by game time (soonest first) and limit to upcoming_games_to_show
             new_upcoming_games.sort(key=lambda x: x.get('start_time', ''))
             new_upcoming_games = new_upcoming_games[:self.upcoming_games_to_show]
+            self.logger.info(f"[MiLB] Found {len(new_upcoming_games)} upcoming games after processing")
                 
             # Compare new list with old list to see if an update is needed
             if self.upcoming_games != new_upcoming_games:
@@ -1660,8 +1666,10 @@ class MiLBUpcomingManager(BaseMiLBManager):
                         self.current_game_index = 0
                         self.current_game = self.upcoming_games[0]
                         self.last_game_switch = current_time
+                        self.logger.info(f"[MiLB] Set current game to: {self.current_game.get('away_team')} @ {self.current_game.get('home_team')}")
                 else:
                     self.current_game = None # No upcoming games
+                    self.logger.info("[MiLB] No upcoming games, cleared current game")
             
             self.last_update = current_time
                 
@@ -1671,7 +1679,7 @@ class MiLBUpcomingManager(BaseMiLBManager):
 
     def display(self, force_clear: bool = False):
         """Display upcoming games."""
-        self.logger.debug(f"[MiLB] Display called with {len(self.upcoming_games)} upcoming games")
+        self.logger.info(f"[MiLB] Display called with {len(self.upcoming_games)} upcoming games")
         if not self.upcoming_games:
             current_time = time.time()
             if current_time - self.last_warning_time > self.warning_cooldown:

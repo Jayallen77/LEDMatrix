@@ -641,6 +641,11 @@ class DisplayManager:
             except Exception:
                 # Fallback to direct save if replace not supported
                 self.image.save(self._snapshot_path, format='PNG')
+            # Try to make the snapshot world-readable so the web UI can read it regardless of user
+            try:
+                os.chmod(self._snapshot_path, 0o644)
+            except Exception:
+                pass
             self._last_snapshot_ts = now
         except Exception as e:
             # Snapshot failures should never break display; log at debug to avoid noise

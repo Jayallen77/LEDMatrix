@@ -63,12 +63,12 @@ class DisplayMonitor:
                 # Prefer service-provided snapshot if available (works when ledmatrix service is running)
                 if os.path.exists(snapshot_path):
                     # Read atomically by reopening; ignore partials by skipping this frame
-                    img_bytes = None
                     try:
                         with open(snapshot_path, 'rb') as f:
                             img_bytes = f.read()
                     except Exception:
                         img_bytes = None
+
                     if img_bytes:
                         img_str = base64.b64encode(img_bytes).decode()
                         # If we can infer dimensions from display_manager, include them; else leave 0
@@ -84,16 +84,8 @@ class DisplayMonitor:
                         # Yield and continue to next frame
                         socketio.sleep(0.1)
                         continue
-                    # If we can infer dimensions from display_manager, include them; else leave 0
-                    width = display_manager.width if display_manager else 0
-                    height = display_manager.height if display_manager else 0
-                    current_display_data = {
-                        'image': img_str,
-                        'width': width,
-                        'height': height,
-                        'timestamp': time.time()
-                    }
-                    socketio.emit('display_update', current_display_data)
+                    # If snapshot exists but couldn't be read (partial write/permissions), skip this frame
+                    # and try again on next loop rather than emitting an invalid payload.
                 elif display_manager and hasattr(display_manager, 'image'):
                     # Fallback to in-process manager image
                     img_buffer = io.BytesIO()
