@@ -396,7 +396,7 @@ class BaseNCAAMBasketballManager:
                 "period": status.get("period", 0),
                 "clock": status.get("displayClock", "0:00"),
                 "is_live": status["type"]["state"] in ("in", "halftime"), # Include halftime as live
-                "is_halftime": status["type"]["state"] == "halftime",
+                "is_halftime": status["type"]["state"] == "halftime" or status["type"]["name"] == "STATUS_HALFTIME",
                 "is_final": status["type"]["state"] == "post",
                 "is_upcoming": status["type"]["state"] == "pre",
                 "home_abbr": home_team["team"]["abbreviation"],

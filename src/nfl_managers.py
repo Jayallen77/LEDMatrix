@@ -382,7 +382,7 @@ class BaseNFLManager: # Renamed class
                  elif period == 3: period_text = "Q3" # Fixed: period 3 is 3rd quarter, not halftime
                  elif period == 4: period_text = "Q4"
                  elif period > 4: period_text = "OT" # OT starts after Q4
-            elif status["type"]["state"] == "halftime": # Check explicit halftime state
+            elif status["type"]["state"] == "halftime" or status["type"]["name"] == "STATUS_HALFTIME": # Check explicit halftime state
                 period_text = "HALF"
             elif status["type"]["state"] == "post":
                  if period > 4 : period_text = "Final/OT"
@@ -407,7 +407,7 @@ class BaseNFLManager: # Renamed class
                 "is_live": status["type"]["state"] == "in",
                 "is_final": status["type"]["state"] == "post",
                 "is_upcoming": status["type"]["state"] == "pre",
-                "is_halftime": status["type"]["state"] == "halftime", # Added halftime check
+                "is_halftime": status["type"]["state"] == "halftime" or status["type"]["name"] == "STATUS_HALFTIME", # Added halftime check
                 "home_abbr": home_abbr,
                 "home_score": home_team.get("score", "0"),
                 "home_record": home_record,
