@@ -141,6 +141,16 @@
             pointer-events: none;
         }
 
+        .led-canvas {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: #000;
+        }
+
         .display-image {
             max-width: 100%;
             max-height: 100%;
@@ -731,6 +741,7 @@
                     <div id="previewStage" class="preview-stage" style="display:none;">
                         <div id="previewMeta" style="position:absolute; top:-28px; left:0; color:#ddd; font-size:12px; opacity:0.85;"></div>
                         <img id="displayImage" class="display-image" alt="LED Matrix Display">
+                        <canvas id="ledCanvas" class="led-canvas" style="display:none;"></canvas>
                         <canvas id="gridOverlay" class="grid-overlay"></canvas>
                     </div>
                     <div id="displayPlaceholder" style="color: #666; font-size: 1.2rem;">
@@ -761,6 +772,15 @@
                         <label style="color:#333; background:#f3f3f3; padding:6px 10px; border-radius:8px; display:inline-flex; align-items:center; gap:8px;">
                             <input type="checkbox" id="toggleGrid">
                             Show pixel grid
+                        </label>
+                        <label style="color:#333; background:#f3f3f3; padding:6px 10px; border-radius:8px; display:inline-flex; align-items:center; gap:8px;">
+                            <input type="checkbox" id="toggleLedDots">
+                            LED dot mode
+                        </label>
+                        <label style="color:#333; background:#f3f3f3; padding:6px 10px; border-radius:8px; display:inline-flex; align-items:center; gap:8px;">
+                            Dot fill
+                            <input type="range" id="dotFillRange" min="40" max="95" value="75">
+                            <span id="dotFillValue">75%</span>
                         </label>
                     </div>
                 </div>
@@ -1778,6 +1798,7 @@
                             gridCanvas.width = data.width * scale;
                             gridCanvas.height = data.height * scale;
                             drawGrid(gridCanvas, data.width, data.height, scale);
+                            renderLedDots();
                         })
                         .catch(() => {});
                 });
@@ -1800,6 +1821,20 @@
                 });
                 // default hidden
                 gridCanvas.style.display = 'none';
+            }
+
+            // LED dot mode controls
+            const toggleLedDots = document.getElementById('toggleLedDots');
+            const dotFillRange = document.getElementById('dotFillRange');
+            const dotFillValue = document.getElementById('dotFillValue');
+            if (dotFillRange && dotFillValue) {
+                dotFillRange.addEventListener('input', () => {
+                    dotFillValue.textContent = `${dotFillRange.value}%`;
+                    renderLedDots();
+                });
+            }
+            if (toggleLedDots) {
+                toggleLedDots.addEventListener('change', renderLedDots);
             }
             
             // Update stats every 30 seconds
@@ -1914,6 +1949,7 @@
             const stage = document.getElementById('previewStage');
             const img = document.getElementById('displayImage');
             const canvas = document.getElementById('gridOverlay');
+            const ledCanvas = document.getElementById('ledCanvas');
             const placeholder = document.getElementById('displayPlaceholder');
 
             if (data.image) {
@@ -1937,9 +1973,12 @@
                 const height = (data.height || 32) * scale;
                 img.style.width = width + 'px';
                 img.style.height = height + 'px';
+                ledCanvas.width = width;
+                ledCanvas.height = height;
                 canvas.width = width;
                 canvas.height = height;
                 drawGrid(canvas, data.width || 128, data.height || 32, scale);
+                renderLedDots();
             } else {
                 stage.style.display = 'none';
                 placeholder.style.display = 'block';
@@ -1947,6 +1986,54 @@
                     <i class="fas fa-exclamation-triangle"></i>
                     No display data available
                 </div>`;
+            }
+        }
+
+        function renderLedDots(){
+            const ledCanvas = document.getElementById('ledCanvas');
+            const img = document.getElementById('displayImage');
+            const toggle = document.getElementById('toggleLedDots');
+            if (!ledCanvas || !img || !toggle) return;
+            const show = toggle.checked;
+            ledCanvas.style.display = show ? 'block' : 'none';
+            if (!show) return;
+
+            const scale = parseInt(document.getElementById('scaleRange').value || '8');
+            const fillPct = parseInt(document.getElementById('dotFillRange').value || '75');
+            const dotRadius = Math.max(1, Math.floor((scale * fillPct) / 200)); // radius in px
+            const ctx = ledCanvas.getContext('2d');
+            ctx.clearRect(0, 0, ledCanvas.width, ledCanvas.height);
+
+            // Draw black background (gaps between LEDs)
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, ledCanvas.width, ledCanvas.height);
+
+            // Create an offscreen canvas to sample pixel colors
+            const off = document.createElement('canvas');
+            const logicalWidth = Math.floor(ledCanvas.width / scale);
+            const logicalHeight = Math.floor(ledCanvas.height / scale);
+            off.width = logicalWidth;
+            off.height = logicalHeight;
+            const offCtx = off.getContext('2d');
+            // Draw the current image scaled down to logical LEDs to sample colors
+            try {
+                offCtx.drawImage(img, 0, 0, logicalWidth, logicalHeight);
+            } catch (_) { /* draw failures ignored */ }
+
+            // Draw circular dots for each LED pixel
+            for (let y = 0; y < logicalHeight; y++) {
+                for (let x = 0; x < logicalWidth; x++) {
+                    const pixel = offCtx.getImageData(x, y, 1, 1).data;
+                    const r = pixel[0], g = pixel[1], b = pixel[2], a = pixel[3];
+                    // Skip fully black to reduce overdraw
+                    if (a === 0 || (r|g|b) === 0) continue;
+                    ctx.fillStyle = `rgb(${r},${g},${b})`;
+                    const cx = Math.floor(x * scale + scale / 2);
+                    const cy = Math.floor(y * scale + scale / 2);
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, dotRadius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
             }
         }
 
