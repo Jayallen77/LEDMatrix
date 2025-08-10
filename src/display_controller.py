@@ -529,50 +529,91 @@ class DisplayController:
         # News manager fetches data when displayed, not during updates
         # if self.news_manager: self.news_manager.fetch_news_data()
         
-        # Update NHL managers
-        if self.nhl_live: self.nhl_live.update()
-        if self.nhl_recent: self.nhl_recent.update()
-        if self.nhl_upcoming: self.nhl_upcoming.update()
+        # Only update the currently active sport manager to prevent confusing logs
+        # and reduce unnecessary API calls
+        current_sport = None
+        if self.current_display_mode.endswith('_live'):
+            current_sport = self.current_display_mode.replace('_live', '')
+        elif self.current_display_mode.endswith('_recent'):
+            current_sport = self.current_display_mode.replace('_recent', '')
+        elif self.current_display_mode.endswith('_upcoming'):
+            current_sport = self.current_display_mode.replace('_upcoming', '')
         
-        # Update NBA managers
-        if self.nba_live: self.nba_live.update()
-        if self.nba_recent: self.nba_recent.update()
-        if self.nba_upcoming: self.nba_upcoming.update()
-        
-        # Update MLB managers
-        if self.mlb_live: self.mlb_live.update()
-        if self.mlb_recent: self.mlb_recent.update()
-        if self.mlb_upcoming: self.mlb_upcoming.update()
-        
-        # Update MiLB managers
-        if self.milb_live: self.milb_live.update()
-        if self.milb_recent: self.milb_recent.update()
-        if self.milb_upcoming: self.milb_upcoming.update()
-        
-        # Update Soccer managers
-        if self.soccer_live: self.soccer_live.update()
-        if self.soccer_recent: self.soccer_recent.update()
-        if self.soccer_upcoming: self.soccer_upcoming.update()
+        # Update only the currently active sport manager
+        if current_sport == 'nhl':
+            if self.nhl_live: self.nhl_live.update()
+            if self.nhl_recent: self.nhl_recent.update()
+            if self.nhl_upcoming: self.nhl_upcoming.update()
+        elif current_sport == 'nba':
+            if self.nba_live: self.nba_live.update()
+            if self.nba_recent: self.nba_recent.update()
+            if self.nba_upcoming: self.nba_upcoming.update()
+        elif current_sport == 'mlb':
+            if self.mlb_live: self.mlb_live.update()
+            if self.mlb_recent: self.mlb_recent.update()
+            if self.mlb_upcoming: self.mlb_upcoming.update()
+        elif current_sport == 'milb':
+            if self.milb_live: self.milb_live.update()
+            if self.milb_recent: self.milb_recent.update()
+            if self.milb_upcoming: self.milb_upcoming.update()
+        elif current_sport == 'soccer':
+            if self.soccer_live: self.soccer_live.update()
+            if self.soccer_recent: self.soccer_recent.update()
+            if self.soccer_upcoming: self.soccer_upcoming.update()
+        elif current_sport == 'nfl':
+            if self.nfl_live: self.nfl_live.update()
+            if self.nfl_recent: self.nfl_recent.update()
+            if self.nfl_upcoming: self.nfl_upcoming.update()
+        elif current_sport == 'ncaa_fb':
+            if self.ncaa_fb_live: self.ncaa_fb_live.update()
+            if self.ncaa_fb_recent: self.ncaa_fb_recent.update()
+            if self.ncaa_fb_upcoming: self.ncaa_fb_upcoming.update()
+        elif current_sport == 'ncaa_baseball':
+            if self.ncaa_baseball_live: self.ncaa_baseball_live.update()
+            if self.ncaa_baseball_recent: self.ncaa_baseball_recent.update()
+            if self.ncaa_baseball_upcoming: self.ncaa_baseball_upcoming.update()
+        elif current_sport == 'ncaam_basketball':
+            if self.ncaam_basketball_live: self.ncaam_basketball_live.update()
+            if self.ncaam_basketball_recent: self.ncaam_basketball_recent.update()
+            if self.ncaam_basketball_upcoming: self.ncaam_basketball_upcoming.update()
+        else:
+            # If no specific sport is active, update all managers (fallback behavior)
+            # This ensures data is available when switching to a sport
+            if self.nhl_live: self.nhl_live.update()
+            if self.nhl_recent: self.nhl_recent.update()
+            if self.nhl_upcoming: self.nhl_upcoming.update()
+            
+            if self.nba_live: self.nba_live.update()
+            if self.nba_recent: self.nba_recent.update()
+            if self.nba_upcoming: self.nba_upcoming.update()
+            
+            if self.mlb_live: self.mlb_live.update()
+            if self.mlb_recent: self.mlb_recent.update()
+            if self.mlb_upcoming: self.mlb_upcoming.update()
+            
+            if self.milb_live: self.milb_live.update()
+            if self.milb_recent: self.milb_recent.update()
+            if self.milb_upcoming: self.milb_upcoming.update()
+            
+            if self.soccer_live: self.soccer_live.update()
+            if self.soccer_recent: self.soccer_recent.update()
+            if self.soccer_upcoming: self.soccer_upcoming.update()
 
-        # Update NFL managers
-        if self.nfl_live: self.nfl_live.update()
-        if self.nfl_recent: self.nfl_recent.update()
-        if self.nfl_upcoming: self.nfl_upcoming.update()
+            if self.nfl_live: self.nfl_live.update()
+            if self.nfl_recent: self.nfl_recent.update()
+            if self.nfl_upcoming: self.nfl_upcoming.update()
 
-        # Update NCAA FB managers
-        if self.ncaa_fb_live: self.ncaa_fb_live.update()
-        if self.ncaa_fb_recent: self.ncaa_fb_recent.update()
-        if self.ncaa_fb_upcoming: self.ncaa_fb_upcoming.update()
+            if self.ncaa_fb_live: self.ncaa_fb_live.update()
+            if self.ncaa_fb_recent: self.ncaa_fb_recent.update()
+            if self.ncaa_fb_upcoming: self.ncaa_fb_upcoming.update()
 
-        # Update NCAA Baseball managers
-        if self.ncaa_baseball_live: self.ncaa_baseball_live.update()
-        if self.ncaa_baseball_recent: self.ncaa_baseball_recent.update()
-        if self.ncaa_baseball_upcoming: self.ncaa_baseball_upcoming.update()
+            if self.ncaa_baseball_live: self.ncaa_baseball_live.update()
+            if self.ncaa_baseball_recent: self.ncaa_baseball_recent.update()
+            if self.ncaa_baseball_upcoming: self.ncaa_baseball_upcoming.update()
 
-        # Update NCAA Men's Basketball managers
-        if self.ncaam_basketball_live: self.ncaam_basketball_live.update()
-        if self.ncaam_basketball_recent: self.ncaam_basketball_recent.update()
-        if self.ncaam_basketball_upcoming: self.ncaam_basketball_upcoming.update()
+            if self.ncaam_basketball_live: self.ncaam_basketball_live.update()
+            if self.ncaam_basketball_recent: self.ncaam_basketball_recent.update()
+            if self.ncaam_basketball_upcoming: self.ncaam_basketball_upcoming.update()
 
     def _check_live_games(self) -> tuple[bool, str]:
         """
