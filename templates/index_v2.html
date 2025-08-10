@@ -1125,9 +1125,9 @@
                         <h3>Sports Configuration</h3>
                         <p>Configure which sports leagues to display and their settings.</p>
                         <!-- Sports configuration will be populated by JavaScript -->
-                <div id="sports-config">
-                    Loading sports configuration...
-                </div>
+                        <div id="sports-config">
+                            Loading sports configuration...
+                        </div>
                 <div style="margin-top:10px; display:flex; gap:10px;">
                     <button type="button" class="btn btn-primary" onclick="refreshSportsConfig()">Refresh</button>
                     <button type="button" class="btn btn-success" onclick="saveSportsConfig()">Save Sports Settings</button>
@@ -1406,6 +1406,11 @@
                         <div id="features-config">
                             Loading features configuration...
                         </div>
+                    </div>
+
+                    <h4>API Calls (24h window)</h4>
+                    <div id="api-metrics" class="stat-card" style="text-align:left;">
+                        <div>Loading API metrics...</div>
                     </div>
                 </div>
 
@@ -1772,6 +1777,7 @@
             initializeEditor();
             updateSystemStats();
             loadNewsManagerData();
+            updateApiMetrics();
 
             // UI controls for grid & scale
             const scaleRange = document.getElementById('scaleRange');
@@ -1836,6 +1842,7 @@
             
             // Update stats every 30 seconds
             setInterval(updateSystemStats, 30000);
+            setInterval(updateApiMetrics, 60000);
         });
 
         // Socket.IO connection
@@ -1880,6 +1887,27 @@
             socket.on('display_update', function(data) {
                 updateDisplayPreview(data);
             });
+        }
+
+        async function updateApiMetrics(){
+            try {
+                const res = await fetch('/api/metrics');
+                const data = await res.json();
+                if (data.status !== 'success') return;
+                const el = document.getElementById('api-metrics');
+                const w = Math.round((data.window_seconds || 86400) / 3600);
+                const f = data.forecast || {};
+                const u = data.used || {};
+                el.innerHTML = `
+                    <div><strong>Window:</strong> ${w} hours</div>
+                    <div><strong>Weather:</strong> ${u.weather || 0} used / ${f.weather || 0} forecast</div>
+                    <div><strong>Stocks:</strong> ${u.stocks || 0} used / ${f.stocks || 0} forecast</div>
+                    <div><strong>Sports:</strong> ${u.sports || 0} used / ${f.sports || 0} forecast</div>
+                    <div><strong>News:</strong> ${u.news || 0} used / ${f.news || 0} forecast</div>
+                `;
+            } catch (e) {
+                // ignore
+            }
         }
 
         // Fallback polling when websocket is disconnected
@@ -2986,6 +3014,11 @@
                 const html = leagues.map(l => {
                     const sec = cfg[l.key] || {};
                     const fav = (sec.favorite_teams || []).join(', ');
+                    const recentToShow = sec.recent_games_to_show ?? 1;
+                    const upcomingToShow = sec.upcoming_games_to_show ?? 1;
+                    const liveUpd = sec.live_update_interval ?? 30;
+                    const recentUpd = sec.recent_update_interval ?? 3600;
+                    const upcomingUpd = sec.upcoming_update_interval ?? 3600;
                     return `
                         <div style="border:1px solid #ddd; border-radius:6px; padding:12px; margin:10px 0;">
                             <label style="display:flex; align-items:center; gap:8px;">
@@ -3011,6 +3044,30 @@
                                     <div class="description">Comma-separated abbreviations</div>
                                 </div>
                             </div>
+                            <div class="form-row" style="margin-top:10px;">
+                                <div class="form-group">
+                                    <label>Live Update Interval (sec)</label>
+                                    <input type="number" min="10" class="form-control sp-live-update" data-league="${l.key}" value="${liveUpd}">
+                                </div>
+                                <div class="form-group">
+                                    <label>Recent Update Interval (sec)</label>
+                                    <input type="number" min="60" class="form-control sp-recent-update" data-league="${l.key}" value="${recentUpd}">
+                                </div>
+                                <div class="form-group">
+                                    <label>Upcoming Update Interval (sec)</label>
+                                    <input type="number" min="60" class="form-control sp-upcoming-update" data-league="${l.key}" value="${upcomingUpd}">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Recent Games to Show</label>
+                                    <input type="number" min="0" class="form-control sp-recent-count" data-league="${l.key}" value="${recentToShow}">
+                                </div>
+                                <div class="form-group">
+                                    <label>Upcoming Games to Show</label>
+                                    <input type="number" min="0" class="form-control sp-upcoming-count" data-league="${l.key}" value="${upcomingToShow}">
+                                </div>
+                            </div>
                         </div>
                     `;
                 }).join('');
@@ -3032,12 +3089,22 @@
                     const favoritesOnly = document.querySelector(`.sp-favorites-only[data-league="${key}"]`)?.checked || false;
                     const favs = document.querySelector(`.sp-favorites[data-league="${key}"]`)?.value || '';
                     const favorite_teams = favs.split(',').map(s => s.trim()).filter(Boolean);
+                    const liveUpd = parseInt(document.querySelector(`.sp-live-update[data-league="${key}"]`)?.value || '30');
+                    const recentUpd = parseInt(document.querySelector(`.sp-recent-update[data-league="${key}"]`)?.value || '3600');
+                    const upcomingUpd = parseInt(document.querySelector(`.sp-upcoming-update[data-league="${key}"]`)?.value || '3600');
+                    const recentCount = parseInt(document.querySelector(`.sp-recent-count[data-league="${key}"]`)?.value || '1');
+                    const upcomingCount = parseInt(document.querySelector(`.sp-upcoming-count[data-league="${key}"]`)?.value || '1');
                     fragment[key] = {
                         enabled,
                         live_priority: livePriority,
                         show_odds: showOdds,
                         show_favorite_teams_only: favoritesOnly,
-                        favorite_teams
+                        favorite_teams,
+                        live_update_interval: liveUpd,
+                        recent_update_interval: recentUpd,
+                        upcoming_update_interval: upcomingUpd,
+                        recent_games_to_show: recentCount,
+                        upcoming_games_to_show: upcomingCount
                     };
                 });
                 await saveConfigJson(fragment);

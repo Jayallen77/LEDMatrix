@@ -469,6 +469,82 @@ def get_system_status_api():
     """Get system status as JSON."""
     return jsonify(get_system_status())
 
+# --- API Call Metrics (simple in-memory counters) ---
+api_counters = {
+    'weather': {'used': 0},
+    'stocks': {'used': 0},
+    'sports': {'used': 0},
+    'news': {'used': 0},
+}
+api_window_start = time.time()
+api_window_seconds = 24 * 3600
+
+def increment_api_counter(kind: str, count: int = 1):
+    global api_window_start
+    now = time.time()
+    if now - api_window_start > api_window_seconds:
+        # Reset window
+        api_window_start = now
+        for v in api_counters.values():
+            v['used'] = 0
+    if kind in api_counters:
+        api_counters[kind]['used'] = api_counters[kind].get('used', 0) + count
+
+@app.route('/api/metrics')
+def get_metrics():
+    """Expose lightweight API usage counters and simple forecasts based on config."""
+    try:
+        config = config_manager.load_config()
+        forecast = {}
+        # Weather forecasted calls per 24h
+        try:
+            w_int = int(config.get('weather', {}).get('update_interval', 1800))
+            forecast['weather'] = max(1, int(api_window_seconds / max(1, w_int)))
+        except Exception:
+            forecast['weather'] = 0
+        # Stocks
+        try:
+            s_int = int(config.get('stocks', {}).get('update_interval', 600))
+            forecast['stocks'] = max(1, int(api_window_seconds / max(1, s_int)))
+        except Exception:
+            forecast['stocks'] = 0
+        # Sports (aggregate of enabled leagues using their recent update intervals)
+        sports_leagues = [
+            ('nhl_scoreboard','recent_update_interval'),
+            ('nba_scoreboard','recent_update_interval'),
+            ('mlb','recent_update_interval'),
+            ('milb','recent_update_interval'),
+            ('soccer_scoreboard','recent_update_interval'),
+            ('nfl_scoreboard','recent_update_interval'),
+            ('ncaa_fb_scoreboard','recent_update_interval'),
+            ('ncaa_baseball_scoreboard','recent_update_interval'),
+            ('ncaam_basketball_scoreboard','recent_update_interval'),
+        ]
+        sports_calls = 0
+        for key, interval_key in sports_leagues:
+            sec = config.get(key, {})
+            if sec.get('enabled', False):
+                ival = int(sec.get(interval_key, 3600))
+                sports_calls += max(1, int(api_window_seconds / max(1, ival)))
+        forecast['sports'] = sports_calls
+
+        # News manager
+        try:
+            n_int = int(config.get('news_manager', {}).get('update_interval', 300))
+            forecast['news'] = max(1, int(api_window_seconds / max(1, n_int)))
+        except Exception:
+            forecast['news'] = 0
+
+        return jsonify({
+            'status': 'success',
+            'window_seconds': api_window_seconds,
+            'since': api_window_start,
+            'forecast': forecast,
+            'used': {k: v.get('used', 0) for k, v in api_counters.items()}
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 # Add all the routes from the original web interface for compatibility
 @app.route('/save_schedule', methods=['POST'])
 def save_schedule_route():
