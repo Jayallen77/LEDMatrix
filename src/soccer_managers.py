@@ -457,7 +457,7 @@ class BaseSoccerManager:
             return "CANC"
         
         # Handle live game time
-        if status_type == "STATUS_IN_PROGRESS":
+        if status_type in ["STATUS_IN_PROGRESS", "STATUS_FIRST_HALF", "STATUS_SECOND_HALF"]:
              # Simple clock display, potentially add period info if needed
              # Remove seconds for cleaner display
              if ':' in clock:
@@ -516,8 +516,8 @@ class BaseSoccerManager:
                     game_date = self.display_manager.format_date_with_ordinal(local_time)
 
             status_type = status["type"]["name"]
-            is_live = status_type == "STATUS_IN_PROGRESS"
-            is_final = status_type == "STATUS_FINAL"
+            is_live = status_type in ["STATUS_IN_PROGRESS", "STATUS_FIRST_HALF", "STATUS_SECOND_HALF"]
+            is_final = status_type in ["STATUS_FINAL", "STATUS_FULL_TIME"]
             is_upcoming = status_type == "STATUS_SCHEDULED"
             is_halftime = status_type == "STATUS_HALFTIME"
 
