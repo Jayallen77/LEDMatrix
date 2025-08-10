@@ -132,37 +132,58 @@ class CalendarManager:
             return []
     
     def draw_event(self, event, y_position=2):
-        """Draw a single calendar event."""
+        """Draw a single calendar event with proper spacing to avoid overlap."""
         try:
             # Get date, time, and summary
             date_text = self._format_event_date(event)
             time_text = self._format_event_time(event)
-            datetime_text = f"{date_text} {time_text}"
+            datetime_text = f"{date_text} {time_text}".strip()
             summary = event.get('summary', 'No Title')
-            
-            # Use regular font (PressStart2P) for date/time
-            datetime_width = self.display_manager.get_text_width(datetime_text, self.display_manager.regular_font)
-            datetime_x = (self.display_manager.matrix.width - datetime_width) // 2
-            
-            # Draw centered date/time with regular font
-            self.display_manager.draw_text(datetime_text, datetime_x, y_position, 
-                                        color=self.time_color,
-                                        font=self.display_manager.regular_font)
-            
-            # Use calendar font (4x6) for summary
-            available_width = self.display_manager.matrix.width - 4  # 2 pixel margin on each side
-            title_lines = self._wrap_text(summary, available_width, self.display_manager.calendar_font, max_lines=2)
-            
-            # Draw centered summary with calendar font
+
+            # Ensure BDF calendar font has a usable pixel height
+            if hasattr(self.display_manager.calendar_font, 'set_char_size'):
+                # 7px height for 5x7 BDF; FreeType expects 64 units per pixel
+                try:
+                    self.display_manager.calendar_font.set_char_size(height=7 * 64)
+                except Exception:
+                    pass
+
+            # Measurements
+            matrix_width = self.display_manager.width
+            date_font = self.display_manager.regular_font
+            title_font = self.display_manager.calendar_font
+            date_line_height = self.display_manager.get_font_height(date_font)
+            title_line_height = self.display_manager.get_font_height(title_font)
+
+            # Draw centered date/time on first line
+            datetime_width = self.display_manager.get_text_width(datetime_text, date_font)
+            datetime_x = (matrix_width - datetime_width) // 2
+            self.display_manager.draw_text(
+                datetime_text,
+                datetime_x,
+                y_position,
+                color=self.time_color,
+                font=date_font,
+            )
+
+            # Wrap summary to fit width with margins
+            available_width = matrix_width - 4  # 2px margin on each side
+            title_lines = self._wrap_text(summary, available_width, title_font, max_lines=2)
+
+            # Start summary beneath date/time with small spacing
+            y_summary_top = y_position + date_line_height + 2
             for i, line in enumerate(title_lines):
-                line_width = self.display_manager.get_text_width(line, self.display_manager.calendar_font)
-                line_x = (self.display_manager.matrix.width - line_width) // 2
-                # Adjust Y position for BDF font - subtract 4 pixels to compensate for the 6-pixel adjustment in _draw_bdf_text
-                adjusted_y = y_position + 8 + (i * 8)
-                self.display_manager.draw_text(line, line_x, adjusted_y,
-                                            color=self.text_color,
-                                            font=self.display_manager.calendar_font)
-            
+                line_width = self.display_manager.get_text_width(line, title_font)
+                line_x = (matrix_width - line_width) // 2
+                line_y = y_summary_top + (i * title_line_height)
+                self.display_manager.draw_text(
+                    line,
+                    line_x,
+                    line_y,
+                    color=self.text_color,
+                    font=title_font,
+                )
+
             return True
         except Exception as e:
             logger.error(f"Error drawing calendar event: {e}", exc_info=True)
