@@ -893,9 +893,9 @@ class DisplayController:
                 # Check for live games and live_priority
                 has_live_games, live_sport_type = self._check_live_games()
                 is_currently_live = self.current_display_mode.endswith('_live')
-                # Determine if any sport has live_priority True and live games
-                live_priority_takeover = False
-                live_priority_sport = None
+                
+                # Collect all sports with live_priority=True that have live games
+                live_priority_sports = []
                 for sport, attr, priority in [
                     ('nhl', 'nhl_live', self.nhl_live_priority),
                     ('nba', 'nba_live', self.nba_live_priority),
@@ -915,63 +915,79 @@ class DisplayController:
                         priority and 
                         live_games is not None and 
                         len(live_games) > 0):
-                        live_priority_takeover = True
-                        live_priority_sport = sport
-                        logger.debug(f"Live priority takeover triggered by {sport} with {len(live_games)} live games")
-                        break
+                        live_priority_sports.append(sport)
+                        logger.debug(f"Live priority sport found: {sport} with {len(live_games)} live games")
                     elif manager is not None and priority and live_games is not None:
                         logger.debug(f"{sport} has live_priority=True but {len(live_games)} live games (not taking over)")
+                
+                # Determine if we have any live priority sports
+                live_priority_takeover = len(live_priority_sports) > 0
+                
                 manager_to_display = None
                 # --- State Machine for Display Logic ---
                 if is_currently_live:
                     if live_priority_takeover:
-                        # Only allow takeover if live_priority is True for the sport
-                        if current_time - self.last_switch >= self.get_current_duration():
-                            new_mode = f"{live_priority_sport}_live"
-                            if self.current_display_mode != new_mode:
-                                logger.info(f"Switching to only active live sport: {new_mode} from {self.current_display_mode}")
+                        # Check if we need to rotate to the next live priority sport
+                        current_sport_type = self.current_display_mode.replace('_live', '')
+                        
+                        # If current sport is not in live priority sports, switch to first one
+                        if current_sport_type not in live_priority_sports:
+                            next_sport = live_priority_sports[0]
+                            new_mode = f"{next_sport}_live"
+                            logger.info(f"Current live sport {current_sport_type} no longer has priority, switching to {new_mode}")
+                            self.current_display_mode = new_mode
+                            if hasattr(self, '_last_logged_duration'):
+                                delattr(self, '_last_logged_duration')
+                            self.force_clear = True
+                            self.last_switch = current_time
+                            manager_to_display = getattr(self, f"{next_sport}_live", None)
+                        else:
+                            # Check if duration has elapsed for current sport
+                            current_duration = self.get_current_duration()
+                            if current_time - self.last_switch >= current_duration:
+                                # Find next sport in rotation
+                                current_index = live_priority_sports.index(current_sport_type)
+                                next_index = (current_index + 1) % len(live_priority_sports)
+                                next_sport = live_priority_sports[next_index]
+                                new_mode = f"{next_sport}_live"
+                                
+                                logger.info(f"Rotating live priority sports: {current_sport_type} -> {next_sport} (duration: {current_duration}s)")
                                 self.current_display_mode = new_mode
-                                # Reset logged duration when mode changes
                                 if hasattr(self, '_last_logged_duration'):
                                     delattr(self, '_last_logged_duration')
                                 self.force_clear = True
+                                self.last_switch = current_time
+                                manager_to_display = getattr(self, f"{next_sport}_live", None)
                             else:
                                 self.force_clear = False
-                            self.last_switch = current_time
-                            manager_to_display = getattr(self, f"{live_priority_sport}_live", None)
-                        else:
-                            self.force_clear = False
-                            current_sport_type = self.current_display_mode.replace('_live', '')
-                            manager_to_display = getattr(self, f"{current_sport_type}_live", None)
+                                manager_to_display = getattr(self, f"{current_sport_type}_live", None)
                     else:
                         # If no sport has live_priority takeover, treat as regular rotation
                         is_currently_live = False
                 if not is_currently_live:
                     previous_mode_before_switch = self.current_display_mode
                     if live_priority_takeover:
-                        new_mode = f"{live_priority_sport}_live"
-                        if self.current_display_mode != new_mode:
-                            # Double-check that the manager actually has live games before switching
-                            target_manager = getattr(self, f"{live_priority_sport}_live", None)
-                            if target_manager and hasattr(target_manager, 'live_games') and len(target_manager.live_games) > 0:
-                                logger.info(f"Live priority takeover: Switching to {new_mode} from {self.current_display_mode}")
-                                logger.debug(f"[DisplayController] Live priority takeover details: sport={live_priority_sport}, manager={target_manager}, live_games={target_manager.live_games}")
-                                if previous_mode_before_switch == 'music' and self.music_manager:
-                                    self.music_manager.deactivate_music_display()
-                                self.current_display_mode = new_mode
-                                # Reset logged duration when mode changes
-                                if hasattr(self, '_last_logged_duration'):
-                                    delattr(self, '_last_logged_duration')
-                                self.force_clear = True
-                                self.last_switch = current_time
-                                manager_to_display = target_manager
-                            else:
-                                logger.warning(f"[DisplayController] Live priority takeover attempted for {new_mode} but manager has no live games, skipping takeover")
-                                live_priority_takeover = False
-                        else:
-                            self.force_clear = False
+                        # Switch to first live priority sport
+                        next_sport = live_priority_sports[0]
+                        new_mode = f"{next_sport}_live"
+                        
+                        # Double-check that the manager actually has live games before switching
+                        target_manager = getattr(self, f"{next_sport}_live", None)
+                        if target_manager and hasattr(target_manager, 'live_games') and len(target_manager.live_games) > 0:
+                            logger.info(f"Live priority takeover: Switching to {new_mode} from {self.current_display_mode}")
+                            logger.debug(f"[DisplayController] Live priority takeover details: sport={next_sport}, manager={target_manager}, live_games={target_manager.live_games}")
+                            if previous_mode_before_switch == 'music' and self.music_manager:
+                                self.music_manager.deactivate_music_display()
+                            self.current_display_mode = new_mode
+                            # Reset logged duration when mode changes
+                            if hasattr(self, '_last_logged_duration'):
+                                delattr(self, '_last_logged_duration')
+                            self.force_clear = True
                             self.last_switch = current_time
-                            manager_to_display = getattr(self, f"{live_priority_sport}_live", None)
+                            manager_to_display = target_manager
+                        else:
+                            logger.warning(f"[DisplayController] Live priority takeover attempted for {new_mode} but manager has no live games, skipping takeover")
+                            live_priority_takeover = False
                     else:
                         # No live_priority takeover, regular rotation
                         needs_switch = False
@@ -1005,91 +1021,95 @@ class DisplayController:
                             # Reset logged duration when mode changes
                             if hasattr(self, '_last_logged_duration'):
                                 delattr(self, '_last_logged_duration')
+                        else:
+                            needs_switch = False
                         if needs_switch:
                             self.force_clear = True
                             self.last_switch = current_time
                         else:
                             self.force_clear = False
-                        # Select the manager for the current regular mode
-                        if self.current_display_mode == 'clock' and self.clock:
-                            manager_to_display = self.clock
-                        elif self.current_display_mode == 'weather_current' and self.weather:
-                            manager_to_display = self.weather
-                        elif self.current_display_mode == 'weather_hourly' and self.weather:
-                            manager_to_display = self.weather
-                        elif self.current_display_mode == 'weather_daily' and self.weather:
-                            manager_to_display = self.weather
-                        elif self.current_display_mode == 'stocks' and self.stocks:
-                            manager_to_display = self.stocks
-                        elif self.current_display_mode == 'stock_news' and self.news:
-                            manager_to_display = self.news
-                        elif self.current_display_mode == 'odds_ticker' and self.odds_ticker:
-                            manager_to_display = self.odds_ticker
-                        elif self.current_display_mode == 'calendar' and self.calendar:
-                            manager_to_display = self.calendar
-                        elif self.current_display_mode == 'youtube' and self.youtube:
-                            manager_to_display = self.youtube
-                        elif self.current_display_mode == 'text_display' and self.text_display:
-                            manager_to_display = self.text_display
-                        elif self.current_display_mode == 'of_the_day' and self.of_the_day:
-                            manager_to_display = self.of_the_day
-                        elif self.current_display_mode == 'news_manager' and self.news_manager:
-                            manager_to_display = self.news_manager
-                        elif self.current_display_mode == 'nhl_recent' and self.nhl_recent:
-                            manager_to_display = self.nhl_recent
-                        elif self.current_display_mode == 'nhl_upcoming' and self.nhl_upcoming:
-                            manager_to_display = self.nhl_upcoming
-                        elif self.current_display_mode == 'nhl_live' and self.nhl_live:
-                            manager_to_display = self.nhl_live
-                        elif self.current_display_mode == 'nba_recent' and self.nba_recent:
-                            manager_to_display = self.nba_recent
-                        elif self.current_display_mode == 'nba_upcoming' and self.nba_upcoming:
-                            manager_to_display = self.nba_upcoming
-                        elif self.current_display_mode == 'nba_live' and self.nba_live:
-                            manager_to_display = self.nba_live
-                        elif self.current_display_mode == 'mlb_recent' and self.mlb_recent:
-                            manager_to_display = self.mlb_recent
-                        elif self.current_display_mode == 'mlb_upcoming' and self.mlb_upcoming:
-                            manager_to_display = self.mlb_upcoming
-                        elif self.current_display_mode == 'mlb_live' and self.mlb_live:
-                            manager_to_display = self.mlb_live
-                        elif self.current_display_mode == 'milb_recent' and self.milb_recent:
-                            manager_to_display = self.milb_recent
-                        elif self.current_display_mode == 'milb_upcoming' and self.milb_upcoming:
-                            manager_to_display = self.milb_upcoming
-                        elif self.current_display_mode == 'milb_live' and self.milb_live:
-                            manager_to_display = self.milb_live
-                        elif self.current_display_mode == 'soccer_recent' and self.soccer_recent:
-                            manager_to_display = self.soccer_recent
-                        elif self.current_display_mode == 'soccer_upcoming' and self.soccer_upcoming:
-                            manager_to_display = self.soccer_upcoming
-                        elif self.current_display_mode == 'soccer_live' and self.soccer_live:
-                            manager_to_display = self.soccer_live
-                        elif self.current_display_mode == 'nfl_recent' and self.nfl_recent:
-                            manager_to_display = self.nfl_recent
-                        elif self.current_display_mode == 'nfl_upcoming' and self.nfl_upcoming:
-                            manager_to_display = self.nfl_upcoming
-                        elif self.current_display_mode == 'nfl_live' and self.nfl_live:
-                            manager_to_display = self.nfl_live
-                        elif self.current_display_mode == 'ncaa_fb_recent' and self.ncaa_fb_recent:
-                            manager_to_display = self.ncaa_fb_recent
-                        elif self.current_display_mode == 'ncaa_fb_upcoming' and self.ncaa_fb_upcoming:
-                            manager_to_display = self.ncaa_fb_upcoming
-                        elif self.current_display_mode == 'ncaa_fb_live' and self.ncaa_fb_live:
-                            manager_to_display = self.ncaa_fb_live
-                        elif self.current_display_mode == 'ncaa_baseball_recent' and self.ncaa_baseball_recent:
-                            manager_to_display = self.ncaa_baseball_recent
-                        elif self.current_display_mode == 'ncaa_baseball_upcoming' and self.ncaa_baseball_upcoming:
-                            manager_to_display = self.ncaa_baseball_upcoming
-                        elif self.current_display_mode == 'ncaa_baseball_live' and self.ncaa_baseball_live:
-                            manager_to_display = self.ncaa_baseball_live
-                        elif self.current_display_mode == 'ncaam_basketball_recent' and self.ncaam_basketball_recent:
-                            manager_to_display = self.ncaam_basketball_recent
-                        elif self.current_display_mode == 'ncaam_basketball_upcoming' and self.ncaam_basketball_upcoming:
-                            manager_to_display = self.ncaam_basketball_upcoming
-                        elif self.current_display_mode == 'ncaam_basketball_live' and self.ncaam_basketball_live:
-                            manager_to_display = self.ncaam_basketball_live
-
+                        # Only set manager_to_display if it hasn't been set by live priority logic
+                        if manager_to_display is None:
+                            if self.current_display_mode == 'clock' and self.clock:
+                                manager_to_display = self.clock
+                            elif self.current_display_mode == 'weather_current' and self.weather:
+                                manager_to_display = self.weather
+                            elif self.current_display_mode == 'weather_hourly' and self.weather:
+                                manager_to_display = self.weather
+                            elif self.current_display_mode == 'weather_daily' and self.weather:
+                                manager_to_display = self.weather
+                            elif self.current_display_mode == 'stocks' and self.stocks:
+                                manager_to_display = self.stocks
+                            elif self.current_display_mode == 'stock_news' and self.news:
+                                manager_to_display = self.news
+                            elif self.current_display_mode == 'odds_ticker' and self.odds_ticker:
+                                manager_to_display = self.odds_ticker
+                            elif self.current_display_mode == 'calendar' and self.calendar:
+                                manager_to_display = self.calendar
+                            elif self.current_display_mode == 'youtube' and self.youtube:
+                                manager_to_display = self.youtube
+                            elif self.current_display_mode == 'text_display' and self.text_display:
+                                manager_to_display = self.text_display
+                            elif self.current_display_mode == 'of_the_day' and self.of_the_day:
+                                manager_to_display = self.of_the_day
+                            elif self.current_display_mode == 'news_manager' and self.news_manager:
+                                manager_to_display = self.news_manager
+                            elif self.current_display_mode == 'nhl_recent' and self.nhl_recent:
+                                manager_to_display = self.nhl_recent
+                            elif self.current_display_mode == 'nhl_upcoming' and self.nhl_upcoming:
+                                manager_to_display = self.nhl_upcoming
+                            elif self.current_display_mode == 'nba_recent' and self.nba_recent:
+                                manager_to_display = self.nba_recent
+                            elif self.current_display_mode == 'nba_upcoming' and self.nba_upcoming:
+                                manager_to_display = self.nba_upcoming
+                            elif self.current_display_mode == 'nfl_recent' and self.nfl_recent:
+                                manager_to_display = self.nfl_recent
+                            elif self.current_display_mode == 'nfl_upcoming' and self.nfl_upcoming:
+                                manager_to_display = self.nfl_upcoming
+                            elif self.current_display_mode == 'ncaa_fb_recent' and self.ncaa_fb_recent:
+                                manager_to_display = self.ncaa_fb_recent
+                            elif self.current_display_mode == 'ncaa_fb_upcoming' and self.ncaa_fb_upcoming:
+                                manager_to_display = self.ncaa_fb_upcoming
+                            elif self.current_display_mode == 'ncaa_baseball_recent' and self.ncaa_baseball_recent:
+                                manager_to_display = self.ncaa_baseball_recent
+                            elif self.current_display_mode == 'ncaa_baseball_upcoming' and self.ncaa_baseball_upcoming:
+                                manager_to_display = self.ncaa_baseball_upcoming
+                            elif self.current_display_mode == 'ncaam_basketball_recent' and self.ncaam_basketball_recent:
+                                manager_to_display = self.ncaam_basketball_recent
+                            elif self.current_display_mode == 'ncaam_basketball_upcoming' and self.ncaam_basketball_upcoming:
+                                manager_to_display = self.ncaam_basketball_upcoming
+                            elif self.current_display_mode == 'mlb_recent' and self.mlb_recent:
+                                manager_to_display = self.mlb_recent
+                            elif self.current_display_mode == 'mlb_upcoming' and self.mlb_upcoming:
+                                manager_to_display = self.mlb_upcoming
+                            elif self.current_display_mode == 'milb_recent' and self.milb_recent:
+                                manager_to_display = self.milb_recent
+                            elif self.current_display_mode == 'milb_upcoming' and self.milb_upcoming:
+                                manager_to_display = self.milb_upcoming
+                            elif self.current_display_mode == 'soccer_recent' and self.soccer_recent:
+                                manager_to_display = self.soccer_recent
+                            elif self.current_display_mode == 'soccer_upcoming' and self.soccer_upcoming:
+                                manager_to_display = self.soccer_upcoming
+                            elif self.current_display_mode == 'music' and self.music_manager:
+                                manager_to_display = self.music_manager
+                            elif self.current_display_mode == 'nhl_live' and self.nhl_live:
+                                manager_to_display = self.nhl_live
+                            elif self.current_display_mode == 'nba_live' and self.nba_live:
+                                manager_to_display = self.nba_live
+                            elif self.current_display_mode == 'nfl_live' and self.nfl_live:
+                                manager_to_display = self.nfl_live
+                            elif self.current_display_mode == 'ncaa_fb_live' and self.ncaa_fb_live:
+                                manager_to_display = self.ncaa_fb_live
+                            elif self.current_display_mode == 'ncaa_baseball_live' and self.ncaa_baseball_live:
+                                manager_to_display = self.ncaa_baseball_live
+                            elif self.current_display_mode == 'ncaam_basketball_live' and self.ncaam_basketball_live:
+                                manager_to_display = self.ncaam_basketball_live
+                            elif self.current_display_mode == 'mlb_live' and self.mlb_live:
+                                manager_to_display = self.mlb_live
+                            elif self.current_display_mode == 'milb_live' and self.milb_live:
+                                manager_to_display = self.milb_live
+                            elif self.current_display_mode == 'soccer_live' and self.soccer_live:
+                                manager_to_display = self.soccer_live
 
                 # --- Perform Display Update ---
                 try:
