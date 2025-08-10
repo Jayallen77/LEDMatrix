@@ -1779,11 +1779,19 @@
 
         // Socket.IO connection
         function initializeSocket() {
-            socket = io({ transports: ['websocket', 'polling'] });
+            socket = io({
+                path: '/socket.io',
+                transports: ['websocket', 'polling'],
+                reconnection: true,
+                reconnectionAttempts: Infinity,
+                reconnectionDelay: 1000,
+                reconnectionDelayMax: 10000
+            });
             
             socket.on('connect', function() {
                 updateConnectionStatus(true);
                 showNotification('Connected to LED Matrix', 'success');
+                stopPreviewPolling();
             });
             
             socket.on('disconnect', function() {
@@ -1800,11 +1808,35 @@
                     }, delay);
                 };
                 retry();
+                startPreviewPolling();
+            });
+            
+            socket.on('connect_error', function(_err){
+                updateConnectionStatus(false);
+                startPreviewPolling();
             });
             
             socket.on('display_update', function(data) {
                 updateDisplayPreview(data);
             });
+        }
+
+        // Fallback polling when websocket is disconnected
+        let __previewPollTimer = null;
+        function startPreviewPolling(){
+            if (__previewPollTimer) return;
+            __previewPollTimer = setInterval(fetchCurrentDisplayOnce, 1000);
+        }
+        function stopPreviewPolling(){
+            if (__previewPollTimer) clearInterval(__previewPollTimer);
+            __previewPollTimer = null;
+        }
+        async function fetchCurrentDisplayOnce(){
+            try {
+                const res = await fetch('/api/display/current');
+                const data = await res.json();
+                if (data && data.image) updateDisplayPreview(data);
+            } catch (_) {}
         }
 
         // Draw pixel grid lines on top of scaled image

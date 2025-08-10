@@ -851,9 +851,23 @@ def get_current_display():
 def handle_connect():
     """Handle client connection."""
     emit('connected', {'status': 'Connected to LED Matrix Interface'})
-    # Send current display state
-    if current_display_data:
-        emit('display_update', current_display_data)
+    # Send current display state immediately after connect
+    try:
+        if display_manager and hasattr(display_manager, 'image'):
+            img_buffer = io.BytesIO()
+            display_manager.image.save(img_buffer, format='PNG')
+            img_str = base64.b64encode(img_buffer.getvalue()).decode()
+            payload = {
+                'image': img_str,
+                'width': display_manager.width,
+                'height': display_manager.height,
+                'timestamp': time.time()
+            }
+            emit('display_update', payload)
+        elif current_display_data:
+            emit('display_update', current_display_data)
+    except Exception as e:
+        logger.error(f"Error sending initial display_update on connect: {e}")
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -872,7 +886,7 @@ if __name__ == '__main__':
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
-    # Start the display monitor
+    # Start the display monitor (runs even if display is not started yet for web preview)
     display_monitor.start()
     
     # Run the app
