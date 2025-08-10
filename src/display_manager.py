@@ -25,6 +25,10 @@ class DisplayManager:
         start_time = time.time()
         self.config = config or {}
         self._force_fallback = force_fallback
+        # Snapshot settings for web preview integration (service writes, web reads)
+        self._snapshot_path = "/tmp/led_matrix_preview.png"
+        self._snapshot_min_interval_sec = 0.2  # max ~5 fps
+        self._last_snapshot_ts = 0.0
         self._setup_matrix()
         logger.info("Matrix setup completed in %.3f seconds", time.time() - start_time)
         
@@ -186,6 +190,8 @@ class DisplayManager:
             if self.matrix is None:
                 # Fallback mode - no actual hardware to update
                 logger.debug("Update display called in fallback mode (no hardware)")
+                # Still write a snapshot so the web UI can preview
+                self._write_snapshot_if_due()
                 return
                 
             # Copy the current image to the offscreen canvas   
@@ -196,6 +202,9 @@ class DisplayManager:
             
             # Swap our canvas references
             self.offscreen_canvas, self.current_canvas = self.current_canvas, self.offscreen_canvas
+
+            # Write a snapshot for the web preview (throttled)
+            self._write_snapshot_if_due()
         except Exception as e:
             logger.error(f"Error updating display: {e}")
 
@@ -616,3 +625,20 @@ class DisplayManager:
             suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
         
         return dt.strftime(f"%b %-d{suffix}") 
+
+    def _write_snapshot_if_due(self) -> None:
+        """Write the current image to a PNG snapshot file at a limited frequency."""
+        try:
+            now = time.time()
+            if (now - self._last_snapshot_ts) < self._snapshot_min_interval_sec:
+                return
+            # Ensure directory exists
+            snapshot_dir = os.path.dirname(self._snapshot_path)
+            if snapshot_dir and not os.path.exists(snapshot_dir):
+                os.makedirs(snapshot_dir, exist_ok=True)
+            # Write PNG snapshot
+            self.image.save(self._snapshot_path, format='PNG')
+            self._last_snapshot_ts = now
+        except Exception as e:
+            # Snapshot failures should never break display; log at debug to avoid noise
+            logger.debug(f"Snapshot write skipped: {e}")

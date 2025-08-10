@@ -57,32 +57,45 @@ class DisplayMonitor:
 
     def _monitor_loop(self):
         global display_manager, current_display_data
+        snapshot_path = "/tmp/led_matrix_preview.png"
         while self.running:
             try:
-                if display_manager and hasattr(display_manager, 'image'):
-                    # Convert raw image to base64 (no server-side scaling; client scales visually)
+                # Prefer service-provided snapshot if available (works when ledmatrix service is running)
+                if os.path.exists(snapshot_path):
+                    with open(snapshot_path, 'rb') as f:
+                        img_bytes = f.read()
+                    img_str = base64.b64encode(img_bytes).decode()
+                    # If we can infer dimensions from display_manager, include them; else leave 0
+                    width = display_manager.width if display_manager else 0
+                    height = display_manager.height if display_manager else 0
+                    current_display_data = {
+                        'image': img_str,
+                        'width': width,
+                        'height': height,
+                        'timestamp': time.time()
+                    }
+                    socketio.emit('display_update', current_display_data)
+                elif display_manager and hasattr(display_manager, 'image'):
+                    # Fallback to in-process manager image
                     img_buffer = io.BytesIO()
                     display_manager.image.save(img_buffer, format='PNG')
                     img_str = base64.b64encode(img_buffer.getvalue()).decode()
-
                     current_display_data = {
                         'image': img_str,
                         'width': display_manager.width,
                         'height': display_manager.height,
                         'timestamp': time.time()
                     }
-
-                    # Emit to all connected clients
                     socketio.emit('display_update', current_display_data)
 
             except Exception as e:
                 logger.error(f"Display monitor error: {e}", exc_info=True)
 
-            # Yield to the async loop; target ~10 FPS to reduce load
+            # Yield to the async loop; target ~5-10 FPS
             try:
-                socketio.sleep(0.1)
+                socketio.sleep(0.2)
             except Exception:
-                time.sleep(0.1)
+                time.sleep(0.2)
 
 display_monitor = DisplayMonitor()
 
