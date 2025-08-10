@@ -1412,6 +1412,9 @@
                     <div id="api-metrics" class="stat-card" style="text-align:left;">
                         <div>Loading API metrics...</div>
                         <div style="margin-top:10px; font-size:12px; color:#666;">If empty, ensure the server is running and /api/metrics is reachable.</div>
+                        <div style="margin-top:10px;">
+                            <button class="btn btn-primary" onclick="updateApiMetrics()"><i class="fas fa-sync"></i> Refresh API Metrics</button>
+                        </div>
                     </div>
                 </div>
 
@@ -1992,6 +1995,10 @@
 
                 // Update image and meta label
                 img.style.imageRendering = 'pixelated';
+                img.onload = () => {
+                    // Ensure LED dot overlay samples after image is ready
+                    renderLedDots();
+                };
                 img.src = `data:image/png;base64,${data.image}`;
                 const meta = document.getElementById('previewMeta');
                 if (meta) {
@@ -2034,9 +2041,8 @@
             const ctx = ledCanvas.getContext('2d');
             ctx.clearRect(0, 0, ledCanvas.width, ledCanvas.height);
 
-            // Draw black background (gaps between LEDs)
-            ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, ledCanvas.width, ledCanvas.height);
+            // Clear previous overlay; do not forcibly black-out if sampling fails
+            ctx.clearRect(0, 0, ledCanvas.width, ledCanvas.height);
 
             // Create an offscreen canvas to sample pixel colors
             const off = document.createElement('canvas');
@@ -2051,6 +2057,7 @@
             } catch (_) { /* draw failures ignored */ }
 
             // Draw circular dots for each LED pixel
+            let drawn = 0;
             for (let y = 0; y < logicalHeight; y++) {
                 for (let x = 0; x < logicalWidth; x++) {
                     const pixel = offCtx.getImageData(x, y, 1, 1).data;
@@ -2063,7 +2070,13 @@
                     ctx.beginPath();
                     ctx.arc(cx, cy, dotRadius, 0, Math.PI * 2);
                     ctx.fill();
+                    drawn++;
                 }
+            }
+
+            // If nothing was drawn (e.g., image not ready), hide overlay to show base image
+            if (drawn === 0) {
+                ledCanvas.style.display = 'none';
             }
         }
 

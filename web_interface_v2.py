@@ -62,18 +62,28 @@ class DisplayMonitor:
             try:
                 # Prefer service-provided snapshot if available (works when ledmatrix service is running)
                 if os.path.exists(snapshot_path):
-                    # Read atomically by reopening; ignore partials by retrying once
+                    # Read atomically by reopening; ignore partials by skipping this frame
                     img_bytes = None
-                    for _ in range(2):
-                        try:
-                            with open(snapshot_path, 'rb') as f:
-                                img_bytes = f.read()
-                            break
-                        except Exception:
-                            socketio.sleep(0.02)
-                    if not img_bytes:
-                        raise RuntimeError('Snapshot read failed')
-                    img_str = base64.b64encode(img_bytes).decode()
+                    try:
+                        with open(snapshot_path, 'rb') as f:
+                            img_bytes = f.read()
+                    except Exception:
+                        img_bytes = None
+                    if img_bytes:
+                        img_str = base64.b64encode(img_bytes).decode()
+                        # If we can infer dimensions from display_manager, include them; else leave 0
+                        width = display_manager.width if display_manager else 0
+                        height = display_manager.height if display_manager else 0
+                        current_display_data = {
+                            'image': img_str,
+                            'width': width,
+                            'height': height,
+                            'timestamp': time.time()
+                        }
+                        socketio.emit('display_update', current_display_data)
+                        # Yield and continue to next frame
+                        socketio.sleep(0.1)
+                        continue
                     # If we can infer dimensions from display_manager, include them; else leave 0
                     width = display_manager.width if display_manager else 0
                     height = display_manager.height if display_manager else 0
@@ -97,14 +107,15 @@ class DisplayMonitor:
                     }
                     socketio.emit('display_update', current_display_data)
 
-            except Exception as e:
-                logger.error(f"Display monitor error: {e}", exc_info=True)
+            except Exception:
+                # Swallow errors in the monitor loop to avoid log spam
+                pass
 
             # Yield to the async loop; target ~5-10 FPS
             try:
-                socketio.sleep(0.2)
+                socketio.sleep(0.1)
             except Exception:
-                time.sleep(0.2)
+                time.sleep(0.1)
 
 display_monitor = DisplayMonitor()
 
