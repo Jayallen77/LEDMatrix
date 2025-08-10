@@ -1132,26 +1132,16 @@ class DisplayController:
                              manager_to_display.display(force_clear=self.force_clear)
                         elif self.current_display_mode == 'news_manager':
                              manager_to_display.display_news()
-                        elif self.current_display_mode == 'nfl_live' and self.nfl_live:
-                            # Update data before displaying for live managers
-                            self.nfl_live.update()
-                            self.nfl_live.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'ncaa_fb_live' and self.ncaa_fb_live:
-                            # Update data before displaying for live managers
-                            self.ncaa_fb_live.update()
-                            self.ncaa_fb_live.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'ncaam_basketball_live' and self.ncaam_basketball_live:
-                            # Update data before displaying for live managers
-                            self.ncaam_basketball_live.update()
-                            self.ncaam_basketball_live.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'ncaa_baseball_live' and self.ncaa_baseball_live:
-                            # Update data before displaying for live managers
-                            self.ncaa_baseball_live.update()
-                            self.ncaa_baseball_live.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'mlb_live' and self.mlb_live:
-                            # Update data before displaying for live managers
-                            self.mlb_live.update()
-                            self.mlb_live.display(force_clear=self.force_clear)
+                        elif self.current_display_mode == 'ncaa_fb_upcoming' and self.ncaa_fb_upcoming:
+                            self.ncaa_fb_upcoming.display(force_clear=self.force_clear)
+                        elif self.current_display_mode == 'ncaam_basketball_recent' and self.ncaam_basketball_recent:
+                            self.ncaam_basketball_recent.display(force_clear=self.force_clear)
+                        elif self.current_display_mode == 'ncaam_basketball_upcoming' and self.ncaam_basketball_upcoming:
+                            self.ncaam_basketball_upcoming.display(force_clear=self.force_clear)
+                        elif self.current_display_mode == 'ncaa_baseball_recent' and self.ncaa_baseball_recent:
+                            self.ncaa_baseball_recent.display(force_clear=self.force_clear)
+                        elif self.current_display_mode == 'ncaa_baseball_upcoming' and self.ncaa_baseball_upcoming:
+                            self.ncaa_baseball_upcoming.display(force_clear=self.force_clear)
                         elif self.current_display_mode == 'milb_live' and self.milb_live and len(self.milb_live.live_games) > 0:
                             logger.debug(f"[DisplayController] Calling MiLB live display with {len(self.milb_live.live_games)} live games")
                             # Update data before displaying for live managers
@@ -1165,17 +1155,10 @@ class DisplayController:
                             self.force_clear = True
                             self.last_switch = current_time
                             logger.info(f"[DisplayController] Switched from milb_live (no games) to {self.current_display_mode}")
-                        elif self.current_display_mode == 'ncaa_fb_upcoming' and self.ncaa_fb_upcoming:
-                            self.ncaa_fb_upcoming.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'ncaam_basketball_recent' and self.ncaam_basketball_recent:
-                            self.ncaam_basketball_recent.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'ncaam_basketball_upcoming' and self.ncaam_basketball_upcoming:
-                            self.ncaam_basketball_upcoming.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'ncaa_baseball_recent' and self.ncaa_baseball_recent:
-                            self.ncaa_baseball_recent.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'ncaa_baseball_upcoming' and self.ncaa_baseball_upcoming:
-                            self.ncaa_baseball_upcoming.display(force_clear=self.force_clear)
                         elif hasattr(manager_to_display, 'display'): # General case for most managers
+                            # Special handling for live managers that need update before display
+                            if self.current_display_mode.endswith('_live') and hasattr(manager_to_display, 'update'):
+                                manager_to_display.update()
                             manager_to_display.display(force_clear=self.force_clear)
                         else:
                             logger.warning(f"Manager {type(manager_to_display).__name__} for mode {self.current_display_mode} does not have a standard 'display' method.")

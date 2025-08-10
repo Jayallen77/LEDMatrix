@@ -317,7 +317,7 @@
     },
     "mlb": {
         "enabled": true,
-        "live_priority": false,
+        "live_priority": true,
         "live_game_duration": 30,
         "show_odds": true,
         "test_mode": false,
