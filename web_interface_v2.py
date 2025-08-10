@@ -432,6 +432,9 @@ def system_action():
         elif action == 'reboot_system':
             result = subprocess.run(['sudo', '-n', 'reboot'], 
                                   capture_output=True, text=True)
+        elif action == 'shutdown_system':
+            result = subprocess.run(['sudo', '-n', 'poweroff'], 
+                                  capture_output=True, text=True)
         elif action == 'git_pull':
             # Run git pull from the repository directory where this file lives
             repo_dir = Path(__file__).resolve().parent
@@ -601,6 +604,9 @@ def run_action_route():
         elif action == 'reboot_system':
             result = subprocess.run(['sudo', '-n', 'reboot'], 
                                  capture_output=True, text=True)
+        elif action == 'shutdown_system':
+            result = subprocess.run(['sudo', '-n', 'poweroff'], 
+                                  capture_output=True, text=True)
         elif action == 'git_pull':
             repo_dir = Path(__file__).resolve().parent
             if not (repo_dir / '.git').exists():

@@ -750,12 +750,6 @@
                     </div>
                 </div>
                 <div class="display-controls">
-                    <button class="btn btn-success" onclick="startDisplay()">
-                        <i class="fas fa-play"></i> Start Display
-                    </button>
-                    <button class="btn btn-danger" onclick="stopDisplay()">
-                        <i class="fas fa-stop"></i> Stop Display
-                    </button>
                     <button class="btn btn-warning" onclick="toggleEditorMode()">
                         <i class="fas fa-edit"></i> 
                         {{ 'Exit Editor' if editor_mode else 'Enter Editor' }}
@@ -1684,6 +1678,9 @@
                             <button type="button" class="btn btn-danger" onclick="runAction('reboot_system')" onclick="return confirm('Are you sure you want to reboot?')">
                                 <i class="fas fa-power-off"></i> Reboot System
                             </button>
+                    <button type="button" class="btn btn-danger" onclick="confirmShutdown()">
+                        <i class="fas fa-power-off"></i> Shutdown System
+                    </button>
                         </div>
 
                         <h4>Action Output</h4>
@@ -2770,6 +2767,11 @@
                 outputElement.textContent = `Error: ${error}`;
                 showNotification(`Error running action: ${error}`, 'error');
             }
+        }
+
+        function confirmShutdown(){
+            if (!confirm('Are you sure you want to shut down the system? This will power off the Raspberry Pi.')) return;
+            runAction('shutdown_system');
         }
 
         async function fetchLogs() {

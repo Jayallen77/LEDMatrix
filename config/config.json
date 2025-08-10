@@ -317,7 +317,7 @@
     },
     "mlb": {
         "enabled": true,
-        "live_priority": true,
+        "live_priority": false,
         "live_game_duration": 30,
         "show_odds": true,
         "test_mode": false,
@@ -412,13 +412,13 @@
         }
     },
     "music": {
-        "enabled": false,
+        "enabled": true,
         "preferred_source": "ytm",
         "YTM_COMPANION_URL": "http://192.168.86.12:9863",
         "POLLING_INTERVAL_SECONDS": 1
     },
     "of_the_day": {
-        "enabled": false,
+        "enabled": true,
         "display_rotate_interval": 20,
         "update_interval": 3600,
         "subtitle_rotate_interval": 10,
