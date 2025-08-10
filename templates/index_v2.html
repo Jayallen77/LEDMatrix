@@ -220,6 +220,17 @@
             margin: 0 auto;
         }
 
+        .quick-controls {
+            background: var(--card-background);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            margin-bottom: 20px;
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
         .tabs {
             display: flex;
             border-bottom: 2px solid var(--border-color);
@@ -688,6 +699,19 @@
                     {{ system_status.uptime }}
                 </div>
             </div>
+        </div>
+
+        <!-- Quick Controls -->
+        <div class="quick-controls">
+            <h2 style="margin-bottom:12px;"><i class="fas fa-bolt"></i> Quick Controls</h2>
+            <div class="display-controls">
+                <button class="btn btn-success" onclick="runAction('start_display')"><i class="fas fa-play"></i> Start Display</button>
+                <button class="btn btn-danger" onclick="runAction('stop_display')"><i class="fas fa-stop"></i> Stop Display</button>
+                <button class="btn btn-primary" onclick="systemAction('restart_service')"><i class="fas fa-redo"></i> Restart Service</button>
+                <button class="btn btn-warning" onclick="systemAction('git_pull')"><i class="fas fa-download"></i> Update Code</button>
+                <button class="btn btn-danger" onclick="systemAction('reboot_system')"><i class="fas fa-power-off"></i> Reboot</button>
+            </div>
+            <div style="margin-top:12px; color:#666; font-size:12px;">Service actions may require sudo privileges on the Pi.</div>
         </div>
 
         <!-- Editor Mode Banner -->
@@ -1969,29 +1993,12 @@
 
         // Display control functions
         async function startDisplay() {
-            try {
-                const response = await fetch('/api/display/start', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'}
-                });
-                const result = await response.json();
-                showNotification(result.message, result.status);
-            } catch (error) {
-                showNotification('Error starting display: ' + error.message, 'error');
-            }
+            // Use system service like Web UI v1 for reliability
+            await runAction('start_display');
         }
 
         async function stopDisplay() {
-            try {
-                const response = await fetch('/api/display/stop', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'}
-                });
-                const result = await response.json();
-                showNotification(result.message, result.status);
-            } catch (error) {
-                showNotification('Error stopping display: ' + error.message, 'error');
-            }
+            await runAction('stop_display');
         }
 
         async function toggleEditorMode() {

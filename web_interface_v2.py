@@ -845,10 +845,16 @@ def view_logs():
     """View system logs."""
     try:
         result = subprocess.run(
-            ['sudo', '-n', 'journalctl', '-u', 'ledmatrix.service', '-n', '500', '--no-pager'],
-            capture_output=True, text=True, check=True
+            ['journalctl', '-u', 'ledmatrix.service', '-n', '500', '--no-pager'],
+            capture_output=True, text=True, check=False
         )
-        logs = result.stdout
+        logs = result.stdout if result.returncode == 0 else ''
+        if result.returncode != 0:
+            try:
+                with open('/tmp/web_interface_v2.log', 'r') as f:
+                    logs = f.read()
+            except Exception:
+                logs = 'Insufficient permissions to read journal. Add user to systemd-journal or configure sudoers for journalctl.'
         
         # Return logs as HTML page
         return f"""
