@@ -5,8 +5,17 @@ import subprocess
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(PROJECT_DIR, 'config', 'config.json')
-WEB_INTERFACE_SCRIPT = os.path.join(PROJECT_DIR, 'web_interface.py')
-PYTHON_EXEC = sys.executable # Use the same python that runs this script
+WEB_INTERFACE_SCRIPT = os.path.join(PROJECT_DIR, 'web_interface_v2.py')
+def get_python_executable():
+    """Prefer the venv_web_v2 Python if present, else fall back to current interpreter."""
+    project_dir = PROJECT_DIR
+    if os.name == 'nt':
+        venv_python = os.path.join(project_dir, 'venv_web_v2', 'Scripts', 'python.exe')
+    else:
+        venv_python = os.path.join(project_dir, 'venv_web_v2', 'bin', 'python')
+    if os.path.exists(venv_python):
+        return venv_python
+    return sys.executable
 
 def main():
     try:
@@ -28,7 +37,8 @@ def main():
             # This is important for systemd to correctly manage the web server process.
             # Ensure PYTHONPATH is set correctly if web_interface.py has relative imports to src
             # The WorkingDirectory in systemd service should handle this for web_interface.py
-            os.execvp(PYTHON_EXEC, [PYTHON_EXEC, WEB_INTERFACE_SCRIPT])
+            py_exec = get_python_executable()
+            os.execvp(py_exec, [py_exec, WEB_INTERFACE_SCRIPT])
         except Exception as e:
             print(f"Failed to exec web interface: {e}")
             sys.exit(1) # Failed to start

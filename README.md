@@ -1,5 +1,5 @@
 # LEDMatrix
-An LED matrix display system that provides real-time information display capabilities for various data sources. The system is highly configurable and supports multiple display modes that can be enabled or disabled based on user preferences.
+
 
 ### Setup video and feature walkthrough on Youtube : 
 [![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/_HaqfJy1Y54/0.jpg)](https://www.youtube.com/watch?v=_HaqfJy1Y54)
@@ -1074,8 +1074,8 @@ The LEDMatrix system includes a robust caching mechanism to optimize API calls a
 
 ##What's Next?
 - Adding MQTT/HomeAssistant integration
-- Gambling odds?
-- Building a user-friendly UI for easier configuration
+- Gambling odds (done!)
+- Building a user-friendly UI for easier configuration (done!)
 
 
 ### If you've read this far — thanks!  
@@ -1131,3 +1131,39 @@ The web interface needs to run certain commands with `sudo` (e.g., `reboot`, `sy
 **Security Considerations:**
 Granting passwordless `sudo` access, even for specific commands, has security implications. Ensure that the scripts and commands allowed are secure and cannot be easily exploited. The web interface itself should also be secured if it's exposed to untrusted networks.
 For `display_controller.py` and `stop_display.sh`, ensure their file permissions restrict write access to only trusted users, preventing unauthorized modification of these scripts which run with elevated privileges.
+
+
+## Web Interface V2 (simplified quick start)
+
+### 1) Create and populate the venv (recommended)
+```
+cd /home/ledpi/LEDMatrix
+python3 -m venv venv_web_v2
+source venv_web_v2/bin/activate
+pip install -r requirements_web_v2.txt
+pip install -e rpi-rgb-led-matrix-master/bindings/python
+```
+
+Alternatively, run the helper (does the above and starts the server):
+```
+python3 start_web_v2.py
+```
+
+### 2) Start the web UI v2
+```
+source venv_web_v2/bin/activate
+python web_interface_v2.py
+```
+
+### 3) Autostart (optional)
+Set `"web_display_autostart": true` in `config/config.json`.
+Ensure your systemd service (or launcher) calls `start_web_conditionally.py`.
+It will prefer `venv_web_v2/bin/python` if present.
+
+### 4) Permissions (optional but recommended)
+- Add the service user to `systemd-journal` for viewing logs without sudo.
+- Configure passwordless sudo for actions (start/stop service, reboot, shutdown) if desired.
+
+### 5) Old web UI (v1)
+The project now defaults to Web UI v2. The v1 interface can be removed or ignored.
+An LED matrix display system that provides real-time information display capabilities for various data sources. The system is highly configurable and supports multiple display modes that can be enabled or disabled based on user preferences.
