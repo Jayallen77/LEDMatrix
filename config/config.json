@@ -224,7 +224,7 @@
         "odds_update_interval": 3600,
         "recent_games_to_show": 1,
         "upcoming_games_to_show": 1,
-        "show_favorite_teams_only": false,
+        "show_favorite_teams_only": true,
         "favorite_teams": [
             "TB",
             "DAL"
