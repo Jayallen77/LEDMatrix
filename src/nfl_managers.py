@@ -379,14 +379,13 @@ class BaseNFLManager: # Renamed class
                  if period == 0: period_text = "Start" # Before kickoff
                  elif period == 1: period_text = "Q1"
                  elif period == 2: period_text = "Q2"
-                 elif period == 3: period_text = "HALF" # Halftime is usually period 3 in API
-                 elif period == 4: period_text = "Q3"
-                 elif period == 5: period_text = "Q4"
-                 elif period > 5: period_text = "OT" # Assuming OT starts at period 6+
+                 elif period == 3: period_text = "Q3" # Fixed: period 3 is 3rd quarter, not halftime
+                 elif period == 4: period_text = "Q4"
+                 elif period > 4: period_text = "OT" # OT starts after Q4
             elif status["type"]["state"] == "halftime": # Check explicit halftime state
                 period_text = "HALF"
             elif status["type"]["state"] == "post":
-                 if period > 5 : period_text = "Final/OT"
+                 if period > 4 : period_text = "Final/OT"
                  else: period_text = "Final"
             elif status["type"]["state"] == "pre":
                 period_text = game_time # Show time for upcoming
