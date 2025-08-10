@@ -207,8 +207,12 @@ class DisplayManager:
             # Use the passed font or fall back to calendar_font
             face = font if font else self.calendar_font
             
-            # Add 6-pixel adjustment for vertical alignment
-            y += 6
+            # Compute baseline from font ascender so caller can pass top-left y
+            try:
+                ascender_px = face.size.ascender >> 6
+            except Exception:
+                ascender_px = 0
+            baseline_y = y + ascender_px
             
             for char in text:
                 face.load_char(char)
@@ -227,10 +231,9 @@ class DisplayManager:
                             if byte & (1 << (7 - (j % 8))):
                                 # Calculate actual pixel position
                                 pixel_x = x + glyph_left + j
-                                pixel_y = y - glyph_top + i
+                                pixel_y = baseline_y - glyph_top + i
                                 # Only draw if within bounds
-                if (0 <= pixel_x < self.width and 
-                                    0 <= pixel_y < self.height):
+                                if (0 <= pixel_x < self.width and 0 <= pixel_y < self.height):
                                     self.draw.point((pixel_x, pixel_y), fill=color)
                 
                 # Move to next character
