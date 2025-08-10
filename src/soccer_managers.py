@@ -387,50 +387,77 @@ class BaseSoccerManager:
         
         self.logger.debug(f"Logo path: {logo_path}")
 
+        # Check if logo exists in original path or cache directory
+        cache_logo_path = None
+        if hasattr(self.cache_manager, 'cache_dir') and self.cache_manager.cache_dir:
+            cache_logo_dir = os.path.join(self.cache_manager.cache_dir, 'placeholder_logos')
+            cache_logo_path = os.path.join(cache_logo_dir, f"{team_abbrev}.png")
+        
         try:
-            if not os.path.exists(logo_path):
+            if not os.path.exists(logo_path) and not (cache_logo_path and os.path.exists(cache_logo_path)):
                 self.logger.info(f"Creating placeholder logo for {team_abbrev}")
+                # Try to create placeholder in cache directory instead of assets directory
+                cache_logo_path = None
                 try:
-                    os.makedirs(os.path.dirname(logo_path), exist_ok=True)
-                    logo = Image.new('RGBA', (36, 36), (random.randint(50, 200), random.randint(50, 200), random.randint(50, 200), 255))
-                    draw = ImageDraw.Draw(logo)
-                    # Optionally add text to placeholder
-                    try:
-                        placeholder_font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 12)
-                        text_width = draw.textlength(team_abbrev, font=placeholder_font)
-                        text_x = (36 - text_width) // 2
-                        text_y = 10
-                        draw.text((text_x, text_y), team_abbrev, fill=(0,0,0,255), font=placeholder_font)
-                    except IOError:
-                        pass # Font not found, skip text
-                    logo.save(logo_path)
-                    self.logger.info(f"Created placeholder logo at {logo_path}")
-                except PermissionError as pe:
-                    self.logger.warning(f"Permission denied creating placeholder logo for {team_abbrev}: {pe}")
+                    # Use cache directory for placeholder logos
+                    if hasattr(self.cache_manager, 'cache_dir') and self.cache_manager.cache_dir:
+                        cache_logo_dir = os.path.join(self.cache_manager.cache_dir, 'placeholder_logos')
+                        os.makedirs(cache_logo_dir, exist_ok=True)
+                        cache_logo_path = os.path.join(cache_logo_dir, f"{team_abbrev}.png")
+                        
+                        # Create placeholder logo
+                        logo = Image.new('RGBA', (36, 36), (random.randint(50, 200), random.randint(50, 200), random.randint(50, 200), 255))
+                        draw = ImageDraw.Draw(logo)
+                        # Optionally add text to placeholder
+                        try:
+                            placeholder_font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 12)
+                            text_width = draw.textlength(team_abbrev, font=placeholder_font)
+                            text_x = (36 - text_width) // 2
+                            text_y = 10
+                            draw.text((text_x, text_y), team_abbrev, fill=(0,0,0,255), font=placeholder_font)
+                        except IOError:
+                            pass # Font not found, skip text
+                        logo.save(cache_logo_path)
+                        self.logger.info(f"Created placeholder logo in cache at {cache_logo_path}")
+                        # Update logo_path to use cache version
+                        logo_path = cache_logo_path
+                    else:
+                        # No cache directory available, just use in-memory placeholder
+                        raise PermissionError("No writable cache directory available")
+                except (PermissionError, OSError) as pe:
+                    self.logger.debug(f"Could not create placeholder logo file for {team_abbrev}: {pe}")
                     # Return a simple in-memory placeholder instead
                     logo = Image.new('RGBA', (36, 36), (random.randint(50, 200), random.randint(50, 200), random.randint(50, 200), 255))
                     self._logo_cache[team_abbrev] = logo
                     return logo
 
-            try:
-                logo = Image.open(logo_path)
-                if logo.mode != 'RGBA':
-                    logo = logo.convert('RGBA')
+            # Try to load logo from original path or cache directory
+            logo_to_load = None
+            if os.path.exists(logo_path):
+                logo_to_load = logo_path
+            elif cache_logo_path and os.path.exists(cache_logo_path):
+                logo_to_load = cache_logo_path
+                
+            if logo_to_load:
+                try:
+                    logo = Image.open(logo_to_load)
+                    if logo.mode != 'RGBA':
+                        logo = logo.convert('RGBA')
 
-                # Resize logo to target size
-                target_size = 36 # Change target size to 36x36
-                # Use resize instead of thumbnail to force size if image is smaller
-                logo = logo.resize((target_size, target_size), Image.Resampling.LANCZOS)
-                self.logger.debug(f"Resized {team_abbrev} logo to {logo.size}")
+                    # Resize logo to target size
+                    target_size = 36 # Change target size to 36x36
+                    # Use resize instead of thumbnail to force size if image is smaller
+                    logo = logo.resize((target_size, target_size), Image.Resampling.LANCZOS)
+                    self.logger.debug(f"Resized {team_abbrev} logo to {logo.size}")
 
-                self._logo_cache[team_abbrev] = logo
-                return logo
-            except PermissionError as pe:
-                self.logger.warning(f"Permission denied accessing logo for {team_abbrev}: {pe}")
-                # Return a simple in-memory placeholder instead
-                logo = Image.new('RGBA', (36, 36), (random.randint(50, 200), random.randint(50, 200), random.randint(50, 200), 255))
-                self._logo_cache[team_abbrev] = logo
-                return logo
+                    self._logo_cache[team_abbrev] = logo
+                    return logo
+                except PermissionError as pe:
+                    self.logger.warning(f"Permission denied accessing logo for {team_abbrev}: {pe}")
+                    # Return a simple in-memory placeholder instead
+                    logo = Image.new('RGBA', (36, 36), (random.randint(50, 200), random.randint(50, 200), random.randint(50, 200), 255))
+                    self._logo_cache[team_abbrev] = logo
+                    return logo
 
         except Exception as e:
             self.logger.error(f"Error loading logo for {team_abbrev}: {e}", exc_info=True)

@@ -922,11 +922,12 @@ class NFLRecentManager(BaseNFLManager): # Renamed class
 
             center_y = self.display_height // 2
 
-            home_x = self.display_width - home_logo.width + 18
+            # MLB-style logo positioning (closer to edges)
+            home_x = self.display_width - home_logo.width + 2
             home_y = center_y - (home_logo.height // 2)
             main_img.paste(home_logo, (home_x, home_y), home_logo)
 
-            away_x = -18
+            away_x = -2
             away_y = center_y - (away_logo.height // 2)
             main_img.paste(away_logo, (away_x, away_y), away_logo)
 

@@ -408,6 +408,30 @@ class StockNewsManager:
             self.cached_text_image = None
             return True
 
+        # Calculate the visible portion
+        # Handle wrap-around drawing
+        visible_end = self.scroll_position + width
+        if visible_end <= total_width:
+            # Normal case: Paste single crop
+            visible_portion = self.cached_text_image.crop((
+                self.scroll_position, 0,
+                visible_end, height
+            ))
+            self.display_manager.image.paste(visible_portion, (0, 0))
+        else:
+            # Wrap-around case: Paste two parts
+            width1 = total_width - self.scroll_position
+            width2 = width - width1
+            portion1 = self.cached_text_image.crop((self.scroll_position, 0, total_width, height))
+            portion2 = self.cached_text_image.crop((0, 0, width2, height))
+            self.display_manager.image.paste(portion1, (0, 0))
+            self.display_manager.image.paste(portion2, (width1, 0))
+
+        self.display_manager.update_display()
+        self._log_frame_rate()
+        time.sleep(self.scroll_delay)
+        return True
+
     def calculate_dynamic_duration(self):
         """Calculate the exact time needed to display all news headlines"""
         # If dynamic duration is disabled, use fixed duration from config
@@ -463,29 +487,4 @@ class StockNewsManager:
 
     def get_dynamic_duration(self) -> int:
         """Get the calculated dynamic duration for display"""
-        return self.dynamic_duration
-
-        # Calculate the visible portion
-        # Handle wrap-around drawing
-        visible_end = self.scroll_position + width
-        if visible_end <= total_width:
-            # Normal case: Paste single crop
-            visible_portion = self.cached_text_image.crop((
-                self.scroll_position, 0,
-                visible_end, height
-            ))
-            self.display_manager.image.paste(visible_portion, (0, 0))
-        else:
-            # Wrap-around case: Paste two parts
-            width1 = total_width - self.scroll_position
-            width2 = width - width1
-            portion1 = self.cached_text_image.crop((self.scroll_position, 0, total_width, height))
-            portion2 = self.cached_text_image.crop((0, 0, width2, height))
-            self.display_manager.image.paste(portion1, (0, 0))
-            self.display_manager.image.paste(portion2, (width1, 0))
-
-        self.display_manager.update_display()
-        self._log_frame_rate()
-        time.sleep(self.scroll_delay)
-        
-        return True 
+        return self.dynamic_duration 
