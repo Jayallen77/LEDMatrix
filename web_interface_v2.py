@@ -201,6 +201,23 @@ def start_display():
                 logger.info("Using fallback DisplayManager for web simulation")
             
             display_monitor.start()
+            # Immediately publish a snapshot for the client
+            try:
+                img_buffer = io.BytesIO()
+                display_manager.image.save(img_buffer, format='PNG')
+                img_str = base64.b64encode(img_buffer.getvalue()).decode()
+                snapshot = {
+                    'image': img_str,
+                    'width': display_manager.width,
+                    'height': display_manager.height,
+                    'timestamp': time.time()
+                }
+                # Update global and notify clients
+                global current_display_data
+                current_display_data = snapshot
+                socketio.emit('display_update', snapshot)
+            except Exception as snap_err:
+                logger.error(f"Failed to publish initial snapshot: {snap_err}")
             
         display_running = True
         
@@ -398,10 +415,15 @@ def system_action():
             result = subprocess.run(['sudo', 'reboot'], 
                                   capture_output=True, text=True)
         elif action == 'git_pull':
-            home_dir = str(Path.home())
-            project_dir = os.path.join(home_dir, 'LEDMatrix')
-            result = subprocess.run(['git', 'pull'], 
-                                  capture_output=True, text=True, cwd=project_dir, check=False)
+            # Run git pull from the repository directory where this file lives
+            repo_dir = Path(__file__).resolve().parent
+            if not (repo_dir / '.git').exists():
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Not a git repository: {repo_dir}'
+                }), 400
+            result = subprocess.run(['git', 'pull'],
+                                   capture_output=True, text=True, cwd=str(repo_dir), check=False)
         else:
             return jsonify({
                 'status': 'error',
@@ -562,10 +584,14 @@ def run_action_route():
             result = subprocess.run(['sudo', 'reboot'], 
                                  capture_output=True, text=True)
         elif action == 'git_pull':
-            home_dir = str(Path.home())
-            project_dir = os.path.join(home_dir, 'LEDMatrix')
-            result = subprocess.run(['git', 'pull'], 
-                                 capture_output=True, text=True, cwd=project_dir, check=True)
+            repo_dir = Path(__file__).resolve().parent
+            if not (repo_dir / '.git').exists():
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Not a git repository: {repo_dir}'
+                }), 400
+            result = subprocess.run(['git', 'pull'],
+                                 capture_output=True, text=True, cwd=str(repo_dir), check=False)
         else:
             return jsonify({
                 'status': 'error',
@@ -846,6 +872,19 @@ def view_logs():
 def get_current_display():
     """Get current display image as base64."""
     return jsonify(current_display_data)
+
+@app.route('/api/editor/layouts', methods=['GET'])
+def get_custom_layouts():
+    """Return saved custom layouts for the editor if available."""
+    try:
+        layouts_path = Path('config') / 'custom_layouts.json'
+        if not layouts_path.exists():
+            return jsonify({'status': 'success', 'data': {'elements': []}})
+        with open(layouts_path, 'r') as f:
+            data = json.load(f)
+        return jsonify({'status': 'success', 'data': data})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @socketio.on('connect')
 def handle_connect():

@@ -92,7 +92,7 @@
 
         .main-grid {
             display: grid;
-            grid-template-columns: 1fr 450px;
+            grid-template-columns: 1fr;
             gap: 20px;
             margin-bottom: 20px;
         }
@@ -216,6 +216,8 @@
             border-radius: var(--border-radius);
             padding: 20px;
             box-shadow: var(--shadow);
+            max-width: 1200px;
+            margin: 0 auto;
         }
 
         .tabs {
@@ -699,7 +701,7 @@
         <!-- Main Grid -->
         <div class="main-grid">
             <!-- Display Panel -->
-            <div class="display-panel">
+            <div class="display-panel" style="max-width: 1200px; margin: 0 auto;">
                 <h2><i class="fas fa-desktop"></i> Live Display Preview</h2>
                 <div class="display-preview" id="displayPreview">
                     <div id="previewStage" class="preview-stage" style="display:none;">
@@ -740,7 +742,7 @@
                 </div>
             </div>
 
-            <!-- Control Panel -->
+            <!-- Control Panel under the preview, wider -->
             <div class="control-panel">
                 <div class="tabs">
                     <button class="tab-btn active" onclick="showTab('overview')">
@@ -1085,10 +1087,13 @@
                         <h3>Sports Configuration</h3>
                         <p>Configure which sports leagues to display and their settings.</p>
                         <!-- Sports configuration will be populated by JavaScript -->
-                        <div id="sports-config">
-                            Loading sports configuration...
-                        </div>
-                        <button type="button" class="btn btn-success" onclick="saveSportsConfig()">Save Sports Settings</button>
+                <div id="sports-config">
+                    Loading sports configuration...
+                </div>
+                <div style="margin-top:10px; display:flex; gap:10px;">
+                    <button type="button" class="btn btn-primary" onclick="refreshSportsConfig()">Refresh</button>
+                    <button type="button" class="btn btn-success" onclick="saveSportsConfig()">Save Sports Settings</button>
+                </div>
                     </div>
                 </div>
 
@@ -1950,6 +1955,8 @@
             // Load specific data when tabs are opened
             if (tabName === 'news') {
                 loadNewsManagerData();
+            } else if (tabName === 'sports') {
+                refreshSportsConfig();
             } else if (tabName === 'logs') {
                 fetchLogs();
             } else if (tabName === 'raw-json') {
@@ -2212,6 +2219,24 @@
                 showNotification(result.message, result.status);
             } catch (error) {
                 showNotification('Error saving layout: ' + error.message, 'error');
+            }
+        }
+
+        async function loadLayout(){
+            try {
+                const res = await fetch('/api/editor/layouts');
+                const data = await res.json();
+                if (data.status === 'success' && data.data && data.data.elements) {
+                    currentElements = data.data.elements;
+                    selectedElement = null;
+                    updatePreview();
+                    updatePropertiesPanel();
+                    showNotification('Layout loaded', 'success');
+                } else {
+                    showNotification('No saved layout found', 'warning');
+                }
+            } catch (err) {
+                showNotification('Error loading layout: ' + err, 'error');
             }
         }
 
@@ -2843,9 +2868,88 @@
             showNotification('News status refreshed', 'success');
         }
 
-        // Sports configuration placeholder
-        function saveSportsConfig() {
-            showNotification('Sports configuration saved (placeholder)', 'success');
+        // Sports configuration
+        async function refreshSportsConfig(){
+            try {
+                const res = await fetch('/api/system/status');
+                const stats = await res.json();
+                // Build a minimal sports UI off current config
+                const cfg = currentConfig;
+                const leagues = [
+                    { key: 'nfl_scoreboard', label: 'NFL' },
+                    { key: 'mlb', label: 'MLB' },
+                    { key: 'milb', label: 'MiLB' },
+                    { key: 'nhl_scoreboard', label: 'NHL' },
+                    { key: 'nba_scoreboard', label: 'NBA' },
+                    { key: 'ncaa_fb_scoreboard', label: 'NCAA FB' },
+                    { key: 'ncaa_baseball_scoreboard', label: 'NCAA Baseball' },
+                    { key: 'ncaam_basketball_scoreboard', label: 'NCAAM Basketball' },
+                    { key: 'soccer_scoreboard', label: 'Soccer' }
+                ];
+                const container = document.getElementById('sports-config');
+                const html = leagues.map(l => {
+                    const sec = cfg[l.key] || {};
+                    const fav = (sec.favorite_teams || []).join(', ');
+                    return `
+                        <div style="border:1px solid #ddd; border-radius:6px; padding:12px; margin:10px 0;">
+                            <label style="display:flex; align-items:center; gap:8px;">
+                                <input type="checkbox" data-league="${l.key}" class="sp-enabled" ${sec.enabled ? 'checked' : ''}>
+                                <strong>${l.label}</strong>
+                            </label>
+                            <div class="form-row" style="margin-top:10px;">
+                                <div class="form-group">
+                                    <label>Live Priority</label>
+                                    <input type="checkbox" data-league="${l.key}" class="sp-live-priority" ${sec.live_priority ? 'checked' : ''}>
+                                </div>
+                                <div class="form-group">
+                                    <label>Show Odds</label>
+                                    <input type="checkbox" data-league="${l.key}" class="sp-show-odds" ${sec.show_odds ? 'checked' : ''}>
+                                </div>
+                                <div class="form-group">
+                                    <label>Favorites Only</label>
+                                    <input type="checkbox" data-league="${l.key}" class="sp-favorites-only" ${sec.show_favorite_teams_only ? 'checked' : ''}>
+                                </div>
+                                <div class="form-group">
+                                    <label>Favorite Teams</label>
+                                    <input type="text" data-league="${l.key}" class="form-control sp-favorites" value="${fav}">
+                                    <div class="description">Comma-separated abbreviations</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                container.innerHTML = html || 'No sports configuration found.';
+            } catch (err) {
+                document.getElementById('sports-config').textContent = 'Failed to load sports configuration';
+            }
+        }
+
+        async function saveSportsConfig(){
+            try {
+                const leagues = document.querySelectorAll('.sp-enabled');
+                const fragment = {};
+                leagues.forEach(chk => {
+                    const key = chk.getAttribute('data-league');
+                    const enabled = chk.checked;
+                    const livePriority = document.querySelector(`.sp-live-priority[data-league="${key}"]`)?.checked || false;
+                    const showOdds = document.querySelector(`.sp-show-odds[data-league="${key}"]`)?.checked || false;
+                    const favoritesOnly = document.querySelector(`.sp-favorites-only[data-league="${key}"]`)?.checked || false;
+                    const favs = document.querySelector(`.sp-favorites[data-league="${key}"]`)?.value || '';
+                    const favorite_teams = favs.split(',').map(s => s.trim()).filter(Boolean);
+                    fragment[key] = {
+                        enabled,
+                        live_priority: livePriority,
+                        show_odds: showOdds,
+                        show_favorite_teams_only: favoritesOnly,
+                        favorite_teams
+                    };
+                });
+                await saveConfigJson(fragment);
+            } catch (err) {
+                showNotification('Error saving sports configuration: ' + err, 'error');
+                return;
+            }
+            showNotification('Sports configuration saved', 'success');
         }
     </script>
 </body>
