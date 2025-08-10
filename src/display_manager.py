@@ -21,9 +21,10 @@ class DisplayManager:
             cls._instance = super(DisplayManager, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self, config: Dict[str, Any] = None, force_fallback: bool = False):
         start_time = time.time()
         self.config = config or {}
+        self._force_fallback = force_fallback
         self._setup_matrix()
         logger.info("Matrix setup completed in %.3f seconds", time.time() - start_time)
         
@@ -39,6 +40,9 @@ class DisplayManager:
         setup_start = time.time()
         
         try:
+            # Allow callers (e.g., web UI) to force non-hardware fallback mode
+            if getattr(self, '_force_fallback', False):
+                raise RuntimeError('Forced fallback mode requested')
             options = RGBMatrixOptions()
             
             # Hardware configuration

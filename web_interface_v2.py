@@ -196,8 +196,8 @@ def start_display():
                 logger.info("DisplayManager initialized successfully")
             except Exception as dm_error:
                 logger.error(f"Failed to initialize DisplayManager: {dm_error}")
-                # Re-attempt with minimal config to enable fallback simulation
-                display_manager = DisplayManager({'display': {'hardware': {}}})
+                # Re-attempt with explicit fallback mode for web preview
+                display_manager = DisplayManager({'display': {'hardware': {}}}, force_fallback=True)
                 logger.info("Using fallback DisplayManager for web simulation")
             
             display_monitor.start()
@@ -223,7 +223,12 @@ def start_display():
         
         return jsonify({
             'status': 'success',
-            'message': 'Display started successfully'
+            'message': 'Display started successfully',
+            'dimensions': {
+                'width': getattr(display_manager, 'width', 0),
+                'height': getattr(display_manager, 'height', 0)
+            },
+            'fallback': display_manager.matrix is None
         })
     except Exception as e:
         logger.error(f"Error in start_display: {e}", exc_info=True)
@@ -616,11 +621,20 @@ def get_logs():
     try:
         # Get logs from journalctl for the ledmatrix service
         result = subprocess.run(
-            ['sudo', '-n', 'journalctl', '-u', 'ledmatrix.service', '-n', '500', '--no-pager'],
-            capture_output=True, text=True, check=True
+            ['journalctl', '-u', 'ledmatrix.service', '-n', '500', '--no-pager'],
+            capture_output=True, text=True, check=False
         )
-        logs = result.stdout
-        return jsonify({'status': 'success', 'logs': logs})
+        if result.returncode == 0:
+            return jsonify({'status': 'success', 'logs': result.stdout})
+        # Permission denied or other error: fall back to web UI log and return hint
+        fallback_logs = ''
+        try:
+            with open('/tmp/web_interface_v2.log', 'r') as f:
+                fallback_logs = f.read()
+        except Exception:
+            fallback_logs = '(No fallback web UI logs found)'
+        hint = 'Insufficient permissions to read system journal. Add the web user to the systemd-journal group or configure sudoers for journalctl.'
+        return jsonify({'status': 'error', 'message': f'Error fetching logs: {result.stderr or "permission denied"}\n\nHint: {hint}', 'fallback': fallback_logs}), 500
     except subprocess.CalledProcessError as e:
         # If the command fails, return the error
         error_message = f"Error fetching logs: {e.stderr}"
