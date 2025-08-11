@@ -1172,7 +1172,11 @@ class DisplayController:
                         logger.info(f"Showing {self.current_display_mode}")
                         self._last_logged_mode = self.current_display_mode
                     
-                    logger.info(f"manager_to_display is {type(manager_to_display).__name__ if manager_to_display else 'None'}")
+                    # Only log manager type when it changes to reduce spam
+                    current_manager_type = type(manager_to_display).__name__ if manager_to_display else 'None'
+                    if current_manager_type != getattr(self, '_last_logged_manager_type', None):
+                        logger.info(f"manager_to_display is {current_manager_type}")
+                        self._last_logged_manager_type = current_manager_type
                     
                     if self.current_display_mode == 'music' and self.music_manager:
                         # Call MusicManager's display method
@@ -1235,7 +1239,11 @@ class DisplayController:
                             # Special handling for live managers that need update before display
                             if self.current_display_mode.endswith('_live') and hasattr(manager_to_display, 'update'):
                                 manager_to_display.update()
-                            logger.info(f"Calling display method for {self.current_display_mode}")
+                            # Only log display method calls occasionally to reduce spam
+                            current_time = time.time()
+                            if not hasattr(self, '_last_display_method_log_time') or current_time - getattr(self, '_last_display_method_log_time', 0) >= 30:
+                                logger.info(f"Calling display method for {self.current_display_mode}")
+                                self._last_display_method_log_time = current_time
                             manager_to_display.display(force_clear=self.force_clear)
                         else:
                             logger.warning(f"Manager {type(manager_to_display).__name__} for mode {self.current_display_mode} does not have a standard 'display' method.")

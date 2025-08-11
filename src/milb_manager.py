@@ -1549,7 +1549,6 @@ class MiLBUpcomingManager(BaseMiLBManager):
 
     def update(self):
         """Update upcoming games data."""
-        self.logger.info("[MiLB] Update method called")
         current_time = time.time()
         
         # Add a check to see if the manager is enabled
@@ -1566,6 +1565,9 @@ class MiLBUpcomingManager(BaseMiLBManager):
         
         if self.last_update != 0 and (current_time - self.last_update < self.update_interval):
             return
+            
+        # Only log when we're actually performing an update
+        self.logger.info("[MiLB] Update method called - performing update")
             
         try:
             # Fetch data from MiLB API
@@ -1694,9 +1696,13 @@ class MiLBUpcomingManager(BaseMiLBManager):
 
     def display(self, force_clear: bool = False):
         """Display upcoming games."""
-        self.logger.info(f"[MiLB] Display called with {len(self.upcoming_games)} upcoming games")
+        # Only log display calls occasionally to reduce spam
+        current_time = time.time()
+        if not hasattr(self, '_last_display_log_time') or current_time - getattr(self, '_last_display_log_time', 0) >= 30:
+            self.logger.info(f"[MiLB] Display called with {len(self.upcoming_games)} upcoming games")
+            self._last_display_log_time = current_time
+            
         if not self.upcoming_games:
-            current_time = time.time()
             if current_time - self.last_warning_time > self.warning_cooldown:
                 self.logger.info("[MiLB] No upcoming games to display")
                 self.last_warning_time = current_time
