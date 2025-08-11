@@ -246,6 +246,12 @@ sudo nano /boot/firmware/config.txt
 sudo reboot
 ```
 
+9. Run the first_time_install.sh with 
+```
+sudo ./first_time_install.sh
+```
+to ensure all the permissions are correct.
+
 -----------------------------------------------------------------------------------
 
 ## Configuration
@@ -807,7 +813,7 @@ This will start the display cycle but only stays active as long as your ssh sess
 
 The LEDMatrix can be installed as a systemd service to run automatically at boot and be managed easily. The service runs as root to ensure proper hardware timing access for the LED matrix.
 
-### Installing the Service
+### Installing the Service (this is included in the first_time_install.sh)
 
 1. Make the install script executable:
 ```bash
