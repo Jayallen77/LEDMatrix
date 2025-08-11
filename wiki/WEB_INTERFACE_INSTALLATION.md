@@ -47,10 +47,10 @@ The script will:
 
 **Note**: The first time the service starts, it will automatically:
 - Create a Python virtual environment (`venv_web_v2`)
-- Install required dependencies (Flask, numpy, requests, etc.)
+- Install required dependencies (Flask, numpy, requests, Google APIs, Spotify, etc.)
 - Install the rgbmatrix module from the local source
 
-This process may take a few minutes on the first run.
+This process may take several minutes on the first run as it installs all dependencies needed by the LEDMatrix system.
 
 ### Step 2: Configure Web Interface Autostart
 
@@ -223,7 +223,10 @@ sudo ufw allow 5001
 **Symptoms:**
 - Service shows as failed in systemctl status
 - Error messages in logs
-- Common error: `ModuleNotFoundError: No module named 'numpy'`
+- Common errors: 
+  - `ModuleNotFoundError: No module named 'numpy'`
+  - `ModuleNotFoundError: No module named 'google'`
+  - `ModuleNotFoundError: No module named 'spotipy'`
 
 **Diagnosis:**
 1. Check service logs:
@@ -233,7 +236,7 @@ journalctl -u ledmatrix-web.service -n 50
 
 2. Verify Python dependencies:
 ```bash
-python3 -c "import flask, flask_socketio, PIL, numpy"
+python3 -c "import flask, flask_socketio, PIL, numpy, google, spotipy"
 ```
 
 3. Check virtual environment:
@@ -268,6 +271,31 @@ sudo systemctl restart ledmatrix-web.service
 ```bash
 sudo chown -R ledpi:ledpi /home/ledpi/LEDMatrix
 sudo chmod +x install_web_service.sh
+```
+
+### Missing Dependencies
+
+**Symptoms:**
+- Import errors for specific modules (google, spotipy, numpy, etc.)
+- Service fails during startup with ModuleNotFoundError
+
+**Cause:**
+The web interface imports all LEDMatrix modules, which require the same dependencies as the main system.
+
+**Solution:**
+The updated `requirements_web_v2.txt` now includes all necessary dependencies. If you're still seeing issues:
+
+1. Ensure you're using the latest requirements file
+2. Recreate the virtual environment:
+```bash
+rm -rf venv_web_v2
+sudo systemctl restart ledmatrix-web.service
+```
+
+3. If specific modules are still missing, install them manually:
+```bash
+source venv_web_v2/bin/activate
+pip install google-auth-oauthlib google-api-python-client spotipy
 ```
 
 ### Import Errors
