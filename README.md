@@ -1199,11 +1199,19 @@ The LEDMatrix system includes a robust caching mechanism to optimize API calls a
 - Building a user-friendly UI for easier configuration (done!)
 
 
-### If you've read this far — thanks!  
+
 
 ## Granting Passwordless Sudo Access for Web Interface Actions
 
 The web interface needs to run certain commands with `sudo` (e.g., `reboot`, `systemctl start/stop/enable/disable ledmatrix.service`, `python display_controller.py`). To avoid needing to enter a password for these actions through the web UI, you can configure the `sudoers` file to allow the user running the Flask application to execute these specific commands without a password.
+
+1. Shortcut to automate the below steps:
+```chmod +x configure_web_sudo.sh```
+then
+```./configure_web_sudo.sh```
+
+
+Manual Method:
 
 **WARNING: Be very careful when editing the `sudoers` file. Incorrect syntax can lock you out of `sudo` access.**
 
@@ -1256,35 +1264,28 @@ For `display_controller.py` and `stop_display.sh`, ensure their file permissions
 
 ## Web Interface V2 (simplified quick start)
 
-### 1) Create and populate the venv (recommended)
-```
-cd /home/ledpi/LEDMatrix
-python3 -m venv venv_web_v2
-source venv_web_v2/bin/activate
-pip install -r requirements_web_v2.txt
-pip install -e rpi-rgb-led-matrix-master/bindings/python
-```
-
-Alternatively, run the helper (does the above and starts the server):
+### 1) un the helper (does the above and starts the server):
 ```
 python3 start_web_v2.py
 ```
 
 ### 2) Start the web UI v2
 ```
-source venv_web_v2/bin/activate
 python web_interface_v2.py
 ```
 
 ### 3) Autostart (optional)
 Set `"web_display_autostart": true` in `config/config.json`.
 Ensure your systemd service (or launcher) calls `start_web_conditionally.py`.
-It will prefer `venv_web_v2/bin/python` if present.
 
 ### 4) Permissions (optional but recommended)
 - Add the service user to `systemd-journal` for viewing logs without sudo.
 - Configure passwordless sudo for actions (start/stop service, reboot, shutdown) if desired.
+    - Required for web Ui actions, look in the section above for the commands to run (chmod +x configure_web_sudo.sh & ./configure_web_sudo.sh)
 
 ### 5) Old web UI (v1)
-The project now defaults to Web UI v2. The v1 interface can be removed or ignored.
+The project now defaults to Web UI v2. The v1 interface can be  ignored.
 An LED matrix display system that provides real-time information display capabilities for various data sources. The system is highly configurable and supports multiple display modes that can be enabled or disabled based on user preferences.
+
+
+### If you've read this far — thanks!  
