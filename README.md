@@ -247,9 +247,16 @@ sudo reboot
 ```
 
 9. Run the first_time_install.sh with 
+
+```bash
+chmod +x first_time_install.sh
 ```
+then
+
+```bash
 sudo ./first_time_install.sh
 ```
+
 to ensure all the permissions are correct.
 
 -----------------------------------------------------------------------------------

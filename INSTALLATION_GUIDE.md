@@ -2,7 +2,128 @@
 
 ## Quick Start (Recommended for First-Time Installation)
 
+# System Setup & Installation
+
+1. Open PowerShell and ssh into your Raspberry Pi with ledpi@ledpi (or Username@Hostname)
+```bash
+ssh ledpi@ledpi
+```
+
+2. Update repositories, upgrade raspberry pi OS, install git
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y git python3-pip cython3 build-essential python3-dev python3-pillow scons
+```
+
+3. Clone this repository:
+```bash
+git clone https://github.com/ChuckBuilds/LEDMatrix.git
+cd LEDMatrix
+```
+
+4. Install dependencies:
+```bash
+sudo pip3 install --break-system-packages -r requirements.txt
+```
+--break-system-packages allows us to install without a virtual environment
+
+
+5. Install rpi-rgb-led-matrix dependencies:
+```bash
+cd rpi-rgb-led-matrix-master
+```
+```bash
+sudo make build-python PYTHON=$(which python3)
+```
+```bash
+cd bindings/python
+sudo python3 setup.py install
+```
+Test it with:
+```bash
+python3 -c 'from rgbmatrix import RGBMatrix, RGBMatrixOptions; print("Success!")'
+```
+
+## Important: Sound Module Configuration
+
+1. Remove unnecessary services that might interfere with the LED matrix:
+```bash
+sudo apt-get remove bluez bluez-firmware pi-bluetooth triggerhappy pigpio
+```
+
+2. Blacklist the sound module:
+```bash
+cat <<EOF | sudo tee /etc/modprobe.d/blacklist-rgb-matrix.conf
+blacklist snd_bcm2835
+EOF
+```
+
+then execute
+
+```bash
+sudo update-initramfs -u
+```
+
+3. Reboot:
+```bash
+sudo reboot
+```
+
+## Performance Optimization
+
+To reduce flickering and improve display quality:
+
+1. Edit `/boot/firmware/cmdline.txt`:
+```bash
+sudo nano /boot/firmware/cmdline.txt
+```
+
+2. Add `isolcpus=3` at the end of the line
+
+3. Ctrl + X to exit, Y to save, Enter to Confirm
+
+4. Edit /boot/firmware/config.txt  with
+```bash
+sudo nano /boot/firmware/config.txt
+```  
+
+6. Edit the `dtparam=audio=on` section to `dtparam=audio=off`
+
+7. Ctrl + X to exit, Y to save, Enter to Confirm
+
+8. Save and reboot:
+```bash
+sudo reboot
+```
+
+9. Run the first_time_install.sh with 
+```
+sudo ./first_time_install.sh
+```
+to ensure all the permissions are correct.
+
+-----------------------------------------------------------------------------------
+
+## Configuration
+
+1.Edit `config/config.json` with your preferences via `sudo nano config/config.json`
+
+###API Keys
+
+For sensitive settings like API keys:
+Copy the template: `cp config/config_secrets.template.json config/config_secrets.json`
+Edit `config/config_secrets.json` with your API keys via `sudo nano config/config_secrets.json`
+Ctrl + X to exit, Y to overwrite, Enter to Confirm
+
+Everything is configured via `config/config.json` and `config/config_secrets.json`.
+
+
 For a complete first-time installation, run:
+
+```bash
+chmod +x first_time_install.sh
+```
+then
 
 ```bash
 sudo ./first_time_install.sh
