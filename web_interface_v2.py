@@ -1365,5 +1365,5 @@ if __name__ == '__main__':
     display_monitor.start()
     
     # Run the app
-    # eventlet/gevent provide a proper WSGI server; Werkzeug is fine for dev
-    socketio.run(app, host='0.0.0.0', port=5001, debug=False)
+    # In threading mode this uses Werkzeug; allow it explicitly for systemd usage
+    socketio.run(app, host='0.0.0.0', port=5001, debug=False, allow_unsafe_werkzeug=True)
