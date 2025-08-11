@@ -356,11 +356,6 @@ class BaseMiLBManager:
             self.logger.debug(f"[MiLB] Drawing date '{game_date_str}' at ({date_x}, {date_y}), size {date_width}x{date_height}")
             self._draw_text_with_outline(draw, game_date_str, (date_x, date_y), date_font)
 
-            # Debug rectangle around date text
-            try:
-                draw.rectangle([date_x-2, date_y-2, date_x+max(0, date_width)+2, date_y+date_height+2], outline=(255, 0, 0))
-            except Exception:
-                pass
 
             # Draw time below date
             try:
@@ -373,11 +368,7 @@ class BaseMiLBManager:
             self.logger.debug(f"[MiLB] Drawing time '{game_time_formatted_str}' at ({time_x}, {time_y}), size {time_width}x{time_height}")
             self._draw_text_with_outline(draw, game_time_formatted_str, (time_x, time_y), time_font)
 
-            # Debug rectangle around time text
-            try:
-                draw.rectangle([time_x-2, time_y-2, time_x+max(0, time_width)+2, time_y+time_height+2], outline=(0, 255, 0))
-            except Exception:
-                pass
+            # Removed debug rectangles around text
         
         # For recent/final games, show scores and status
         elif game_data['status'] in ['status_final', 'final', 'completed']:
