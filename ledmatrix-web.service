@@ -1,0 +1,18 @@
+[Unit]
+Description=LED Matrix Web Interface Service
+After=network.target
+Wants=ledmatrix.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/ledpi/LEDMatrix
+ExecStart=/usr/bin/python3 /home/ledpi/LEDMatrix/start_web_conditionally.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=ledmatrix-web
+
+[Install]
+WantedBy=multi-user.target
