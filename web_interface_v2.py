@@ -38,15 +38,16 @@ import logging
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
-# Prefer eventlet if available for stable websockets on Pi; fall back gracefully
-async_mode = None
+# Use standard threads for background tasks to avoid blocking the web UI when
+# running blocking I/O (e.g., requests) inside on-demand update loops.
+# We still import eventlet if present so environments with it installed don't break,
+# but we intentionally choose 'threading' for async_mode.
 try:
     import eventlet  # noqa: F401
-    async_mode = 'eventlet'
 except Exception:
-    async_mode = 'threading'
+    pass
 
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode=async_mode)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # Global variables
 config_manager = ConfigManager()
@@ -151,9 +152,10 @@ class OnDemandRunner:
         if not display_manager:
             # Initialize with hardware if possible
             try:
-                display_manager = DisplayManager(self.config)
+                # Suppress the startup test pattern to avoid random lines flash during on-demand
+                display_manager = DisplayManager(self.config, suppress_test_pattern=True)
             except Exception:
-                display_manager = DisplayManager({'display': {'hardware': {}}}, force_fallback=True)
+                display_manager = DisplayManager({'display': {'hardware': {}}}, force_fallback=True, suppress_test_pattern=True)
             display_monitor.start()
 
     def _is_service_active(self) -> bool:

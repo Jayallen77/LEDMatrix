@@ -21,10 +21,11 @@ class DisplayManager:
             cls._instance = super(DisplayManager, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, config: Dict[str, Any] = None, force_fallback: bool = False):
+    def __init__(self, config: Dict[str, Any] = None, force_fallback: bool = False, suppress_test_pattern: bool = False):
         start_time = time.time()
         self.config = config or {}
         self._force_fallback = force_fallback
+        self._suppress_test_pattern = suppress_test_pattern
         # Snapshot settings for web preview integration (service writes, web reads)
         self._snapshot_path = "/tmp/led_matrix_preview.png"
         self._snapshot_min_interval_sec = 0.2  # max ~5 fps
@@ -105,8 +106,9 @@ class DisplayManager:
                 logger.error(f"Failed to load initial font: {e}")
                 self.font = ImageFont.load_default()
             
-            # Draw a test pattern
-            self._draw_test_pattern()
+            # Draw a test pattern unless caller suppressed it (e.g., web on-demand)
+            if not getattr(self, '_suppress_test_pattern', False):
+                self._draw_test_pattern()
             
         except Exception as e:
             logger.error(f"Failed to initialize RGB Matrix: {e}", exc_info=True)
@@ -222,11 +224,24 @@ class DisplayManager:
             self.image = Image.new('RGB', (self.matrix.width, self.matrix.height))
             self.draw = ImageDraw.Draw(self.image)
             
-            # Clear both canvases
-            self.offscreen_canvas.Clear()
-            self.current_canvas.Clear()
+            # Clear both canvases and the underlying matrix to ensure no artifacts
+            try:
+                self.offscreen_canvas.Clear()
+            except Exception:
+                pass
+            try:
+                self.current_canvas.Clear()
+            except Exception:
+                pass
+            try:
+                # Extra safety: clear the matrix front buffer as well
+                self.matrix.Clear()
+            except Exception:
+                pass
             
-            # Update the display to show the clear
+            # Update the display to show the clear. Swap twice to flush any latent frame.
+            self.update_display()
+            time.sleep(0.01)
             self.update_display()
         except Exception as e:
             logger.error(f"Error clearing display: {e}")
