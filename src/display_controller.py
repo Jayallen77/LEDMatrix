@@ -1139,7 +1139,6 @@ class DisplayController:
                                 manager_to_display = self.milb_recent
                             elif self.current_display_mode == 'milb_upcoming' and self.milb_upcoming:
                                 manager_to_display = self.milb_upcoming
-                                logger.info("Set manager_to_display to milb_upcoming")
                             elif self.current_display_mode == 'soccer_recent' and self.soccer_recent:
                                 manager_to_display = self.soccer_recent
                             elif self.current_display_mode == 'soccer_upcoming' and self.soccer_upcoming:

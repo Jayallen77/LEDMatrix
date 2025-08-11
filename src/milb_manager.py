@@ -211,7 +211,11 @@ class BaseMiLBManager:
 
     def _create_game_display(self, game_data: Dict[str, Any]) -> Image.Image:
         """Create a display image for an MiLB game with team logos, score, and game state."""
-        self.logger.info(f"[MiLB] Creating game display for: {game_data.get('away_team')} @ {game_data.get('home_team')}")
+        # Throttle this info log to avoid spamming (once every 30s)
+        now_ts = time.time()
+        if not hasattr(self, '_last_create_log_ts') or (now_ts - getattr(self, '_last_create_log_ts', 0)) >= 30:
+            self.logger.info(f"[MiLB] Creating game display for: {game_data.get('away_team')} @ {game_data.get('home_team')}")
+            self._last_create_log_ts = now_ts
         width = self.display_manager.matrix.width
         height = self.display_manager.matrix.height
         image = Image.new('RGB', (width, height), color=(0, 0, 0))
@@ -258,19 +262,37 @@ class BaseMiLBManager:
         # For upcoming games, show date and time stacked in the center
         self.logger.debug(f"[MiLB] Game status: {game_data.get('status')}, status_state: {game_data.get('status_state')}")
         self.logger.debug(f"[MiLB] Full game data: {game_data}")
-        if game_data['status'] == 'status_scheduled':
+        is_upcoming_status = (
+            game_data.get('status') == 'status_scheduled' or
+            game_data.get('status_state') not in ['post', 'final', 'completed']
+        )
+        if is_upcoming_status:
             # Ensure game_time_str is defined before use
             game_time_str = game_data.get('start_time', '')
-            # Show "Next Game" at the top using NHL-style font
+            # Show "Next Game" at the top using BDF font when available, else TTF fallback
             status_text = "Next Game"
-            # Set font size for BDF font
-            self.display_manager.calendar_font.set_char_size(height=7*64)  # 7 pixels high, 64 units per pixel
-            status_width = self.display_manager.get_text_width(status_text, self.display_manager.calendar_font)
-            status_x = (width - status_width) // 2
-            status_y = 2
-            # Draw on the current image
-            self.display_manager.draw = draw
-            self.display_manager._draw_bdf_text(status_text, status_x, status_y, color=(255, 255, 255), font=self.display_manager.calendar_font)
+            try:
+                if hasattr(self.display_manager.calendar_font, 'set_char_size'):
+                    # Likely a freetype.Face (BDF). Size to ~7px
+                    self.display_manager.calendar_font.set_char_size(height=7*64)
+                    status_width = self.display_manager.get_text_width(status_text, self.display_manager.calendar_font)
+                    status_x = (width - status_width) // 2
+                    status_y = 2
+                    # Draw on the current image
+                    self.display_manager.draw = draw
+                    self.display_manager._draw_bdf_text(status_text, status_x, status_y, color=(255, 255, 255), font=self.display_manager.calendar_font)
+                else:
+                    # Fallback to small TTF font
+                    fallback_font = self.display_manager.small_font
+                    status_width = self.display_manager.get_text_width(status_text, fallback_font)
+                    status_x = (width - status_width) // 2
+                    status_y = 2
+                    self._draw_text_with_outline(draw, status_text, (status_x, status_y), fallback_font)
+            except Exception as e:
+                # As a last resort, draw with default PIL font
+                status_x = 2
+                status_y = 2
+                self._draw_text_with_outline(draw, status_text, (status_x, status_y), ImageFont.load_default())
             
             if not game_time_str or 'TBD' in game_time_str:
                 game_date_str = "TBD"
@@ -309,11 +331,15 @@ class BaseMiLBManager:
             
             # Draw date and time using NHL-style fonts
             try:
-                date_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
-                time_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
-                self.logger.debug(f"[MiLB] Fonts loaded successfully")
+                # Prefer already loaded small font from DisplayManager to avoid I/O and failures
+                date_font = getattr(self.display_manager, 'small_font', None)
+                time_font = getattr(self.display_manager, 'small_font', None)
+                if date_font is None or time_font is None:
+                    date_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
+                    time_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
+                self.logger.debug(f"[MiLB] Fonts prepared successfully")
             except Exception as e:
-                self.logger.error(f"[MiLB] Failed to load fonts: {e}")
+                self.logger.error(f"[MiLB] Failed to prepare fonts: {e}")
                 # Fallback to default font
                 date_font = ImageFont.load_default()
                 time_font = ImageFont.load_default()
