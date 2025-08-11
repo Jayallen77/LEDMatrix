@@ -29,6 +29,9 @@ Step-by-step instructions for setting up your Raspberry Pi for LEDMatrix.
 ## 🚀 [Installation & Deployment](WIKI_INSTALLATION.md)
 Complete installation process, service setup, and deployment options.
 
+## 🌐 [Web Interface Installation](WEB_INTERFACE_INSTALLATION.md)
+Install and configure the web interface for remote control and configuration.
+
 ## 🔐 [API Authentication](WIKI_API_AUTH.md)
 How to set up API keys and authentication for all supported services.
 

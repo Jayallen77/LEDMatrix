@@ -867,6 +867,102 @@ sudo ./start_display.sh
 sudo ./stop_display.sh
 ```
 
+-----------------------------------------------------------------------------------
+
+## Web Interface Installation
+
+The LEDMatrix system includes a web interface that allows you to control and configure the display remotely. The web interface runs on port 5001 and provides real-time display preview, configuration management, and on-demand display controls.
+
+### Installing the Web Interface Service
+
+1. Make the install script executable:
+```bash
+chmod +x install_web_service.sh
+```
+
+2. Run the install script with sudo:
+```bash
+sudo ./install_web_service.sh
+```
+
+The script will:
+- Copy the web service file to `/etc/systemd/system/`
+- Enable the service to start on boot
+- Start the service immediately
+- Show the service status
+
+### Web Interface Configuration
+
+The web interface can be configured to start automatically with the main display service:
+
+1. In `config/config.json`, ensure the web interface autostart is enabled:
+```json
+{
+    "web_display_autostart": true
+}
+```
+
+2. The web interface will now start automatically when:
+   - The system boots
+   - The `web_display_autostart` setting is `true` in your config
+
+### Accessing the Web Interface
+
+Once installed, you can access the web interface at:
+```
+http://your-pi-ip:5001
+```
+
+### Managing the Web Interface Service
+
+```bash
+# Check service status
+sudo systemctl status ledmatrix-web.service
+
+# View logs
+journalctl -u ledmatrix-web.service -f
+
+# Stop the service
+sudo systemctl stop ledmatrix-web.service
+
+# Start the service
+sudo systemctl start ledmatrix-web.service
+
+# Disable autostart
+sudo systemctl disable ledmatrix-web.service
+
+# Enable autostart
+sudo systemctl enable ledmatrix-web.service
+```
+
+### Web Interface Features
+
+- **Real-time Display Preview**: See what's currently displayed on the LED matrix
+- **Configuration Management**: Edit settings through a web interface
+- **On-Demand Controls**: Start specific displays (weather, stocks, sports) on demand
+- **Service Management**: Start/stop the main display service
+- **System Controls**: Restart, update code, and manage the system
+- **API Metrics**: Monitor API usage and system performance
+- **Logs**: View system logs in real-time
+
+### Troubleshooting Web Interface
+
+**Web Interface Not Accessible After Restart:**
+1. Check if the web service is running: `sudo systemctl status ledmatrix-web.service`
+2. Verify the service is enabled: `sudo systemctl is-enabled ledmatrix-web.service`
+3. Check logs for errors: `journalctl -u ledmatrix-web.service -f`
+4. Ensure `web_display_autostart` is set to `true` in `config/config.json`
+
+**Port 5001 Not Accessible:**
+1. Check if the service is running on the correct port
+2. Verify firewall settings allow access to port 5001
+3. Check if another service is using port 5001
+
+**Service Fails to Start:**
+1. Check Python dependencies are installed
+2. Verify the virtual environment is set up correctly
+3. Check file permissions and ownership
+
 
 -----------------------------------------------------------------------------------
 
