@@ -13,11 +13,11 @@ echo "Setting up LED Matrix Web Interface V2..."
 
 # Install dependencies using system Python
 echo "Installing dependencies..."
-python3 -m pip install -r requirements_web_v2.txt
+python3 -m pip install --break-system-packages -r requirements_web_v2.txt
 
 # Install rgbmatrix module from local source
 echo "Installing rgbmatrix module..."
-python3 -m pip install -e rpi-rgb-led-matrix-master/bindings/python
+python3 -m pip install --break-system-packages -e rpi-rgb-led-matrix-master/bindings/python
 
 # Run the web interface
 echo "Starting web interface on http://0.0.0.0:5001"

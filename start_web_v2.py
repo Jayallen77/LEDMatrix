@@ -45,7 +45,7 @@ def check_dependencies():
         logger.info("Installing missing packages...")
         try:
             subprocess.check_call([
-                sys.executable, '-m', 'pip', 'install', '-r', 'requirements_web_v2.txt'
+                sys.executable, '-m', 'pip', 'install', '--break-system-packages', '-r', 'requirements_web_v2.txt'
             ])
             logger.info("Dependencies installed successfully")
         except subprocess.CalledProcessError as e:
@@ -57,7 +57,7 @@ def check_dependencies():
     try:
         rgbmatrix_path = Path(__file__).parent / 'rpi-rgb-led-matrix-master' / 'bindings' / 'python'
         subprocess.check_call([
-            sys.executable, '-m', 'pip', 'install', '-e', str(rgbmatrix_path)
+            sys.executable, '-m', 'pip', 'install', '--break-system-packages', '-e', str(rgbmatrix_path)
         ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         logger.info("rgbmatrix module installed successfully")
     except subprocess.CalledProcessError as e:

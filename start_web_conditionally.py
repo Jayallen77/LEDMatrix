@@ -14,7 +14,7 @@ def install_dependencies():
     try:
         requirements_file = os.path.join(PROJECT_DIR, 'requirements_web_v2.txt')
         subprocess.check_call([
-            sys.executable, '-m', 'pip', 'install', '-r', requirements_file
+            sys.executable, '-m', 'pip', 'install', '--break-system-packages', '-r', requirements_file
         ])
         print("Dependencies installed successfully")
         
@@ -23,7 +23,7 @@ def install_dependencies():
         rgbmatrix_path = Path(PROJECT_DIR) / 'rpi-rgb-led-matrix-master' / 'bindings' / 'python'
         if rgbmatrix_path.exists():
             subprocess.check_call([
-                sys.executable, '-m', 'pip', 'install', '-e', str(rgbmatrix_path)
+                sys.executable, '-m', 'pip', 'install', '--break-system-packages', '-e', str(rgbmatrix_path)
             ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             print("rgbmatrix module installed successfully")
         
