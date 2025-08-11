@@ -183,9 +183,20 @@ class OnDemandRunner:
         self.thread = socketio.start_background_task(self._run_loop)
 
     def stop(self):
+        """Stop on-demand display and clear the screen."""
         self.running = False
         self.mode = None
         self.thread = None
+        
+        # Clear the display to stop showing content
+        global display_manager
+        if display_manager:
+            try:
+                display_manager.clear()
+                # Force update to show the cleared display
+                display_manager.update_display()
+            except Exception as e:
+                logger.error(f"Error clearing display during on-demand stop: {e}")
 
     def status(self) -> dict:
         return {
@@ -295,6 +306,8 @@ class OnDemandRunner:
     def _run_loop(self):
         """Background loop: update and display selected mode until stopped."""
         mode = self.mode
+        logger.info(f"Starting on-demand loop for mode: {mode}")
+        
         try:
             manager, display_fn, update_fn, update_interval = self._build_manager(mode)
         except Exception as e:
@@ -303,8 +316,19 @@ class OnDemandRunner:
             return
 
         last_update = 0.0
+        loop_count = 0
+        
         while self.running and self.mode == mode:
             try:
+                # Check running status more frequently
+                if not self.running:
+                    logger.info(f"On-demand loop for {mode} stopping - running flag is False")
+                    break
+                    
+                if self.mode != mode:
+                    logger.info(f"On-demand loop for {mode} stopping - mode changed to {self.mode}")
+                    break
+                
                 now = time.time()
                 if update_fn and (now - last_update >= max(1e-3, update_interval)):
                     update_fn()
@@ -319,6 +343,12 @@ class OnDemandRunner:
 
                 if self.force_clear_next:
                     self.force_clear_next = False
+                    
+                # Log every 100 loops for debugging
+                loop_count += 1
+                if loop_count % 100 == 0:
+                    logger.debug(f"On-demand loop for {mode} - iteration {loop_count}")
+                    
             except Exception as loop_err:
                 logger.error(f"Error in on-demand loop for {mode}: {loop_err}")
                 # small backoff to avoid tight error loop
@@ -334,6 +364,8 @@ class OnDemandRunner:
                 socketio.sleep(sleep_seconds)
             except Exception:
                 time.sleep(sleep_seconds)
+        
+        logger.info(f"On-demand loop for {mode} exited")
 
 
 on_demand_runner = OnDemandRunner()
@@ -731,16 +763,29 @@ def api_ondemand_start():
 @app.route('/api/ondemand/stop', methods=['POST'])
 def api_ondemand_stop():
     try:
+        logger.info("Stopping on-demand display...")
         on_demand_runner.stop()
-        return jsonify({'status': 'success', 'message': 'On-Demand stopped', 'on_demand': on_demand_runner.status()})
+        
+        # Give the thread a moment to stop
+        import time
+        time.sleep(0.1)
+        
+        status = on_demand_runner.status()
+        logger.info(f"On-demand stopped. Status: {status}")
+        
+        return jsonify({'status': 'success', 'message': 'On-Demand stopped', 'on_demand': status})
     except Exception as e:
+        logger.error(f"Error stopping on-demand: {e}")
         return jsonify({'status': 'error', 'message': f'Error stopping on-demand: {e}'}), 500
 
 @app.route('/api/ondemand/status', methods=['GET'])
 def api_ondemand_status():
     try:
-        return jsonify({'status': 'success', 'on_demand': on_demand_runner.status()})
+        status = on_demand_runner.status()
+        logger.debug(f"On-demand status requested: {status}")
+        return jsonify({'status': 'success', 'on_demand': status})
     except Exception as e:
+        logger.error(f"Error getting on-demand status: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 # --- API Call Metrics (simple in-memory counters) ---
