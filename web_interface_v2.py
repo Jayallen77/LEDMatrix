@@ -11,6 +11,25 @@ import psutil
 from pathlib import Path
 from src.config_manager import ConfigManager
 from src.display_manager import DisplayManager
+from src.cache_manager import CacheManager
+from src.clock import Clock
+from src.weather_manager import WeatherManager
+from src.stock_manager import StockManager
+from src.stock_news_manager import StockNewsManager
+from src.odds_ticker_manager import OddsTickerManager
+from src.calendar_manager import CalendarManager
+from src.youtube_display import YouTubeDisplay
+from src.text_display import TextDisplay
+from src.news_manager import NewsManager
+from src.nhl_managers import NHLLiveManager, NHLRecentManager, NHLUpcomingManager
+from src.nba_managers import NBALiveManager, NBARecentManager, NBAUpcomingManager
+from src.mlb_manager import MLBLiveManager, MLBRecentManager, MLBUpcomingManager
+from src.milb_manager import MiLBLiveManager, MiLBRecentManager, MiLBUpcomingManager
+from src.soccer_managers import SoccerLiveManager, SoccerRecentManager, SoccerUpcomingManager
+from src.nfl_managers import NFLLiveManager, NFLRecentManager, NFLUpcomingManager
+from src.ncaa_fb_managers import NCAAFBLiveManager, NCAAFBRecentManager, NCAAFBUpcomingManager
+from src.ncaa_baseball_managers import NCAABaseballLiveManager, NCAABaseballRecentManager, NCAABaseballUpcomingManager
+from src.ncaam_basketball_managers import NCAAMBasketballLiveManager, NCAAMBasketballRecentManager, NCAAMBasketballUpcomingManager
 from PIL import Image
 import io
 import signal
@@ -111,6 +130,214 @@ class DisplayMonitor:
 
 display_monitor = DisplayMonitor()
 
+
+class OnDemandRunner:
+    """Run a single display mode on demand until stopped."""
+    def __init__(self):
+        self.running = False
+        self.thread = None
+        self.mode = None
+        self.force_clear_next = False
+        self.cache_manager = None
+        self.config = None
+
+    def _ensure_infra(self):
+        """Ensure config, cache, and display manager are initialized."""
+        global display_manager
+        if self.cache_manager is None:
+            self.cache_manager = CacheManager()
+        if self.config is None:
+            self.config = config_manager.load_config()
+        if not display_manager:
+            # Initialize with hardware if possible
+            try:
+                display_manager = DisplayManager(self.config)
+            except Exception:
+                display_manager = DisplayManager({'display': {'hardware': {}}}, force_fallback=True)
+            display_monitor.start()
+
+    def _is_service_active(self) -> bool:
+        try:
+            result = subprocess.run(['systemctl', 'is-active', 'ledmatrix'], capture_output=True, text=True)
+            return result.stdout.strip() == 'active'
+        except Exception:
+            return False
+
+    def start(self, mode: str):
+        """Start on-demand mode. Throws RuntimeError if service is active."""
+        if self._is_service_active():
+            raise RuntimeError('LEDMatrix service is active. Stop it first to use On-Demand.')
+
+        # If already running same mode, no-op
+        if self.running and self.mode == mode:
+            return
+        # Switch from previous
+        if self.running:
+            self.stop()
+
+        self._ensure_infra()
+        self.mode = mode
+        self.running = True
+        self.force_clear_next = True
+        # Use SocketIO bg task for cooperative sleeping
+        self.thread = socketio.start_background_task(self._run_loop)
+
+    def stop(self):
+        self.running = False
+        self.mode = None
+        self.thread = None
+
+    def status(self) -> dict:
+        return {
+            'running': self.running,
+            'mode': self.mode,
+        }
+
+    # --- Mode construction helpers ---
+    def _build_manager(self, mode: str):
+        global display_manager
+        cfg = self.config or {}
+        # Non-sport managers
+        if mode == 'clock':
+            mgr = Clock(display_manager)
+            self._force_enable(mgr)
+            return mgr, lambda fc=False: mgr.display_time(force_clear=fc), None, 1.0
+        if mode == 'weather_current':
+            mgr = WeatherManager(cfg, display_manager)
+            self._force_enable(mgr)
+            return mgr, lambda fc=False: mgr.display_weather(force_clear=fc), lambda: mgr.get_weather(), float(cfg.get('weather', {}).get('update_interval', 1800))
+        if mode == 'weather_hourly':
+            mgr = WeatherManager(cfg, display_manager)
+            self._force_enable(mgr)
+            return mgr, lambda fc=False: mgr.display_hourly_forecast(force_clear=fc), lambda: mgr.get_weather(), float(cfg.get('weather', {}).get('update_interval', 1800))
+        if mode == 'weather_daily':
+            mgr = WeatherManager(cfg, display_manager)
+            self._force_enable(mgr)
+            return mgr, lambda fc=False: mgr.display_daily_forecast(force_clear=fc), lambda: mgr.get_weather(), float(cfg.get('weather', {}).get('update_interval', 1800))
+        if mode == 'stocks':
+            mgr = StockManager(cfg, display_manager)
+            self._force_enable(mgr)
+            return mgr, lambda fc=False: mgr.display_stocks(force_clear=fc), lambda: mgr.update_stock_data(), float(cfg.get('stocks', {}).get('update_interval', 600))
+        if mode == 'stock_news':
+            mgr = StockNewsManager(cfg, display_manager)
+            self._force_enable(mgr)
+            return mgr, lambda fc=False: mgr.display_news(), lambda: mgr.update_news_data(), float(cfg.get('stock_news', {}).get('update_interval', 300))
+        if mode == 'odds_ticker':
+            mgr = OddsTickerManager(cfg, display_manager)
+            self._force_enable(mgr)
+            return mgr, lambda fc=False: mgr.display(force_clear=fc), lambda: mgr.update(), float(cfg.get('odds_ticker', {}).get('update_interval', 300))
+        if mode == 'calendar':
+            mgr = CalendarManager(display_manager, cfg)
+            self._force_enable(mgr)
+            return mgr, lambda fc=False: mgr.display(force_clear=fc), lambda: mgr.update(time.time()), 60.0
+        if mode == 'youtube':
+            mgr = YouTubeDisplay(display_manager, cfg)
+            self._force_enable(mgr)
+            return mgr, lambda fc=False: mgr.display(force_clear=fc), lambda: mgr.update(), float(cfg.get('youtube', {}).get('update_interval', 30))
+        if mode == 'text_display':
+            mgr = TextDisplay(display_manager, cfg)
+            self._force_enable(mgr)
+            return mgr, lambda fc=False: mgr.display(), lambda: getattr(mgr, 'update', lambda: None)(), 5.0
+        if mode == 'of_the_day':
+            from src.of_the_day_manager import OfTheDayManager  # local import to avoid circulars
+            mgr = OfTheDayManager(display_manager, cfg)
+            self._force_enable(mgr)
+            return mgr, lambda fc=False: mgr.display(force_clear=fc), lambda: mgr.update(time.time()), 300.0
+        if mode == 'news_manager':
+            mgr = NewsManager(cfg, display_manager)
+            self._force_enable(mgr)
+            return mgr, lambda fc=False: mgr.display_news(), None, 0
+
+        # Sports managers mapping helper
+        def sport(kind: str, variant: str):
+            # kind examples: nhl, nba, mlb, milb, soccer, nfl, ncaa_fb, ncaa_baseball, ncaam_basketball
+            # variant: live/recent/upcoming
+            if kind == 'nhl':
+                cls = {'live': NHLLiveManager, 'recent': NHLRecentManager, 'upcoming': NHLUpcomingManager}[variant]
+            elif kind == 'nba':
+                cls = {'live': NBALiveManager, 'recent': NBARecentManager, 'upcoming': NBAUpcomingManager}[variant]
+            elif kind == 'mlb':
+                cls = {'live': MLBLiveManager, 'recent': MLBRecentManager, 'upcoming': MLBUpcomingManager}[variant]
+            elif kind == 'milb':
+                cls = {'live': MiLBLiveManager, 'recent': MiLBRecentManager, 'upcoming': MiLBUpcomingManager}[variant]
+            elif kind == 'soccer':
+                cls = {'live': SoccerLiveManager, 'recent': SoccerRecentManager, 'upcoming': SoccerUpcomingManager}[variant]
+            elif kind == 'nfl':
+                cls = {'live': NFLLiveManager, 'recent': NFLRecentManager, 'upcoming': NFLUpcomingManager}[variant]
+            elif kind == 'ncaa_fb':
+                cls = {'live': NCAAFBLiveManager, 'recent': NCAAFBRecentManager, 'upcoming': NCAAFBUpcomingManager}[variant]
+            elif kind == 'ncaa_baseball':
+                cls = {'live': NCAABaseballLiveManager, 'recent': NCAABaseballRecentManager, 'upcoming': NCAABaseballUpcomingManager}[variant]
+            elif kind == 'ncaam_basketball':
+                cls = {'live': NCAAMBasketballLiveManager, 'recent': NCAAMBasketballRecentManager, 'upcoming': NCAAMBasketballUpcomingManager}[variant]
+            else:
+                raise ValueError(f"Unsupported sport kind: {kind}")
+            mgr = cls(cfg, display_manager, self.cache_manager)
+            self._force_enable(mgr)
+            return mgr, lambda fc=False: mgr.display(force_clear=fc), lambda: mgr.update(), float(getattr(mgr, 'update_interval', 60))
+
+        if mode.endswith('_live'):
+            return sport(mode.replace('_live', ''), 'live')
+        if mode.endswith('_recent'):
+            return sport(mode.replace('_recent', ''), 'recent')
+        if mode.endswith('_upcoming'):
+            return sport(mode.replace('_upcoming', ''), 'upcoming')
+
+        raise ValueError(f"Unknown on-demand mode: {mode}")
+
+    def _force_enable(self, mgr):
+        try:
+            if hasattr(mgr, 'is_enabled'):
+                setattr(mgr, 'is_enabled', True)
+        except Exception:
+            pass
+
+    def _run_loop(self):
+        """Background loop: update and display selected mode until stopped."""
+        mode = self.mode
+        try:
+            manager, display_fn, update_fn, update_interval = self._build_manager(mode)
+        except Exception as e:
+            logger.error(f"Failed to initialize on-demand manager for mode {mode}: {e}")
+            self.running = False
+            return
+
+        last_update = 0.0
+        while self.running and self.mode == mode:
+            try:
+                now = time.time()
+                if update_fn and (now - last_update >= max(1e-3, update_interval)):
+                    update_fn()
+                    last_update = now
+
+                # Call display frequently for smooth animation where applicable
+                try:
+                    display_fn(self.force_clear_next)
+                except TypeError:
+                    # Fallback if callable ignores force_clear
+                    display_fn()
+
+                if self.force_clear_next:
+                    self.force_clear_next = False
+            except Exception as loop_err:
+                logger.error(f"Error in on-demand loop for {mode}: {loop_err}")
+                # small backoff to avoid tight error loop
+                try:
+                    socketio.sleep(0.5)
+                except Exception:
+                    time.sleep(0.5)
+                continue
+
+            # Target higher FPS for ticker; moderate for others
+            sleep_seconds = 0.02 if mode == 'odds_ticker' else 0.08
+            try:
+                socketio.sleep(sleep_seconds)
+            except Exception:
+                time.sleep(sleep_seconds)
+
+
+on_demand_runner = OnDemandRunner()
+
 @app.route('/')
 def index():
     try:
@@ -185,7 +412,7 @@ def get_system_status():
         disk = psutil.disk_usage('/')
         disk_used_percent = round((disk.used / disk.total) * 100, 1)
         
-        return {
+        status = {
             'service_active': service_active,
             'memory_used_percent': mem_used_percent,
             'cpu_percent': cpu_percent,
@@ -193,8 +420,10 @@ def get_system_status():
             'disk_used_percent': disk_used_percent,
             'uptime': f"{uptime_hours}h {uptime_minutes}m",
             'display_connected': display_manager is not None,
-            'editor_mode': editor_mode
+            'editor_mode': editor_mode,
+            'on_demand': on_demand_runner.status()
         }
+        return status
     except Exception as e:
         return {
             'service_active': False,
@@ -480,6 +709,39 @@ def system_action():
 def get_system_status_api():
     """Get system status as JSON."""
     return jsonify(get_system_status())
+
+# --- On-Demand Controls ---
+@app.route('/api/ondemand/start', methods=['POST'])
+def api_ondemand_start():
+    try:
+        data = request.get_json(force=True)
+        mode = (data or {}).get('mode')
+        if not mode:
+            return jsonify({'status': 'error', 'message': 'Missing mode'}), 400
+        # Refuse if service is running
+        if on_demand_runner._is_service_active():
+            return jsonify({'status': 'error', 'message': 'Service is active. Stop it first to use On-Demand.'}), 400
+        on_demand_runner.start(mode)
+        return jsonify({'status': 'success', 'message': f'On-Demand started: {mode}', 'on_demand': on_demand_runner.status()})
+    except RuntimeError as rte:
+        return jsonify({'status': 'error', 'message': str(rte)}), 400
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'Error starting on-demand: {e}'}), 500
+
+@app.route('/api/ondemand/stop', methods=['POST'])
+def api_ondemand_stop():
+    try:
+        on_demand_runner.stop()
+        return jsonify({'status': 'success', 'message': 'On-Demand stopped', 'on_demand': on_demand_runner.status()})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'Error stopping on-demand: {e}'}), 500
+
+@app.route('/api/ondemand/status', methods=['GET'])
+def api_ondemand_status():
+    try:
+        return jsonify({'status': 'success', 'on_demand': on_demand_runner.status()})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 # --- API Call Metrics (simple in-memory counters) ---
 api_counters = {

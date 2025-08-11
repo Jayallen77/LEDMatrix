@@ -720,6 +720,8 @@
                 <button class="btn btn-primary" onclick="systemAction('restart_service')"><i class="fas fa-redo"></i> Restart Service</button>
                 <button class="btn btn-warning" onclick="systemAction('git_pull')"><i class="fas fa-download"></i> Update Code</button>
                 <button class="btn btn-danger" onclick="systemAction('reboot_system')"><i class="fas fa-power-off"></i> Reboot</button>
+                <button class="btn btn-secondary" onclick="stopOnDemand()"><i class="fas fa-ban"></i> Stop On-Demand</button>
+                <span id="ondemand-status" style="margin-left:auto; font-size:12px; color:#333; background:#f3f3f3; padding:6px 10px; border-radius:8px;">On-Demand: None</span>
             </div>
             <div style="margin-top:12px; color:#666; font-size:12px;">Service actions may require sudo privileges on the Pi.</div>
         </div>
@@ -1147,7 +1149,14 @@
                 <!-- Weather Tab -->
                 <div id="weather" class="tab-content">
                     <div class="config-section">
-                        <h3>Weather Configuration</h3>
+                        <div style="display:flex; justify-content: space-between; align-items:center;">
+                            <h3>Weather Configuration</h3>
+                            <div style="display:flex; gap:8px;">
+                                <button type="button" class="btn btn-info" onclick="startOnDemand('weather_current')"><i class="fas fa-bolt"></i> On-Demand Current</button>
+                                <button type="button" class="btn btn-info" onclick="startOnDemand('weather_hourly')"><i class="fas fa-bolt"></i> Hourly</button>
+                                <button type="button" class="btn btn-info" onclick="startOnDemand('weather_daily')"><i class="fas fa-bolt"></i> Daily</button>
+                            </div>
+                        </div>
                         <form id="weather-form">
                             <div class="form-group">
                                 <label>
@@ -1191,7 +1200,12 @@
                 <!-- Stocks Tab -->
                 <div id="stocks" class="tab-content">
                     <div class="config-section">
-                        <h3>Stocks & Crypto Configuration</h3>
+                        <div style="display:flex; justify-content: space-between; align-items:center;">
+                            <h3>Stocks & Crypto Configuration</h3>
+                            <div style="display:flex; gap:8px;">
+                                <button type="button" class="btn btn-info" onclick="startOnDemand('stocks')"><i class="fas fa-bolt"></i> On-Demand Stocks</button>
+                            </div>
+                        </div>
                         <form id="stocks-form">
                             <div class="form-group">
                                 <label>
@@ -1283,7 +1297,12 @@
                 <!-- Stock News Tab -->
                 <div id="stocknews" class="tab-content">
                     <div class="config-section">
-                        <h3>Stock News</h3>
+                        <div style="display:flex; justify-content: space-between; align-items:center;">
+                            <h3>Stock News</h3>
+                            <div style="display:flex; gap:8px;">
+                                <button type="button" class="btn btn-info" onclick="startOnDemand('stock_news')"><i class="fas fa-bolt"></i> On-Demand News</button>
+                            </div>
+                        </div>
                         <form id="stocknews-form">
                             <div class="form-group">
                                 <label>
@@ -1334,7 +1353,13 @@
                 <!-- Odds Ticker Tab -->
                 <div id="odds" class="tab-content">
                     <div class="config-section">
-                        <h3>Odds Ticker</h3>
+                        <div style="display:flex; justify-content: space-between; align-items:center;">
+                            <h3>Odds Ticker</h3>
+                            <div style="display:flex; gap:8px;">
+                                <button type="button" class="btn btn-info" onclick="startOnDemand('odds_ticker')"><i class="fas fa-bolt"></i> On-Demand</button>
+                                <button type="button" class="btn btn-secondary" onclick="stopOnDemand()"><i class="fas fa-ban"></i> Stop</button>
+                            </div>
+                        </div>
                         <form id="odds-form">
                             <div class="form-group">
                                 <label>
@@ -1386,7 +1411,12 @@
                 <!-- Text Display Tab -->
                 <div id="text" class="tab-content">
                     <div class="config-section">
-                        <h3>Text Display</h3>
+                        <div style="display:flex; justify-content: space-between; align-items:center;">
+                            <h3>Text Display</h3>
+                            <div style="display:flex; gap:8px;">
+                                <button type="button" class="btn btn-info" onclick="startOnDemand('text_display')"><i class="fas fa-bolt"></i> On-Demand</button>
+                            </div>
+                        </div>
                         <form id="text-form">
                             <div class="form-group"><label><input type="checkbox" id="text_enabled" {% if main_config.text_display.enabled %}checked{% endif %}> Enable</label></div>
                             <div class="form-group"><label for="text_text">Text</label><input type="text" id="text_text" class="form-control" value="{{ main_config.text_display.text }}"></div>
@@ -1455,7 +1485,12 @@
                 <!-- YouTube Tab -->
                 <div id="youtube" class="tab-content">
                     <div class="config-section">
-                        <h3>YouTube</h3>
+                        <div style="display:flex; justify-content: space-between; align-items:center;">
+                            <h3>YouTube</h3>
+                            <div style="display:flex; gap:8px;">
+                                <button type="button" class="btn btn-info" onclick="startOnDemand('youtube')"><i class="fas fa-bolt"></i> On-Demand</button>
+                            </div>
+                        </div>
                         <form id="youtube-form">
                             <div class="form-group"><label><input type="checkbox" id="youtube_enabled" {% if main_config.youtube.enabled %}checked{% endif %}> Enable YouTube</label></div>
                             <div class="form-group"><label for="youtube_update_interval">Update Interval (sec)</label><input type="number" id="youtube_update_interval" class="form-control" value="{{ main_config.youtube.update_interval }}"></div>
@@ -1467,7 +1502,12 @@
                 <!-- Calendar Tab -->
                 <div id="calendar" class="tab-content">
                     <div class="config-section">
-                        <h3>Calendar Configuration</h3>
+                        <div style="display:flex; justify-content: space-between; align-items:center;">
+                            <h3>Calendar Configuration</h3>
+                            <div style="display:flex; gap:8px;">
+                                <button type="button" class="btn btn-info" onclick="startOnDemand('calendar')"><i class="fas fa-bolt"></i> On-Demand</button>
+                            </div>
+                        </div>
                         <form id="calendar-form">
                             <div class="form-group">
                                 <label>
@@ -1498,7 +1538,12 @@
                 <!-- News Tab -->
                 <div id="news" class="tab-content">
                     <div class="config-section">
-                        <h3>News Manager Configuration</h3>
+                        <div style="display:flex; justify-content: space-between; align-items:center;">
+                            <h3>News Manager Configuration</h3>
+                            <div style="display:flex; gap:8px;">
+                                <button type="button" class="btn btn-info" onclick="startOnDemand('news_manager')"><i class="fas fa-bolt"></i> On-Demand</button>
+                            </div>
+                        </div>
                         <p>Configure RSS news feeds and scrolling ticker settings</p>
                         
                         <div class="form-group">
@@ -1775,6 +1820,44 @@
         let currentElements = [];
         let selectedElement = null;
 
+        async function refreshOnDemandStatus(){
+            try{
+                const res = await fetch('/api/ondemand/status');
+                const data = await res.json();
+                if(data && data.on_demand){
+                    const s = data.on_demand;
+                    const el = document.getElementById('ondemand-status');
+                    if(el){ el.textContent = `On-Demand: ${s.running && s.mode ? s.mode : 'None'}`; }
+                }
+            }catch(e){ /* ignore */ }
+        }
+
+        async function startOnDemand(mode){
+            try{
+                const res = await fetch('/api/ondemand/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode })
+                });
+                const data = await res.json();
+                showNotification(data.message || 'Requested on-demand start', data.status || 'success');
+                refreshOnDemandStatus();
+            }catch(err){
+                showNotification('Error starting on-demand: ' + err, 'error');
+            }
+        }
+
+        async function stopOnDemand(){
+            try{
+                const res = await fetch('/api/ondemand/stop', { method: 'POST' });
+                const data = await res.json();
+                showNotification(data.message || 'On-Demand stopped', data.status || 'success');
+                refreshOnDemandStatus();
+            }catch(err){
+                showNotification('Error stopping on-demand: ' + err, 'error');
+            }
+        }
+
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
             initializeSocket();
@@ -1782,6 +1865,7 @@
             updateSystemStats();
             loadNewsManagerData();
             updateApiMetrics();
+            refreshOnDemandStatus();
 
             // UI controls for grid & scale
             const scaleRange = document.getElementById('scaleRange');
@@ -2119,6 +2203,7 @@
                     validateJson('secrets-config-json', 'secrets-config-validation');
                 }, 100);
             }
+            refreshOnDemandStatus();
         }
 
         // Display control functions
@@ -2401,6 +2486,7 @@
                     document.querySelectorAll('.stat-card .stat-value')[2].textContent = stats.cpu_temp + '°C';
                     document.querySelectorAll('.stat-card .stat-value')[5].textContent = stats.disk_used_percent + '%';
                 }
+                refreshOnDemandStatus();
             } catch (error) {
                 console.error('Error updating system stats:', error);
             }
@@ -3017,6 +3103,17 @@
                 const stats = await res.json();
                 // Build a minimal sports UI off current config
                 const cfg = currentConfig;
+                const leaguePrefixes = {
+                    'nfl_scoreboard': 'nfl',
+                    'mlb': 'mlb',
+                    'milb': 'milb',
+                    'nhl_scoreboard': 'nhl',
+                    'nba_scoreboard': 'nba',
+                    'ncaa_fb_scoreboard': 'ncaa_fb',
+                    'ncaa_baseball_scoreboard': 'ncaa_baseball',
+                    'ncaam_basketball_scoreboard': 'ncaam_basketball',
+                    'soccer_scoreboard': 'soccer'
+                };
                 const leagues = [
                     { key: 'nfl_scoreboard', label: 'NFL' },
                     { key: 'mlb', label: 'MLB' },
@@ -3031,6 +3128,7 @@
                 const container = document.getElementById('sports-config');
                 const html = leagues.map(l => {
                     const sec = cfg[l.key] || {};
+                    const p = leaguePrefixes[l.key] || l.key;
                     const fav = (sec.favorite_teams || []).join(', ');
                     const recentToShow = sec.recent_games_to_show ?? 1;
                     const upcomingToShow = sec.upcoming_games_to_show ?? 1;
@@ -3039,10 +3137,18 @@
                     const upcomingUpd = sec.upcoming_update_interval ?? 3600;
                     return `
                         <div style="border:1px solid #ddd; border-radius:6px; padding:12px; margin:10px 0;">
-                            <label style="display:flex; align-items:center; gap:8px;">
-                                <input type="checkbox" data-league="${l.key}" class="sp-enabled" ${sec.enabled ? 'checked' : ''}>
-                                <strong>${l.label}</strong>
-                            </label>
+                            <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom:8px;">
+                                <label style="display:flex; align-items:center; gap:8px; margin:0;">
+                                    <input type="checkbox" data-league="${l.key}" class="sp-enabled" ${sec.enabled ? 'checked' : ''}>
+                                    <strong>${l.label}</strong>
+                                </label>
+                                <div style="display:flex; gap:6px;">
+                                    <button type="button" class="btn btn-info" onclick="startOnDemand('${p}_live')"><i class="fas fa-bolt"></i> Live</button>
+                                    <button type="button" class="btn btn-info" onclick="startOnDemand('${p}_recent')"><i class="fas fa-bolt"></i> Recent</button>
+                                    <button type="button" class="btn btn-info" onclick="startOnDemand('${p}_upcoming')"><i class="fas fa-bolt"></i> Upcoming</button>
+                                    <button type="button" class="btn btn-secondary" onclick="stopOnDemand()"><i class="fas fa-ban"></i> Stop</button>
+                                </div>
+                            </div>
                             <div class="form-row" style="margin-top:10px;">
                                 <div class="form-group">
                                     <label>Live Priority</label>
