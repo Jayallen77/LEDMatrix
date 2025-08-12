@@ -2,6 +2,23 @@
 
 Get your LEDMatrix system up and running in minutes! This guide covers the essential steps to get your display working.
 
+## Fast Path (Recommended)
+
+If this is a brand new install, you can run the all-in-one installer and then use the web UI:
+
+```bash
+chmod +x first_time_install.sh
+sudo ./first_time_install.sh
+```
+
+Then open the web UI at:
+
+```
+http://your-pi-ip:5001
+```
+
+The steps below document the manual process for advanced users.
+
 ## Prerequisites
 
 ### Hardware Requirements
@@ -219,7 +236,23 @@ sudo ./start_display.sh
 sudo ./stop_display.sh
 ```
 
-## Step 8: Add More Features
+## Step 8: Web Interface (V2)
+
+### 8.1 Start the web interface manually (optional)
+```bash
+python3 start_web_v2.py
+```
+
+### 8.2 Autostart the web interface (recommended)
+Set `"web_display_autostart": true` in `config/config.json`.
+The installed `ledmatrix-web.service` will call `start_web_conditionally.py` to start the web UI on boot.
+
+Access the web interface at:
+```
+http://your-pi-ip:5001
+```
+
+## Step 9: Add More Features
 
 ### 8.1 Enable Stocks
 Edit `config/config.json`:

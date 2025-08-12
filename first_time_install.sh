@@ -3,15 +3,44 @@
 # LED Matrix First-Time Installation Script
 # This script handles the complete setup for a new LED Matrix installation
 
-set -e
+set -Eeuo pipefail
+
+# Global state for nicer error messages
+CURRENT_STEP="initialization"
+
+# Error handler for friendlier failures
+on_error() {
+    local exit_code=$?
+    local line_no=${1:-unknown}
+    echo "✗ An error occurred during: $CURRENT_STEP (line $line_no, exit $exit_code)" >&2
+    if [ -n "${LOG_FILE:-}" ]; then
+        echo "See the log for details: $LOG_FILE" >&2
+        echo "-- Last 50 lines from log --" >&2
+        tail -n 50 "$LOG_FILE" >&2 || true
+    fi
+    echo "\nCommon fixes:" >&2
+    echo "- Ensure the Pi is online (try: ping -c1 8.8.8.8)." >&2
+    echo "- If you saw an APT lock error: wait a minute, close other installers, then run: sudo dpkg --configure -a" >&2
+    echo "- Re-run this script. It is safe to run multiple times." >&2
+    exit "$exit_code"
+}
+trap 'on_error $LINENO' ERR
 
 echo "=========================================="
 echo "LED Matrix First-Time Installation Script"
 echo "=========================================="
 echo ""
 
-# Get the actual user who invoked sudo
-if [ -n "$SUDO_USER" ]; then
+# Show device model if available (helps users confirm they're on a Raspberry Pi)
+if [ -r /proc/device-tree/model ]; then
+    DEVICE_MODEL=$(tr -d '\0' </proc/device-tree/model)
+    echo "Detected device: $DEVICE_MODEL"
+else
+    echo "⚠ Could not detect Raspberry Pi model (continuing anyway)"
+fi
+
+# Get the actual user who invoked sudo (set after we ensure sudo below)
+if [ -n "${SUDO_USER:-}" ]; then
     ACTUAL_USER="$SUDO_USER"
 else
     ACTUAL_USER=$(whoami)
@@ -28,53 +57,149 @@ echo "User home directory: $USER_HOME"
 echo "Project directory: $PROJECT_ROOT_DIR"
 echo ""
 
-# Check if running as root
-if [ "$EUID" -eq 0 ]; then
-    echo "✓ Running as root (required for installation)"
-else
-    echo "✗ This script must be run as root (use sudo)"
-    echo "Usage: sudo ./first_time_install.sh"
-    exit 1
+# Check if running as root; if not, try to elevate automatically for novices
+if [ "$EUID" -ne 0 ]; then
+    echo "This script needs administrator privileges. Attempting to re-run with sudo..."
+    exec sudo -E env LEDMATRIX_ELEVATED=1 bash "$0" "$@"
 fi
+echo "✓ Running as root (required for installation)"
+
+# Initialize logging
+LOG_DIR="$PROJECT_ROOT_DIR/logs"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/first_time_install_$(date +%Y%m%d_%H%M%S).log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+echo "Logging to: $LOG_FILE"
+
+# Args and options (novice-friendly defaults)
+ASSUME_YES=${LEDMATRIX_ASSUME_YES:-0}
+SKIP_SOUND=${LEDMATRIX_SKIP_SOUND:-0}
+SKIP_PERF=${LEDMATRIX_SKIP_PERF:-0}
+SKIP_REBOOT_PROMPT=${LEDMATRIX_SKIP_REBOOT_PROMPT:-0}
+
+usage() {
+    cat <<USAGE
+Usage: sudo ./first_time_install.sh [options]
+
+Options:
+  -y, --yes                 Proceed without interactive confirmations
+      --force-rebuild       Force rebuild of rpi-rgb-led-matrix even if present
+      --skip-sound          Skip sound module configuration
+      --skip-perf           Skip performance tweaks (isolcpus/audio)
+      --no-reboot-prompt    Do not prompt for reboot at the end
+  -h, --help                Show this help message and exit
+
+Environment variables (same effect as flags):
+  LEDMATRIX_ASSUME_YES=1, RPI_RGB_FORCE_REBUILD=1, LEDMATRIX_SKIP_SOUND=1,
+  LEDMATRIX_SKIP_PERF=1, LEDMATRIX_SKIP_REBOOT_PROMPT=1
+USAGE
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -y|--yes) ASSUME_YES=1 ;;
+        --force-rebuild) RPI_RGB_FORCE_REBUILD=1 ;;
+        --skip-sound) SKIP_SOUND=1 ;;
+        --skip-perf) SKIP_PERF=1 ;;
+        --no-reboot-prompt) SKIP_REBOOT_PROMPT=1 ;;
+        -h|--help) usage; exit 0 ;;
+        *) echo "Unknown option: $1"; usage; exit 1 ;;
+    esac
+    shift
+done
+
+# Helpers
+retry() {
+    local attempt=1
+    local max_attempts=3
+    local delay_seconds=5
+    while true; do
+        "$@" && return 0
+        local status=$?
+        if [ $attempt -ge $max_attempts ]; then
+            echo "✗ Command failed after $attempt attempts: $*"
+            return $status
+        fi
+        echo "⚠ Command failed (attempt $attempt/$max_attempts). Retrying in ${delay_seconds}s: $*"
+        attempt=$((attempt+1))
+        sleep "$delay_seconds"
+    done
+}
+
+apt_update() { retry apt update; }
+apt_install() { retry apt install -y "$@"; }
+apt_remove() { apt-get remove -y "$@" || true; }
+
+check_network() {
+    if command -v ping >/dev/null 2>&1; then
+        if ping -c 1 -W 3 8.8.8.8 >/dev/null 2>&1; then
+            return 0
+        fi
+    fi
+    if command -v curl >/dev/null 2>&1; then
+        if curl -Is --max-time 5 http://deb.debian.org >/dev/null 2>&1; then
+            return 0
+        fi
+    fi
+    echo "✗ No internet connectivity detected."
+    echo "Please connect your Raspberry Pi to the internet and re-run this script."
+    exit 1
+}
 
 echo ""
 echo "This script will perform the following steps:"
 echo "1. Install system dependencies"
 echo "2. Fix cache permissions"
 echo "3. Install main LED Matrix service"
-echo "4. Install web interface service"
-echo "5. Configure web interface permissions"
-echo "6. Configure passwordless sudo access"
-echo "7. Set up proper file ownership"
-echo "8. Test the installation"
+echo "4. Install Python project dependencies (requirements.txt)"
+echo "5. Build and install rpi-rgb-led-matrix and test import"
+echo "6. Install web interface dependencies"
+echo "7. Install web interface service"
+echo "8. Configure web interface permissions"
+echo "9. Configure passwordless sudo access"
+echo "10. Set up proper file ownership"
+echo "11. Configure sound module to avoid conflicts"
+echo "12. Apply performance optimizations"
+echo "13. Test the installation"
 echo ""
 
 # Ask for confirmation
-read -p "Do you want to proceed with the installation? (y/N): " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Installation cancelled."
-    exit 0
+if [ "$ASSUME_YES" = "1" ]; then
+    echo "Non-interactive mode: proceeding with installation."
+else
+    read -p "Do you want to proceed with the installation? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Installation cancelled."
+        exit 0
+    fi
 fi
 
 echo ""
+CLEAR='
+'
+CURRENT_STEP="Install system dependencies"
 echo "Step 1: Installing system dependencies..."
 echo "----------------------------------------"
 
+# Ensure network is available before APT operations
+check_network
+
 # Update package list
-apt update
+apt_update
 
 # Install required system packages
 echo "Installing Python packages and dependencies..."
-apt install -y python3-pip python3-venv python3-dev python3-pil python3-pil.imagetk
+apt_install python3-pip python3-venv python3-dev python3-pil python3-pil.imagetk build-essential python3-setuptools python3-wheel cython3
 
 # Install additional system dependencies that might be needed
 echo "Installing additional system dependencies..."
-apt install -y git curl wget unzip
+apt_install git curl wget unzip
 
 echo "✓ System dependencies installed"
 echo ""
 
+CURRENT_STEP="Fix cache permissions"
 echo "Step 2: Fixing cache permissions..."
 echo "----------------------------------"
 
@@ -92,21 +217,83 @@ else
 fi
 echo ""
 
+CURRENT_STEP="Install main LED Matrix service"
 echo "Step 3: Installing main LED Matrix service..."
 echo "---------------------------------------------"
 
-# Run the main service installation
+# Run the main service installation (idempotent)
 if [ -f "$PROJECT_ROOT_DIR/install_service.sh" ]; then
     echo "Running main service installation..."
     bash "$PROJECT_ROOT_DIR/install_service.sh"
     echo "✓ Main LED Matrix service installed"
 else
-    echo "✗ Main service installation script not found"
+    echo "✗ Main service installation script not found at $PROJECT_ROOT_DIR/install_service.sh"
+    echo "Please ensure you are running this script from the project root: $PROJECT_ROOT_DIR"
     exit 1
 fi
 echo ""
 
-echo "Step 4: Installing web interface dependencies..."
+CURRENT_STEP="Install project Python dependencies"
+echo "Step 4: Installing Python project dependencies..."
+echo "-----------------------------------------------"
+
+# Install main project Python dependencies
+cd "$PROJECT_ROOT_DIR"
+if [ -f "$PROJECT_ROOT_DIR/requirements.txt" ]; then
+    python3 -m pip install --break-system-packages -r "$PROJECT_ROOT_DIR/requirements.txt"
+else
+    echo "⚠ requirements.txt not found; skipping main dependency install"
+fi
+
+echo "✓ Project Python dependencies installed"
+echo ""
+
+CURRENT_STEP="Build and install rpi-rgb-led-matrix"
+echo "Step 5: Building and installing rpi-rgb-led-matrix..."
+echo "-----------------------------------------------------"
+
+# If already installed and not forcing rebuild, skip expensive build
+if python3 -c 'from rgbmatrix import RGBMatrix, RGBMatrixOptions' >/dev/null 2>&1 && [ "${RPI_RGB_FORCE_REBUILD:-0}" != "1" ]; then
+    echo "rgbmatrix Python package already available; skipping build (set RPI_RGB_FORCE_REBUILD=1 to force rebuild)."
+else
+    # Build and install rpi-rgb-led-matrix Python bindings
+    if [ -d "$PROJECT_ROOT_DIR/rpi-rgb-led-matrix-master" ]; then
+        pushd "$PROJECT_ROOT_DIR/rpi-rgb-led-matrix-master" >/dev/null
+        echo "Building rpi-rgb-led-matrix Python bindings..."
+        make build-python PYTHON=$(which python3)
+        cd bindings/python
+        echo "Installing rpi-rgb-led-matrix Python package..."
+        python3 setup.py install
+        popd >/dev/null
+    else
+        echo "✗ rpi-rgb-led-matrix-master directory not found at $PROJECT_ROOT_DIR"
+        echo "You can clone it with: git submodule update --init --recursive (if applicable)"
+        exit 1
+    fi
+
+    echo "Running rgbmatrix import test..."
+    if python3 - <<'PY'
+from importlib.metadata import version, PackageNotFoundError
+try:
+    from rgbmatrix import RGBMatrix, RGBMatrixOptions
+    try:
+        print("Success! rgbmatrix version:", version('rgbmatrix'))
+    except PackageNotFoundError:
+        print("Success! rgbmatrix installed (version unknown)")
+except Exception as e:
+    raise SystemExit(f"rgbmatrix import failed: {e}")
+PY
+    then
+        echo "✓ rpi-rgb-led-matrix installed and verified"
+    else
+        echo "✗ rpi-rgb-led-matrix import test failed"
+        exit 1
+    fi
+fi
+echo ""
+
+CURRENT_STEP="Install web interface dependencies"
+echo "Step 6: Installing web interface dependencies..."
 echo "------------------------------------------------"
 
 # Install web interface dependencies
@@ -119,30 +306,54 @@ if [ -f "$PROJECT_ROOT_DIR/install_dependencies_apt.py" ]; then
     python3 "$PROJECT_ROOT_DIR/install_dependencies_apt.py"
 else
     echo "Using pip to install dependencies..."
-    python3 -m pip install --break-system-packages -r requirements_web_v2.txt
-    
-    # Install rgbmatrix module from local source
-    echo "Installing rgbmatrix module..."
-    python3 -m pip install --break-system-packages -e rpi-rgb-led-matrix-master/bindings/python
+    if [ -f "$PROJECT_ROOT_DIR/requirements_web_v2.txt" ]; then
+        python3 -m pip install --break-system-packages -r requirements_web_v2.txt
+    else
+        echo "⚠ requirements_web_v2.txt not found; skipping web dependency install"
+    fi
 fi
 
 echo "✓ Web interface dependencies installed"
 echo ""
 
-echo "Step 5: Configuring web interface permissions..."
+CURRENT_STEP="Install web interface service"
+echo "Step 7: Installing web interface service..."
+echo "-------------------------------------------"
+
+if [ -f "$PROJECT_ROOT_DIR/install_web_service.sh" ]; then
+    bash "$PROJECT_ROOT_DIR/install_web_service.sh"
+    # Ensure systemd sees any new/changed unit files
+    systemctl daemon-reload || true
+    echo "✓ Web interface service installed"
+else
+    echo "⚠ install_web_service.sh not found; skipping web service installation"
+fi
+echo ""
+
+CURRENT_STEP="Configure web interface permissions"
+echo "Step 8: Configuring web interface permissions..."
 echo "------------------------------------------------"
 
-# Add user to required groups
+# Add user to required groups (idempotent)
 echo "Adding user to systemd-journal group..."
-usermod -a -G systemd-journal "$ACTUAL_USER"
+if id -nG "$ACTUAL_USER" | grep -qw systemd-journal; then
+    echo "User $ACTUAL_USER already in systemd-journal"
+else
+    usermod -a -G systemd-journal "$ACTUAL_USER"
+fi
 
 echo "Adding user to adm group..."
-usermod -a -G adm "$ACTUAL_USER"
+if id -nG "$ACTUAL_USER" | grep -qw adm; then
+    echo "User $ACTUAL_USER already in adm"
+else
+    usermod -a -G adm "$ACTUAL_USER"
+fi
 
 echo "✓ User added to required groups"
 echo ""
 
-echo "Step 6: Configuring passwordless sudo access..."
+CURRENT_STEP="Configure passwordless sudo access"
+echo "Step 9: Configuring passwordless sudo access..."
 echo "------------------------------------------------"
 
 # Create sudoers configuration for the web interface
@@ -175,15 +386,21 @@ $ACTUAL_USER ALL=(ALL) NOPASSWD: $BASH_PATH $PROJECT_ROOT_DIR/start_display.sh
 $ACTUAL_USER ALL=(ALL) NOPASSWD: $BASH_PATH $PROJECT_ROOT_DIR/stop_display.sh
 EOF
 
-# Install the sudoers file
-cp /tmp/ledmatrix_web_sudoers "$SUDOERS_FILE"
-chmod 440 "$SUDOERS_FILE"
-rm /tmp/ledmatrix_web_sudoers
+if [ -f "$SUDOERS_FILE" ] && cmp -s /tmp/ledmatrix_web_sudoers "$SUDOERS_FILE"; then
+    echo "Sudoers configuration already up to date"
+    rm /tmp/ledmatrix_web_sudoers
+else
+    echo "Installing/updating sudoers configuration..."
+    cp /tmp/ledmatrix_web_sudoers "$SUDOERS_FILE"
+    chmod 440 "$SUDOERS_FILE"
+    rm /tmp/ledmatrix_web_sudoers
+fi
 
 echo "✓ Passwordless sudo access configured"
 echo ""
 
-echo "Step 7: Setting proper file ownership..."
+CURRENT_STEP="Set proper file ownership"
+echo "Step 10: Setting proper file ownership..."
 echo "----------------------------------------"
 
 # Set ownership of project files to the user
@@ -199,7 +416,100 @@ fi
 echo "✓ File ownership configured"
 echo ""
 
-echo "Step 8: Testing the installation..."
+CURRENT_STEP="Sound module configuration"
+echo "Step 11: Sound module configuration..."
+echo "-------------------------------------"
+
+# Remove services that may interfere with LED matrix timing
+echo "Removing potential conflicting services (bluetooth and others)..."
+if [ "$SKIP_SOUND" = "1" ]; then
+    echo "Skipping sound module configuration as requested (--skip-sound)."
+elif apt_remove bluez bluez-firmware pi-bluetooth triggerhappy pigpio; then
+    echo "✓ Unnecessary services removed (or not present)"
+else
+    echo "⚠ Some packages could not be removed; continuing"
+fi
+
+# Blacklist onboard sound module (idempotent)
+BLACKLIST_FILE="/etc/modprobe.d/blacklist-rgb-matrix.conf"
+if [ -f "$BLACKLIST_FILE" ] && grep -q '^blacklist snd_bcm2835\b' "$BLACKLIST_FILE"; then
+    echo "snd_bcm2835 already blacklisted in $BLACKLIST_FILE"
+else
+    echo "Ensuring snd_bcm2835 is blacklisted in $BLACKLIST_FILE..."
+    mkdir -p "/etc/modprobe.d"
+    if [ -f "$BLACKLIST_FILE" ]; then
+        cp "$BLACKLIST_FILE" "$BLACKLIST_FILE.bak" 2>/dev/null || true
+    fi
+    # Append once (don't clobber existing unrelated content)
+    if [ -f "$BLACKLIST_FILE" ]; then
+        echo "blacklist snd_bcm2835" >> "$BLACKLIST_FILE"
+    else
+        printf "blacklist snd_bcm2835\n" > "$BLACKLIST_FILE"
+    fi
+fi
+
+# Update initramfs if available
+if command -v update-initramfs >/dev/null 2>&1; then
+    echo "Updating initramfs..."
+    update-initramfs -u
+else
+    echo "update-initramfs not found; skipping"
+fi
+
+echo "✓ Sound module configuration applied"
+echo ""
+
+CURRENT_STEP="Apply performance optimizations"
+echo "Step 12: Applying performance optimizations..."
+echo "---------------------------------------------"
+
+# Prefer /boot/firmware on newer Raspberry Pi OS, fall back to /boot on older
+CMDLINE_FILE="/boot/firmware/cmdline.txt"
+CONFIG_FILE="/boot/firmware/config.txt"
+if [ ! -f "$CMDLINE_FILE" ]; then CMDLINE_FILE="/boot/cmdline.txt"; fi
+if [ ! -f "$CONFIG_FILE" ]; then CONFIG_FILE="/boot/config.txt"; fi
+
+# Append isolcpus=3 to cmdline if not present (idempotent)
+if [ "$SKIP_PERF" = "1" ]; then
+    echo "Skipping performance optimizations as requested (--skip-perf)."
+elif [ -f "$CMDLINE_FILE" ]; then
+    if grep -q '\bisolcpus=3\b' "$CMDLINE_FILE"; then
+        echo "isolcpus=3 already present in $CMDLINE_FILE"
+    else
+        echo "Adding isolcpus=3 to $CMDLINE_FILE..."
+        cp "$CMDLINE_FILE" "$CMDLINE_FILE.bak" 2>/dev/null || true
+        # Ensure single-line cmdline gets the flag once, with a leading space
+        sed -i '1 s/$/ isolcpus=3/' "$CMDLINE_FILE"
+    fi
+else
+    echo "✗ $CMDLINE_FILE not found; skipping isolcpus optimization"
+fi
+
+# Ensure dtparam=audio=off in config.txt (idempotent)
+if [ "$SKIP_PERF" = "1" ]; then
+    : # skipped
+elif [ -f "$CONFIG_FILE" ]; then
+    if grep -q '^dtparam=audio=off\b' "$CONFIG_FILE"; then
+        echo "Onboard audio already disabled in $CONFIG_FILE"
+    elif grep -q '^dtparam=audio=on\b' "$CONFIG_FILE"; then
+        echo "Disabling onboard audio in $CONFIG_FILE..."
+        cp "$CONFIG_FILE" "$CONFIG_FILE.bak" 2>/dev/null || true
+        sed -i 's/^dtparam=audio=on\b/dtparam=audio=off/' "$CONFIG_FILE"
+    else
+        echo "Adding dtparam=audio=off to $CONFIG_FILE..."
+        cp "$CONFIG_FILE" "$CONFIG_FILE.bak" 2>/dev/null || true
+        printf "\n# Disable onboard audio for LED matrix performance\n" >> "$CONFIG_FILE"
+        echo "dtparam=audio=off" >> "$CONFIG_FILE"
+    fi
+else
+    echo "✗ $CONFIG_FILE not found; skipping audio disable"
+fi
+
+echo "✓ Performance optimizations applied"
+echo ""
+
+CURRENT_STEP="Test the installation"
+echo "Step 13: Testing the installation..."
 echo "----------------------------------"
 
 # Test sudo access
@@ -233,6 +543,20 @@ else
 fi
 
 echo ""
+if [ "$SKIP_REBOOT_PROMPT" = "1" ]; then
+    echo "Skipping reboot prompt as requested (--no-reboot-prompt)."
+elif [ "$ASSUME_YES" = "1" ]; then
+    echo "Non-interactive mode: rebooting now to apply changes..."
+    reboot
+else
+    read -p "A reboot is recommended to apply kernel and audio changes. Reboot now? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo "Rebooting now..."
+        reboot
+    fi
+fi
+
 echo "=========================================="
 echo "Installation Complete!"
 echo "=========================================="

@@ -246,18 +246,14 @@ sudo nano /boot/firmware/config.txt
 sudo reboot
 ```
 
-9. Run the first_time_install.sh with 
+9. First-time installation (recommended)
 
 ```bash
 chmod +x first_time_install.sh
-```
-then
-
-```bash
 sudo ./first_time_install.sh
 ```
 
-to ensure all the permissions are correct.
+This single script installs services, dependencies, configures permissions and sudoers, and validates the setup.
 
 -----------------------------------------------------------------------------------
 
@@ -882,9 +878,9 @@ sudo ./stop_display.sh
 
 -----------------------------------------------------------------------------------
 
-## Web Interface Installation
+## Web Interface Installation (V2)
 
-The LEDMatrix system includes a web interface that allows you to control and configure the display remotely. The web interface runs on port 5001 and provides real-time display preview, configuration management, and on-demand display controls.
+The LEDMatrix system includes Web Interface V2 that runs on port 5001 and provides real-time display preview, configuration management, and on-demand display controls.
 
 ### Installing the Web Interface Service
 
@@ -1277,7 +1273,7 @@ For `display_controller.py` and `stop_display.sh`, ensure their file permissions
 
 ## Web Interface V2 (simplified quick start)
 
-### 1) un the helper (does the above and starts the server):
+### 1) Run the helper (does the above and starts the server):
 ```
 python3 start_web_v2.py
 ```
@@ -1287,9 +1283,9 @@ python3 start_web_v2.py
 python web_interface_v2.py
 ```
 
-### 3) Autostart (optional)
+### 3) Autostart (recommended)
 Set `"web_display_autostart": true` in `config/config.json`.
-Ensure your systemd service (or launcher) calls `start_web_conditionally.py`.
+Ensure your systemd service calls `start_web_conditionally.py` (installed by `install_service.sh`).
 
 ### 4) Permissions (optional but recommended)
 - Add the service user to `systemd-journal` for viewing logs without sudo.

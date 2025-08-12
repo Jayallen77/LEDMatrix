@@ -38,6 +38,10 @@ Detailed documentation for each display manager and their configuration options.
 - [General Troubleshooting](WIKI_TROUBLESHOOTING.md)
 - [MiLB Troubleshooting](MILB_TROUBLESHOOTING.md)
 
+## 🚀 Install & Quick Start
+- [Installation Guide](INSTALLATION_GUIDE.md)
+- [Quick Start](WIKI_QUICK_START.md)
+
 ---
 
 ## Quick Navigation

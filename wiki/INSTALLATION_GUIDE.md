@@ -96,18 +96,26 @@ sudo nano /boot/firmware/config.txt
 sudo reboot
 ```
 
-9. Run the first_time_install.sh with 
-```
+9. Run the first_time_install.sh
+```bash
+chmod +x first_time_install.sh
 sudo ./first_time_install.sh
 ```
-to ensure all the permissions are correct.
 
-10. Then run
+This handles dependency setup, service installation, permissions, and sudoers configuration.
 
+10. Web Interface (V2)
+
+- If `"web_display_autostart": true` is set in `config/config.json` (recommended), the web interface will be started by the installed service.
+- Access the web UI at:
 ```
-sudo python start_web_conditionally.py
+http://your-pi-ip:5001
 ```
-to start the web ui and download the r
+- To launch manually instead of using the service:
+```bash
+python3 start_web_v2.py
+```
+This installs any missing dependencies and starts `web_interface_v2.py` on port 5001.
 -----------------------------------------------------------------------------------
 
 ## Configuration

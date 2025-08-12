@@ -17,7 +17,7 @@ The web interface provides:
 
 ### Prerequisites
 
-- LEDMatrix system already installed and configured
+- LEDMatrix system already installed and configured (or run `first_time_install.sh` first)
 - Python 3.7+ installed
 - Network access to the Raspberry Pi
 
