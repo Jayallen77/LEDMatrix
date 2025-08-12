@@ -67,7 +67,7 @@ python3 enable_news_manager.py disable
 
 Access the news manager through the web interface:
 
-1. Open your browser to `http://your-display-ip:5000`
+1. Open your browser to `http://your-display-ip:5001`
 2. Click on the "News Manager" tab
 3. Configure your preferred settings:
    - Enable/disable the news manager

@@ -102,6 +102,12 @@ sudo ./first_time_install.sh
 ```
 to ensure all the permissions are correct.
 
+10. Then run
+
+```
+sudo python start_web_conditionally.py
+```
+to start the web ui and download the r
 -----------------------------------------------------------------------------------
 
 ## Configuration

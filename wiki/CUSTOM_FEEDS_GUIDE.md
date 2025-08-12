@@ -78,7 +78,7 @@ python3 add_custom_feed_example.py list
 
 ## Method 2: Web Interface
 
-1. **Open Web Interface**: Go to `http://your-display-ip:5000`
+1. **Open Web Interface**: Go to `http://your-display-ip:5001`
 2. **Navigate to News Tab**: Click the "News Manager" tab
 3. **Add Custom Feed**:
    - Enter feed name in "Feed Name" field (e.g., "BBC F1")

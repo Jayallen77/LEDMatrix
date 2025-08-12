@@ -311,7 +311,7 @@ python3 -c "from src.weather_manager import WeatherManager; from src.display_man
 - Set up "of the day" content
 
 ### 5. Web Interface
-- Access web interface at `http://ledpi:5000`
+- Access web interface at `http://ledpi:5001`
 - Control display remotely
 - Monitor system status
 

@@ -85,7 +85,7 @@ python3 test_dynamic_duration.py status
 ```
 
 ### Web Interface
-1. Go to `http://display-ip:5000`
+1. Go to `http://display-ip:5001`
 2. Click "News Manager" tab
 3. Adjust "Duration Settings":
    - **Min Duration**: Shortest acceptable cycle time

@@ -17,50 +17,26 @@ Complete guide to configuring all aspects of your LEDMatrix system.
 ## 🎯 [Display Managers](WIKI_DISPLAY_MANAGERS.md)
 Detailed documentation for each display manager and their configuration options.
 
-## 🎨 [Display Manager Details](WIKI_DISPLAY_MANAGER_DETAILS.md)
-In-depth technical details about each display manager's functionality and API integration.
+## 🌐 Web Interface
+- [Web Interface Installation](WEB_INTERFACE_INSTALLATION.md)
+- [Web Interface V2 Enhancements](WEB_INTERFACE_V2_ENHANCED_SUMMARY.md)
 
-## 🔧 [Hardware Setup](WIKI_HARDWARE.md)
-Complete hardware requirements, assembly instructions, and troubleshooting.
+## 📰 News & Feeds
+- [Sports News Manager](NEWS_MANAGER_README.md)
+- [Add Custom RSS Feeds](CUSTOM_FEEDS_GUIDE.md)
 
-## 🐧 [Raspberry Pi Setup](WIKI_RASPBERRY_PI.md)
-Step-by-step instructions for setting up your Raspberry Pi for LEDMatrix.
+## ⏱️ Dynamic Duration
+- [Feature Overview](dynamic_duration.md)
+- [Implementation Guide](DYNAMIC_DURATION_GUIDE.md)
+- [Stocks Implementation Details](DYNAMIC_DURATION_STOCKS_IMPLEMENTATION.md)
 
-## 🚀 [Installation & Deployment](WIKI_INSTALLATION.md)
-Complete installation process, service setup, and deployment options.
+## 🗄️ Caching
+- [Cache Strategy](CACHE_STRATEGY.md)
+- [Cache Management](cache_management.md)
 
-## 🌐 [Web Interface Installation](WEB_INTERFACE_INSTALLATION.md)
-Install and configure the web interface for remote control and configuration.
-
-## 🔐 [API Authentication](WIKI_API_AUTH.md)
-How to set up API keys and authentication for all supported services.
-
-## 🎵 [Music Integration](WIKI_MUSIC.md)
-Complete guide to Spotify and YouTube Music integration.
-
-## 🏈 [Sports Integration](WIKI_SPORTS.md)
-Detailed documentation for all sports leagues and their configuration.
-
-## 💰 [Financial Data](WIKI_FINANCIAL.md)
-Stock ticker, crypto, and financial news display configuration.
-
-## 🌤️ [Weather Display](WIKI_WEATHER.md)
-Weather current conditions, forecasts, and icon system.
-
-## 📅 [Calendar Integration](WIKI_CALENDAR.md)
-Google Calendar integration and event display.
-
-## 🎨 [Custom Displays](WIKI_CUSTOM_DISPLAYS.md)
-Text display, YouTube stats, and custom content creation.
-
-## 🔧 [Troubleshooting](WIKI_TROUBLESHOOTING.md)
-Common issues, solutions, and debugging techniques.
-
-## 🛠️ [Development Guide](WIKI_DEVELOPMENT.md)
-How to extend the system, add new features, and contribute.
-
-## 📚 [API Reference](WIKI_API_REFERENCE.md)
-Technical reference for all classes, methods, and configuration options.
+## 🧩 Troubleshooting
+- [General Troubleshooting](WIKI_TROUBLESHOOTING.md)
+- [MiLB Troubleshooting](MILB_TROUBLESHOOTING.md)
 
 ---
 
