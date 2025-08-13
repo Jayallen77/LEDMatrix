@@ -239,13 +239,15 @@ echo "-----------------------------------------------"
 
 # Ensure config directory exists
 mkdir -p "$PROJECT_ROOT_DIR/config"
+chmod 755 "$PROJECT_ROOT_DIR/config" || true
 
 # Create config_secrets.json from template if missing
 if [ ! -f "$PROJECT_ROOT_DIR/config/config_secrets.json" ]; then
     if [ -f "$PROJECT_ROOT_DIR/config/config_secrets.template.json" ]; then
         echo "Creating config/config_secrets.json from template..."
         cp "$PROJECT_ROOT_DIR/config/config_secrets.template.json" "$PROJECT_ROOT_DIR/config/config_secrets.json"
-        chmod 600 "$PROJECT_ROOT_DIR/config/config_secrets.json"
+        chown "$ACTUAL_USER:$ACTUAL_USER" "$PROJECT_ROOT_DIR/config/config_secrets.json" || true
+        chmod 640 "$PROJECT_ROOT_DIR/config/config_secrets.json"
         echo "✓ Secrets file created from template"
     else
         echo "⚠ Template config/config_secrets.template.json not found; creating a minimal secrets file"
@@ -256,7 +258,8 @@ if [ ! -f "$PROJECT_ROOT_DIR/config/config_secrets.json" ]; then
   }
 }
 EOF
-        chmod 600 "$PROJECT_ROOT_DIR/config/config_secrets.json"
+        chown "$ACTUAL_USER:$ACTUAL_USER" "$PROJECT_ROOT_DIR/config/config_secrets.json" || true
+        chmod 640 "$PROJECT_ROOT_DIR/config/config_secrets.json"
         echo "✓ Minimal secrets file created"
     fi
 else
@@ -444,9 +447,10 @@ if [ -f "$PROJECT_ROOT_DIR/config/config.json" ]; then
     echo "✓ Config file permissions set"
 fi
 
-# Set proper permissions for secrets file (restrictive)
+# Set proper permissions for secrets file (restrictive: owner rw, group r)
 if [ -f "$PROJECT_ROOT_DIR/config/config_secrets.json" ]; then
-    chmod 600 "$PROJECT_ROOT_DIR/config/config_secrets.json"
+    chown "$ACTUAL_USER:$ACTUAL_USER" "$PROJECT_ROOT_DIR/config/config_secrets.json" || true
+    chmod 640 "$PROJECT_ROOT_DIR/config/config_secrets.json"
     echo "✓ Secrets file permissions set"
 fi
 

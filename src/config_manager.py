@@ -23,12 +23,17 @@ class ConfigManager:
             with open(self.config_path, 'r') as f:
                 self.config = json.load(f)
 
-            # Load and merge secrets if they exist
+            # Load and merge secrets if they exist (be permissive on errors)
             if os.path.exists(self.secrets_path):
-                with open(self.secrets_path, 'r') as f:
-                    secrets = json.load(f)
-                    # Deep merge secrets into config
-                    self._deep_merge(self.config, secrets)
+                try:
+                    with open(self.secrets_path, 'r') as f:
+                        secrets = json.load(f)
+                        # Deep merge secrets into config
+                        self._deep_merge(self.config, secrets)
+                except PermissionError as e:
+                    print(f"Secrets file not readable ({self.secrets_path}): {e}. Continuing without secrets.")
+                except (json.JSONDecodeError, OSError) as e:
+                    print(f"Error reading secrets file ({self.secrets_path}): {e}. Continuing without secrets.")
             
             return self.config
             
