@@ -1054,13 +1054,20 @@ def run_action_route():
 @app.route('/get_logs', methods=['GET'])
 def get_logs():
     try:
-        # Get logs from journalctl for the ledmatrix service
-        result = subprocess.run(
-            ['journalctl', '-u', 'ledmatrix.service', '-n', '500', '--no-pager'],
-            capture_output=True, text=True, check=False
-        )
-        if result.returncode == 0:
-            return jsonify({'status': 'success', 'logs': result.stdout})
+        # Prefer journalctl logs for ledmatrix; apply a timeout to avoid UI hangs
+        journal_cmd = ['journalctl', '-u', 'ledmatrix.service', '-n', '500', '--no-pager', '--output=cat']
+        try:
+            result = subprocess.run(journal_cmd, capture_output=True, text=True, check=False, timeout=5)
+            if result.returncode == 0:
+                return jsonify({'status': 'success', 'logs': result.stdout})
+            # Try sudo fallback (in case group membership hasn't applied yet)
+            sudo_result = subprocess.run(['sudo', '-n'] + journal_cmd, capture_output=True, text=True, check=False, timeout=5)
+            if sudo_result.returncode == 0:
+                return jsonify({'status': 'success', 'logs': sudo_result.stdout})
+            error_msg = result.stderr or sudo_result.stderr or 'permission denied'
+        except subprocess.TimeoutExpired:
+            error_msg = 'journalctl timed out'
+
         # Permission denied or other error: fall back to web UI log and return hint
         fallback_logs = ''
         try:
@@ -1068,8 +1075,8 @@ def get_logs():
                 fallback_logs = f.read()
         except Exception:
             fallback_logs = '(No fallback web UI logs found)'
-        hint = 'Insufficient permissions to read system journal. Add the web user to the systemd-journal group or configure sudoers for journalctl.'
-        return jsonify({'status': 'error', 'message': f'Error fetching logs: {result.stderr or "permission denied"}\n\nHint: {hint}', 'fallback': fallback_logs}), 500
+        hint = 'Insufficient permissions or timeout reading system journal. Ensure the web user is in the systemd-journal group, restart the service to pick up group changes, or configure sudoers for journalctl.'
+        return jsonify({'status': 'error', 'message': f'Error fetching logs: {error_msg}\n\nHint: {hint}', 'fallback': fallback_logs}), 500
     except subprocess.CalledProcessError as e:
         # If the command fails, return the error
         error_message = f"Error fetching logs: {e.stderr}"
