@@ -372,16 +372,31 @@ class BaseMiLBManager:
         
         # For recent/final games, show scores and status
         elif game_data['status'] in ['status_final', 'final', 'completed']:
-            # Show "Final" at the top using NHL-style font
+            # Show "Final" at the top using BDF when available, else TTF fallback
             status_text = "Final"
-            # Set font size for BDF font
-            self.display_manager.calendar_font.set_char_size(height=7*64)  # 7 pixels high, 64 units per pixel
-            status_width = self.display_manager.get_text_width(status_text, self.display_manager.calendar_font)
-            status_x = (width - status_width) // 2
-            status_y = 2
-            # Draw on the current image
-            self.display_manager.draw = draw
-            self.display_manager._draw_bdf_text(status_text, status_x, status_y, color=(255, 255, 255), font=self.display_manager.calendar_font)
+            font_for_status = self.display_manager.calendar_font
+            try:
+                if hasattr(font_for_status, 'set_char_size'):
+                    try:
+                        font_for_status.set_char_size(height=7*64)  # 7 pixels high, 64 units per pixel
+                    except Exception:
+                        pass
+                    status_width = self.display_manager.get_text_width(status_text, font_for_status)
+                    status_x = (width - status_width) // 2
+                    status_y = 2
+                    # Draw on the current image
+                    self.display_manager.draw = draw
+                    self.display_manager._draw_bdf_text(status_text, status_x, status_y, color=(255, 255, 255), font=font_for_status)
+                else:
+                    # Fallback to small TTF font
+                    fallback_font = getattr(self.display_manager, 'small_font', ImageFont.load_default())
+                    status_width = self.display_manager.get_text_width(status_text, fallback_font)
+                    status_x = (width - status_width) // 2
+                    status_y = 2
+                    self._draw_text_with_outline(draw, status_text, (status_x, status_y), fallback_font)
+            except Exception:
+                # Last resort
+                self._draw_text_with_outline(draw, status_text, (2, 2), ImageFont.load_default())
             
             # Draw scores at the bottom using NHL-style font
             away_score = str(game_data['away_score'])
@@ -1277,8 +1292,18 @@ class MiLBLiveManager(BaseMiLBManager):
         
         count_text = f"{balls}-{strikes}"
         bdf_font = self.display_manager.calendar_font
-        bdf_font.set_char_size(height=7*64) # Set 7px height
-        count_text_width = self.display_manager.get_text_width(count_text, bdf_font)
+        # Determine font type and compute width
+        if hasattr(bdf_font, 'set_char_size'):
+            try:
+                bdf_font.set_char_size(height=7*64)  # Set 7px height
+            except Exception:
+                pass
+            count_text_width = self.display_manager.get_text_width(count_text, bdf_font)
+            using_bdf = True
+        else:
+            fallback_font = getattr(self.display_manager, 'small_font', ImageFont.load_default())
+            count_text_width = self.display_manager.get_text_width(count_text, fallback_font)
+            using_bdf = False
         
         # Position below the base/out cluster
         cluster_bottom_y = overall_start_y + base_cluster_height # Find the bottom of the taller part (bases)
@@ -1287,22 +1312,20 @@ class MiLBLiveManager(BaseMiLBManager):
         # Center horizontally within the BASE cluster width
         count_x = bases_origin_x + (base_cluster_width - count_text_width) // 2
         
-        # Ensure draw object is set and draw text
-        self.display_manager.draw = draw 
-        # self.display_manager._draw_bdf_text(count_text, count_x, count_y, text_color, font=bdf_font)
-        # Use _draw_text_with_outline for count text
-        # self._draw_text_with_outline(draw, count_text, (count_x, count_y), bdf_font, fill=text_color)
-
-        # Draw Balls-Strikes Count with outline using BDF font
-        # Define outline color (consistent with _draw_text_with_outline default)
-        outline_color_for_bdf = (0, 0, 0)
-        
-        # Draw outline
-        for dx_offset, dy_offset in [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]:
-            self.display_manager._draw_bdf_text(count_text, count_x + dx_offset, count_y + dy_offset, color=outline_color_for_bdf, font=bdf_font)
-        
-        # Draw main text
-        self.display_manager._draw_bdf_text(count_text, count_x, count_y, color=text_color, font=bdf_font)
+        # Draw the count either with BDF or TTF path
+        if using_bdf:
+            # Ensure draw object is set for BDF draw
+            self.display_manager.draw = draw 
+            # Outline color consistent with _draw_text_with_outline default
+            outline_color_for_bdf = (0, 0, 0)
+            # Draw outline
+            for dx_offset, dy_offset in [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]:
+                self.display_manager._draw_bdf_text(count_text, count_x + dx_offset, count_y + dy_offset, color=outline_color_for_bdf, font=bdf_font)
+            # Draw main text
+            self.display_manager._draw_bdf_text(count_text, count_x, count_y, color=text_color, font=bdf_font)
+        else:
+            # Use TTF fallback with outline helper
+            self._draw_text_with_outline(draw, count_text, (count_x, count_y), fallback_font)
 
         # Draw Team:Score at the bottom
         score_font = self.display_manager.font # Use PressStart2P
