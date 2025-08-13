@@ -296,8 +296,8 @@ else
         echo "Building rpi-rgb-led-matrix Python bindings..."
         make build-python PYTHON=$(which python3)
         cd bindings/python
-        echo "Installing rpi-rgb-led-matrix Python package..."
-        python3 setup.py install
+        echo "Installing rpi-rgb-led-matrix Python package via pip..."
+        python3 -m pip install --break-system-packages .
         popd >/dev/null
     else
         echo "✗ rpi-rgb-led-matrix-master directory not found at $PROJECT_ROOT_DIR"
@@ -355,10 +355,14 @@ echo "Step 7: Installing web interface service..."
 echo "-------------------------------------------"
 
 if [ -f "$PROJECT_ROOT_DIR/install_web_service.sh" ]; then
-    bash "$PROJECT_ROOT_DIR/install_web_service.sh"
-    # Ensure systemd sees any new/changed unit files
-    systemctl daemon-reload || true
-    echo "✓ Web interface service installed"
+    if [ ! -f "/etc/systemd/system/ledmatrix-web.service" ]; then
+        bash "$PROJECT_ROOT_DIR/install_web_service.sh"
+        # Ensure systemd sees any new/changed unit files
+        systemctl daemon-reload || true
+        echo "✓ Web interface service installed"
+    else
+        echo "ledmatrix-web.service already present; preserving existing configuration and skipping static installer"
+    fi
 else
     echo "⚠ install_web_service.sh not found; skipping web service installation"
 fi

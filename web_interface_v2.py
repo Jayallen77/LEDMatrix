@@ -1401,4 +1401,13 @@ if __name__ == '__main__':
     # In threading mode this uses Werkzeug; allow it explicitly for systemd usage
     # Use eventlet server when available; fall back to Werkzeug in threading mode
     logger.info(f"Starting web interface on http://0.0.0.0:5001 (async_mode={ASYNC_MODE})")
-    socketio.run(app, host='0.0.0.0', port=5001, debug=False, use_reloader=False)
+    # When running without eventlet/gevent, Flask-SocketIO uses Werkzeug, which now
+    # enforces a production guard unless explicitly allowed. Enable it here.
+    socketio.run(
+        app,
+        host='0.0.0.0',
+        port=5001,
+        debug=False,
+        use_reloader=False,
+        allow_unsafe_werkzeug=True
+    )
