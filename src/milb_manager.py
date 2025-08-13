@@ -6,6 +6,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta, timezone
 import os
 from PIL import Image, ImageDraw, ImageFont
+import freetype
 import numpy as np
 from .cache_manager import CacheManager
 from requests.adapters import HTTPAdapter
@@ -272,7 +273,7 @@ class BaseMiLBManager:
             # Show "Next Game" at the top using BDF font when available, else TTF fallback
             status_text = "Next Game"
             try:
-                if hasattr(self.display_manager.calendar_font, 'set_char_size'):
+                if isinstance(self.display_manager.calendar_font, freetype.Face):
                     # Likely a freetype.Face (BDF). Size to ~7px
                     self.display_manager.calendar_font.set_char_size(height=7*64)
                     status_width = self.display_manager.get_text_width(status_text, self.display_manager.calendar_font)
@@ -376,7 +377,7 @@ class BaseMiLBManager:
             status_text = "Final"
             font_for_status = self.display_manager.calendar_font
             try:
-                if hasattr(font_for_status, 'set_char_size'):
+                if isinstance(font_for_status, freetype.Face):
                     try:
                         font_for_status.set_char_size(height=7*64)  # 7 pixels high, 64 units per pixel
                     except Exception:
@@ -1293,7 +1294,7 @@ class MiLBLiveManager(BaseMiLBManager):
         count_text = f"{balls}-{strikes}"
         bdf_font = self.display_manager.calendar_font
         # Determine font type and compute width
-        if hasattr(bdf_font, 'set_char_size'):
+        if isinstance(bdf_font, freetype.Face):
             try:
                 bdf_font.set_char_size(height=7*64)  # Set 7px height
             except Exception:

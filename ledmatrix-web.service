@@ -1,7 +1,6 @@
 [Unit]
 Description=LED Matrix Web Interface Service
 After=network.target
-Wants=ledmatrix.service
 
 [Service]
 Type=simple
