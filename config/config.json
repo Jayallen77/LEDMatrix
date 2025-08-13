@@ -153,7 +153,7 @@
         "duration_buffer": 0.1
     },
     "calendar": {
-        "enabled": true,
+        "enabled": false,
         "credentials_file": "credentials.json",
         "token_file": "token.pickle",
         "update_interval": 3600,

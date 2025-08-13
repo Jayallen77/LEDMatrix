@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file, Response
 from flask_socketio import SocketIO, emit
 import json
 import os
@@ -38,16 +38,14 @@ import logging
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
-# Use standard threads for background tasks to avoid blocking the web UI when
-# running blocking I/O (e.g., requests) inside on-demand update loops.
-# We still import eventlet if present so environments with it installed don't break,
-# but we intentionally choose 'threading' for async_mode.
+# Prefer eventlet when available to avoid Werkzeug dev server quirks
 try:
     import eventlet  # noqa: F401
+    ASYNC_MODE = 'eventlet'
 except Exception:
-    pass
+    ASYNC_MODE = 'threading'
 
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode=ASYNC_MODE)
 
 # Global variables
 config_manager = ConfigManager()
@@ -400,18 +398,19 @@ def index():
                              editor_mode=editor_mode)
                              
     except Exception as e:
-        flash(f"Error loading configuration: {e}", "error")
-        return render_template('index_v2.html', 
-                             schedule_config={},
-                             main_config={},
-                             main_config_data={},
-                             secrets_config={},
-                             main_config_json="{}",
-                             secrets_config_json="{}",
-                             main_config_path="",
-                             secrets_config_path="",
-                             system_status={},
-                             editor_mode=False)
+        # Return a minimal, valid response to avoid Werkzeug assertion errors
+        logger.error(f"Error loading configuration on index: {e}", exc_info=True)
+        return render_template('index_v2.html',
+                               schedule_config={},
+                               main_config={},
+                               main_config_data={},
+                               secrets_config={},
+                               main_config_json="{}",
+                               secrets_config_json="{}",
+                               main_config_path="",
+                               secrets_config_path="",
+                               system_status={'error': str(e)},
+                               editor_mode=False)
 
 def get_system_status():
     """Get current system status including display state, performance metrics, and CPU utilization."""
@@ -742,7 +741,11 @@ def system_action():
 @app.route('/api/system/status')
 def get_system_status_api():
     """Get system status as JSON."""
-    return jsonify(get_system_status())
+    try:
+        return jsonify(get_system_status())
+    except Exception as e:
+        # Ensure a valid JSON response is always produced
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 # --- On-Demand Controls ---
 @app.route('/api/ondemand/start', methods=['POST'])
@@ -1307,7 +1310,10 @@ def view_logs():
 @app.route('/api/display/current')
 def get_current_display():
     """Get current display image as base64."""
-    return jsonify(current_display_data)
+    try:
+        return jsonify(current_display_data)
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e), 'image': None}), 500
 
 @app.route('/api/editor/layouts', methods=['GET'])
 def get_custom_layouts():
@@ -1325,7 +1331,11 @@ def get_custom_layouts():
 @socketio.on('connect')
 def handle_connect():
     """Handle client connection."""
-    emit('connected', {'status': 'Connected to LED Matrix Interface'})
+    try:
+        emit('connected', {'status': 'Connected to LED Matrix Interface'})
+    except Exception:
+        # If emit failed before a response started, just return
+        return
     # Send current display state immediately after connect
     try:
         if display_manager and hasattr(display_manager, 'image'):
@@ -1366,4 +1376,5 @@ if __name__ == '__main__':
     
     # Run the app
     # In threading mode this uses Werkzeug; allow it explicitly for systemd usage
-    socketio.run(app, host='0.0.0.0', port=5001, debug=False, allow_unsafe_werkzeug=True)
+    # Use eventlet server when available; fall back to Werkzeug in threading mode
+    socketio.run(app, host='0.0.0.0', port=5001, debug=False, use_reloader=False)
