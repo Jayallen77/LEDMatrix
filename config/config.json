@@ -81,13 +81,13 @@
         "update_interval": 1
     },
     "weather": {
-        "enabled": true,
+        "enabled": false,
         "update_interval": 1800,
         "units": "imperial",
         "display_format": "{temp}\u00b0F\n{condition}"
     },
     "stocks": {
-        "enabled": true,
+        "enabled": false,
         "update_interval": 600,
         "scroll_speed": 1,
         "scroll_delay": 0.01,
@@ -108,7 +108,7 @@
         "display_format": "{symbol}: ${price} ({change}%)"
     },
     "crypto": {
-        "enabled": true,
+        "enabled": false,
         "update_interval": 600,
         "symbols": [
             "BTC-USD",
@@ -117,7 +117,7 @@
         "display_format": "{symbol}: ${price} ({change}%)"
     },
     "stock_news": {
-        "enabled": true,
+        "enabled": false,
         "update_interval": 3600,
         "scroll_speed": 1,
         "scroll_delay": 0.01,
@@ -213,7 +213,7 @@
         }
     },
     "nfl_scoreboard": {
-        "enabled": true,
+        "enabled": false,
         "live_priority": true,
         "live_game_duration": 30,
         "show_odds": true,
@@ -238,7 +238,7 @@
         }
     },
     "ncaa_fb_scoreboard": {
-        "enabled": true,
+        "enabled": false,
         "live_priority": true,
         "live_game_duration": 20,
         "show_odds": true,
@@ -316,7 +316,7 @@
         "update_interval": 3600
     },
     "mlb": {
-        "enabled": true,
+        "enabled": false,
         "live_priority": false,
         "live_game_duration": 30,
         "show_odds": true,
@@ -343,7 +343,7 @@
         }
     },
     "milb": {
-        "enabled": true,
+        "enabled": false,
         "live_priority": false,
         "live_game_duration": 30,
         "test_mode": false,
@@ -385,7 +385,7 @@
         "scroll_gap_width": 32
     },
     "soccer_scoreboard": {
-        "enabled": true,
+        "enabled": false,
         "live_priority": true,
         "live_game_duration": 30,
         "show_odds": true,
@@ -412,13 +412,13 @@
         }
     },
     "music": {
-        "enabled": true,
+        "enabled": false,
         "preferred_source": "ytm",
         "YTM_COMPANION_URL": "http://192.168.86.12:9863",
         "POLLING_INTERVAL_SECONDS": 1
     },
     "of_the_day": {
-        "enabled": true,
+        "enabled": false,
         "display_rotate_interval": 20,
         "update_interval": 3600,
         "subtitle_rotate_interval": 10,
@@ -440,7 +440,7 @@
         }
     },
     "news_manager": {
-        "enabled": true,
+        "enabled": false,
         "update_interval": 300,
         "scroll_speed": 1,
         "scroll_delay": 0.01,
