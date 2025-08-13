@@ -692,17 +692,17 @@
                     <i class="fas fa-{{ 'play' if system_status.service_active else 'stop' }}"></i>
                     Service {{ 'Active' if system_status.service_active else 'Inactive' }}
                 </div>
-                <div class="status-item {{ 'status-warning' if system_status.cpu_percent > 80 else 'status-active' }}">
+                <div class="status-item {{ 'status-warning' if system_status and system_status.cpu_percent and system_status.cpu_percent > 80 else 'status-active' }}">
                     <i class="fas fa-microchip"></i>
-                    {{ system_status.cpu_percent }}% CPU
+                    {{ system_status.cpu_percent if system_status and system_status.cpu_percent is defined else 0 }}% CPU
                 </div>
-                <div class="status-item {{ 'status-warning' if system_status.memory_used_percent > 80 else 'status-active' }}">
+                <div class="status-item {{ 'status-warning' if system_status and system_status.memory_used_percent and system_status.memory_used_percent > 80 else 'status-active' }}">
                     <i class="fas fa-memory"></i>
-                    {{ system_status.memory_used_percent }}% RAM
+                    {{ system_status.memory_used_percent if system_status and system_status.memory_used_percent is defined else 0 }}% RAM
                 </div>
-                <div class="status-item {{ 'status-warning' if system_status.cpu_temp > 70 else 'status-active' }}">
+                <div class="status-item {{ 'status-warning' if system_status and system_status.cpu_temp and system_status.cpu_temp > 70 else 'status-active' }}">
                     <i class="fas fa-thermometer-half"></i>
-                    {{ system_status.cpu_temp }}°C
+                    {{ system_status.cpu_temp if system_status and system_status.cpu_temp is defined else 0 }}°C
                 </div>
                 <div class="status-item status-active">
                     <i class="fas fa-clock"></i>
@@ -858,15 +858,15 @@
                     <h3>System Overview</h3>
                     <div class="stats-grid">
                         <div class="stat-card">
-                            <div class="stat-value">{{ system_status.cpu_percent }}%</div>
+                            <div class="stat-value">{{ system_status.cpu_percent if system_status and system_status.cpu_percent is defined else 0 }}%</div>
                             <div class="stat-label">CPU Usage</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-value">{{ system_status.memory_used_percent }}%</div>
+                            <div class="stat-value">{{ system_status.memory_used_percent if system_status and system_status.memory_used_percent is defined else 0 }}%</div>
                             <div class="stat-label">Memory Usage</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-value">{{ system_status.cpu_temp }}°C</div>
+                            <div class="stat-value">{{ system_status.cpu_temp if system_status and system_status.cpu_temp is defined else 0 }}°C</div>
                             <div class="stat-label">CPU Temperature</div>
                         </div>
                         <div class="stat-card">
@@ -878,7 +878,7 @@
                             <div class="stat-label">Resolution</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-value">{{ system_status.disk_used_percent }}%</div>
+                            <div class="stat-value">{{ system_status.disk_used_percent if system_status and system_status.disk_used_percent is defined else 0 }}%</div>
                             <div class="stat-label">Disk Usage</div>
                         </div>
                     </div>
@@ -1630,7 +1630,7 @@
                             <h4>Weather API</h4>
                             <div class="form-group">
                                 <label for="weather_api_key">OpenWeatherMap API Key:</label>
-                                <input type="password" class="form-control" id="weather_api_key" name="weather_api_key" value="{{ secrets_config.weather.api_key if secrets_config.weather.api_key != 'YOUR_OPENWEATHERMAP_API_KEY' else '' }}" placeholder="Enter your OpenWeatherMap API key">
+                                <input type="password" class="form-control" id="weather_api_key" name="weather_api_key" value="{{ (secrets_config.weather.api_key if secrets_config and secrets_config.weather and secrets_config.weather.api_key != 'YOUR_OPENWEATHERMAP_API_KEY' else '') if secrets_config else '' }}" placeholder="Enter your OpenWeatherMap API key">
                                 <div class="description">Get your free API key from <a href="https://openweathermap.org/api" target="_blank">OpenWeatherMap</a></div>
                             </div>
 

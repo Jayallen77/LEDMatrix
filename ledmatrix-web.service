@@ -7,6 +7,7 @@ Wants=ledmatrix.service
 Type=simple
 User=root
 WorkingDirectory=/home/ledpi/LEDMatrix
+Environment=USE_THREADING=1
 ExecStart=/usr/bin/python3 /home/ledpi/LEDMatrix/start_web_conditionally.py
 Restart=on-failure
 RestartSec=10

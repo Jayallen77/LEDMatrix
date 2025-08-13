@@ -38,12 +38,16 @@ import logging
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
-# Prefer eventlet when available to avoid Werkzeug dev server quirks
-try:
-    import eventlet  # noqa: F401
-    ASYNC_MODE = 'eventlet'
-except Exception:
+# Prefer eventlet when available, but allow forcing threading via env for troubleshooting
+force_threading = os.getenv('USE_THREADING', '0') == '1' or os.getenv('FORCE_THREADING', '0') == '1'
+if force_threading:
     ASYNC_MODE = 'threading'
+else:
+    try:
+        import eventlet  # noqa: F401
+        ASYNC_MODE = 'eventlet'
+    except Exception:
+        ASYNC_MODE = 'threading'
 
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode=ASYNC_MODE)
 
@@ -382,6 +386,16 @@ def index():
         # Get raw config data for JSON editors
         main_config_data = config_manager.get_raw_file_content('main')
         secrets_config_data = config_manager.get_raw_file_content('secrets')
+        # Normalize secrets structure for template safety
+        try:
+            if not isinstance(secrets_config_data, dict):
+                secrets_config_data = {}
+            if 'weather' not in secrets_config_data or not isinstance(secrets_config_data['weather'], dict):
+                secrets_config_data['weather'] = {}
+            if 'api_key' not in secrets_config_data['weather']:
+                secrets_config_data['weather']['api_key'] = ''
+        except Exception:
+            secrets_config_data = {'weather': {'api_key': ''}}
         main_config_json = json.dumps(main_config_data, indent=4)
         secrets_config_json = json.dumps(secrets_config_data, indent=4)
         
@@ -398,18 +412,20 @@ def index():
                              editor_mode=editor_mode)
                              
     except Exception as e:
-        # Return a minimal, valid response to avoid Werkzeug assertion errors
+        # Return a minimal, valid response to avoid template errors when keys are missing
         logger.error(f"Error loading configuration on index: {e}", exc_info=True)
+        safe_system_status = get_system_status()
+        safe_secrets = {'weather': {'api_key': ''}}
         return render_template('index_v2.html',
                                schedule_config={},
                                main_config={},
                                main_config_data={},
-                               secrets_config={},
+                               secrets_config=safe_secrets,
                                main_config_json="{}",
                                secrets_config_json="{}",
                                main_config_path="",
                                secrets_config_path="",
-                               system_status={'error': str(e)},
+                               system_status=safe_system_status,
                                editor_mode=False)
 
 def get_system_status():
@@ -1377,4 +1393,5 @@ if __name__ == '__main__':
     # Run the app
     # In threading mode this uses Werkzeug; allow it explicitly for systemd usage
     # Use eventlet server when available; fall back to Werkzeug in threading mode
+    logger.info(f"Starting web interface on http://0.0.0.0:5001 (async_mode={ASYNC_MODE})")
     socketio.run(app, host='0.0.0.0', port=5001, debug=False, use_reloader=False)

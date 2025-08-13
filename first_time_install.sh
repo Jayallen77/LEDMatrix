@@ -233,6 +233,37 @@ else
 fi
 echo ""
 
+CURRENT_STEP="Ensure secrets configuration exists"
+echo "Step 3.1: Ensuring secrets configuration exists..."
+echo "-----------------------------------------------"
+
+# Ensure config directory exists
+mkdir -p "$PROJECT_ROOT_DIR/config"
+
+# Create config_secrets.json from template if missing
+if [ ! -f "$PROJECT_ROOT_DIR/config/config_secrets.json" ]; then
+    if [ -f "$PROJECT_ROOT_DIR/config/config_secrets.template.json" ]; then
+        echo "Creating config/config_secrets.json from template..."
+        cp "$PROJECT_ROOT_DIR/config/config_secrets.template.json" "$PROJECT_ROOT_DIR/config/config_secrets.json"
+        chmod 600 "$PROJECT_ROOT_DIR/config/config_secrets.json"
+        echo "✓ Secrets file created from template"
+    else
+        echo "⚠ Template config/config_secrets.template.json not found; creating a minimal secrets file"
+        cat > "$PROJECT_ROOT_DIR/config/config_secrets.json" <<'EOF'
+{
+  "weather": {
+    "api_key": "YOUR_OPENWEATHERMAP_API_KEY"
+  }
+}
+EOF
+        chmod 600 "$PROJECT_ROOT_DIR/config/config_secrets.json"
+        echo "✓ Minimal secrets file created"
+    fi
+else
+    echo "Secrets file already exists; leaving as-is"
+fi
+echo ""
+
 CURRENT_STEP="Install project Python dependencies"
 echo "Step 4: Installing Python project dependencies..."
 echo "-----------------------------------------------"
@@ -411,6 +442,12 @@ chown -R "$ACTUAL_USER:$ACTUAL_USER" "$PROJECT_ROOT_DIR"
 if [ -f "$PROJECT_ROOT_DIR/config/config.json" ]; then
     chmod 644 "$PROJECT_ROOT_DIR/config/config.json"
     echo "✓ Config file permissions set"
+fi
+
+# Set proper permissions for secrets file (restrictive)
+if [ -f "$PROJECT_ROOT_DIR/config/config_secrets.json" ]; then
+    chmod 600 "$PROJECT_ROOT_DIR/config/config_secrets.json"
+    echo "✓ Secrets file permissions set"
 fi
 
 echo "✓ File ownership configured"

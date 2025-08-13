@@ -58,6 +58,7 @@ def main():
             # This is important for systemd to correctly manage the web server process.
             # Ensure PYTHONPATH is set correctly if web_interface.py has relative imports to src
             # The WorkingDirectory in systemd service should handle this for web_interface.py
+            print(f"Launching web interface: {sys.executable} {WEB_INTERFACE_SCRIPT} (USE_THREADING={os.getenv('USE_THREADING','0')}, FORCE_THREADING={os.getenv('FORCE_THREADING','0')})")
             os.execvp(sys.executable, [sys.executable, WEB_INTERFACE_SCRIPT])
         except Exception as e:
             print(f"Failed to exec web interface: {e}")
