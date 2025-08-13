@@ -37,14 +37,40 @@ class OfTheDayManager:
         self.last_rotation_time = time.time()
         self.last_category_rotation_time = time.time()
 
-        # Load fonts using freetype
-        font_dir = os.path.join(os.path.dirname(__file__), '..', 'assets', 'fonts')
-        self.title_font = freetype.Face(os.path.join(font_dir, 'ic8x8u.bdf'))
-        self.body_font = freetype.Face(os.path.join(font_dir, 'MatrixLight6.bdf'))
-        
-        # Log font properties for debugging
-        logger.debug(f"Title font properties: height={self.title_font.size.height}, ascender={self.title_font.size.ascender}, descender={self.title_font.size.descender}")
-        logger.debug(f"Body font properties: height={self.body_font.size.height}, ascender={self.body_font.size.ascender}, descender={self.body_font.size.descender}")
+        # Load fonts with robust path resolution and fallbacks
+        try:
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            font_dir = os.path.abspath(os.path.join(script_dir, '..', 'assets', 'fonts'))
+
+            def _safe_load_bdf_font(filename):
+                try:
+                    font_path = os.path.abspath(os.path.join(font_dir, filename))
+                    if not os.path.exists(font_path):
+                        raise FileNotFoundError(f"Font file not found: {font_path}")
+                    return freetype.Face(font_path)
+                except Exception as e:
+                    logger.error(f"Failed to load BDF font '{filename}': {e}")
+                    return None
+
+            self.title_font = _safe_load_bdf_font('ic8x8u.bdf')
+            self.body_font = _safe_load_bdf_font('MatrixLight6.bdf')
+
+            # Fallbacks if BDF fonts aren't available
+            if self.title_font is None:
+                self.title_font = getattr(self.display_manager, 'bdf_5x7_font', None) or getattr(self.display_manager, 'small_font', ImageFont.load_default())
+                logger.warning("Using fallback font for title in OfTheDayManager")
+            if self.body_font is None:
+                self.body_font = getattr(self.display_manager, 'bdf_5x7_font', None) or getattr(self.display_manager, 'small_font', ImageFont.load_default())
+                logger.warning("Using fallback font for body in OfTheDayManager")
+
+            # Log font types for debugging
+            logger.debug(f"Title font type: {type(self.title_font).__name__}")
+            logger.debug(f"Body font type: {type(self.body_font).__name__}")
+        except Exception as e:
+            logger.error(f"Unexpected error during font initialization: {e}")
+            # Last-resort fallback
+            self.title_font = ImageFont.load_default()
+            self.body_font = ImageFont.load_default()
 
         # Load categories and their data
         self.categories = self.of_the_day_config.get('categories', {})
@@ -170,31 +196,34 @@ class OfTheDayManager:
             self.last_update = current_time
     
     def _draw_bdf_text(self, draw, face, text, x, y, color=(255,255,255)):
-        """Draw text using a BDF font loaded with freetype."""
-        for char in text:
-            # Load the glyph
-            face.load_char(char)
-            bitmap = face.glyph.bitmap
-            
-            # Draw the glyph
-            for i in range(bitmap.rows):
-                for j in range(bitmap.width):
-                    try:
-                        # Get the byte containing the pixel
-                        byte_index = i * bitmap.pitch + (j // 8)
-                        if byte_index < len(bitmap.buffer):
-                            byte = bitmap.buffer[byte_index]
-                            # Check if the specific bit is set
-                            if byte & (1 << (7 - (j % 8))):
-                                draw_y = y - face.glyph.bitmap_top + i
-                                draw_x = x + face.glyph.bitmap_left + j
-                                draw.point((draw_x, draw_y), fill=color)
-                    except IndexError:
-                        logger.warning(f"Index out of range for char '{char}' at position ({i}, {j})")
-                        continue
-            
-            # Move to next character position
-            x += face.glyph.advance.x >> 6
+        """Draw text for both BDF (FreeType Face) and PIL TTF fonts."""
+        try:
+            # If we have a PIL font, use native text rendering
+            if not isinstance(face, freetype.Face):
+                draw.text((x, y), text, fill=color, font=face)
+                return
+
+            # Otherwise, render BDF glyphs manually
+            for char in text:
+                face.load_char(char)
+                bitmap = face.glyph.bitmap
+                
+                for i in range(bitmap.rows):
+                    for j in range(bitmap.width):
+                        try:
+                            byte_index = i * bitmap.pitch + (j // 8)
+                            if byte_index < len(bitmap.buffer):
+                                byte = bitmap.buffer[byte_index]
+                                if byte & (1 << (7 - (j % 8))):
+                                    draw_y = y - face.glyph.bitmap_top + i
+                                    draw_x = x + face.glyph.bitmap_left + j
+                                    draw.point((draw_x, draw_y), fill=color)
+                        except IndexError:
+                            logger.warning(f"Index out of range for char '{char}' at position ({i}, {j})")
+                            continue
+                x += face.glyph.advance.x >> 6
+        except Exception as e:
+            logger.error(f"Error in _draw_bdf_text: {e}", exc_info=True)
 
     def draw_item(self, category_name, item):
         try:
@@ -207,21 +236,24 @@ class OfTheDayManager:
             title_font = self.title_font
             body_font = self.body_font
             
-            # Get font heights - simplified
-            title_font.load_char('A')
-            title_height = title_font.glyph.bitmap.rows
-            body_font.load_char('A')
-            body_height = body_font.glyph.bitmap.rows
+            # Get font heights using DisplayManager helpers (handles BDF and PIL fonts)
+            try:
+                title_height = self.display_manager.get_font_height(title_font)
+            except Exception:
+                title_height = 8
+            try:
+                body_height = self.display_manager.get_font_height(body_font)
+            except Exception:
+                body_height = 8
             
             # --- Draw Title (always at top) ---
             title_y = title_height  # Position title so its bottom is at title_height
             
-            # Calculate title width for centering
-            title_width = 0
-            for c in title:
-                title_font.load_char(c)
-                title_width += title_font.glyph.advance.x
-            title_width = title_width // 64
+            # Calculate title width for centering (robust to font type)
+            try:
+                title_width = self.display_manager.get_text_width(title, title_font)
+            except Exception:
+                title_width = len(title) * 6
             
             # Center the title
             title_x = (matrix_width - title_width) // 2
@@ -246,11 +278,10 @@ class OfTheDayManager:
                 for i, line in enumerate(wrapped):
                     if line.strip():  # Only draw non-empty lines
                         # Center each line of body text
-                        line_width = 0
-                        for c in line:
-                            body_font.load_char(c)
-                            line_width += body_font.glyph.advance.x
-                        line_width = line_width // 64
+                        try:
+                            line_width = self.display_manager.get_text_width(line, body_font)
+                        except Exception:
+                            line_width = len(line) * 6
                         line_x = (matrix_width - line_width) // 2
                         # Add one pixel buffer between lines
                         line_y = y_start + i * (body_height + 1)
@@ -261,11 +292,10 @@ class OfTheDayManager:
                 for i, line in enumerate(wrapped):
                     if line.strip():  # Only draw non-empty lines
                         # Center each line of body text
-                        line_width = 0
-                        for c in line:
-                            body_font.load_char(c)
-                            line_width += body_font.glyph.advance.x
-                        line_width = line_width // 64
+                        try:
+                            line_width = self.display_manager.get_text_width(line, body_font)
+                        except Exception:
+                            line_width = len(line) * 6
                         line_x = (matrix_width - line_width) // 2
                         # Add one pixel buffer between lines
                         line_y = y_start + i * (body_height + 1)
@@ -284,11 +314,10 @@ class OfTheDayManager:
         words = text.split()
         for word in words:
             test_line = ' '.join(current_line + [word]) if current_line else word
-            text_width = 0
-            for c in test_line:
-                face.load_char(c)
-                text_width += face.glyph.advance.x
-            text_width = text_width // 64
+            try:
+                text_width = self.display_manager.get_text_width(test_line, face)
+            except Exception:
+                text_width = len(test_line) * 6
             if text_width <= max_width:
                 current_line.append(word)
             else:
@@ -298,11 +327,10 @@ class OfTheDayManager:
                 else:
                     truncated = word
                     while len(truncated) > 0:
-                        test_width = 0
-                        for c in (truncated + "..."):
-                            face.load_char(c)
-                            test_width += face.glyph.advance.x
-                        test_width = test_width // 64
+                        try:
+                            test_width = self.display_manager.get_text_width(truncated + "...", face)
+                        except Exception:
+                            test_width = len(truncated) * 6
                         if test_width <= max_width:
                             lines.append(truncated + "...")
                             break
