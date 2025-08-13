@@ -6,14 +6,21 @@
 
 echo "Fixing LEDMatrix cache directory permissions..."
 
-CACHE_DIRS=(
-    "/var/cache/ledmatrix"
-    "/home/ledpi/.ledmatrix_cache"
-)
-
 # Get the real user (not root when running with sudo)
 REAL_USER=${SUDO_USER:-$USER}
+# Resolve the home directory of the real user robustly
+if command -v getent >/dev/null 2>&1; then
+    REAL_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
+else
+    REAL_HOME=$(eval echo ~"$REAL_USER")
+fi
 REAL_GROUP=$(id -gn "$REAL_USER")
+
+# Known cache directories for LEDMatrix. Use the actual user's home instead of a hard-coded path.
+CACHE_DIRS=(
+    "/var/cache/ledmatrix"
+    "$REAL_HOME/.ledmatrix_cache"
+)
 
 for CACHE_DIR in "${CACHE_DIRS[@]}"; do
     echo ""
@@ -25,6 +32,7 @@ for CACHE_DIR in "${CACHE_DIRS[@]}"; do
     echo "  - Current permissions:"
     ls -ld "$CACHE_DIR"
     echo "  - Fixing permissions..."
+    # Make directory writable by services regardless of user context
     sudo chmod 777 "$CACHE_DIR"
     sudo chown "$REAL_USER":"$REAL_GROUP" "$CACHE_DIR"
     echo "  - Updated permissions:"

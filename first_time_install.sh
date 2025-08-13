@@ -364,6 +364,19 @@ else
 fi
 echo ""
 
+CURRENT_STEP="Harden systemd unit file permissions"
+echo "Step 7.1: Setting systemd unit file permissions..."
+echo "-----------------------------------------------"
+for unit in "/etc/systemd/system/ledmatrix.service" "/etc/systemd/system/ledmatrix-web.service"; do
+    if [ -f "$unit" ]; then
+        chown root:root "$unit" || true
+        chmod 644 "$unit" || true
+    fi
+done
+systemctl daemon-reload || true
+echo "✓ Systemd unit file permissions set"
+echo ""
+
 CURRENT_STEP="Configure web interface permissions"
 echo "Step 8: Configuring web interface permissions..."
 echo "------------------------------------------------"
@@ -455,6 +468,27 @@ if [ -f "$PROJECT_ROOT_DIR/config/config_secrets.json" ]; then
 fi
 
 echo "✓ File ownership configured"
+echo ""
+
+CURRENT_STEP="Normalize project file permissions"
+echo "Step 10.1: Normalizing project file and directory permissions..."
+echo "--------------------------------------------------------------"
+
+# Normalize directory permissions (exclude VCS metadata)
+find "$PROJECT_ROOT_DIR" -path "*/.git*" -prune -o -type d -exec chmod 755 {} +
+
+# Set default file permissions
+find "$PROJECT_ROOT_DIR" -path "*/.git*" -prune -o -type f -exec chmod 644 {} +
+
+# Ensure shell scripts are executable
+find "$PROJECT_ROOT_DIR" -path "*/.git*" -prune -o -type f -name "*.sh" -exec chmod 755 {} +
+
+# Explicitly ensure common helper scripts are executable (in case paths change)
+chmod 755 "$PROJECT_ROOT_DIR/start_display.sh" "$PROJECT_ROOT_DIR/stop_display.sh" 2>/dev/null || true
+chmod 755 "$PROJECT_ROOT_DIR/fix_cache_permissions.sh" "$PROJECT_ROOT_DIR/fix_web_permissions.sh" 2>/dev/null || true
+chmod 755 "$PROJECT_ROOT_DIR/install_service.sh" "$PROJECT_ROOT_DIR/install_web_service.sh" 2>/dev/null || true
+
+echo "✓ Project file permissions normalized"
 echo ""
 
 CURRENT_STEP="Sound module configuration"
