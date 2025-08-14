@@ -77,6 +77,16 @@ git clone https://github.com/ChuckBuilds/LEDMatrix.git
 cd LEDMatrix
 ```
 
+ ### 2.3 First-time installation (recommended)
+
+```bash
+chmod +x first_time_install.sh
+sudo ./first_time_install.sh
+```
+
+
+### Or manually 
+
 ### 2.3 Install Dependencies
 ```bash
 sudo pip3 install --break-system-packages -r requirements.txt

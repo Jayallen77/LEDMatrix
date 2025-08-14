@@ -171,6 +171,17 @@ git clone https://github.com/ChuckBuilds/LEDMatrix.git
 cd LEDMatrix
 ```
 
+
+4. First-time installation (recommended)
+
+```bash
+chmod +x first_time_install.sh
+sudo ./first_time_install.sh
+```
+
+This single script installs services, dependencies, configures permissions and sudoers, and validates the setup.
+
+----- OLD STEPS (left for manual review) -----
 4. Install dependencies:
 ```bash
 sudo pip3 install --break-system-packages -r requirements.txt
@@ -245,16 +256,6 @@ sudo nano /boot/firmware/config.txt
 ```bash
 sudo reboot
 ```
-
-9. First-time installation (recommended)
-
-```bash
-chmod +x first_time_install.sh
-sudo ./first_time_install.sh
-```
-
-This single script installs services, dependencies, configures permissions and sudoers, and validates the setup.
-
 -----------------------------------------------------------------------------------
 
 ## Configuration
