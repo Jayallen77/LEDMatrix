@@ -741,7 +741,7 @@ class NHLRecentManager(BaseNHLManager):
             current_time = time.time()
             
             # Check if it's time to switch games
-            if current_time - self.last_game_switch >= self.game_display_duration:
+            if len(self.games_list) > 1 and current_time - self.last_game_switch >= self.game_display_duration:
                 # Move to next game
                 self.current_game_index = (self.current_game_index + 1) % len(self.games_list)
                 self.current_game = self.games_list[self.current_game_index]
@@ -859,7 +859,7 @@ class NHLUpcomingManager(BaseNHLManager):
             current_time = time.time()
             
             # Check if it's time to switch games
-            if current_time - self.last_game_switch >= self.game_display_duration:
+            if len(self.upcoming_games) > 1 and current_time - self.last_game_switch >= self.game_display_duration:
                 # Move to next game
                 self.current_game_index = (self.current_game_index + 1) % len(self.upcoming_games)
                 self.current_game = self.upcoming_games[self.current_game_index]

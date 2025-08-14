@@ -794,7 +794,7 @@ class NBARecentManager(BaseNBAManager):
             current_time = time.time()
 
             # Check if it's time to switch games
-            if current_time - self.last_game_switch >= self.game_display_duration:
+            if len(self.recent_games) > 1 and current_time - self.last_game_switch >= self.game_display_duration:
                 self.current_game_index = (self.current_game_index + 1) % len(self.recent_games)
                 self.current_game = self.recent_games[self.current_game_index]
                 self.last_game_switch = current_time
@@ -816,6 +816,8 @@ class NBAUpcomingManager(BaseNBAManager):
         self.last_update = 0
         self.update_interval = 3600  # 1 hour for upcoming games
         self.upcoming_games_to_show = self.nba_config.get("upcoming_games_to_show", 5)  # Number of upcoming games to display
+        self.last_game_switch = 0
+        self.game_display_duration = 15  # Display each game for 15 seconds
 
     def update(self):
         """Update upcoming games data."""
@@ -867,12 +869,18 @@ class NBAUpcomingManager(BaseNBAManager):
             return
 
         try:
+            current_time = time.time()
+            
+            # Check if it's time to switch games
+            if len(self.upcoming_games) > 1 and current_time - self.last_game_switch >= self.game_display_duration:
+                # Move to next game
+                self.current_game_index = (self.current_game_index + 1) % len(self.upcoming_games)
+                self.current_game = self.upcoming_games[self.current_game_index]
+                self.last_game_switch = current_time
+                force_clear = True
+            
             # Draw the scorebug layout
             self._draw_scorebug_layout(self.current_game, force_clear)
-
-            # Move to next game
-            self.current_game_index = (self.current_game_index + 1) % len(self.upcoming_games)
-            self.current_game = self.upcoming_games[self.current_game_index]
 
         except Exception as e:
             self.logger.error(f"[NBA] Error displaying upcoming game: {e}", exc_info=True) 

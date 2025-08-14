@@ -1255,7 +1255,7 @@ class MLBRecentManager(BaseMLBManager):
             current_time = time.time()
             
             # Check if it's time to switch games
-            if current_time - self.last_game_switch >= self.game_display_duration:
+            if len(self.recent_games) > 1 and current_time - self.last_game_switch >= self.game_display_duration:
                 # Move to next game
                 self.current_game_index = (self.current_game_index + 1) % len(self.recent_games)
                 self.current_game = self.recent_games[self.current_game_index]
@@ -1377,7 +1377,7 @@ class MLBUpcomingManager(BaseMLBManager):
             current_time = time.time()
             
             # Check if it's time to switch games
-            if current_time - self.last_game_switch >= self.game_display_duration:
+            if len(self.upcoming_games) > 1 and current_time - self.last_game_switch >= self.game_display_duration:
                 # Move to next game
                 self.current_game_index = (self.current_game_index + 1) % len(self.upcoming_games)
                 self.current_game = self.upcoming_games[self.current_game_index]
