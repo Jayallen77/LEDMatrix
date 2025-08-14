@@ -337,8 +337,8 @@ class WeatherManager:
             # --- Right Side (Below Condition): Current Temp ---
             temp = round(weather_data['main']['temp'])
             temp_text = f"{temp}°"
-            # Ensure we use the intended PS2P font managed by DisplayManager
-            temp_font = getattr(self.display_manager, 'regular_font', self.display_manager.small_font)
+            # Use the small font from DisplayManager as before
+            temp_font = self.display_manager.small_font
             temp_text_width = draw.textlength(temp_text, font=temp_font)
             temp_x = self.display_manager.matrix.width - temp_text_width - 1 # Align right
             temp_y = condition_y + 8 # Position below condition text (adjust 8 based on font size)

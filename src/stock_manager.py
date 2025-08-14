@@ -428,10 +428,14 @@ class StockManager:
         fallback = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
         draw = ImageDraw.Draw(fallback)
         try:
-            # Resolve font path absolutely to avoid fallback under systemd
+            # Resolve font path absolutely to avoid fallback under systemd; fall back to PS2P if missing
             script_dir = os.path.dirname(os.path.abspath(__file__))
             font_path = os.path.abspath(os.path.join(script_dir, "../assets/fonts/OpenSans-Regular.ttf"))
-            font = ImageFont.truetype(font_path, 16)
+            try:
+                font = ImageFont.truetype(font_path, 16)
+            except Exception:
+                ps2p = os.path.abspath(os.path.join(script_dir, "../assets/fonts/PressStart2P-Regular.ttf"))
+                font = ImageFont.truetype(ps2p, 8)
         except:
             font = ImageFont.load_default()
         
