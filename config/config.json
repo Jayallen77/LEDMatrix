@@ -248,8 +248,8 @@
         "live_odds_update_interval": 3600,
         "odds_update_interval": 3600,
         "season_cache_duration_seconds": 86400,
-        "recent_games_to_show": 2,
-        "upcoming_games_to_show": 2,
+        "recent_games_to_show": 1,
+        "upcoming_games_to_show": 1,
         "show_favorite_teams_only": true,
         "favorite_teams": [
             "UGA",
@@ -296,8 +296,8 @@
         "test_mode": false,
         "update_interval_seconds": 3600,
         "live_update_interval": 30,
-        "recent_games_to_show": 2,
-        "upcoming_games_to_show": 2,
+        "recent_games_to_show": 1,
+        "upcoming_games_to_show": 1,
         "show_favorite_teams_only": true,
         "favorite_teams": [
             "UGA",
@@ -327,8 +327,8 @@
         "odds_update_interval": 3600,
         "recent_update_interval": 3600,
         "upcoming_update_interval": 3600,
-        "recent_games_to_show": 2,
-        "upcoming_games_to_show": 2,
+        "recent_games_to_show": 1,
+        "upcoming_games_to_show": 1,
         "show_favorite_teams_only": true,
         "favorite_teams": [
             "TB",
@@ -351,8 +351,8 @@
         "live_update_interval": 30,
         "recent_update_interval": 3600,
         "upcoming_update_interval": 3600,
-        "recent_games_to_show": 2,
-        "upcoming_games_to_show": 2,
+        "recent_games_to_show": 1,
+        "upcoming_games_to_show": 1,
         "favorite_teams": [
             "TAM"
         ],
@@ -394,8 +394,8 @@
         "live_update_interval": 30,
         "recent_update_interval": 3600,
         "upcoming_update_interval": 3600,
-        "recent_games_to_show": 2,
-        "upcoming_games_to_show": 5,
+        "recent_games_to_show": 1,
+        "upcoming_games_to_show": 1,
         "show_favorite_teams_only": true,
         "favorite_teams": [
             "DAL"
