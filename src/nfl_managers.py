@@ -565,7 +565,7 @@ class NFLLiveManager(BaseNFLManager): # Renamed class
                     events = data["events"]
 
                     # --- Optimization: Filter for favorite teams before extracting details/odds ---
-                    if self.nfl_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+                    if self.nfl_config.get("show_favorite_teams_only", False):
                         filtered_events = []
                         for event in events:
                             try:
@@ -828,7 +828,7 @@ class NFLRecentManager(BaseNFLManager): # Renamed class
             events = data['events']
 
             # --- Optimization: Filter for favorite teams before extracting details/odds ---
-            if self.nfl_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+            if self.nfl_config.get("show_favorite_teams_only", False):
                 filtered_events = []
                 for event in events:
                     try:
@@ -1048,7 +1048,7 @@ class NFLUpcomingManager(BaseNFLManager): # Renamed class
             events = data['events']
 
             # --- Optimization: Filter for favorite teams before extracting details/odds ---
-            if self.nfl_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+            if self.nfl_config.get("show_favorite_teams_only", False):
                 filtered_events = []
                 for event in events:
                     try:

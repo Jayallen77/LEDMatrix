@@ -674,7 +674,7 @@ class NCAAMBasketballLiveManager(BaseNCAAMBasketballManager):
                         details = self._extract_game_details(event)
                         if details and details["is_live"]: # is_live includes 'in' and 'halftime'
                             # Filter for favorite teams only if the config is set
-                            if self.ncaam_basketball_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+                            if self.ncaam_basketball_config.get("show_favorite_teams_only", False):
                                 if not (details["home_abbr"] in self.favorite_teams or details["away_abbr"] in self.favorite_teams):
                                     continue
                             
@@ -699,7 +699,7 @@ class NCAAMBasketballLiveManager(BaseNCAAMBasketballManager):
                     
                     if should_log:
                         if new_live_games:
-                            filter_text = "favorite teams" if self.ncaam_basketball_config.get("show_favorite_teams_only", False) and self.favorite_teams else "all teams"
+                            filter_text = "favorite teams" if self.ncaam_basketball_config.get("show_favorite_teams_only", False) else "all teams"
                             self.logger.info(f"[NCAAMBasketball] Found {len(new_live_games)} live games involving {filter_text}")
                             for game in new_live_games:
                                 period = game.get('period', 0)
@@ -719,7 +719,7 @@ class NCAAMBasketballLiveManager(BaseNCAAMBasketballManager):
                             if has_favorite_team:
                                 self.logger.info("[NCAAMBasketball] Found live game(s) for favorite team(s)")
                         else:
-                            filter_text = "favorite teams" if self.ncaam_basketball_config.get("show_favorite_teams_only", False) and self.favorite_teams else "criteria"
+                            filter_text = "favorite teams" if self.ncaam_basketball_config.get("show_favorite_teams_only", False) else "criteria"
                             self.logger.info(f"[NCAAMBasketball] No live games found matching {filter_text}")
                         self.last_log_time = current_time
                     

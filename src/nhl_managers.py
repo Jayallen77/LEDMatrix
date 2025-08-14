@@ -592,7 +592,7 @@ class NHLLiveManager(BaseNHLManager):
                             new_live_games.append(details)
                     
                     # Filter for favorite teams only if the config is set
-                    if self.nhl_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+                    if self.nhl_config.get("show_favorite_teams_only", False):
                         new_live_games = [game for game in new_live_games 
                                          if game['home_abbr'] in self.favorite_teams or 
                                             game['away_abbr'] in self.favorite_teams]
@@ -606,12 +606,12 @@ class NHLLiveManager(BaseNHLManager):
                     
                     if should_log:
                         if new_live_games:
-                            filter_text = "favorite teams" if self.nhl_config.get("show_favorite_teams_only", False) and self.favorite_teams else "all teams"
+                            filter_text = "favorite teams" if self.nhl_config.get("show_favorite_teams_only", False) else "all teams"
                             self.logger.info(f"[NHL] Found {len(new_live_games)} live games involving {filter_text}")
                             for game in new_live_games:
                                 self.logger.info(f"[NHL] Live game: {game['away_abbr']} vs {game['home_abbr']} - Period {game['period']}, {game['clock']}")
                         else:
-                            filter_text = "favorite teams" if self.nhl_config.get("show_favorite_teams_only", False) and self.favorite_teams else "criteria"
+                            filter_text = "favorite teams" if self.nhl_config.get("show_favorite_teams_only", False) else "criteria"
                             self.logger.info(f"[NHL] No live games found matching {filter_text}")
                         self.last_log_time = current_time
                     
@@ -701,7 +701,7 @@ class NHLRecentManager(BaseNHLManager):
                     processed_games.append(game)
             
             # Filter for favorite teams only if the config is set
-            if self.nhl_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+            if self.nhl_config.get("show_favorite_teams_only", False):
                 team_games = [game for game in processed_games
                          if game['home_abbr'] in self.favorite_teams or 
                             game['away_abbr'] in self.favorite_teams]
@@ -806,7 +806,7 @@ class NHLUpcomingManager(BaseNHLManager):
                     new_upcoming_games.append(game)
             
             # Filter for favorite teams only if the config is set
-            if self.nhl_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+            if self.nhl_config.get("show_favorite_teams_only", False):
                 team_games = [game for game in new_upcoming_games 
                          if game['home_abbr'] in self.favorite_teams or 
                             game['away_abbr'] in self.favorite_teams]

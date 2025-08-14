@@ -825,7 +825,7 @@ class SoccerLiveManager(BaseSoccerManager):
                             new_live_games.append(details)
                     
                     # Filter for favorite teams only if the config is set
-                    if self.soccer_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+                    if self.soccer_config.get("show_favorite_teams_only", False):
                         new_live_games = [game for game in new_live_games if game['home_abbr'] in self.favorite_teams or game['away_abbr'] in self.favorite_teams]
 
                     # Logging
@@ -834,7 +834,7 @@ class SoccerLiveManager(BaseSoccerManager):
                                   not self.live_games)
                     if should_log:
                         if new_live_games:
-                            filter_text = "favorite teams" if self.soccer_config.get("show_favorite_teams_only", False) and self.favorite_teams else "all teams"
+                            filter_text = "favorite teams" if self.soccer_config.get("show_favorite_teams_only", False) else "all teams"
                             self.logger.info(f"[Soccer] Found {len(new_live_games)} live games involving {filter_text}.")
                             for game in new_live_games:
                                 self.logger.info(f"[Soccer] Live game: {game['away_abbr']} vs {game['home_abbr']} ({game['game_clock_display']}) - {game['league']}")
@@ -891,7 +891,7 @@ class SoccerLiveManager(BaseSoccerManager):
                     else:
                         # No live games found
                         if self.live_games: # Log only if previously had games
-                            filter_text = "favorite teams" if self.soccer_config.get("show_favorite_teams_only", False) and self.favorite_teams else "criteria"
+                            filter_text = "favorite teams" if self.soccer_config.get("show_favorite_teams_only", False) else "criteria"
                             self.logger.info(f"[Soccer] All live games have ended or no longer match {filter_text}.")
                         self.live_games = []
                         self.current_game = None
@@ -957,7 +957,7 @@ class SoccerRecentManager(BaseSoccerManager):
                     new_recent_games.append(game)
 
             # Filter for favorite teams only if the config is set
-            if self.soccer_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+            if self.soccer_config.get("show_favorite_teams_only", False):
                 team_games = [game for game in new_recent_games if game['home_abbr'] in self.favorite_teams or game['away_abbr'] in self.favorite_teams]
             else:
                 team_games = new_recent_games
@@ -1064,7 +1064,7 @@ class SoccerUpcomingManager(BaseSoccerManager):
                     new_upcoming_games.append(game)
             
             # Filter for favorite teams only if the config is set
-            if self.soccer_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+            if self.soccer_config.get("show_favorite_teams_only", False):
                 team_games = [game for game in new_upcoming_games if game['home_abbr'] in self.favorite_teams or game['away_abbr'] in self.favorite_teams]
             else:
                 team_games = new_upcoming_games

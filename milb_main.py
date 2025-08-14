@@ -1144,7 +1144,7 @@ class MiLBUpcomingManager(BaseMiLBManager):
                 return
 
             # --- Optimization: Filter for favorite teams before processing ---
-            if self.milb_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+            if self.milb_config.get("show_favorite_teams_only", False):
                 games = {
                     game_id: game for game_id, game in games.items()
                     if game['home_team'] in self.favorite_teams or game['away_team'] in self.favorite_teams

@@ -615,7 +615,7 @@ class NCAABaseballLiveManager(BaseNCAABaseballManager):
                     for game in games.values():
                         if game['status_state'] == 'in':
                             # Filter for favorite teams only if the config is set
-                            if self.ncaa_baseball_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+                            if self.ncaa_baseball_config.get("show_favorite_teams_only", False):
                                 if not (game['home_team'] in self.favorite_teams or game['away_team'] in self.favorite_teams):
                                     continue
                             
@@ -635,12 +635,12 @@ class NCAABaseballLiveManager(BaseNCAABaseballManager):
                     
                     if should_log:
                         if new_live_games:
-                            filter_text = "favorite teams" if self.ncaa_baseball_config.get("show_favorite_teams_only", False) and self.favorite_teams else "all teams"
+                            filter_text = "favorite teams" if self.ncaa_baseball_config.get("show_favorite_teams_only", False) else "all teams"
                             logger.info(f"[NCAABaseball] Found {len(new_live_games)} live games involving {filter_text}")
                             for game in new_live_games:
                                 logger.info(f"[NCAABaseball] Live game: {game['away_team']} vs {game['home_team']} - {game['inning_half']}{game['inning']}, {game['balls']}-{game['strikes']}")
                         else:
-                            filter_text = "favorite teams" if self.ncaa_baseball_config.get("show_favorite_teams_only", False) and self.favorite_teams else "criteria"
+                            filter_text = "favorite teams" if self.ncaa_baseball_config.get("show_favorite_teams_only", False) else "criteria"
                             logger.info(f"[NCAABaseball] No live games found matching {filter_text}")
                         self.last_log_time = current_time
                     

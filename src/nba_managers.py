@@ -702,7 +702,7 @@ class NBALiveManager(BaseNBAManager):
                         new_live_games.append(details)
 
                 # Filter for favorite teams only if the config is set
-                if self.nba_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+                if self.nba_config.get("show_favorite_teams_only", False):
                     new_live_games = [game for game in new_live_games 
                                      if game['home_abbr'] in self.favorite_teams or 
                                         game['away_abbr'] in self.favorite_teams]
@@ -760,7 +760,7 @@ class NBARecentManager(BaseNBAManager):
                     new_recent_games.append(game)
 
             # Filter for favorite teams only if the config is set
-            if self.nba_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+            if self.nba_config.get("show_favorite_teams_only", False):
                 team_games = [game for game in new_recent_games 
                              if game['home_abbr'] in self.favorite_teams or 
                                 game['away_abbr'] in self.favorite_teams]
@@ -837,7 +837,7 @@ class NBAUpcomingManager(BaseNBAManager):
                     new_upcoming_games.append(game)
 
             # Filter for favorite teams only if the config is set
-            if self.nba_config.get("show_favorite_teams_only", False) and self.favorite_teams:
+            if self.nba_config.get("show_favorite_teams_only", False):
                 team_games = [game for game in new_upcoming_games 
                              if game['home_abbr'] in self.favorite_teams or 
                                 game['away_abbr'] in self.favorite_teams]
