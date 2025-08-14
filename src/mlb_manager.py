@@ -264,10 +264,8 @@ class BaseMLBManager:
             game_time_str = self._format_game_time(game_data['start_time'])
             
             # Draw date and time using NHL-style fonts
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            ps2p = os.path.abspath(os.path.join(script_dir, "../assets/fonts/PressStart2P-Regular.ttf"))
-            date_font = ImageFont.truetype(ps2p, 8)
-            time_font = ImageFont.truetype(ps2p, 8)
+            date_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
+            time_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
             
             # Draw date in center
             date_width = draw.textlength(game_date, font=date_font)
@@ -304,7 +302,7 @@ class BaseMLBManager:
             away_score = str(game_data['away_score'])
             home_score = str(game_data['home_score'])
             display_text = f"{away_score}-{home_score}"
-            font = ImageFont.truetype(ps2p, 12)
+            font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 12)
             display_width = draw.textlength(display_text, font=font)
             display_x = (width - display_width) // 2
             display_y = (height - font.size) // 2
@@ -332,7 +330,7 @@ class BaseMLBManager:
             away_score = str(game_data['away_score'])
             home_score = str(game_data['home_score'])
             score_text = f"{away_score}-{home_score}"
-            score_font = ImageFont.truetype(ps2p, 12)
+            score_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 12)
             
             # Calculate position for the score text
             score_width = draw.textlength(score_text, font=score_font)
