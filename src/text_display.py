@@ -96,12 +96,10 @@ class TextDisplay:
     def _load_font(self):
         """Load the specified font file (TTF or BDF)."""
         font_path = self.font_path
-        if not os.path.isabs(font_path) and not font_path.startswith('assets/'):
-             base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-             font_path = os.path.join(base_path, font_path)
-        elif not os.path.isabs(font_path) and font_path.startswith('assets/'):
-             base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-             font_path = os.path.join(base_path, font_path)
+        # Resolve relative paths against project root based on this file location
+        if not os.path.isabs(font_path):
+            base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+            font_path = os.path.join(base_path, font_path)
 
         logger.info(f"Attempting to load font: {font_path} at size {self.font_size}")
         

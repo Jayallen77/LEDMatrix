@@ -185,10 +185,12 @@ class OddsTickerManager:
     def _load_fonts(self) -> Dict[str, ImageFont.FreeTypeFont]:
         """Load fonts for the ticker display."""
         try:
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            ps2p = os.path.abspath(os.path.join(script_dir, "../assets/fonts/PressStart2P-Regular.ttf"))
             return {
-                'small': ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 6),
-                'medium': ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8),
-                'large': ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 10)
+                'small': ImageFont.truetype(ps2p, 6),
+                'medium': ImageFont.truetype(ps2p, 8),
+                'large': ImageFont.truetype(ps2p, 10)
             }
         except Exception as e:
             logger.error(f"Error loading fonts: {e}")

@@ -162,11 +162,13 @@ class BaseNHLManager:
         """Load fonts used by the scoreboard."""
         fonts = {}
         try:
-            # Try to load the Press Start 2P font first
-            fonts['score'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 12)
-            fonts['time'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
-            fonts['team'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
-            fonts['status'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6)
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            ps2p = os.path.abspath(os.path.join(script_dir, "../assets/fonts/PressStart2P-Regular.ttf"))
+            font_4x6 = os.path.abspath(os.path.join(script_dir, "../assets/fonts/4x6-font.ttf"))
+            fonts['score'] = ImageFont.truetype(ps2p, 12)
+            fonts['time'] = ImageFont.truetype(ps2p, 8)
+            fonts['team'] = ImageFont.truetype(ps2p, 8)
+            fonts['status'] = ImageFont.truetype(font_4x6, 6)
             logging.info("[NHL] Successfully loaded Press Start 2P font for all text elements")
         except IOError:
             logging.warning("[NHL] Press Start 2P font not found, trying 4x6 font.")

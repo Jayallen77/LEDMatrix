@@ -46,35 +46,11 @@ class CacheManager:
             self.logger.warning("ConfigManager not available, using default cache intervals")
 
     def _get_writable_cache_dir(self) -> Optional[str]:
-        """Tries to find or create a writable cache directory in a few common locations."""
-        # Attempt 1: User's home directory (handling sudo)
+        """Tries to find or create a writable cache directory, preferring a system path when available."""
+        # Attempt 1: System-wide persistent cache directory (preferred for services)
         try:
-            real_user = os.environ.get('SUDO_USER') or os.environ.get('USER', 'default')
-            if real_user and real_user != 'root':
-                 home_dir = os.path.expanduser(f"~{real_user}")
-            else:
-                home_dir = os.path.expanduser('~')
-            
-            user_cache_dir = os.path.join(home_dir, '.ledmatrix_cache')
-            os.makedirs(user_cache_dir, exist_ok=True)
-            
-            # Test writability
-            test_file = os.path.join(user_cache_dir, '.writetest')
-            with open(test_file, 'w') as f:
-                f.write('test')
-            os.remove(test_file)
-            return user_cache_dir
-        except Exception as e:
-            self.logger.warning(f"Could not use user-specific cache directory: {e}")
-
-        # Attempt 2: System-wide persistent cache directory (for sudo scenarios)
-        try:
-            # Try /var/cache/ledmatrix first (most standard)
             system_cache_dir = '/var/cache/ledmatrix'
-            
-            # Check if directory exists and we can write to it
             if os.path.exists(system_cache_dir):
-                # Test if we can write to the existing directory
                 test_file = os.path.join(system_cache_dir, '.writetest')
                 try:
                     with open(test_file, 'w') as f:
@@ -84,12 +60,29 @@ class CacheManager:
                 except (IOError, OSError):
                     self.logger.warning(f"Directory exists but is not writable: {system_cache_dir}")
             else:
-                # Try to create the directory
                 os.makedirs(system_cache_dir, exist_ok=True)
                 if os.access(system_cache_dir, os.W_OK):
                     return system_cache_dir
         except Exception as e:
             self.logger.warning(f"Could not use /var/cache/ledmatrix: {e}")
+
+        # Attempt 2: User's home directory (handling sudo), but avoid /root preference
+        try:
+            real_user = os.environ.get('SUDO_USER') or os.environ.get('USER', 'default')
+            if real_user and real_user != 'root':
+                home_dir = os.path.expanduser(f"~{real_user}")
+            else:
+                # When running as root and /var/cache/ledmatrix failed, still allow fallback to /root
+                home_dir = os.path.expanduser('~')
+            user_cache_dir = os.path.join(home_dir, '.ledmatrix_cache')
+            os.makedirs(user_cache_dir, exist_ok=True)
+            test_file = os.path.join(user_cache_dir, '.writetest')
+            with open(test_file, 'w') as f:
+                f.write('test')
+            os.remove(test_file)
+            return user_cache_dir
+        except Exception as e:
+            self.logger.warning(f"Could not use user-specific cache directory: {e}")
 
         # Attempt 3: /opt/ledmatrix/cache (alternative persistent location)
         try:
@@ -240,6 +233,16 @@ class CacheManager:
                                     pass
                     except Exception as e:
                         self.logger.error(f"Atomic write failed for key '{key}': {e}")
+                        # Attempt one-time fallback write directly into /var/cache/ledmatrix if available
+                        try:
+                            fallback_dir = '/var/cache/ledmatrix'
+                            if os.path.isdir(fallback_dir) and os.access(fallback_dir, os.W_OK):
+                                fallback_path = os.path.join(fallback_dir, os.path.basename(cache_path))
+                                with open(fallback_path, 'w') as tmp_file:
+                                    json.dump(data, tmp_file, indent=4, cls=DateTimeEncoder)
+                                self.logger.warning(f"Cache wrote to fallback location: {fallback_path}")
+                        except Exception as e2:
+                            self.logger.error(f"Fallback cache write also failed: {e2}")
             
         except (IOError, OSError) as e:
             self.logger.error(f"Failed to save cache for key '{key}': {e}")

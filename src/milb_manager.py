@@ -336,8 +336,10 @@ class BaseMiLBManager:
                 date_font = getattr(self.display_manager, 'small_font', None)
                 time_font = getattr(self.display_manager, 'small_font', None)
                 if date_font is None or time_font is None:
-                    date_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
-                    time_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
+                    script_dir = os.path.dirname(os.path.abspath(__file__))
+                    ps2p = os.path.abspath(os.path.join(script_dir, "../assets/fonts/PressStart2P-Regular.ttf"))
+                    date_font = ImageFont.truetype(ps2p, 8)
+                    time_font = ImageFont.truetype(ps2p, 8)
                 self.logger.debug(f"[MiLB] Fonts prepared successfully")
             except Exception as e:
                 self.logger.error(f"[MiLB] Failed to prepare fonts: {e}")
@@ -403,7 +405,9 @@ class BaseMiLBManager:
             away_score = str(game_data['away_score'])
             home_score = str(game_data['home_score'])
             score_text = f"{away_score}-{home_score}"
-            score_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 12)
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            ps2p = os.path.abspath(os.path.join(script_dir, "../assets/fonts/PressStart2P-Regular.ttf"))
+            score_font = ImageFont.truetype(ps2p, 12)
             
             # Calculate position for the score text
             score_width = draw.textlength(score_text, font=score_font)
@@ -415,7 +419,10 @@ class BaseMiLBManager:
         # Draw records for upcoming and recent games
         if self.show_records and game_data['status'] in ['status_scheduled', 'status_final', 'final', 'completed']:
             try:
-                record_font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6)
+                # Resolve 4x6 font via absolute path
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                font_4x6 = os.path.abspath(os.path.join(script_dir, "../assets/fonts/4x6-font.ttf"))
+                record_font = ImageFont.truetype(font_4x6, 6)
             except IOError:
                 record_font = ImageFont.load_default()
             

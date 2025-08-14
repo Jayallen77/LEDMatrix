@@ -428,7 +428,10 @@ class StockManager:
         fallback = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
         draw = ImageDraw.Draw(fallback)
         try:
-            font = ImageFont.truetype("assets/fonts/OpenSans-Regular.ttf", 16)
+            # Resolve font path absolutely to avoid fallback under systemd
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            font_path = os.path.abspath(os.path.join(script_dir, "../assets/fonts/OpenSans-Regular.ttf"))
+            font = ImageFont.truetype(font_path, 16)
         except:
             font = ImageFont.load_default()
         

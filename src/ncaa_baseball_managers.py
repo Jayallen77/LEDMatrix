@@ -240,7 +240,9 @@ class BaseNCAABaseballManager:
             status_x = (width - status_width) // 2
             status_y = 2
             self.display_manager.draw = draw
-            status_font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6) # Using a default small font
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            font_4x6 = os.path.abspath(os.path.join(script_dir, "../assets/fonts/4x6-font.ttf"))
+            status_font = ImageFont.truetype(font_4x6, 6) # Using a default small font
             self._draw_text_with_outline(draw, status_text, (status_x, status_y), status_font)
             
             game_time = datetime.fromisoformat(game_data['start_time'].replace('Z', '+00:00'))
@@ -263,8 +265,9 @@ class BaseNCAABaseballManager:
 
             game_time_str = self._format_game_time(game_data['start_time'])
             
-            date_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
-            time_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
+            ps2p = os.path.abspath(os.path.join(script_dir, "../assets/fonts/PressStart2P-Regular.ttf"))
+            date_font = ImageFont.truetype(ps2p, 8)
+            time_font = ImageFont.truetype(ps2p, 8)
             
             date_width = draw.textlength(game_date, font=date_font)
             date_x = (width - date_width) // 2
@@ -279,7 +282,7 @@ class BaseNCAABaseballManager:
         # For recent/final games, show scores and status
         elif game_data['status'] in ['status_final', 'final', 'completed']:
             status_text = "Final"
-            status_font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6) # Using a default small font
+            status_font = ImageFont.truetype(font_4x6, 6) # Using a default small font
             status_width = draw.textlength(status_text, font=status_font)
             status_x = (width - status_width) // 2
             status_y = 2
@@ -289,7 +292,7 @@ class BaseNCAABaseballManager:
             away_score = str(game_data['away_score'])
             home_score = str(game_data['home_score'])
             score_text = f"{away_score}-{home_score}"
-            score_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 12)
+            score_font = ImageFont.truetype(ps2p, 12)
             
             score_width = draw.textlength(score_text, font=score_font)
             score_x = (width - score_width) // 2
@@ -298,7 +301,7 @@ class BaseNCAABaseballManager:
 
         if self.show_records and game_data['status'] in ['status_scheduled', 'status_final', 'final', 'completed']:
             try:
-                record_font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6)
+                record_font = ImageFont.truetype(font_4x6, 6)
             except IOError:
                 record_font = ImageFont.load_default()
 
@@ -339,7 +342,7 @@ class BaseNCAABaseballManager:
             # Define colors for odds text
             # Use a small readable font for odds; fall back to default if not available
             try:
-                odds_font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6)
+                odds_font = ImageFont.truetype(font_4x6, 6)
             except IOError:
                 odds_font = ImageFont.load_default()
             odds_color = (255, 0, 0)  # Red text
