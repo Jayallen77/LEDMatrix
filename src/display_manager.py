@@ -98,11 +98,9 @@ class DisplayManager:
             self.draw = ImageDraw.Draw(self.image)
             logger.info(f"Image canvas created with dimensions: {self.matrix.width}x{self.matrix.height}")
             
-            # Initialize font with Press Start 2P using an absolute path so services don't fall back
+            # Initialize font with Press Start 2P
             try:
-                script_dir = os.path.dirname(os.path.abspath(__file__))
-                ps2p_path = os.path.abspath(os.path.join(script_dir, "../assets/fonts/PressStart2P-Regular.ttf"))
-                self.font = ImageFont.truetype(ps2p_path, 8)
+                self.font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
                 logger.info("Initial Press Start 2P font loaded successfully")
             except Exception as e:
                 logger.error(f"Failed to load initial font: {e}")
@@ -292,21 +290,17 @@ class DisplayManager:
     def _load_fonts(self):
         """Load fonts with proper error handling."""
         try:
-            # Load Press Start 2P font using absolute path to avoid fallback when run under systemd
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            ps2p_path = os.path.abspath(os.path.join(script_dir, "../assets/fonts/PressStart2P-Regular.ttf"))
-            self.regular_font = ImageFont.truetype(ps2p_path, 8)
+            # Load Press Start 2P font
+            self.regular_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
             logger.info("Press Start 2P font loaded successfully")
             
             # Use the same font for small text (currently same size; adjust size here if needed)
-            self.small_font = ImageFont.truetype(ps2p_path, 8)
+            self.small_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
             logger.info("Press Start 2P small font loaded successfully")
 
             # Load 5x7 BDF font for calendar events
             try:
-                script_dir = os.path.dirname(os.path.abspath(__file__))
-                relative_font_path = os.path.join(script_dir, "../assets/fonts/5x7.bdf")
-                self.calendar_font_path = os.path.abspath(relative_font_path)
+                self.calendar_font_path = "assets/fonts/5x7.bdf"
                 logger.info(f"Attempting to load 5x7 font from: {self.calendar_font_path}")
                 
                 if not os.path.exists(self.calendar_font_path):
@@ -332,9 +326,7 @@ class DisplayManager:
 
             # Load 4x6 font as extra_small_font
             try:
-                script_dir = os.path.dirname(os.path.abspath(__file__))
-                relative_font_path = os.path.join(script_dir, "../assets/fonts/4x6-font.ttf")
-                font_path = os.path.abspath(relative_font_path)
+                font_path = "assets/fonts/4x6-font.ttf"
                 logger.info(f"Attempting to load 4x6 TTF font from: {font_path} at size 6")
                 self.extra_small_font = ImageFont.truetype(font_path, 6)
                 logger.info(f"4x6 TTF extra small font loaded successfully from {font_path}")
