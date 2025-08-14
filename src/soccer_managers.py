@@ -312,13 +312,10 @@ class BaseSoccerManager:
         """Load fonts used by the scoreboard."""
         fonts = {}
         try:
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            ps2p = os.path.abspath(os.path.join(script_dir, "../assets/fonts/PressStart2P-Regular.ttf"))
-            font_4x6 = os.path.abspath(os.path.join(script_dir, "../assets/fonts/4x6-font.ttf"))
-            fonts['score'] = ImageFont.truetype(ps2p, 10) # Slightly larger score
-            fonts['time'] = ImageFont.truetype(ps2p, 8)
-            fonts['team'] = ImageFont.truetype(font_4x6, 6) # Keep team abbr small
-            fonts['status'] = ImageFont.truetype(font_4x6, 6) # Keep status small
+            fonts['score'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 10) # Slightly larger score
+            fonts['time'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
+            fonts['team'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6) # Keep team abbr small
+            fonts['status'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6) # Keep status small
             logging.info("[Soccer] Successfully loaded custom fonts")
         except IOError:
             logging.warning("[Soccer] Custom fonts not found, using default PIL font.")

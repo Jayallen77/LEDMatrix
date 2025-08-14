@@ -211,14 +211,11 @@ class BaseNCAAFBManager: # Renamed class
         """Load fonts used by the scoreboard."""
         fonts = {}
         try:
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            ps2p = os.path.abspath(os.path.join(script_dir, "../assets/fonts/PressStart2P-Regular.ttf"))
-            font_4x6 = os.path.abspath(os.path.join(script_dir, "../assets/fonts/4x6-font.ttf"))
-            fonts['score'] = ImageFont.truetype(ps2p, 10)
-            fonts['time'] = ImageFont.truetype(ps2p, 8)
-            fonts['team'] = ImageFont.truetype(ps2p, 8)
-            fonts['status'] = ImageFont.truetype(font_4x6, 6) # Using 4x6 for status
-            fonts['detail'] = ImageFont.truetype(font_4x6, 6) # Added detail font
+            fonts['score'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 10)
+            fonts['time'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
+            fonts['team'] = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
+            fonts['status'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6) # Using 4x6 for status
+            fonts['detail'] = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6) # Added detail font
             logging.info("[NCAAFB] Successfully loaded fonts") # Changed log prefix
         except IOError:
             logging.warning("[NCAAFB] Fonts not found, using default PIL font.") # Changed log prefix
