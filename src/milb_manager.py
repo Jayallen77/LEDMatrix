@@ -336,8 +336,13 @@ class BaseMiLBManager:
                 date_font = getattr(self.display_manager, 'small_font', None)
                 time_font = getattr(self.display_manager, 'small_font', None)
                 if date_font is None or time_font is None:
-                    date_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
-                    time_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
+                    try:
+                        date_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
+                        time_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 8)
+                    except Exception as e:
+                        self.logger.warning(f"[MiLB] Could not load PressStart2P fonts: {e}, using default")
+                        date_font = ImageFont.load_default()
+                        time_font = ImageFont.load_default()
                 self.logger.debug(f"[MiLB] Fonts prepared successfully")
             except Exception as e:
                 self.logger.error(f"[MiLB] Failed to prepare fonts: {e}")
@@ -405,8 +410,8 @@ class BaseMiLBManager:
             score_text = f"{away_score}-{home_score}"
             try:
                 score_font = ImageFont.truetype("assets/fonts/PressStart2P-Regular.ttf", 12)
-            except IOError:
-                self.logger.warning("[MiLB] Could not load PressStart2P font, using default")
+            except Exception as e:
+                self.logger.warning(f"[MiLB] Could not load PressStart2P font: {e}, using default")
                 score_font = ImageFont.load_default()
             
             # Calculate position for the score text
@@ -420,7 +425,8 @@ class BaseMiLBManager:
         if self.show_records and game_data['status'] in ['status_scheduled', 'status_final', 'final', 'completed']:
             try:
                 record_font = ImageFont.truetype("assets/fonts/4x6-font.ttf", 6)
-            except IOError:
+            except Exception as e:
+                self.logger.warning(f"[MiLB] Could not load 4x6 font: {e}, using default")
                 record_font = ImageFont.load_default()
             
             away_record = game_data.get('away_record', '')
