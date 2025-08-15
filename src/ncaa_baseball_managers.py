@@ -887,7 +887,9 @@ class NCAABaseballRecentManager(BaseNCAABaseballManager):
                 if game_time.tzinfo is None: game_time = game_time.replace(tzinfo=timezone.utc)
                 
                 is_favorite_game = (game['home_team'] in self.favorite_teams or game['away_team'] in self.favorite_teams)
-                if not is_favorite_game: continue
+                # Only filter by favorite teams if show_favorite_teams_only is True
+                if self.ncaa_baseball_config.get("show_favorite_teams_only", False) and not is_favorite_game:
+                    continue
                 
                 logger.info(f"[NCAABaseball] Checking favorite recent game: {game['away_team']} @ {game['home_team']}")
                 logger.info(f"[NCAABaseball] Game time (UTC): {game_time}")
@@ -983,7 +985,9 @@ class NCAABaseballUpcomingManager(BaseNCAABaseballManager):
                 
                 for game in games.values():
                     is_favorite_game = (game['home_team'] in self.favorite_teams or game['away_team'] in self.favorite_teams)
-                    if not is_favorite_game: continue
+                    # Only filter by favorite teams if show_favorite_teams_only is True
+                    if self.ncaa_baseball_config.get("show_favorite_teams_only", False) and not is_favorite_game:
+                        continue
                         
                     game_time = datetime.fromisoformat(game['start_time'].replace('Z', '+00:00'))
                     if game_time.tzinfo is None: game_time = game_time.replace(tzinfo=timezone.utc)

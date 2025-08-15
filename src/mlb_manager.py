@@ -809,31 +809,28 @@ class MLBLiveManager(BaseMLBManager):
                         }
                         self.logger.info(f"[MLB Live] Filtered to {len(games)} games for favorite teams.")
 
-                    # Find all live games involving favorite teams
+                    # Find all live games
                     new_live_games = []
                     for game in games.values():
                         # Only process games that are actually in progress
                         if game['status_state'] == 'in' and game['status'] == 'status_in_progress':
-                            if not self.favorite_teams or (
-                                game['home_team'] in self.favorite_teams or 
-                                game['away_team'] in self.favorite_teams
-                            ):
-                                self._fetch_odds(game)
-                                # Ensure scores are valid numbers
-                                try:
-                                    game['home_score'] = int(game['home_score'])
-                                    game['away_score'] = int(game['away_score'])
-                                    new_live_games.append(game)
-                                except (ValueError, TypeError):
-                                    self.logger.warning(f"Invalid score format for game {game['away_team']} @ {game['home_team']}")
-                            else:
-                                # Not in favorites-only mode, so add the game
-                                try:
-                                    game['home_score'] = int(game['home_score'])
-                                    game['away_score'] = int(game['away_score'])
-                                    new_live_games.append(game)
-                                except (ValueError, TypeError):
-                                    self.logger.warning(f"Invalid score format for game {game['away_team']} @ {game['home_team']}")
+                            # Check if this is a favorite team game
+                            is_favorite_game = (game['home_team'] in self.favorite_teams or 
+                                              game['away_team'] in self.favorite_teams)
+                            
+                            # Only filter by favorite teams if show_favorite_teams_only is True
+                            if self.mlb_config.get("show_favorite_teams_only", False) and not is_favorite_game:
+                                self.logger.debug(f"[MLB Live] Skipping game {game['away_team']} @ {game['home_team']} - not a favorite team.")
+                                continue
+                            
+                            self._fetch_odds(game)
+                            # Ensure scores are valid numbers
+                            try:
+                                game['home_score'] = int(game['home_score'])
+                                game['away_score'] = int(game['away_score'])
+                                new_live_games.append(game)
+                            except (ValueError, TypeError):
+                                self.logger.warning(f"Invalid score format for game {game['away_team']} @ {game['home_team']}")
 
                     # Only log if there's a change in games or enough time has passed
                     should_log = (
@@ -1201,7 +1198,8 @@ class MLBRecentManager(BaseMLBManager):
                     self.logger.info(f"[MLB] Game time (UTC): {game_time}")
                     self.logger.info(f"[MLB] Game status: {game['status']}, State: {game['status_state']}")
                 
-                if not is_favorite_game:
+                # Only filter by favorite teams if show_favorite_teams_only is True
+                if self.mlb_config.get("show_favorite_teams_only", False) and not is_favorite_game:
                     self.logger.debug(f"[MLB] Skipping game {game_id} - not a favorite team.")
                     continue
 
