@@ -1,4 +1,5 @@
 import os
+from typing import Union
 from PIL import Image, ImageDraw
 # math is no longer needed for drawing, remove if not used elsewhere
 # import math 
@@ -62,7 +63,7 @@ class WeatherIcons:
         return filename
 
     @staticmethod
-    def load_weather_icon(icon_code: str, size: int = DEFAULT_SIZE) -> Image.Image | None:
+    def load_weather_icon(icon_code: str, size: int = DEFAULT_SIZE) -> Union[Image.Image, None]:
         """Loads, converts, and resizes the appropriate weather icon based on the OWM code. Returns None on failure."""
         filename = WeatherIcons._get_icon_filename(icon_code)
         icon_path = os.path.join(WeatherIcons.ICON_DIR, filename)

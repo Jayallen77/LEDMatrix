@@ -627,11 +627,11 @@ class DisplayController:
             if self.ncaam_basketball_recent: self.ncaam_basketball_recent.update()
             if self.ncaam_basketball_upcoming: self.ncaam_basketball_upcoming.update()
 
-    def _check_live_games(self) -> tuple[bool, str]:
+    def _check_live_games(self) -> tuple:
         """
         Check if there are any live games available.
         Returns:
-            tuple[bool, str]: (has_live_games, sport_type)
+            tuple: (has_live_games, sport_type)
             sport_type will be 'nhl', 'nba', 'mlb', 'milb', 'soccer' or None
         """
         # Only include sports that are enabled in config

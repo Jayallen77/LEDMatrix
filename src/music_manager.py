@@ -6,6 +6,7 @@ import json
 import os
 from io import BytesIO
 import requests
+from typing import Union
 from PIL import Image, ImageEnhance
 import queue # Added import
 
@@ -305,7 +306,7 @@ class MusicManager:
             except Exception as e:
                 logger.error(f"Error executing DisplayController update callback from YTM direct update: {e}")
 
-    def _fetch_and_resize_image(self, url: str, target_size: tuple[int, int]) -> Image.Image | None:
+    def _fetch_and_resize_image(self, url: str, target_size: tuple) -> Union[Image.Image, None]:
         """Fetches an image from a URL, resizes it, and returns a PIL Image object."""
         if not url:
             return None
