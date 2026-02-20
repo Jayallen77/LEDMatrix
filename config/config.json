@@ -2,23 +2,23 @@
     "web_display_autostart": true,
     "schedule": {
         "enabled": true,
-        "start_time": "07:00",
-        "end_time": "23:00"
+        "start_time": "00:01",
+        "end_time": "23:59"
     },
-    "timezone": "America/Chicago",
+    "timezone": "America/Denver",
     "location": {
-        "city": "Dallas",
-        "state": "Texas",
+        "city": "Denver",
+        "state": "Colorado",
         "country": "US"
     },
     "display": {
         "hardware": {
-            "rows": 32,
+            "rows": 64,
             "cols": 64,
-            "chain_length": 2,
+            "chain_length": 1,
             "parallel": 1,
             "brightness": 95,
-            "hardware_mapping": "adafruit-hat-pwm",
+            "hardware_mapping": "regular",
             "scan_mode": 0,
             "pwm_bits": 9,
             "pwm_dither_bits": 1,
@@ -32,11 +32,10 @@
             "gpio_slowdown": 3
         },
         "display_durations": {
-            "clock": 15,
-            "weather": 30,
+            "clock": 60,
+            "weather": 15,
             "stocks": 30,
-            "hourly_forecast": 30,
-            "daily_forecast": 30,
+            "daily_forecast": 10,
             "stock_news": 20,
             "odds_ticker": 60,
             "nhl_live": 30,
@@ -69,7 +68,7 @@
             "ncaam_basketball_live": 30,
             "ncaam_basketball_recent": 30,
             "ncaam_basketball_upcoming": 30,
-            "music": 30,
+            "music": 1000,
             "of_the_day": 40,
             "news_manager": 60
         },
@@ -81,34 +80,32 @@
         "update_interval": 1
     },
     "weather": {
-        "enabled": false,
+        "enabled": true,
         "update_interval": 1800,
         "units": "imperial",
         "display_format": "{temp}\u00b0F\n{condition}"
     },
     "stocks": {
-        "enabled": false,
+        "enabled": true,
         "update_interval": 600,
-        "scroll_speed": 1,
-        "scroll_delay": 0.01,
+        "scroll_speed": 0.60,
+        "scroll_delay": 0.0125,
         "toggle_chart": true,
         "dynamic_duration": true,
         "min_duration": 30,
         "max_duration": 300,
         "duration_buffer": 0.1,
         "symbols": [
-            "ASTS",
-            "SCHD",
-            "INTC",
-            "NVDA",
-            "T",
-            "VOO",
-            "SMCI"
+            "AAPL",
+            "AMZN",
+            "GOOGL",
+            "TSLA",
+            "NVDA"
         ],
         "display_format": "{symbol}: ${price} ({change}%)"
     },
     "crypto": {
-        "enabled": false,
+        "enabled": true,
         "update_interval": 600,
         "symbols": [
             "BTC-USD",
@@ -129,7 +126,7 @@
         "duration_buffer": 0.1
     },
     "odds_ticker": {
-        "enabled": true,
+        "enabled": false,
         "show_favorite_teams_only": true,
         "games_per_favorite_team": 1,
         "max_games_per_league": 5,
@@ -412,10 +409,10 @@
         }
     },
     "music": {
-        "enabled": false,
-        "preferred_source": "ytm",
+        "enabled": true,
+        "preferred_source": "spotify",
         "YTM_COMPANION_URL": "http://192.168.86.12:9863",
-        "POLLING_INTERVAL_SECONDS": 1
+        "POLLING_INTERVAL_SECONDS": 2
     },
     "of_the_day": {
         "enabled": false,

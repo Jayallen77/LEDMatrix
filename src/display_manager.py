@@ -22,6 +22,8 @@ class DisplayManager:
         return cls._instance
 
     def __init__(self, config: Dict[str, Any] = None, force_fallback: bool = False, suppress_test_pattern: bool = False):
+        if DisplayManager._initialized:
+            return
         start_time = time.time()
         self.config = config or {}
         self._force_fallback = force_fallback
@@ -30,15 +32,17 @@ class DisplayManager:
         self._snapshot_path = "/tmp/led_matrix_preview.png"
         self._snapshot_min_interval_sec = 0.2  # max ~5 fps
         self._last_snapshot_ts = 0.0
-        self._setup_matrix()
-        logger.info("Matrix setup completed in %.3f seconds", time.time() - start_time)
-        
+
         font_time = time.time()
         self._load_fonts()
         logger.info("Font loading completed in %.3f seconds", time.time() - font_time)
-        
+
+        self._setup_matrix()
+        logger.info("Matrix setup completed in %.3f seconds", time.time() - start_time)
+
         # Initialize managers
         # Calendar manager is now initialized by DisplayController
+        DisplayManager._initialized = True
         
     def _setup_matrix(self):
         """Initialize the RGB matrix with configuration settings."""
@@ -166,7 +170,7 @@ class DisplayManager:
                 # Fallback mode - just draw on the image
                 self.draw.rectangle([0, 0, self.image.width-1, self.image.height-1], outline=(255, 0, 0))
                 self.draw.line([0, 0, self.image.width-1, self.image.height-1], fill=(0, 255, 0))
-                self.draw.text((10, 10), "Simulation", font=self.font, fill=(0, 0, 255))
+                self.draw.text((5, 5), "Sim", font=self.regular_font, fill=(0, 255, 0))
                 logger.info("Drew test pattern in fallback mode")
                 return
             
@@ -176,8 +180,19 @@ class DisplayManager:
             # Draw a diagonal line
             self.draw.line([0, 0, self.matrix.width-1, self.matrix.height-1], fill=(0, 255, 0))
             
-            # Draw some text - changed from "TEST" to "Initializing" with smaller font
-            self.draw.text((10, 10), "Initializing", font=self.font, fill=(0, 0, 255))
+            # Draw initialization text - centered and visible
+            init_text = "OK"
+            # Calculate text size for centering
+            try:
+                bbox = self.draw.textbbox((0, 0), init_text, font=self.regular_font)
+                text_width = bbox[2] - bbox[0]
+                text_height = bbox[3] - bbox[1]
+                x = (self.matrix.width - text_width) // 2
+                y = (self.matrix.height - text_height) // 2
+                self.draw.text((x, y), init_text, font=self.regular_font, fill=(0, 255, 0))
+            except Exception as e:
+                # Fallback to simple positioning if bbox fails
+                self.draw.text((25, 25), "OK", font=self.regular_font, fill=(0, 255, 0))
             
             # Update the display once after everything is drawn
             self.update_display()
@@ -338,11 +353,14 @@ class DisplayManager:
 
         except Exception as e:
             logger.error(f"Error in font loading: {e}", exc_info=True)
-            # Fallback to default font
-            self.regular_font = ImageFont.load_default()
+            # Fallback to default PIL fonts that are compatible with textbbox
+            try:
+                self.regular_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 8)
+            except:
+                self.regular_font = ImageFont.load_default()
             self.small_font = self.regular_font
             self.calendar_font = self.regular_font
-            if not hasattr(self, 'extra_small_font'): 
+            if not hasattr(self, 'extra_small_font'):
                 self.extra_small_font = self.regular_font
             if not hasattr(self, 'bdf_5x7_font'): # Ensure bdf_5x7_font also gets a fallback
                 self.bdf_5x7_font = self.regular_font

@@ -364,27 +364,37 @@ class MusicManager:
                         polled_track_info_data = spotify_track
                         source_for_callback = MusicSource.SPOTIFY
                         simplified_info_poll = self.get_simplified_track_info(polled_track_info_data, MusicSource.SPOTIFY)
-                        
+
                         with self.track_info_lock:
-                            if simplified_info_poll != self.current_track_info:
-                                self.current_track_info = simplified_info_poll
-                                self.current_source = MusicSource.SPOTIFY
-                                significant_change_for_callback = True # Spotify poll changes always considered significant
+                            previous_info = self.current_track_info.copy() if self.current_track_info else {}
+                            # Always update the live snapshot so progress can advance smoothly
+                            self.current_track_info = simplified_info_poll
+                            self.current_source = MusicSource.SPOTIFY
+
+                            # Determine if a meaningful change occurred (ignore progress/duration)
+                            meaningful_fields = ["title", "artist", "album_art_url", "is_playing"]
+                            meaningful_change = any(
+                                previous_info.get(field) != simplified_info_poll.get(field)
+                                for field in meaningful_fields
+                            ) or (self.current_source != MusicSource.SPOTIFY)
+
+                            if meaningful_change:
+                                significant_change_for_callback = True
                                 simplified_info_for_callback = simplified_info_poll.copy()
-                                self._needs_immediate_full_refresh = True # Reset display state
-                                # Handle album art for Spotify if needed (similar to _process_ytm_data_update)
-                                old_album_art_url = self.current_track_info.get('album_art_url_prev_spotify') # Need a way to store prev
-                                new_album_art_url = simplified_info_poll.get('album_art_url')
-                                if new_album_art_url != old_album_art_url:
-                                     self.album_art_image = None
-                                     self.last_album_art_url = new_album_art_url
-                                self.current_track_info['album_art_url_prev_spotify'] = new_album_art_url
-
-
-                                logger.debug(f"Polling Spotify: Active track - {spotify_track.get('item', {}).get('name')}")
+                                self._needs_immediate_full_refresh = True
+                                logger.info(f"Polling Spotify: Meaningful change detected - {spotify_track.get('item', {}).get('name', 'Unknown')}, is_playing: {simplified_info_poll.get('is_playing')}")
                             else:
-                                logger.debug("Polling Spotify: No change in simplified track info.")
-                        
+                                logger.debug("Polling Spotify: Only minor changes (e.g., progress). No full refresh.")
+
+                            # Handle album art cache only when the URL actually changes
+                            old_album_art_url = previous_info.get('album_art_url')
+                            new_album_art_url = simplified_info_poll.get('album_art_url')
+                            if new_album_art_url != old_album_art_url:
+                                self.album_art_image = None
+                                self.last_album_art_url = new_album_art_url
+                            # Track previous art url for next comparison if needed
+                            self.current_track_info['album_art_url_prev_spotify'] = new_album_art_url
+
                     else:
                         logger.debug("Polling Spotify: No active track or player paused.")
                         # If Spotify was playing and now it's not
@@ -543,6 +553,13 @@ class MusicManager:
         with self.track_info_lock:
             return self.current_track_info.copy() if self.current_track_info else None
 
+    def is_spotify_playing(self):
+        """Returns True if Spotify is currently playing music."""
+        with self.track_info_lock:
+            return (self.current_source == MusicSource.SPOTIFY and 
+                    self.current_track_info and 
+                    self.current_track_info.get('is_playing', False))
+
     def start_polling(self):
         # Only start polling if enabled
         if not self.enabled:
@@ -603,7 +620,9 @@ class MusicManager:
             log_msg_detail = f"force_clear_from_DC={force_clear}, event_driven_refresh_attempted={'Yes' if initial_data_from_queue_due_to_event is not None else 'No'}"
             logger.debug(f"MusicManager.display: Performing full refresh cycle. Details: {log_msg_detail}")
             
-            self.display_manager.clear()
+            # Only clear display if explicitly forced (not for periodic refreshes)
+            if force_clear:
+                self.display_manager.clear()
             self.activate_music_display() # Call this BEFORE snapshotting data for this cycle.
                                         # This might trigger YTM events if it reconnects.
             self.last_periodic_refresh_time = time.time() # Update timer *after* potential processing in activate
@@ -647,23 +666,72 @@ class MusicManager:
                 self._last_nothing_playing_log_time = time.time()
 
             if not self.is_currently_showing_nothing_playing or perform_full_refresh_this_cycle:
-                if perform_full_refresh_this_cycle or not self.is_currently_showing_nothing_playing:
+                if (perform_full_refresh_this_cycle and force_clear) or not self.is_currently_showing_nothing_playing:
                     self.display_manager.clear()
                 
-                text_width = self.display_manager.get_text_width("Nothing Playing", self.display_manager.regular_font)
-                x_pos = (self.display_manager.matrix.width - text_width) // 2
-                y_pos = (self.display_manager.matrix.height // 2) - 4
-                self.display_manager.draw_text("Nothing Playing", x=x_pos, y=y_pos, font=self.display_manager.regular_font)
+                phrase = "Nothing Playing"
+                matrix_w = self.display_manager.matrix.width
+                matrix_h = self.display_manager.matrix.height
+                available_w = matrix_w - 2
+
+                # Try single line with small font first
+                single_font = self.display_manager.small_font if hasattr(self.display_manager, 'small_font') else self.display_manager.regular_font
+                single_width = self.display_manager.get_text_width(phrase, single_font)
+
+                if single_width <= available_w:
+                    # Center single line text
+                    try:
+                        ascent, descent = single_font.getmetrics()
+                        line_height = ascent + descent
+                    except Exception:
+                        # Fallback height estimate
+                        line_height = 8
+                    x_pos = (matrix_w - single_width) // 2
+                    y_pos = (matrix_h - line_height) // 2
+                    self.display_manager.draw_text(phrase, x=x_pos, y=y_pos, font=single_font)
+                else:
+                    # Split into two centered lines: "Nothing" and "Playing"
+                    line1 = "Nothing"
+                    line2 = "Playing"
+
+                    # Prefer small_font for readability; fallback to BDF if needed
+                    use_font = single_font
+                    w1 = self.display_manager.get_text_width(line1, use_font)
+                    w2 = self.display_manager.get_text_width(line2, use_font)
+
+                    if w1 > available_w or w2 > available_w:
+                        # Fallback to 5x7 BDF font
+                        use_font = self.display_manager.bdf_5x7_font if hasattr(self.display_manager, 'bdf_5x7_font') else single_font
+                        w1 = self.display_manager.get_text_width(line1, use_font)
+                        w2 = self.display_manager.get_text_width(line2, use_font)
+
+                    # Determine line height
+                    try:
+                        ascent, descent = use_font.getmetrics()
+                        line_height = ascent + descent
+                    except Exception:
+                        line_height = 8  # BDF fallback used elsewhere
+
+                    padding = 2
+                    total_h = (line_height * 2) + padding
+                    y1 = (matrix_h - total_h) // 2
+                    y2 = y1 + line_height + padding
+                    x1 = (matrix_w - w1) // 2
+                    x2 = (matrix_w - w2) // 2
+
+                    self.display_manager.draw_text(line1, x=x1, y=y1, font=use_font)
+                    self.display_manager.draw_text(line2, x=x2, y=y2, font=use_font)
                 self.display_manager.update_display()
                 self.is_currently_showing_nothing_playing = True
 
-            with self.track_info_lock: 
+            with self.track_info_lock:
                 self.scroll_position_title = 0
                 self.scroll_position_artist = 0
                 self.scroll_position_album = 0
                 self.title_scroll_tick = 0
                 self.artist_scroll_tick = 0
                 self.album_scroll_tick = 0
+                self.scroll_pixel_position = 0
                 if self.album_art_image is not None or self.last_album_art_url is not None:
                     logger.debug("Clearing album art cache as 'Nothing Playing' is displayed.")
                     self.album_art_image = None
@@ -672,12 +740,13 @@ class MusicManager:
 
         self.is_currently_showing_nothing_playing = False 
 
-        if perform_full_refresh_this_cycle: 
+        if perform_full_refresh_this_cycle:
             title_being_displayed = current_track_info_snapshot.get('title','N/A') if current_track_info_snapshot else "N/A"
             logger.debug(f"MusicManager: Resetting scroll positions for track '{title_being_displayed}' due to full refresh signal (periodic or event-driven).")
             self.scroll_position_title = 0
             self.scroll_position_artist = 0
             self.scroll_position_album = 0
+            self.scroll_pixel_position = -20
 
         if not self.is_music_display_active and not perform_full_refresh_this_cycle : 
              # If display wasn't active, and this isn't a full refresh cycle that would activate it,
@@ -693,20 +762,38 @@ class MusicManager:
         if not perform_full_refresh_this_cycle: 
             self.display_manager.draw.rectangle([0, 0, self.display_manager.matrix.width, self.display_manager.matrix.height], fill=(0, 0, 0))
 
+        # Define regions independently: album art, scrolling text, progress bar
         matrix_height = self.display_manager.matrix.height
-        album_art_size = matrix_height # Was matrix_height - 2
+        matrix_width = self.display_manager.matrix.width
+        progress_bar_height = 1
+        
+        # Scrolling text moved up 1 pixel from previous position
+        TEXT_BAND_HEIGHT = 8
+        text_band_y_start = matrix_height - progress_bar_height - TEXT_BAND_HEIGHT + 7  # y=62 on 64x64 matrix
+        
+        # Album art positioned at the top with optimal size (centered)
+        art_region_top = 0
+        album_art_size = 56  # Optimal album art size (split the difference)
         album_art_target_size = (album_art_size, album_art_size)
-        album_art_x = 0 # Was 1
-        album_art_y = 0 # Was 1
-        text_area_x_start = album_art_x + album_art_size + 2
-        text_area_width = self.display_manager.matrix.width - text_area_x_start - 1 
+        # Text band uses full width at the bottom
+        text_area_x_start = 0
+        text_area_width = matrix_width 
 
         image_to_render_this_cycle = None
         target_art_url_for_current_track = current_track_info_snapshot.get('album_art_url')
 
         if target_art_url_for_current_track:
             if image_currently_in_cache and art_url_currently_in_cache == target_art_url_for_current_track:
-                image_to_render_this_cycle = image_currently_in_cache
+                # Ensure cached image matches current target size; resize if needed
+                if image_currently_in_cache.size != album_art_target_size:
+                    try:
+                        image_to_render_this_cycle = image_currently_in_cache.resize(album_art_target_size, Image.Resampling.LANCZOS)
+                        with self.track_info_lock:
+                            self.album_art_image = image_to_render_this_cycle
+                    except Exception:
+                        image_to_render_this_cycle = image_currently_in_cache
+                else:
+                    image_to_render_this_cycle = image_currently_in_cache
                 # logger.debug(f"Using cached album art for {target_art_url_for_current_track}") # Can be noisy
             else:
                 logger.info(f"MusicManager: Fetching album art for: {target_art_url_for_current_track}")
@@ -737,18 +824,32 @@ class MusicManager:
                     self.last_album_art_url = None 
 
         if image_to_render_this_cycle:
-            self.display_manager.image.paste(image_to_render_this_cycle, (album_art_x, album_art_y))
+            # Center art horizontally at the top of the matrix
+            art_w, art_h = image_to_render_this_cycle.width, image_to_render_this_cycle.height
+            paste_x = max(0, (matrix_width - art_w) // 2)
+            paste_y = art_region_top  # Position at the very top
+            self.display_manager.image.paste(image_to_render_this_cycle, (paste_x, paste_y))
         else:
-            self.display_manager.draw.rectangle([album_art_x, album_art_y, 
-                                                 album_art_x + album_art_size -1, album_art_y + album_art_size -1],
+            # Draw a centered placeholder square at the top
+            placeholder_x = (matrix_width - album_art_size) // 2
+            self.display_manager.draw.rectangle([placeholder_x, art_region_top, 
+                                                placeholder_x + album_art_size - 1, art_region_top + album_art_size - 1],
                                                  outline=(50,50,50), fill=(10,10,10))
+
 
         title = current_track_info_snapshot.get('title', ' ')
         artist = current_track_info_snapshot.get('artist', ' ')
         album = current_track_info_snapshot.get('album', ' ') 
+        year = ''
+        # Try to extract year from album name if present like "Album Name (YEAR)" or "Album Name - YEAR"
+        if album:
+            import re
+            m = re.search(r'(19|20)\d{2}', album)
+            if m:
+                year = m.group(0)
 
         font_title = self.display_manager.small_font
-        font_artist_album = self.display_manager.bdf_5x7_font
+        font_artist = self.display_manager.bdf_5x7_font
 
         # Get line height for the TTF title font
         ascent, descent = font_title.getmetrics()
@@ -758,103 +859,124 @@ class MusicManager:
         LINE_HEIGHT_BDF = 8  # Fixed pixel height for 5x7 BDF font
         PADDING_BETWEEN_LINES = 1
 
-        # Calculate y positions as percentages of display height for scaling
-        matrix_height = self.display_manager.matrix.height
-        
-        # Define positions as percentages (0.0 to 1.0)
-        ARTIST_Y_PERCENT = 0.34  # 34% from top  
-        ALBUM_Y_PERCENT = 0.60   # 60% from top
-        
-        # Calculate actual pixel positions
-        y_pos_title_top = 1
-        y_pos_artist_top = int(matrix_height * ARTIST_Y_PERCENT)
-        y_pos_album_top = int(matrix_height * ALBUM_Y_PERCENT)
-        
-        TEXT_SCROLL_DIVISOR = 5
+        # Bottom info band uses BDF font
+        progress_bar_height = 1
+        info_line_height = LINE_HEIGHT_BDF
 
-        # --- Title --- 
-        title_width = self.display_manager.get_text_width(title, font_title)
-        current_title_display_text = title
-        if title_width > text_area_width:
-            if self.scroll_position_title >= len(title):
-                self.scroll_position_title = 0
-            current_title_display_text = title[self.scroll_position_title:] + "   " + title[:self.scroll_position_title]
+        TEXT_SCROLL_DIVISOR = 1
+
+        # --- Combined Info Line: "TITLE - ARTIST (YEAR)" ---
+        info_parts = []
+        if title.strip():
+            info_parts.append(title.strip())
+        if artist.strip():
+            info_parts.append(artist.strip())
+        base_text = " - ".join(info_parts) if info_parts else ""
+        if year:
+            combined_text = f"{base_text} ({year})" if base_text else f"({year})"
+        else:
+            combined_text = base_text
+        if not combined_text:
+            combined_text = " "
+
+        # Use compact BDF font for the bottom info line with smooth pixel-based scrolling
+        info_font = font_artist
+        info_width = self.display_manager.get_text_width(combined_text, info_font)
         
-        self.display_manager.draw_text(current_title_display_text, 
-                                     x=text_area_x_start, y=y_pos_title_top, color=(255, 255, 255), font=font_title)
-        if title_width > text_area_width:
+        # Dark band behind text at the bottom (using explicit height)
+        self.display_manager.draw.rectangle([0, text_band_y_start, text_area_width - 1, text_band_y_start + TEXT_BAND_HEIGHT - 1], fill=(0,0,0))
+        
+        if info_width > text_area_width:
+            # Smooth pixel-based scrolling - create extended text with spacing
+            extended_text = combined_text + "     " + combined_text
+            extended_width = self.display_manager.get_text_width(extended_text, info_font)
+            
+            # Use pixel-based scroll position instead of character-based
+            if not hasattr(self, 'scroll_pixel_position'):
+                self.scroll_pixel_position = -20
+            
+            # Calculate x position for smooth scrolling
+            info_x = -self.scroll_pixel_position
+            
+            # Draw the extended text
+            self.display_manager.draw_text(extended_text, x=info_x, y=text_band_y_start, color=(255, 255, 255), font=info_font)
+            
+            # Advance scroll position smoothly
             self.title_scroll_tick += 1
             if self.title_scroll_tick % TEXT_SCROLL_DIVISOR == 0:
-                self.scroll_position_title = (self.scroll_position_title + 1) % len(title)
-                self.title_scroll_tick = 0 
+                self.scroll_pixel_position += 1
+                # Reset when we've scrolled past the original text width
+                if self.scroll_pixel_position >= info_width + self.display_manager.get_text_width("     ", info_font):
+                    self.scroll_pixel_position = 0
+                self.title_scroll_tick = 0
         else:
-            self.scroll_position_title = 0
+            # Center if fits, no scrolling needed
+            info_x = (text_area_width - info_width) // 2
+            self.display_manager.draw_text(combined_text, x=info_x, y=text_band_y_start, color=(255, 255, 255), font=info_font)
+            self.scroll_pixel_position = 0
             self.title_scroll_tick = 0
 
-        # --- Artist --- 
-        artist_width = self.display_manager.get_text_width(artist, font_artist_album)
-        current_artist_display_text = artist
-        if artist_width > text_area_width:
-            if self.scroll_position_artist >= len(artist):
-                self.scroll_position_artist = 0
-            current_artist_display_text = artist[self.scroll_position_artist:] + "   " + artist[:self.scroll_position_artist]
-
-        self.display_manager.draw_text(current_artist_display_text, 
-                                      x=text_area_x_start, y=y_pos_artist_top, color=(180, 180, 180), font=font_artist_album)
-        if artist_width > text_area_width:
-            self.artist_scroll_tick += 1
-            if self.artist_scroll_tick % TEXT_SCROLL_DIVISOR == 0:
-                self.scroll_position_artist = (self.scroll_position_artist + 1) % len(artist)
-                self.artist_scroll_tick = 0
-        else:
-            self.scroll_position_artist = 0
-            self.artist_scroll_tick = 0
-            
-        # --- Album ---
-        if (matrix_height - y_pos_album_top) >= LINE_HEIGHT_BDF : 
-            album_width = self.display_manager.get_text_width(album, font_artist_album)
-            # Display album if it fits or can be scrolled (maintains original behavior but adds scrolling)
-            if album_width <= text_area_width:
-                # Album fits without scrolling - display normally
-                self.display_manager.draw_text(album, 
-                                             x=text_area_x_start, y=y_pos_album_top, color=(150, 150, 150), font=font_artist_album)
-                self.scroll_position_album = 0
-                self.album_scroll_tick = 0
-            elif album_width > text_area_width:
-                # Album is too wide - scroll it
-                current_album_display_text = album
-                if self.scroll_position_album >= len(album):
-                    self.scroll_position_album = 0
-                current_album_display_text = album[self.scroll_position_album:] + "   " + album[:self.scroll_position_album]
-                
-                self.display_manager.draw_text(current_album_display_text, 
-                                             x=text_area_x_start, y=y_pos_album_top, color=(150, 150, 150), font=font_artist_album)
-                self.album_scroll_tick += 1
-                if self.album_scroll_tick % TEXT_SCROLL_DIVISOR == 0:
-                    self.scroll_position_album = (self.scroll_position_album + 1) % len(album)
-                    self.album_scroll_tick = 0
-
-        # --- Progress Bar --- 
-        progress_bar_height = 3
-        progress_bar_y = matrix_height - progress_bar_height - 1
+        # --- Rainbow Progress Bar (1 pixel height) --- 
+        progress_bar_height = 1
+        progress_bar_y = matrix_height - progress_bar_height
         duration_ms = current_track_info_snapshot.get('duration_ms', 0)
         progress_ms = current_track_info_snapshot.get('progress_ms', 0)
-
         if duration_ms > 0:
             bar_total_width = text_area_width
-            filled_ratio = progress_ms / duration_ms
+            filled_ratio = max(0.0, min(1.0, progress_ms / duration_ms))
             filled_width = int(filled_ratio * bar_total_width)
 
+            # draw dark track background
             self.display_manager.draw.rectangle([
-                text_area_x_start, progress_bar_y, 
-                text_area_x_start + bar_total_width -1, progress_bar_y + progress_bar_height -1
-            ], outline=(60, 60, 60), fill=(30,30,30)) 
+                0, progress_bar_y, 
+                bar_total_width -1, progress_bar_y + progress_bar_height -1
+            ], outline=None, fill=(20,20,20)) 
             
+            # Rainbow filled portion with pulsing effect
             if filled_width > 0:
-                self.display_manager.draw.rectangle([
-                    text_area_x_start, progress_bar_y, 
-                    text_area_x_start + filled_width -1, progress_bar_y + progress_bar_height -1
-                ], fill=(200, 200, 200)) 
+                import math
+                
+                # Create pulsing rainbow effect
+                time_factor = time.time() * 3  # Speed of color cycling
+                
+                # Convert HSV to RGB for rainbow effect
+                def hsv_to_rgb(h, s, v):
+                    i = int(h * 6.0)
+                    f = (h * 6.0) - i
+                    p = v * (1.0 - s)
+                    q = v * (1.0 - s * f)
+                    t = v * (1.0 - s * (1.0 - f))
+                    
+                    if i % 6 == 0: return (v, t, p)
+                    elif i % 6 == 1: return (q, v, p)
+                    elif i % 6 == 2: return (p, v, t)
+                    elif i % 6 == 3: return (p, q, v)
+                    elif i % 6 == 4: return (t, p, v)
+                    else: return (v, p, q)
+                
+                # Draw each pixel of the progress bar with smooth flowing rainbow colors
+                for x in range(filled_width):
+                    # Check if this is the play head pixel (rightmost filled pixel)
+                    if x == filled_width - 1:
+                        # White play head pixel
+                        self.display_manager.draw.rectangle([
+                            x, progress_bar_y, 
+                            x, progress_bar_y + progress_bar_height -1
+                        ], fill=(255, 255, 255))
+                    else:
+                        # Calculate rainbow color - reverse flow direction (left to right)
+                        hue = (x / bar_total_width - time_factor * 0.1) % 1.0  # Reversed flow direction
+                        
+                        # Steady brightness - no pulsing/flashing
+                        brightness = 0.8  # Consistent brightness level
+                        
+                        r, g, b = hsv_to_rgb(hue, 1.0, brightness)
+                        
+                        # Draw rainbow pixel
+                        self.display_manager.draw.rectangle([
+                            x, progress_bar_y, 
+                            x, progress_bar_y + progress_bar_height -1
+                        ], fill=(int(r*255), int(g*255), int(b*255))) 
 
         self.display_manager.update_display()
 

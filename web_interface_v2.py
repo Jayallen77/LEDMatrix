@@ -362,8 +362,13 @@ class OnDemandRunner:
                     time.sleep(0.5)
                 continue
 
-            # Target higher FPS for ticker; moderate for others
-            sleep_seconds = 0.02 if mode == 'odds_ticker' else 0.08
+            # Target higher FPS for ticker; slower for stocks to allow internal scroll timing
+            if mode == 'odds_ticker':
+                sleep_seconds = 0.02
+            elif mode == 'stocks':
+                sleep_seconds = 0.25  # Give stocks more time for internal scroll timing
+            else:
+                sleep_seconds = 0.08
             try:
                 socketio.sleep(sleep_seconds)
             except Exception:

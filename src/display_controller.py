@@ -32,7 +32,7 @@ from src.ncaam_basketball_managers import NCAAMBasketballLiveManager, NCAAMBaske
 from src.youtube_display import YouTubeDisplay
 from src.calendar_manager import CalendarManager
 from src.text_display import TextDisplay
-from src.music_manager import MusicManager
+from src.music_manager import MusicManager, MusicSource
 from src.of_the_day_manager import OfTheDayManager
 from src.news_manager import NewsManager
 
@@ -56,7 +56,7 @@ class DisplayController:
         # Initialize display modes
         init_time = time.time()
         self.clock = Clock(self.display_manager) if self.config.get('clock', {}).get('enabled', True) else None
-        self.weather = WeatherManager(self.config, self.display_manager) if self.config.get('weather', {}).get('enabled', False) else None
+        self.weather = WeatherManager(self.config, self.display_manager, self.cache_manager) if self.config.get('weather', {}).get('enabled', False) else None
         self.stocks = StockManager(self.config, self.display_manager) if self.config.get('stocks', {}).get('enabled', False) else None
         self.news = StockNewsManager(self.config, self.display_manager) if self.config.get('stock_news', {}).get('enabled', False) else None
         self.odds_ticker = OddsTickerManager(self.config, self.display_manager) if self.config.get('odds_ticker', {}).get('enabled', False) else None
@@ -254,7 +254,7 @@ class DisplayController:
         # List of available display modes (adjust order as desired)
         self.available_modes = []
         if self.clock: self.available_modes.append('clock')
-        if self.weather: self.available_modes.extend(['weather_current', 'weather_hourly', 'weather_daily'])
+        if self.weather: self.available_modes.extend(['weather_current', 'weather_daily'])
         if self.stocks: self.available_modes.append('stocks')
         if self.news: self.available_modes.append('stock_news')
         if self.odds_ticker: self.available_modes.append('odds_ticker')
@@ -353,8 +353,6 @@ class DisplayController:
         try:
             if 'weather' in self.display_durations and 'weather_current' not in self.display_durations:
                 self.display_durations['weather_current'] = self.display_durations['weather']
-            if 'hourly_forecast' in self.display_durations and 'weather_hourly' not in self.display_durations:
-                self.display_durations['weather_hourly'] = self.display_durations['hourly_forecast']
             if 'daily_forecast' in self.display_durations and 'weather_daily' not in self.display_durations:
                 self.display_durations['weather_daily'] = self.display_durations['daily_forecast']
         except Exception:
@@ -363,7 +361,6 @@ class DisplayController:
         default_durations = {
             'clock': 15,
             'weather_current': 15,
-            'weather_hourly': 15,
             'weather_daily': 15,
             'stocks': 45,
             'stock_news': 30,
@@ -443,6 +440,49 @@ class DisplayController:
             logger.debug(f"DisplayController received music update (via callback): Title - {track_info.get('title')}, Playing - {track_info.get('is_playing')}")
         else:
             logger.debug("DisplayController received music update (via callback): Track is None or not playing.")
+
+        # Check if we need to auto-switch to music mode when music starts playing
+        if (track_info and
+            track_info.get('is_playing', False) and
+            self.current_display_mode != 'music' and
+            self.music_manager and
+            self.music_manager.enabled):
+
+            logger.info(f"Music started playing (callback) - auto-switching to music mode from {self.current_display_mode}")
+            logger.info(f"Track: {track_info.get('title', 'Unknown')} by {track_info.get('artist', 'Unknown')}")
+            # Explicitly clear the display before switching to music to prevent overlay
+            self.display_manager.clear()
+            if self.music_manager:
+                self.music_manager.activate_music_display()
+            self.current_display_mode = 'music'
+            self.force_clear = True
+            self.last_switch = time.time()
+            # Reset logged duration when mode changes
+            if hasattr(self, '_last_logged_duration'):
+                delattr(self, '_last_logged_duration')
+            return
+
+        # Check if we need to auto-switch back to regular rotation when music stops
+        if (not track_info or
+            not track_info.get('is_playing', False)) and \
+            self.current_display_mode == 'music' and \
+            self.music_manager and \
+            self.music_manager.enabled:
+
+            logger.info("Music stopped playing (callback) - auto-switching to regular rotation")
+            # Explicitly clear the display before switching away from music to prevent overlay
+            self.display_manager.clear()
+            if self.music_manager:
+                self.music_manager.deactivate_music_display()
+            # Switch to next mode in rotation
+            self.current_mode_index = self._get_next_mode_index(self.current_mode_index)
+            self.current_display_mode = self.available_modes[self.current_mode_index]
+            self.force_clear = True
+            self.last_switch = time.time()
+            # Reset logged duration when mode changes
+            if hasattr(self, '_last_logged_duration'):
+                delattr(self, '_last_logged_duration')
+            return
 
         if self.current_display_mode == 'music' and self.music_manager:
             if significant_change:
@@ -877,7 +917,7 @@ class DisplayController:
                 if mode_name in self.available_modes:
                     self.available_modes.remove(mode_name)
                 return
-                
+
             if not live_priority:
                 # Only add to rotation if manager exists and has live games
                 if manager and getattr(manager, 'live_games', None):
@@ -893,7 +933,7 @@ class DisplayController:
                 # These modes are only used for live priority takeover
                 if mode_name in self.available_modes:
                     self.available_modes.remove(mode_name)
-        
+
         # Check if each sport is enabled before processing
         nhl_enabled = self.config.get('nhl_scoreboard', {}).get('enabled', False)
         nba_enabled = self.config.get('nba_scoreboard', {}).get('enabled', False)
@@ -904,7 +944,7 @@ class DisplayController:
         ncaa_fb_enabled = self.config.get('ncaa_fb_scoreboard', {}).get('enabled', False)
         ncaa_baseball_enabled = self.config.get('ncaa_baseball_scoreboard', {}).get('enabled', False)
         ncaam_basketball_enabled = self.config.get('ncaam_basketball_scoreboard', {}).get('enabled', False)
-        
+
         update_mode('nhl_live', getattr(self, 'nhl_live', None), self.nhl_live_priority, nhl_enabled)
         update_mode('nba_live', getattr(self, 'nba_live', None), self.nba_live_priority, nba_enabled)
         update_mode('mlb_live', getattr(self, 'mlb_live', None), self.mlb_live_priority, mlb_enabled)
@@ -914,6 +954,28 @@ class DisplayController:
         update_mode('ncaa_fb_live', getattr(self, 'ncaa_fb_live', None), self.ncaa_fb_live_priority, ncaa_fb_enabled)
         update_mode('ncaa_baseball_live', getattr(self, 'ncaa_baseball_live', None), self.ncaa_baseball_live_priority, ncaa_baseball_enabled)
         update_mode('ncaam_basketball_live', getattr(self, 'ncaam_basketball_live', None), self.ncaam_basketball_live_priority, ncaam_basketball_enabled)
+
+    def _is_music_playing(self):
+        """Check if music is currently playing."""
+        if not self.music_manager or not self.music_manager.enabled:
+            return False
+        with self.music_manager.track_info_lock:
+            current_track = self.music_manager.current_track_info
+            return (current_track and
+                    current_track.get('is_playing', False) and
+                    self.music_manager.current_source != MusicSource.NONE)
+
+    def _get_next_mode_index(self, current_index):
+        """Get the next valid mode index, skipping 'music' if not playing."""
+        num_modes = len(self.available_modes)
+        next_index = (current_index + 1) % num_modes
+
+        # If the next mode is 'music' and music is not playing, skip it
+        if (self.available_modes[next_index] == 'music' and
+            not self._is_music_playing()):
+            next_index = (next_index + 1) % num_modes
+
+        return next_index
 
     def run(self):
         """Run the display controller, switching between displays."""
@@ -1042,13 +1104,58 @@ class DisplayController:
                             logger.warning(f"[DisplayController] Live priority takeover attempted for {new_mode} but manager has no live games, skipping takeover")
                             live_priority_takeover = False
                     else:
+                        # Check for Spotify playing before regular rotation
+                        spotify_is_playing = False
+                        if self.music_manager and self.music_manager.enabled:
+                            with self.music_manager.track_info_lock:
+                                current_track = self.music_manager.current_track_info
+                                if (current_track and 
+                                    current_track.get('is_playing', False) and 
+                                    self.music_manager.current_source != MusicSource.NONE):
+                                    spotify_is_playing = True
+                        
+                        # If Spotify is playing and we're not already in music mode, switch to music
+                        if spotify_is_playing and self.current_display_mode != 'music':
+                            logger.info(f"Spotify is playing - switching to music from {self.current_display_mode}")
+                            # Explicitly clear the display before switching to music to prevent overlay
+                            self.display_manager.clear()
+                            if self.music_manager:
+                                self.music_manager.activate_music_display()
+                            self.current_display_mode = 'music'
+                            self.force_clear = True
+                            self.last_switch = current_time
+                            # Reset logged duration when mode changes
+                            if hasattr(self, '_last_logged_duration'):
+                                delattr(self, '_last_logged_duration')
+                        # If Spotify stopped playing and we're in music mode, switch back to regular rotation
+                        elif not spotify_is_playing and self.current_display_mode == 'music':
+                            logger.info("Spotify stopped playing - switching to regular rotation")
+                            # Explicitly clear the display before switching away from music to prevent overlay
+                            self.display_manager.clear()
+                            if self.music_manager:
+                                self.music_manager.deactivate_music_display()
+                            # Switch to next mode in rotation
+                            self.current_mode_index = self._get_next_mode_index(self.current_mode_index)
+                            self.current_display_mode = self.available_modes[self.current_mode_index]
+                            self.force_clear = True
+                            self.last_switch = current_time
+                            # Reset logged duration when mode changes
+                            if hasattr(self, '_last_logged_duration'):
+                                delattr(self, '_last_logged_duration')
+                        else:
+                            # Log current state for debugging
+                            if spotify_is_playing and self.current_display_mode == 'music':
+                                logger.debug("Spotify is playing and already in music mode")
+                            elif not spotify_is_playing and self.current_display_mode != 'music':
+                                logger.debug("Spotify is not playing and not in music mode")
+                        
                         # No live_priority takeover, regular rotation
                         needs_switch = False
                         if self.current_display_mode.endswith('_live'):
                             # For live modes without live_priority, check if duration has elapsed
                             if current_time - self.last_switch >= self.get_current_duration():
                                 needs_switch = True
-                                self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
+                                self.current_mode_index = self._get_next_mode_index(self.current_mode_index)
                                 new_mode_after_timer = self.available_modes[self.current_mode_index]
                                 if previous_mode_before_switch == 'music' and self.music_manager and new_mode_after_timer != 'music':
                                     self.music_manager.deactivate_music_display()
@@ -1064,7 +1171,7 @@ class DisplayController:
                             elif self.current_display_mode == 'of_the_day' and self.of_the_day:
                                 self.of_the_day.advance_item()
                             needs_switch = True
-                            self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
+                            self.current_mode_index = self._get_next_mode_index(self.current_mode_index)
                             new_mode_after_timer = self.available_modes[self.current_mode_index]
                             if previous_mode_before_switch == 'music' and self.music_manager and new_mode_after_timer != 'music':
                                 self.music_manager.deactivate_music_display()
@@ -1086,8 +1193,6 @@ class DisplayController:
                             if self.current_display_mode == 'clock' and self.clock:
                                 manager_to_display = self.clock
                             elif self.current_display_mode == 'weather_current' and self.weather:
-                                manager_to_display = self.weather
-                            elif self.current_display_mode == 'weather_hourly' and self.weather:
                                 manager_to_display = self.weather
                             elif self.current_display_mode == 'weather_daily' and self.weather:
                                 manager_to_display = self.weather
@@ -1191,8 +1296,6 @@ class DisplayController:
                             manager_to_display.display_time(force_clear=self.force_clear)
                         elif self.current_display_mode == 'weather_current':
                             manager_to_display.display_weather(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'weather_hourly':
-                            manager_to_display.display_hourly_forecast(force_clear=self.force_clear)
                         elif self.current_display_mode == 'weather_daily':
                             manager_to_display.display_daily_forecast(force_clear=self.force_clear)
                         elif self.current_display_mode == 'stocks':
@@ -1229,7 +1332,7 @@ class DisplayController:
                         elif self.current_display_mode == 'milb_live' and self.milb_live:
                             logger.debug(f"[DisplayController] MiLB live manager exists but has {len(self.milb_live.live_games)} live games, switching to next mode")
                             # Switch to next mode since there are no live games
-                            self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
+                            self.current_mode_index = self._get_next_mode_index(self.current_mode_index)
                             self.current_display_mode = self.available_modes[self.current_mode_index]
                             self.force_clear = True
                             self.last_switch = current_time
@@ -1256,7 +1359,7 @@ class DisplayController:
                          logger.warning(f"No manager found or selected for display mode: {self.current_display_mode}")
                          # If we can't display the current mode, switch to the next available mode
                          if self.available_modes:
-                             self.current_mode_index = (self.current_mode_index + 1) % len(self.available_modes)
+                             self.current_mode_index = self._get_next_mode_index(self.current_mode_index)
                              self.current_display_mode = self.available_modes[self.current_mode_index]
                              logger.info(f"Switching to next available mode: {self.current_display_mode}")
                          else:

@@ -40,9 +40,9 @@ class StockManager:
         self.cached_text = None
         self.cache_manager = CacheManager()
         
-        # Get scroll settings from config with faster defaults
-        self.scroll_speed = self.stocks_config.get('scroll_speed', 1)
-        self.scroll_delay = self.stocks_config.get('scroll_delay', 0.01)
+        # Get scroll settings from config with slower defaults 
+        self.scroll_speed = self.stocks_config.get('scroll_speed', 0.75)  # Reduced from 1 to 0.75 pixels per frame for 25% slower scrolling
+        self.scroll_delay = self.stocks_config.get('scroll_delay', 0.01)  # Reset to original value
         
         # Get chart toggle setting from config
         self.toggle_chart = self.stocks_config.get('toggle_chart', False)
@@ -356,8 +356,8 @@ class StockManager:
             logger.info(f"Stock symbols changed. New symbols: {new_symbols}")
             
         # Update scroll and chart settings
-        self.scroll_speed = self.stocks_config.get('scroll_speed', 1)
-        self.scroll_delay = self.stocks_config.get('scroll_delay', 0.01)
+        self.scroll_speed = self.stocks_config.get('scroll_speed', 0.75)  # Reduced from 1 to 0.75 pixels per frame for 25% slower scrolling
+        self.scroll_delay = self.stocks_config.get('scroll_delay', 0.01)  # Reset to original value
         self.toggle_chart = self.stocks_config.get('toggle_chart', False)
         
         # Clear cached image if settings changed
@@ -392,6 +392,27 @@ class StockManager:
                     self.stock_data[symbol] = data
 
             self.last_update = current_time
+
+    def _draw_text_with_outline(self, draw, text, position, font, fill=(255, 255, 255), outline_color=(0, 0, 0)):
+        """
+        Draw text with a black outline for better readability.
+        
+        Args:
+            draw: ImageDraw object
+            text: Text to draw
+            position: (x, y) position to draw the text
+            font: Font to use
+            fill: Text color (default: white)
+            outline_color: Outline color (default: black)
+        """
+        x, y = position
+        
+        # Draw the outline by drawing the text in black at 8 positions around the text
+        for dx, dy in [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]:
+            draw.text((x + dx, y + dy), text, font=font, fill=outline_color)
+        
+        # Draw the text in the specified color
+        draw.text((x, y), text, font=font, fill=fill)
 
     def _get_stock_logo(self, symbol: str, is_crypto: bool = False) -> Image.Image:
         """Get stock or crypto logo image from local directory."""
@@ -502,23 +523,23 @@ class StockManager:
             # When chart is disabled, position text with more space from logo
             column_x = width // 2.2
         
-        # Draw symbol
+        # Draw symbol with outline
         symbol_width = symbol_bbox[2] - symbol_bbox[0]
         symbol_x = column_x - (symbol_width // 2)
-        draw.text((symbol_x, start_y), symbol_text, font=symbol_font, fill=(255, 255, 255))
+        self._draw_text_with_outline(draw, symbol_text, (symbol_x, start_y), symbol_font, fill=(255, 255, 255))
         
-        # Draw price
+        # Draw price with outline
         price_width = price_bbox[2] - price_bbox[0]
         price_x = column_x - (price_width // 2)
         price_y = start_y + (symbol_bbox[3] - symbol_bbox[1]) + text_gap  # Adjusted gap
-        draw.text((price_x, price_y), price_text, font=price_font, fill=(255, 255, 255))
+        self._draw_text_with_outline(draw, price_text, (price_x, price_y), price_font, fill=(255, 255, 255))
         
-        # Draw change with color based on value
+        # Draw change with color based on value and outline
         change_width = change_bbox[2] - change_bbox[0]
         change_x = column_x - (change_width // 2)
         change_y = price_y + (price_bbox[3] - price_bbox[1]) + text_gap  # Adjusted gap
         change_color = (0, 255, 0) if change >= 0 else (255, 0, 0)
-        draw.text((change_x, change_y), change_text, font=small_font, fill=change_color)
+        self._draw_text_with_outline(draw, change_text, (change_x, change_y), small_font, fill=change_color)
         
         # Draw mini chart on the right only if toggle_chart is enabled
         if self.toggle_chart and symbol in self.stock_data and 'price_history' in self.stock_data[symbol]:
@@ -528,9 +549,9 @@ class StockManager:
                 chart_data = [p['price'] for p in price_history]
                 
                 # Calculate chart dimensions
-                chart_width = int(width // 2.5)  # Reduced from width//2.5 to prevent overlap
+                chart_width = int(width // 2.0)  # Increased from width//2.5 to make chart longer
                 chart_height = height // 1.5
-                chart_x = width - chart_width - 4  # 4px margin from right edge
+                chart_x = int(width * 0.7)  # Position chart a little further right for better spacing
                 chart_y = (height - chart_height) // 2
                 
                 # Find min and max prices for scaling
