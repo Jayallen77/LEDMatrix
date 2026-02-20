@@ -23,3 +23,7 @@ ENV/
 
 # Cache directory
 cache/
+# local secrets
+credentials.json
+config/spotify_auth.json
+config/config.json
