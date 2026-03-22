@@ -5,6 +5,19 @@ import json
 import os
 import sys
 
+try:
+    from src.spotify_auth_utils import (
+        ensure_spotify_cache_access,
+        get_expected_runtime_user,
+        log_spotify_cache_diagnostics,
+    )
+except ImportError:
+    from spotify_auth_utils import (  # type: ignore
+        ensure_spotify_cache_access,
+        get_expected_runtime_user,
+        log_spotify_cache_diagnostics,
+    )
+
 # Setup basic logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -46,6 +59,7 @@ def load_spotify_credentials():
 
 if __name__ == "__main__":
     logging.info("Starting Spotify Authentication Process...")
+    logging.info("Spotify auth cache will be normalized for runtime user '%s'.", get_expected_runtime_user())
 
     client_id, client_secret, redirect_uri = load_spotify_credentials()
 
@@ -116,6 +130,8 @@ if __name__ == "__main__":
         token_info = sp_oauth.get_access_token(auth_code, check_cache=False)
         if token_info:
             logging.info(f"Spotify authentication successful. Token info cached at {SPOTIFY_AUTH_CACHE_PATH}")
+            ensure_spotify_cache_access(SPOTIFY_AUTH_CACHE_PATH, logger=logging.getLogger(__name__))
+            log_spotify_cache_diagnostics(SPOTIFY_AUTH_CACHE_PATH, logger=logging.getLogger(__name__))
         else:
             logging.error("Failed to obtain Spotify token info with the provided code.")
             logging.error("Please ensure the code was correct and not expired.")

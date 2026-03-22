@@ -597,7 +597,7 @@ If you are using the Spotify integration to display currently playing music, you
         ```
 
 2.  **Run the Authentication Script:**
-    *   Execute the authentication script using `sudo`. This is important because it needs to create an authentication cache file (`spotify_auth.json`) that will be owned by root.
+    *   Execute the authentication script using `sudo`. This is important because it needs to create an authentication cache file (`spotify_auth.json`) and then hand ownership to the runtime matrix user (defaults to `daemon`).
         ```bash
         sudo python3 src/authenticate_spotify.py
         ```
@@ -606,15 +606,15 @@ If you are using the Spotify integration to display currently playing music, you
     *   Your browser will be redirected to a URL starting with `http://127.0.0.1:8888/callback?code=...`. It will likely show an error page like "This site can't be reached" – this is expected.
     *   Copy the **entire** redirected URL from your browser's address bar.
     *   Paste this full URL back into the terminal when prompted by the script.
-    *   If successful, it will indicate that token info has been cached.
+    *   If successful, it will indicate that token info has been cached and normalized for the matrix runtime user.
 
-3.  **Adjust Cache File Permissions:**
-    *   The main display script (`display_controller.py`), even when run with `sudo`, might operate with an effective User ID (e.g., UID 1 for 'daemon') that doesn't have permission to read the `spotify_auth.json` file created by `root` (which has -rw------- permissions by default).
-    *   To allow the display script to read this cache file, change its permissions:
+3.  **Verify Cache Ownership:**
+    *   The RGB matrix library drops privileges after initialization, so the running display process usually accesses Spotify as the `daemon` user.
+    *   The authentication script now assigns `config/spotify_auth.json` to that runtime user with mode `600`. Verify it if Spotify still fails to initialize:
         ```bash
-        sudo chmod 644 config/spotify_auth.json
+        ls -l config/spotify_auth.json
         ```
-    This makes the file readable by all users, including the effective user of the display script.
+    *   If your setup uses a different post-matrix account, set `LEDMATRIX_SPOTIFY_RUNTIME_USER` before running authentication so the cache is assigned to the correct user.
 
 4.  **Run the Main Application:**
     *   You should now be able to run your main display controller script using `sudo`:
@@ -625,7 +625,7 @@ If you are using the Spotify integration to display currently playing music, you
 
 **Why these specific permissions steps?**
 
-The `authenticate_spotify.py` script, when run with `sudo`, creates `config/spotify_auth.json` owned by `root`. If the main `display_controller.py` (also run with `sudo`) effectively runs as a different user (e.g., UID 1/daemon, as observed during troubleshooting), that user won't be able to read the `root`-owned file unless its permissions are relaxed (e.g., to `644`). The `chmod 644` command allows the owner (`root`) to read/write, and everyone else (including the `daemon` user) to read.
+The `authenticate_spotify.py` script now fixes the auth cache for the same user the matrix process runs as after privilege drop. This avoids relying on a world-readable token file and stays compatible with newer `spotipy` releases that write the OAuth cache with restrictive permissions by default.
 
 ### Youtube Music Authentication for Music Display
 

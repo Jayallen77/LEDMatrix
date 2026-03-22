@@ -1652,6 +1652,11 @@
                                 <input type="password" class="form-control" id="spotify_client_secret" name="spotify_client_secret" value="{{ secrets_config.music.SPOTIFY_CLIENT_SECRET if secrets_config.music.SPOTIFY_CLIENT_SECRET != 'YOUR_SPOTIFY_CLIENT_SECRET_HERE' else '' }}" placeholder="Enter your Spotify Client Secret">
                                 <div class="description">Your Spotify Client Secret</div>
                             </div>
+                            <div class="form-group">
+                                <label for="spotify_redirect_uri">Spotify Redirect URI:</label>
+                                <input type="text" class="form-control" id="spotify_redirect_uri" name="spotify_redirect_uri" value="{{ secrets_config.music.SPOTIFY_REDIRECT_URI }}" placeholder="http://127.0.0.1:8888/callback">
+                                <div class="description">Must match the redirect URI configured in your Spotify developer app</div>
+                            </div>
                             
                             <button type="submit" class="btn btn-success">Save API Keys</button>
                         </form>
@@ -2686,6 +2691,49 @@
             });
         })();
 
+        // Music form submit
+        (function augmentMusicForm(){
+            const form = document.getElementById('music-form');
+            if (!form) return;
+
+            form.addEventListener('submit', async function(e){
+                e.preventDefault();
+                const payload = {
+                    music: {
+                        enabled: document.getElementById('music_enabled').checked,
+                        preferred_source: document.getElementById('music_preferred_source').value,
+                        YTM_COMPANION_URL: document.getElementById('ytm_companion_url').value,
+                        POLLING_INTERVAL_SECONDS: parseInt(document.getElementById('music_polling_interval').value)
+                    }
+                };
+                await saveConfigJson(payload);
+            });
+        })();
+
+        // Secrets form submit
+        (function augmentSecretsForm(){
+            const form = document.getElementById('secrets-form');
+            if (!form) return;
+
+            form.addEventListener('submit', async function(e){
+                e.preventDefault();
+                const payload = {
+                    weather: {
+                        api_key: document.getElementById('weather_api_key').value
+                    },
+                    youtube: {
+                        api_key: document.getElementById('youtube_api_key').value
+                    },
+                    music: {
+                        SPOTIFY_CLIENT_ID: document.getElementById('spotify_client_id').value,
+                        SPOTIFY_CLIENT_SECRET: document.getElementById('spotify_client_secret').value,
+                        SPOTIFY_REDIRECT_URI: document.getElementById('spotify_redirect_uri').value
+                    }
+                };
+                await saveSecretsJson(payload);
+            });
+        })();
+
         // Text form submit
         (function augmentTextForm(){
             const form = document.getElementById('text-form');
@@ -2774,6 +2822,22 @@
                 showNotification(result.message || 'Saved', result.status || 'success');
             } catch (error) {
                 showNotification('Error saving configuration: ' + error, 'error');
+            }
+        }
+
+        async function saveSecretsJson(fragment){
+            try {
+                const response = await fetch('/save_config', {
+                    method: 'POST',
+                    body: makeFormData({
+                        config_type: 'secrets',
+                        config_data: JSON.stringify(fragment)
+                    })
+                });
+                const result = await response.json();
+                showNotification(result.message || 'Saved', result.status || 'success');
+            } catch (error) {
+                showNotification('Error saving secrets: ' + error, 'error');
             }
         }
 

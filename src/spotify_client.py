@@ -4,6 +4,19 @@ import logging
 import json
 import os
 
+try:
+    from src.spotify_auth_utils import (
+        ensure_spotify_cache_access,
+        get_expected_runtime_user,
+        log_spotify_cache_diagnostics,
+    )
+except ImportError:
+    from spotify_auth_utils import (  # type: ignore
+        ensure_spotify_cache_access,
+        get_expected_runtime_user,
+        log_spotify_cache_diagnostics,
+    )
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Suppress spotipy.cache_handler warnings about not being able to write cache
@@ -58,39 +71,12 @@ class SpotifyClient:
             logging.warning("Cannot authenticate Spotify: credentials missing.")
             return
 
-        # ---- START DIAGNOSTIC BLOCK ----
-        logging.info(f"SpotifyClient using cache path: {SPOTIFY_AUTH_CACHE_PATH}")
-        if os.path.exists(SPOTIFY_AUTH_CACHE_PATH):
-            logging.info(f"DIAG: Cache file {SPOTIFY_AUTH_CACHE_PATH} EXISTS.")
-            # Log effective UID of the current process
-            euid = os.geteuid()
-            logging.info(f"DIAG: Current process Effective UID: {euid}")
-            
-            try:
-                stat_info = os.stat(SPOTIFY_AUTH_CACHE_PATH)
-                logging.info(f"DIAG: Cache file stat: UID={stat_info.st_uid}, GID={stat_info.st_gid}, Mode={oct(stat_info.st_mode)}")
-                
-                # Explicit check if EUID is the owner and has read permission
-                if euid == stat_info.st_uid and (stat_info.st_mode & 0o400): # 0o400 is S_IRUSR
-                    logging.info("DIAG: Effective UID is owner AND has read permission (stat).")
-                elif (stat_info.st_mode & 0o040) and euid in os.getgroups(): # Check group read
-                     logging.info("DIAG: Effective UID is in group AND group has read permission (stat).")
-                elif stat_info.st_mode & 0o004: # Check other read
-                     logging.info("DIAG: Others have read permission (stat).")
-                else:
-                    logging.warning("DIAG: Stat check indicates NO READ PERMISSION for effective UID.")
-
-                # Attempt to open and read directly
-                with open(SPOTIFY_AUTH_CACHE_PATH, 'r') as f_test:
-                    content_preview = f_test.read(120) # Read a bit more
-                    logging.info(f"DIAG: Cache file manual read successful. Content (first 120 chars): '{content_preview}'")
-                    if not content_preview.strip():
-                        logging.warning("DIAG: Cache file IS EMPTY or whitespace only (manual inspection).")
-            except Exception as e_diag:
-                logging.error(f"DIAG: Error during diagnostic check/read of cache file: {e_diag}")
-        else:
-            logging.warning(f"DIAG: Cache file {SPOTIFY_AUTH_CACHE_PATH} does NOT exist when _authenticate is called.")
-        # ---- END DIAGNOSTIC BLOCK ----
+        logging.info(
+            "SpotifyClient using cache path: %s (expected runtime user: %s)",
+            SPOTIFY_AUTH_CACHE_PATH,
+            get_expected_runtime_user(),
+        )
+        log_spotify_cache_diagnostics(SPOTIFY_AUTH_CACHE_PATH, logger=logging.getLogger(__name__))
 
         try:
             # Use the explicit cache path. Spotipy will try to load/refresh token from here.
@@ -102,14 +88,35 @@ class SpotifyClient:
                 cache_path=SPOTIFY_AUTH_CACHE_PATH, # Use the defined cache path
                 open_browser=False
             )
+
+            token_info = self._get_valid_cached_token(auth_manager)
+            if not token_info or not token_info.get("access_token"):
+                raise RuntimeError(
+                    "No valid Spotify playback token found in cache. "
+                    "Re-run authenticate_spotify.py to create a fresh cache."
+                )
+
+            ensure_spotify_cache_access(SPOTIFY_AUTH_CACHE_PATH, logger=logging.getLogger(__name__))
             self.sp = spotipy.Spotify(auth_manager=auth_manager)
-            
-            # Try making a lightweight call to verify if the token from cache is valid or can be refreshed.
-            self.sp.current_user() # This will raise an exception if token is invalid/expired and cannot be refreshed.
             logging.info("Spotify client initialized and authenticated using cached token.")
         except Exception as e:
             logging.warning(f"Spotify client initialization/authentication failed: {e}. Run authenticate_spotify.py if needed.")
             self.sp = None # Ensure sp is None if auth fails
+
+    def _get_valid_cached_token(self, auth_manager):
+        """Validate and refresh the cached token without requiring profile scopes."""
+        cached_token = None
+
+        cache_handler = getattr(auth_manager, "cache_handler", None)
+        if cache_handler and hasattr(cache_handler, "get_cached_token"):
+            cached_token = cache_handler.get_cached_token()
+        elif hasattr(auth_manager, "get_cached_token"):
+            cached_token = auth_manager.get_cached_token()
+
+        if hasattr(auth_manager, "validate_token"):
+            return auth_manager.validate_token(cached_token)
+
+        return cached_token
 
     def is_authenticated(self):
         """Checks if the client is currently considered authenticated and usable."""

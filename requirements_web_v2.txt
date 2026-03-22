@@ -15,7 +15,7 @@ geopy==2.4.1
 google-auth-oauthlib==1.0.0
 google-auth-httplib2==0.1.0
 google-api-python-client==2.86.0
-spotipy
+spotipy>=2.25.2,<2.26
 unidecode
 icalevents
 python-engineio

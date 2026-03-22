@@ -320,7 +320,7 @@ python3 -c 'from rgbmatrix import RGBMatrix, RGBMatrixOptions; print("RGB Matrix
 1. **Spotify Authentication**:
    ```bash
    sudo python3 src/authenticate_spotify.py
-   sudo chmod 644 config/spotify_auth.json
+   ls -l config/spotify_auth.json
    ```
 
 2. **YouTube Music Setup**:

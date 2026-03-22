@@ -30,6 +30,7 @@ from src.nfl_managers import NFLLiveManager, NFLRecentManager, NFLUpcomingManage
 from src.ncaa_fb_managers import NCAAFBLiveManager, NCAAFBRecentManager, NCAAFBUpcomingManager
 from src.ncaa_baseball_managers import NCAABaseballLiveManager, NCAABaseballRecentManager, NCAABaseballUpcomingManager
 from src.ncaam_basketball_managers import NCAAMBasketballLiveManager, NCAAMBasketballRecentManager, NCAAMBasketballUpcomingManager
+from src.web_config_utils import apply_config_fragment, apply_secrets_update, merge_dict
 from PIL import Image
 import io
 import signal
@@ -681,9 +682,10 @@ def save_config():
         config_data = data.get('data', {})
         
         if config_type == 'main':
-            current_config = config_manager.load_config()
-            # Deep merge the changes
-            merge_dict(current_config, config_data)
+            current_config = apply_config_fragment(
+                config_manager.load_config(),
+                json.dumps(config_data),
+            )
             config_manager.save_config(current_config)
         elif config_type == 'layout':
             # Save custom layout configuration
@@ -699,14 +701,6 @@ def save_config():
             'status': 'error',
             'message': f'Error saving configuration: {e}'
         }), 500
-
-def merge_dict(target, source):
-    """Deep merge source dict into target dict."""
-    for key, value in source.items():
-        if key in target and isinstance(target[key], dict) and isinstance(value, dict):
-            merge_dict(target[key], value)
-        else:
-            target[key] = value
 
 @app.route('/api/system/action', methods=['POST'])
 def system_action():
@@ -949,16 +943,7 @@ def save_config_route():
             # If config_data is provided as JSON, merge it
             if config_data_str:
                 try:
-                    new_data = json.loads(config_data_str)
-                    # Merge the new data with existing config
-                    for key, value in new_data.items():
-                        if key in main_config:
-                            if isinstance(value, dict) and isinstance(main_config[key], dict):
-                                merge_dict(main_config[key], value)
-                            else:
-                                main_config[key] = value
-                        else:
-                            main_config[key] = value
+                    main_config = apply_config_fragment(main_config, config_data_str)
                 except json.JSONDecodeError:
                     return jsonify({
                         'status': 'error',
@@ -974,19 +959,20 @@ def save_config_route():
         elif config_type == 'secrets':
             # Handle secrets configuration
             secrets_config = config_manager.get_raw_file_content('secrets')
-            
-            # If config_data is provided as JSON, use it
-            if config_data_str:
-                try:
-                    new_data = json.loads(config_data_str)
-                    config_manager.save_raw_file_content('secrets', new_data)
-                except json.JSONDecodeError:
-                    return jsonify({
-                        'status': 'error',
-                        'message': 'Error: Invalid JSON format for secrets config.'
-                    }), 400
-            else:
-                config_manager.save_raw_file_content('secrets', secrets_config)
+
+            try:
+                secrets_config = apply_secrets_update(
+                    existing_secrets=secrets_config,
+                    config_data_str=config_data_str,
+                    form_data=request.form,
+                )
+            except json.JSONDecodeError:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Error: Invalid JSON format for secrets config.'
+                }), 400
+
+            config_manager.save_raw_file_content('secrets', secrets_config)
             
             return jsonify({
                 'status': 'success',
