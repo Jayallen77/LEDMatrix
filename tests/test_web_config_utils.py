@@ -8,7 +8,11 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.web_config_utils import apply_config_fragment, apply_secrets_update
+from src.web_config_utils import (
+    apply_config_fragment,
+    apply_secrets_update,
+    spotify_credentials_changed,
+)
 
 
 class WebConfigUtilsTests(unittest.TestCase):
@@ -93,6 +97,41 @@ class WebConfigUtilsTests(unittest.TestCase):
         self.assertEqual(updated["music"]["SPOTIFY_CLIENT_ID"], "spotify-id")
         self.assertEqual(updated["music"]["SPOTIFY_CLIENT_SECRET"], "spotify-secret")
         self.assertEqual(updated["music"]["SPOTIFY_REDIRECT_URI"], "http://127.0.0.1:8888/callback")
+
+    def test_spotify_credentials_changed_detects_oauth_changes(self):
+        existing = {
+            "music": {
+                "SPOTIFY_CLIENT_ID": "old-id",
+                "SPOTIFY_CLIENT_SECRET": "same-secret",
+                "SPOTIFY_REDIRECT_URI": "http://127.0.0.1:8888/callback",
+            }
+        }
+        updated = {
+            "music": {
+                "SPOTIFY_CLIENT_ID": "new-id",
+                "SPOTIFY_CLIENT_SECRET": "same-secret",
+                "SPOTIFY_REDIRECT_URI": "http://127.0.0.1:8888/callback",
+            }
+        }
+
+        self.assertTrue(spotify_credentials_changed(existing, updated))
+
+    def test_spotify_credentials_changed_ignores_unrelated_secret_updates(self):
+        spotify_settings = {
+            "SPOTIFY_CLIENT_ID": "same-id",
+            "SPOTIFY_CLIENT_SECRET": "same-secret",
+            "SPOTIFY_REDIRECT_URI": "http://127.0.0.1:8888/callback",
+        }
+        existing = {
+            "weather": {"api_key": "old"},
+            "music": spotify_settings.copy(),
+        }
+        updated = {
+            "weather": {"api_key": "new"},
+            "music": spotify_settings.copy(),
+        }
+
+        self.assertFalse(spotify_credentials_changed(existing, updated))
 
 
 if __name__ == "__main__":

@@ -5,6 +5,11 @@ from typing import Any, Optional
 
 
 DEFAULT_SPOTIFY_REDIRECT_URI = "http://127.0.0.1:8888/callback"
+SPOTIFY_CREDENTIAL_KEYS = (
+    "SPOTIFY_CLIENT_ID",
+    "SPOTIFY_CLIENT_SECRET",
+    "SPOTIFY_REDIRECT_URI",
+)
 
 
 def merge_dict(target: MutableMapping[str, Any], source: Mapping[str, Any]) -> MutableMapping[str, Any]:
@@ -84,3 +89,30 @@ def apply_secrets_update(
             merge_dict(updated_secrets, form_fragment)
 
     return updated_secrets
+
+
+def spotify_credentials_changed(
+    existing_secrets: Optional[Mapping[str, Any]],
+    updated_secrets: Optional[Mapping[str, Any]],
+) -> bool:
+    """Return whether any Spotify OAuth application credential changed."""
+    existing_music = (
+        existing_secrets.get("music", {})
+        if isinstance(existing_secrets, Mapping)
+        else {}
+    )
+    updated_music = (
+        updated_secrets.get("music", {})
+        if isinstance(updated_secrets, Mapping)
+        else {}
+    )
+
+    if not isinstance(existing_music, Mapping):
+        existing_music = {}
+    if not isinstance(updated_music, Mapping):
+        updated_music = {}
+
+    return any(
+        existing_music.get(key) != updated_music.get(key)
+        for key in SPOTIFY_CREDENTIAL_KEYS
+    )

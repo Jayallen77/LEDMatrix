@@ -112,10 +112,16 @@ class MusicManager:
         if self.preferred_source == "spotify":
             try:
                 self.spotify = SpotifyClient()
-                if not self.spotify.is_authenticated():
-                    logging.warning("Spotify client initialized but not authenticated. Please run src/authenticate_spotify.py if you want to use Spotify.")
-                else:
+                if self.spotify.is_authenticated():
                     logging.info("Spotify client authenticated.")
+                elif self.spotify.should_retry():
+                    logging.warning(
+                        "Spotify client is temporarily unavailable and will retry automatically."
+                    )
+                else:
+                    logging.warning(
+                        "Spotify authorization is required. Run src/authenticate_spotify.py."
+                    )
             except Exception as e:
                 logging.error(f"Failed to initialize Spotify client: {e}")
                 self.spotify = None
@@ -357,7 +363,11 @@ class MusicManager:
             significant_change_for_callback = False
             simplified_info_for_callback = None
 
-            if self.preferred_source == "spotify" and self.spotify and self.spotify.is_authenticated():
+            if (
+                self.preferred_source == "spotify"
+                and self.spotify
+                and self.spotify.get_state() != SpotifyClient.STATE_REAUTH_REQUIRED
+            ):
                 try:
                     spotify_track = self.spotify.get_current_track()
                     if spotify_track and spotify_track.get('is_playing'):
@@ -397,17 +407,22 @@ class MusicManager:
 
                     else:
                         logger.debug("Polling Spotify: No active track or player paused.")
-                        # If Spotify was playing and now it's not
-                        with self.track_info_lock:
-                            if self.current_source == MusicSource.SPOTIFY:
-                                simplified_info_for_callback = self.get_simplified_track_info(None, MusicSource.NONE)
-                                self.current_track_info = simplified_info_for_callback
-                                self.current_source = MusicSource.NONE
-                                significant_change_for_callback = True
-                                self._needs_immediate_full_refresh = True # Reset display state
-                                self.album_art_image = None # Clear art
-                                self.last_album_art_url = None
-                                logger.info("Polling Spotify: Player stopped. Updating to Nothing Playing.")
+                        if self.spotify.should_retry():
+                            logger.debug(
+                                "Spotify is retryable; preserving the last known playback state."
+                            )
+                        else:
+                            # If Spotify was playing and now it is not
+                            with self.track_info_lock:
+                                if self.current_source == MusicSource.SPOTIFY:
+                                    simplified_info_for_callback = self.get_simplified_track_info(None, MusicSource.NONE)
+                                    self.current_track_info = simplified_info_for_callback
+                                    self.current_source = MusicSource.NONE
+                                    significant_change_for_callback = True
+                                    self._needs_immediate_full_refresh = True # Reset display state
+                                    self.album_art_image = None # Clear art
+                                    self.last_album_art_url = None
+                                    logger.info("Polling Spotify: Player stopped. Updating to Nothing Playing.")
 
 
                 except Exception as e:
@@ -1047,4 +1062,4 @@ if __name__ == '__main__':
     # finally:
     # if manager.enabled:
     # manager.stop_polling()
-    #         logger.info("Test finished.") 
+    #         logger.info("Test finished.")

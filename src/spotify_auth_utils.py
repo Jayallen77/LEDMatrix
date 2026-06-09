@@ -2,12 +2,18 @@ import logging
 import os
 import pwd
 import stat
-from typing import Optional
+from typing import Any, Dict, Optional
 
 
 DEFAULT_RUNTIME_USER = "daemon"
 RUNTIME_USER_ENV = "LEDMATRIX_SPOTIFY_RUNTIME_USER"
 EXPECTED_CACHE_MODE = 0o600
+
+
+def get_spotify_cache_path() -> str:
+    return os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "config", "spotify_auth.json")
+    )
 
 
 def get_expected_runtime_user() -> str:
@@ -35,9 +41,16 @@ def log_spotify_cache_diagnostics(
     cache_path: str,
     logger: Optional[logging.Logger] = None,
     expected_owner: Optional[str] = None,
-) -> None:
+) -> Dict[str, Any]:
     logger = _logger(logger)
     expected_owner = expected_owner or get_expected_runtime_user()
+    parent_dir = os.path.dirname(cache_path) or "."
+    diagnostics: Dict[str, Any] = {
+        "path": cache_path,
+        "exists": os.path.exists(cache_path),
+        "expected_owner": expected_owner,
+        "parent_writable": os.access(parent_dir, os.W_OK),
+    }
 
     logger.info(
         "Spotify auth cache expected owner=%s mode=%s path=%s",
@@ -45,22 +58,44 @@ def log_spotify_cache_diagnostics(
         oct(EXPECTED_CACHE_MODE),
         cache_path,
     )
+    logger.info(
+        "DIAG: Cache parent directory=%s current process write access=%s",
+        parent_dir,
+        diagnostics["parent_writable"],
+    )
 
-    if not os.path.exists(cache_path):
+    if not diagnostics["exists"]:
         logger.warning("Spotify auth cache does not exist at %s", cache_path)
-        return
+        return diagnostics
 
     euid = _safe_geteuid()
     stat_info = os.stat(cache_path)
     mode = stat.S_IMODE(stat_info.st_mode)
+    diagnostics.update({
+        "uid": stat_info.st_uid,
+        "gid": stat_info.st_gid,
+        "mode": mode,
+        "readable": os.access(cache_path, os.R_OK),
+        "writable": os.access(cache_path, os.W_OK),
+    })
+    try:
+        diagnostics["owner"] = pwd.getpwuid(stat_info.st_uid).pw_name
+    except KeyError:
+        diagnostics["owner"] = str(stat_info.st_uid)
+
     logger.info(
-        "DIAG: Cache file stat: UID=%s, GID=%s, Mode=%s",
+        "DIAG: Cache file stat: owner=%s UID=%s GID=%s Mode=%s",
+        diagnostics["owner"],
         stat_info.st_uid,
         stat_info.st_gid,
         oct(mode),
     )
     logger.info("DIAG: Current process Effective UID: %s", euid)
-    logger.info("DIAG: Current process read access: %s", os.access(cache_path, os.R_OK))
+    logger.info(
+        "DIAG: Current process cache access: read=%s write=%s",
+        diagnostics["readable"],
+        diagnostics["writable"],
+    )
 
     expected_user = _resolve_user(expected_owner)
     if expected_user:
@@ -87,6 +122,13 @@ def log_spotify_cache_diagnostics(
             logger.warning("DIAG: Cache file is empty or whitespace only.")
     except Exception as exc:
         logger.error("DIAG: Error during diagnostic read of cache file: %s", exc)
+
+    if not diagnostics["writable"]:
+        logger.warning(
+            "Spotify auth cache is not writable by the current process; token refreshes cannot be persisted."
+        )
+
+    return diagnostics
 
 
 def ensure_spotify_cache_access(
@@ -127,19 +169,44 @@ def ensure_spotify_cache_access(
         stat_info = os.stat(cache_path)
         return stat.S_IMODE(stat_info.st_mode) == EXPECTED_CACHE_MODE
 
-    try:
-        os.chown(cache_path, expected_user.pw_uid, expected_user.pw_gid)
-    except PermissionError:
-        logger.warning(
-            "Cannot change owner of %s to %s unless this runs as root. Current EUID=%s.",
-            cache_path,
-            runtime_user,
-            euid,
-        )
-    except OSError as exc:
-        logger.warning("Failed to change owner of Spotify auth cache %s: %s", cache_path, exc)
+    stat_info = os.stat(cache_path)
+    if (
+        stat_info.st_uid != expected_user.pw_uid
+        or stat_info.st_gid != expected_user.pw_gid
+    ):
+        try:
+            os.chown(cache_path, expected_user.pw_uid, expected_user.pw_gid)
+        except PermissionError:
+            logger.warning(
+                "Cannot change owner of %s to %s unless this runs as root. Current EUID=%s.",
+                cache_path,
+                runtime_user,
+                euid,
+            )
+        except OSError as exc:
+            logger.warning("Failed to change owner of Spotify auth cache %s: %s", cache_path, exc)
 
     log_spotify_cache_diagnostics(cache_path, logger=logger, expected_owner=runtime_user)
     stat_info = os.stat(cache_path)
     mode = stat.S_IMODE(stat_info.st_mode)
     return stat_info.st_uid == expected_user.pw_uid and mode == EXPECTED_CACHE_MODE
+
+
+def invalidate_spotify_cache(
+    cache_path: Optional[str] = None,
+    logger: Optional[logging.Logger] = None,
+) -> bool:
+    logger = _logger(logger)
+    cache_path = cache_path or get_spotify_cache_path()
+
+    if not os.path.exists(cache_path):
+        logger.info("Spotify auth cache is already absent at %s", cache_path)
+        return True
+
+    try:
+        os.unlink(cache_path)
+        logger.info("Invalidated Spotify auth cache at %s", cache_path)
+        return True
+    except OSError as exc:
+        logger.error("Failed to invalidate Spotify auth cache at %s: %s", cache_path, exc)
+        return False

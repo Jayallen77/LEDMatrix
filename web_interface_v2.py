@@ -30,7 +30,13 @@ from src.nfl_managers import NFLLiveManager, NFLRecentManager, NFLUpcomingManage
 from src.ncaa_fb_managers import NCAAFBLiveManager, NCAAFBRecentManager, NCAAFBUpcomingManager
 from src.ncaa_baseball_managers import NCAABaseballLiveManager, NCAABaseballRecentManager, NCAABaseballUpcomingManager
 from src.ncaam_basketball_managers import NCAAMBasketballLiveManager, NCAAMBasketballRecentManager, NCAAMBasketballUpcomingManager
-from src.web_config_utils import apply_config_fragment, apply_secrets_update, merge_dict
+from src.spotify_auth_utils import invalidate_spotify_cache
+from src.web_config_utils import (
+    apply_config_fragment,
+    apply_secrets_update,
+    merge_dict,
+    spotify_credentials_changed,
+)
 from PIL import Image
 import io
 import signal
@@ -958,11 +964,11 @@ def save_config_route():
             
         elif config_type == 'secrets':
             # Handle secrets configuration
-            secrets_config = config_manager.get_raw_file_content('secrets')
+            existing_secrets = config_manager.get_raw_file_content('secrets')
 
             try:
                 secrets_config = apply_secrets_update(
-                    existing_secrets=secrets_config,
+                    existing_secrets=existing_secrets,
                     config_data_str=config_data_str,
                     form_data=request.form,
                 )
@@ -972,11 +978,18 @@ def save_config_route():
                     'message': 'Error: Invalid JSON format for secrets config.'
                 }), 400
 
+            spotify_changed = spotify_credentials_changed(existing_secrets, secrets_config)
             config_manager.save_raw_file_content('secrets', secrets_config)
+            cache_invalidated = invalidate_spotify_cache() if spotify_changed else False
+            message = 'Secrets configuration saved successfully!'
+            if spotify_changed:
+                message += ' Spotify credentials changed; authorization is required.'
             
             return jsonify({
                 'status': 'success',
-                'message': 'Secrets configuration saved successfully!'
+                'message': message,
+                'spotify_reauth_required': spotify_changed,
+                'spotify_cache_invalidated': cache_invalidated,
             })
         
     except json.JSONDecodeError:
@@ -1104,12 +1117,25 @@ def save_raw_json_route():
                 'message': f'Invalid JSON format: {str(e)}'
             }), 400
         
-        # Save the raw JSON
+        spotify_changed = False
+        cache_invalidated = False
+        if config_type == 'secrets':
+            existing_secrets = config_manager.get_raw_file_content('secrets')
+            spotify_changed = spotify_credentials_changed(existing_secrets, parsed_data)
+
         config_manager.save_raw_file_content(config_type, parsed_data)
+        if spotify_changed:
+            cache_invalidated = invalidate_spotify_cache()
+
+        message = f'{config_type.capitalize()} configuration saved successfully!'
+        if spotify_changed:
+            message += ' Spotify credentials changed; authorization is required.'
         
         return jsonify({
             'status': 'success',
-            'message': f'{config_type.capitalize()} configuration saved successfully!'
+            'message': message,
+            'spotify_reauth_required': spotify_changed,
+            'spotify_cache_invalidated': cache_invalidated,
         })
         
     except Exception as e:

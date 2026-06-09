@@ -3,29 +3,30 @@ from spotipy.oauth2 import SpotifyOAuth
 import logging
 import json
 import os
+import time
 
 try:
     from src.spotify_auth_utils import (
         ensure_spotify_cache_access,
         get_expected_runtime_user,
+        get_spotify_cache_path,
         log_spotify_cache_diagnostics,
     )
 except ImportError:
     from spotify_auth_utils import (  # type: ignore
         ensure_spotify_cache_access,
         get_expected_runtime_user,
+        get_spotify_cache_path,
         log_spotify_cache_diagnostics,
     )
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# Suppress spotipy.cache_handler warnings about not being able to write cache
-logging.getLogger('spotipy.cache_handler').setLevel(logging.ERROR)
+logger = logging.getLogger(__name__)
 
 # Define paths relative to this file's location
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), '..', 'config')
 SECRETS_PATH = os.path.join(CONFIG_DIR, 'config_secrets.json')
-SPOTIFY_AUTH_CACHE_PATH = os.path.join(CONFIG_DIR, 'spotify_auth.json') # Explicit cache path for token
+SPOTIFY_AUTH_CACHE_PATH = get_spotify_cache_path()
 
 # Resolve to absolute paths
 CONFIG_DIR = os.path.abspath(CONFIG_DIR)
@@ -33,18 +34,29 @@ SECRETS_PATH = os.path.abspath(SECRETS_PATH)
 SPOTIFY_AUTH_CACHE_PATH = os.path.abspath(SPOTIFY_AUTH_CACHE_PATH)
 
 class SpotifyClient:
+    STATE_READY = "ready"
+    STATE_RETRYABLE = "retryable"
+    STATE_REAUTH_REQUIRED = "reauth_required"
+
+    INITIAL_RETRY_DELAY_SECONDS = 2
+    MAX_RETRY_DELAY_SECONDS = 60
+
     def __init__(self):
         self.client_id = None
         self.client_secret = None
         self.redirect_uri = None
         self.scope = "user-read-currently-playing user-read-playback-state"
         self.sp = None
+        self.auth_manager = None
+        self.state = self.STATE_RETRYABLE
+        self.retry_attempts = 0
+        self.next_retry_at = 0.0
+        self.last_error = None
         self.load_credentials()
         if self.client_id and self.client_secret and self.redirect_uri:
-            # Attempt to authenticate once using the cache path
             self._authenticate()
         else:
-            logging.warning("Spotify credentials not loaded. Spotify client will not be functional.")
+            self._mark_reauth_required("Spotify credentials are missing.")
 
     def load_credentials(self):
         if not os.path.exists(SECRETS_PATH):
@@ -68,84 +80,184 @@ class SpotifyClient:
     def _authenticate(self):
         """Initializes Spotipy with SpotifyOAuth, relying on a cached token."""
         if not self.client_id or not self.client_secret or not self.redirect_uri:
-            logging.warning("Cannot authenticate Spotify: credentials missing.")
+            self._mark_reauth_required("Cannot authenticate Spotify: credentials are missing.")
             return
 
-        logging.info(
+        logger.info(
             "SpotifyClient using cache path: %s (expected runtime user: %s)",
             SPOTIFY_AUTH_CACHE_PATH,
             get_expected_runtime_user(),
         )
-        log_spotify_cache_diagnostics(SPOTIFY_AUTH_CACHE_PATH, logger=logging.getLogger(__name__))
+        diagnostics = log_spotify_cache_diagnostics(SPOTIFY_AUTH_CACHE_PATH, logger=logger)
 
         try:
-            # Use the explicit cache path. Spotipy will try to load/refresh token from here.
-            auth_manager = SpotifyOAuth(
+            self.auth_manager = SpotifyOAuth(
                 client_id=self.client_id,
                 client_secret=self.client_secret,
                 redirect_uri=self.redirect_uri,
                 scope=self.scope,
-                cache_path=SPOTIFY_AUTH_CACHE_PATH, # Use the defined cache path
+                cache_path=SPOTIFY_AUTH_CACHE_PATH,
                 open_browser=False
             )
 
-            token_info = self._get_valid_cached_token(auth_manager)
-            if not token_info or not token_info.get("access_token"):
-                raise RuntimeError(
-                    "No valid Spotify playback token found in cache. "
-                    "Re-run authenticate_spotify.py to create a fresh cache."
+            cached_token = self._get_cached_token()
+            if not cached_token or not cached_token.get("access_token"):
+                if diagnostics.get("exists") and not diagnostics.get("readable", False):
+                    self._mark_retryable("Spotify auth cache exists but is not readable.")
+                else:
+                    self._mark_reauth_required(
+                        "No valid Spotify playback token was found in the cache."
+                    )
+                return
+
+            self._get_access_token()
+            ensure_spotify_cache_access(SPOTIFY_AUTH_CACHE_PATH, logger=logger)
+            log_spotify_cache_diagnostics(SPOTIFY_AUTH_CACHE_PATH, logger=logger)
+            self.sp = spotipy.Spotify(auth_manager=self.auth_manager)
+            self._mark_ready()
+            logger.info("Spotify client initialized and authenticated using cached token.")
+        except Exception as exc:
+            self.sp = None
+            if self._is_reauth_error(exc):
+                self._mark_reauth_required(
+                    f"Spotify rejected the cached authorization: {exc}"
+                )
+            else:
+                self._mark_retryable(
+                    f"Spotify initialization failed and will be retried: {exc}"
                 )
 
-            ensure_spotify_cache_access(SPOTIFY_AUTH_CACHE_PATH, logger=logging.getLogger(__name__))
-            self.sp = spotipy.Spotify(auth_manager=auth_manager)
-            logging.info("Spotify client initialized and authenticated using cached token.")
-        except Exception as e:
-            logging.warning(f"Spotify client initialization/authentication failed: {e}. Run authenticate_spotify.py if needed.")
-            self.sp = None # Ensure sp is None if auth fails
+    def _get_cached_token(self):
+        if not self.auth_manager:
+            return None
 
-    def _get_valid_cached_token(self, auth_manager):
-        """Validate and refresh the cached token without requiring profile scopes."""
-        cached_token = None
-
-        cache_handler = getattr(auth_manager, "cache_handler", None)
+        cache_handler = getattr(self.auth_manager, "cache_handler", None)
         if cache_handler and hasattr(cache_handler, "get_cached_token"):
-            cached_token = cache_handler.get_cached_token()
-        elif hasattr(auth_manager, "get_cached_token"):
-            cached_token = auth_manager.get_cached_token()
+            return cache_handler.get_cached_token()
+        if hasattr(self.auth_manager, "get_cached_token"):
+            return self.auth_manager.get_cached_token()
+        return None
 
-        if hasattr(auth_manager, "validate_token"):
-            return auth_manager.validate_token(cached_token)
+    def _get_access_token(self):
+        try:
+            return self.auth_manager.get_access_token(as_dict=False)
+        except TypeError:
+            return self.auth_manager.get_access_token()
 
-        return cached_token
+    def _mark_ready(self):
+        self.state = self.STATE_READY
+        self.retry_attempts = 0
+        self.next_retry_at = 0.0
+        self.last_error = None
+
+    def _mark_retryable(self, message):
+        self.state = self.STATE_RETRYABLE
+        self.last_error = str(message)
+        self.retry_attempts = min(self.retry_attempts + 1, 6)
+        delay = min(
+            self.MAX_RETRY_DELAY_SECONDS,
+            self.INITIAL_RETRY_DELAY_SECONDS * (2 ** (self.retry_attempts - 1)),
+        )
+        self.next_retry_at = time.time() + delay
+        logger.warning("%s Retrying in %s seconds.", message, delay)
+
+    def _mark_reauth_required(self, message):
+        self.state = self.STATE_REAUTH_REQUIRED
+        self.last_error = str(message)
+        self.next_retry_at = 0.0
+        self.sp = None
+        logger.warning("%s Run src/authenticate_spotify.py to authorize Spotify again.", message)
+
+    @staticmethod
+    def _is_reauth_error(exc):
+        message = str(exc).lower()
+        return any(marker in message for marker in (
+            "invalid_grant",
+            "invalid_client",
+            "invalid client",
+            "refresh token revoked",
+            "refresh token is invalid",
+            "invalid refresh token",
+        ))
+
+    def get_state(self):
+        return self.state
 
     def is_authenticated(self):
         """Checks if the client is currently considered authenticated and usable."""
-        return self.sp is not None # Relies on _authenticate setting sp to None on failure
+        return self.state == self.STATE_READY and self.sp is not None
+
+    def should_retry(self):
+        return self.state == self.STATE_RETRYABLE
 
     # Removed get_auth_url method - this is now handled by authenticate_spotify.py
 
     def get_current_track(self):
         """Fetches the currently playing track from Spotify."""
-        if not self.is_authenticated(): # Check our internal state
-            # Do not attempt to re-authenticate here. User must run authenticate_spotify.py
-            # logging.debug("Spotify not authenticated. Cannot fetch track. Run authenticate_spotify.py if needed.")
+        if self.state == self.STATE_REAUTH_REQUIRED:
             return None
+
+        if self.state == self.STATE_RETRYABLE:
+            if time.time() < self.next_retry_at:
+                return None
+            if self.sp is None:
+                self._authenticate()
+                if not self.is_authenticated():
+                    return None
 
         try:
             track_info = self.sp.current_playback()
-            if track_info and track_info['item']:
-                 return track_info
-            else:
-                 return None 
-        except spotipy.exceptions.SpotifyException as e:
-            logging.error(f"Spotify API error when fetching current track: {e}")
-            # If it's an auth error (e.g. token revoked server-side), set sp to None so is_authenticated reflects it.
-            if e.http_status == 401 or e.http_status == 403: 
-                logging.warning("Spotify authentication error (token may be revoked or expired). Please re-run authenticate_spotify.py.")
-                self.sp = None # Mark as not authenticated
+            self._mark_ready()
+            if track_info and track_info.get("item"):
+                return track_info
             return None
-        except Exception as e: # Catch other potential errors (network, etc.)
-            logging.error(f"Unexpected error fetching current track from Spotify: {e}")
+        except spotipy.exceptions.SpotifyException as exc:
+            logger.error("Spotify API error when fetching current track: %s", exc)
+            if getattr(exc, "http_status", None) == 401:
+                return self._refresh_and_retry_current_track()
+            if self._is_reauth_error(exc):
+                self._mark_reauth_required(f"Spotify authorization was rejected: {exc}")
+            else:
+                self._mark_retryable(f"Spotify API request failed: {exc}")
+            return None
+        except Exception as exc:
+            if self._is_reauth_error(exc):
+                self._mark_reauth_required(f"Spotify authorization was rejected: {exc}")
+            else:
+                self._mark_retryable(f"Unexpected Spotify request failure: {exc}")
+            return None
+
+    def _refresh_and_retry_current_track(self):
+        token_info = self._get_cached_token()
+        refresh_token = token_info.get("refresh_token") if token_info else None
+        if not refresh_token:
+            self._mark_reauth_required(
+                "Spotify returned 401 and no refresh token is available."
+            )
+            return None
+
+        try:
+            self.auth_manager.refresh_access_token(refresh_token)
+            ensure_spotify_cache_access(SPOTIFY_AUTH_CACHE_PATH, logger=logger)
+            log_spotify_cache_diagnostics(SPOTIFY_AUTH_CACHE_PATH, logger=logger)
+            track_info = self.sp.current_playback()
+            self._mark_ready()
+            if track_info and track_info.get("item"):
+                return track_info
+            return None
+        except spotipy.exceptions.SpotifyException as exc:
+            if getattr(exc, "http_status", None) == 401 or self._is_reauth_error(exc):
+                self._mark_reauth_required(
+                    f"Spotify refresh was rejected: {exc}"
+                )
+            else:
+                self._mark_retryable(f"Spotify refresh retry failed: {exc}")
+            return None
+        except Exception as exc:
+            if self._is_reauth_error(exc):
+                self._mark_reauth_required(f"Spotify refresh was rejected: {exc}")
+            else:
+                self._mark_retryable(f"Spotify refresh failed: {exc}")
             return None
 
 # Example Usage (for testing, adapt to new auth flow)

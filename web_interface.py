@@ -4,6 +4,8 @@ import os
 import subprocess
 from pathlib import Path
 from src.config_manager import ConfigManager
+from src.spotify_auth_utils import invalidate_spotify_cache
+from src.web_config_utils import apply_secrets_update, spotify_credentials_changed
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -199,40 +201,31 @@ def save_config_route():
             })
             
         elif config_type == 'secrets':
-            # Handle secrets configuration
-            secrets_config = config_manager.get_raw_file_content('secrets')
-            
-            # Update weather API key
-            if 'weather_api_key' in request.form:
-                secrets_config['weather']['api_key'] = request.form.get('weather_api_key', '')
-            
-            # Update YouTube API settings
-            if 'youtube_api_key' in request.form:
-                secrets_config['youtube']['api_key'] = request.form.get('youtube_api_key', '')
-                secrets_config['youtube']['channel_id'] = request.form.get('youtube_channel_id', '')
-            
-            # Update Spotify API settings
-            if 'spotify_client_id' in request.form:
-                secrets_config['music']['SPOTIFY_CLIENT_ID'] = request.form.get('spotify_client_id', '')
-                secrets_config['music']['SPOTIFY_CLIENT_SECRET'] = request.form.get('spotify_client_secret', '')
-                secrets_config['music']['SPOTIFY_REDIRECT_URI'] = request.form.get('spotify_redirect_uri', 'http://127.0.0.1:8888/callback')
-            
-            # If config_data is provided as JSON, use it
-            if config_data_str:
-                try:
-                    new_data = json.loads(config_data_str)
-                    config_manager.save_raw_file_content('secrets', new_data)
-                except json.JSONDecodeError:
-                    return jsonify({
-                        'status': 'error',
-                        'message': 'Error: Invalid JSON format for secrets config.'
-                    }), 400
-            else:
-                config_manager.save_raw_file_content('secrets', secrets_config)
+            existing_secrets = config_manager.get_raw_file_content('secrets')
+            try:
+                secrets_config = apply_secrets_update(
+                    existing_secrets=existing_secrets,
+                    config_data_str=config_data_str,
+                    form_data=request.form,
+                )
+            except json.JSONDecodeError:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Error: Invalid JSON format for secrets config.'
+                }), 400
+
+            spotify_changed = spotify_credentials_changed(existing_secrets, secrets_config)
+            config_manager.save_raw_file_content('secrets', secrets_config)
+            cache_invalidated = invalidate_spotify_cache() if spotify_changed else False
+            message = 'Secrets configuration saved successfully!'
+            if spotify_changed:
+                message += ' Spotify credentials changed; authorization is required.'
             
             return jsonify({
                 'status': 'success',
-                'message': 'Secrets configuration saved successfully!'
+                'message': message,
+                'spotify_reauth_required': spotify_changed,
+                'spotify_cache_invalidated': cache_invalidated,
             })
         
     except json.JSONDecodeError:
@@ -337,12 +330,25 @@ def save_raw_json_route():
                 'message': f'Invalid JSON format: {str(e)}'
             }), 400
         
-        # Save the raw JSON
+        spotify_changed = False
+        cache_invalidated = False
+        if config_type == 'secrets':
+            existing_secrets = config_manager.get_raw_file_content('secrets')
+            spotify_changed = spotify_credentials_changed(existing_secrets, parsed_data)
+
         config_manager.save_raw_file_content(config_type, parsed_data)
+        if spotify_changed:
+            cache_invalidated = invalidate_spotify_cache()
+
+        message = f'{config_type.capitalize()} configuration saved successfully!'
+        if spotify_changed:
+            message += ' Spotify credentials changed; authorization is required.'
         
         return jsonify({
             'status': 'success',
-            'message': f'{config_type.capitalize()} configuration saved successfully!'
+            'message': message,
+            'spotify_reauth_required': spotify_changed,
+            'spotify_cache_invalidated': cache_invalidated,
         })
         
     except Exception as e:
@@ -506,4 +512,4 @@ def toggle_news_manager():
         }), 400
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True) 
+    app.run(host='0.0.0.0', port=5000, debug=True)

@@ -1,6 +1,7 @@
 [Unit]
 Description=LED Matrix Display Service
-After=network.target
+Wants=network-online.target
+After=network-online.target
 
 [Service]
 Type=simple
@@ -14,4 +15,4 @@ StandardError=syslog
 SyslogIdentifier=ledmatrix
 
 [Install]
-WantedBy=multi-user.target 
+WantedBy=multi-user.target

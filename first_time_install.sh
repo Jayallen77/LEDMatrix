@@ -492,6 +492,22 @@ chmod 755 "$PROJECT_ROOT_DIR/start_display.sh" "$PROJECT_ROOT_DIR/stop_display.s
 chmod 755 "$PROJECT_ROOT_DIR/fix_cache_permissions.sh" "$PROJECT_ROOT_DIR/fix_web_permissions.sh" 2>/dev/null || true
 chmod 755 "$PROJECT_ROOT_DIR/install_service.sh" "$PROJECT_ROOT_DIR/install_web_service.sh" 2>/dev/null || true
 
+# Spotipy rewrites this file during token refresh, so it must remain owned by
+# the account used after the RGB matrix library drops privileges.
+SPOTIFY_AUTH_CACHE="$PROJECT_ROOT_DIR/config/spotify_auth.json"
+SPOTIFY_RUNTIME_USER="${LEDMATRIX_SPOTIFY_RUNTIME_USER:-daemon}"
+if [ -f "$SPOTIFY_AUTH_CACHE" ]; then
+    if id "$SPOTIFY_RUNTIME_USER" >/dev/null 2>&1; then
+        SPOTIFY_RUNTIME_GROUP="$(id -gn "$SPOTIFY_RUNTIME_USER")"
+        chown "$SPOTIFY_RUNTIME_USER:$SPOTIFY_RUNTIME_GROUP" "$SPOTIFY_AUTH_CACHE"
+        chmod 600 "$SPOTIFY_AUTH_CACHE"
+        echo "✓ Spotify auth cache assigned to $SPOTIFY_RUNTIME_USER with mode 600"
+    else
+        echo "⚠ Spotify runtime user '$SPOTIFY_RUNTIME_USER' does not exist; cache ownership was not changed"
+        chmod 600 "$SPOTIFY_AUTH_CACHE"
+    fi
+fi
+
 echo "✓ Project file permissions normalized"
 echo ""
 
