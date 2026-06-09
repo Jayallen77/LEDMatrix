@@ -1,0 +1,190 @@
+import sys
+import types
+import unittest
+from pathlib import Path
+from unittest.mock import Mock, patch
+
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+
+class FakeImage:
+    def __init__(self, size):
+        self.size = size
+        self.width, self.height = size
+
+
+class FakeDraw:
+    def __init__(self, image):
+        self.image = image
+        self.operations = []
+
+    def text(self, position, text, **kwargs):
+        self.operations.append(("text", position, text, kwargs))
+
+    def line(self, points, **kwargs):
+        self.operations.append(("line", points, kwargs))
+
+
+def install_dependency_stubs():
+    if "PIL" not in sys.modules:
+        pil = types.ModuleType("PIL")
+        image_module = types.ModuleType("PIL.Image")
+        image_module.Image = FakeImage
+        image_module.new = lambda mode, size, color=None: FakeImage(size)
+        draw_module = types.ModuleType("PIL.ImageDraw")
+        draw_module.Draw = FakeDraw
+        pil.Image = image_module
+        pil.ImageDraw = draw_module
+        sys.modules["PIL"] = pil
+        sys.modules["PIL.Image"] = image_module
+        sys.modules["PIL.ImageDraw"] = draw_module
+
+    if "requests" not in sys.modules:
+        requests = types.ModuleType("requests")
+        requests.Session = Mock
+        requests.RequestException = Exception
+        requests.exceptions = types.SimpleNamespace(RequestException=Exception)
+        adapters = types.ModuleType("requests.adapters")
+        adapters.HTTPAdapter = Mock
+        requests.adapters = adapters
+        sys.modules["requests"] = requests
+        sys.modules["requests.adapters"] = adapters
+
+    if "urllib3.util.retry" not in sys.modules:
+        urllib3 = types.ModuleType("urllib3")
+        util = types.ModuleType("urllib3.util")
+        retry = types.ModuleType("urllib3.util.retry")
+        retry.Retry = Mock
+        sys.modules["urllib3"] = urllib3
+        sys.modules["urllib3.util"] = util
+        sys.modules["urllib3.util.retry"] = retry
+
+    if "src.cache_manager" not in sys.modules:
+        cache_module = types.ModuleType("src.cache_manager")
+        cache_module.CacheManager = Mock
+        sys.modules["src.cache_manager"] = cache_module
+
+
+install_dependency_stubs()
+from src import stock_manager
+
+
+class MemoryCache:
+    def __init__(self, initial=None):
+        self.records = initial or {}
+
+    def load_cache(self, key):
+        return self.records.get(key)
+
+    def set(self, key, data):
+        self.records[key] = {"data": data, "timestamp": 100}
+
+
+class FakeDisplay:
+    width = 64
+    height = 64
+    extra_small_font = object()
+    small_font = object()
+
+    def __init__(self):
+        self.image = None
+        self.draw = None
+        self.updated = 0
+        self.cleared = 0
+
+    @staticmethod
+    def get_text_width(text, font):
+        del font
+        return len(text) * 4
+
+    def clear(self):
+        self.cleared += 1
+
+    def update_display(self):
+        self.updated += 1
+
+
+class MarketPulseTests(unittest.TestCase):
+    def make_manager(self, cache=None, include_btc=True):
+        config = {
+            "stocks": {"enabled": True, "update_interval": 600},
+            "crypto": {"enabled": include_btc},
+            "display": {"display_durations": {"stocks": 30}},
+        }
+        with (
+            patch.object(stock_manager, "CacheManager", return_value=cache or MemoryCache()),
+            patch.object(
+                stock_manager.StockManager,
+                "update_stock_data",
+                return_value=False,
+            ),
+        ):
+            return stock_manager.StockManager(config, FakeDisplay())
+
+    def test_formats_market_rows_and_renders_64_square(self):
+        manager = self.make_manager()
+        manager.market_data = {
+            "sp500": {"price": 6000, "change_percent": 0.6},
+            "nasdaq": {"price": 19000, "change_percent": 1.1},
+            "dow": {"price": 42000, "change_percent": -0.2},
+            "btc": {"price": 104200, "change_percent": 2.0},
+            "vix": {"price": 18.4, "change_percent": 3.0},
+        }
+
+        image = manager._render_market_pulse()
+
+        self.assertEqual(image.size, (64, 64))
+        self.assertEqual(manager._format_row("sp500", "S&P")[0], "S&P +0.6%")
+        self.assertEqual(manager._format_row("btc", "BTC")[0], "BTC $104K")
+        self.assertEqual(
+            manager._format_row("vix", "VIX")[1],
+            (255, 40, 40),
+        )
+
+    def test_partial_refresh_merges_cached_rows(self):
+        manager = self.make_manager()
+        manager.market_data = {
+            "dow": {"price": 40000, "change_percent": -0.1},
+        }
+        manager.last_update = 0
+        manager._fetch_instrument = Mock(
+            side_effect=[
+                ({"price": 6100, "change_percent": 0.5}, None),
+                (None, 429),
+            ]
+        )
+
+        self.assertTrue(manager.update_stock_data())
+        self.assertIn("sp500", manager.market_data)
+        self.assertIn("dow", manager.market_data)
+        self.assertTrue(manager.is_stale)
+
+    def test_rate_limit_keeps_cached_data_and_sets_bounded_retry(self):
+        manager = self.make_manager()
+        manager.market_data = {
+            "sp500": {"price": 6000, "change_percent": 0.1},
+        }
+        manager.last_update = 0
+        manager._fetch_instrument = Mock(return_value=(None, 429))
+
+        with patch.object(stock_manager.time, "time", return_value=100.0):
+            self.assertFalse(manager.update_stock_data())
+
+        self.assertEqual(manager.market_data["sp500"]["price"], 6000)
+        self.assertEqual(manager.next_retry_at, 130.0)
+        self.assertTrue(manager.is_stale)
+
+    def test_no_data_renders_unavailable_rows_instead_of_blank_frame(self):
+        manager = self.make_manager()
+        manager.market_data = {}
+
+        self.assertTrue(manager.display_stocks(force_clear=True))
+        self.assertEqual(manager.display_manager.image.size, (64, 64))
+        self.assertEqual(manager.display_manager.updated, 1)
+
+
+if __name__ == "__main__":
+    unittest.main()

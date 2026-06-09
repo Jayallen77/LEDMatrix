@@ -810,7 +810,7 @@
                         <i class="fas fa-cloud-sun"></i> Weather
                     </button>
                     <button class="tab-btn" onclick="showTab('stocks')">
-                        <i class="fas fa-chart-line"></i> Stocks
+                        <i class="fas fa-chart-line"></i> Market Pulse
                     </button>
                     <button class="tab-btn" onclick="showTab('stocknews')">
                         <i class="fas fa-newspaper"></i> Stock News
@@ -1133,16 +1133,27 @@
                 <!-- Sports Tab -->
                 <div id="sports" class="tab-content">
                     <div class="config-section">
-                        <h3>Sports Configuration</h3>
-                        <p>Configure which sports leagues to display and their settings.</p>
-                        <!-- Sports configuration will be populated by JavaScript -->
-                        <div id="sports-config">
-                            Loading sports configuration...
+                        <div style="display:flex; justify-content: space-between; align-items:center;">
+                            <h3>Colorado Live Sports</h3>
+                            <button type="button" class="btn btn-info" onclick="startOnDemand('sports_live')"><i class="fas fa-bolt"></i> On-Demand</button>
                         </div>
-                <div style="margin-top:10px; display:flex; gap:10px;">
-                    <button type="button" class="btn btn-primary" onclick="refreshSportsConfig()">Refresh</button>
-                    <button type="button" class="btn btn-success" onclick="saveSportsConfig()">Save Sports Settings</button>
-                </div>
+                        <p>Shows Avalanche, Nuggets, Broncos, Rockies, and Rapids only while a game is live.</p>
+                        <form id="colorado-sports-form">
+                            <div class="form-group">
+                                <label><input type="checkbox" id="colorado_sports_enabled" {% if main_config.colorado_sports.enabled %}checked{% endif %}> Enable Colorado live scores</label>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="colorado_sports_polling_interval">Polling Interval (seconds)</label>
+                                    <input type="number" class="form-control" id="colorado_sports_polling_interval" value="{{ main_config.colorado_sports.polling_interval }}" min="15" max="300">
+                                </div>
+                                <div class="form-group">
+                                    <label for="colorado_sports_stale_timeout">Network Fallback (seconds)</label>
+                                    <input type="number" class="form-control" id="colorado_sports_stale_timeout" value="{{ main_config.colorado_sports.stale_timeout }}" min="30" max="600">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-success">Save Colorado Sports</button>
+                        </form>
                     </div>
                 </div>
 
@@ -1201,95 +1212,30 @@
                 <div id="stocks" class="tab-content">
                     <div class="config-section">
                         <div style="display:flex; justify-content: space-between; align-items:center;">
-                            <h3>Stocks & Crypto Configuration</h3>
+                            <h3>Market Pulse Configuration</h3>
                             <div style="display:flex; gap:8px;">
-                                <button type="button" class="btn btn-info" onclick="startOnDemand('stocks')"><i class="fas fa-bolt"></i> On-Demand Stocks</button>
+                                <button type="button" class="btn btn-info" onclick="startOnDemand('stocks')"><i class="fas fa-bolt"></i> On-Demand Market Pulse</button>
                             </div>
                         </div>
                         <form id="stocks-form">
                             <div class="form-group">
                                 <label>
                                     <input type="checkbox" id="stocks_enabled" name="stocks_enabled" {% if main_config.stocks.enabled %}checked{% endif %}>
-                                    Enable Stocks
+                                    Enable Market Pulse
                                 </label>
                             </div>
                             <div class="form-group">
-                                <label for="stocks_symbols">Stock Symbols:</label>
-                                <input type="text" class="form-control" id="stocks_symbols" name="stocks_symbols" value="{{ main_config.stocks.symbols|join(', ') }}" placeholder="AAPL, GOOGL, MSFT">
-                                <div class="description">Comma-separated stock symbols</div>
-                            </div>
-                            <div class="form-group">
-                                <label for="stocks_update_interval">Update Interval (seconds):</label>
+                                <label for="stocks_update_interval">Market Update Interval (seconds):</label>
                                 <input type="number" class="form-control" id="stocks_update_interval" name="stocks_update_interval" value="{{ main_config.stocks.update_interval }}" min="60" max="3600">
-                                <div class="description">How often to update stock data</div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="stocks_scroll_speed">Scroll Speed</label>
-                                    <input type="number" step="0.1" class="form-control" id="stocks_scroll_speed" value="{{ main_config.stocks.scroll_speed }}">
-                                    <div class="description">Horizontal scroll pixels per step.</div>
-                                </div>
-                                <div class="form-group">
-                                    <label for="stocks_scroll_delay">Scroll Delay (seconds)</label>
-                                    <input type="number" step="0.001" class="form-control" id="stocks_scroll_delay" value="{{ main_config.stocks.scroll_delay }}">
-                                    <div class="description">Delay between scroll steps.</div>
-                                </div>
+                                <div class="description">S&amp;P 500, Nasdaq, Dow, BTC, and VIX use cached data when the network is unavailable.</div>
                             </div>
                             <div class="form-group">
                                 <label>
-                                    <input type="checkbox" id="stocks_toggle_chart" name="stocks_toggle_chart" {% if main_config.stocks.toggle_chart %}checked{% endif %}>
-                                    Show Charts
-                                </label>
-                                <div class="description">Display mini charts alongside stock ticker data</div>
-                            </div>
-                            <div class="form-group">
-                                <label>
-                                    <input type="checkbox" id="stocks_dynamic_duration" {% if main_config.stocks.dynamic_duration %}checked{% endif %}>
-                                    Dynamic Duration
-                                </label>
-                                <div class="description">Adjust display duration based on content length.</div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="stocks_min_duration">Min Duration (sec)</label>
-                                    <input type="number" class="form-control" id="stocks_min_duration" value="{{ main_config.stocks.min_duration }}">
-                                </div>
-                                <div class="form-group">
-                                    <label for="stocks_max_duration">Max Duration (sec)</label>
-                                    <input type="number" class="form-control" id="stocks_max_duration" value="{{ main_config.stocks.max_duration }}">
-                                </div>
-                                <div class="form-group">
-                                    <label for="stocks_duration_buffer">Duration Buffer</label>
-                                    <input type="number" step="0.01" class="form-control" id="stocks_duration_buffer" value="{{ main_config.stocks.duration_buffer }}">
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="stocks_display_format">Display Format</label>
-                                <input type="text" class="form-control" id="stocks_display_format" value="{{ main_config.stocks.display_format }}">
-                                <div class="description">Use tokens like {symbol}, {price}, {change}.</div>
-                            </div>
-                            <button type="submit" class="btn btn-success">Save Stocks Settings</button>
-                        </form>
-
-                        <h3>Cryptocurrency</h3>
-                        <form id="crypto-form">
-                            <div class="form-group">
-                                <label>
-                                    <input type="checkbox" id="crypto_enabled" name="crypto_enabled" {% if main_config.crypto.enabled %}checked{% endif %}>
-                                    Enable Crypto
+                                    <input type="checkbox" id="crypto_enabled" {% if main_config.crypto.enabled %}checked{% endif %}>
+                                    Include Bitcoin
                                 </label>
                             </div>
-                            <div class="form-group">
-                                <label for="crypto_symbols">Crypto Symbols:</label>
-                                <input type="text" class="form-control" id="crypto_symbols" name="crypto_symbols" value="{{ main_config.crypto.symbols|join(', ') }}" placeholder="BTC-USD, ETH-USD">
-                                <div class="description">Comma-separated crypto symbols (e.g., BTC-USD, ETH-USD)</div>
-                            </div>
-                            <div class="form-group">
-                                <label for="crypto_update_interval">Update Interval (seconds):</label>
-                                <input type="number" class="form-control" id="crypto_update_interval" name="crypto_update_interval" value="{{ main_config.crypto.update_interval }}" min="60" max="3600">
-                                <div class="description">How often to update crypto data</div>
-                            </div>
-                            <button type="submit" class="btn btn-success">Save Crypto Settings</button>
+                            <button type="submit" class="btn btn-success">Save Market Pulse</button>
                         </form>
                     </div>
                 </div>
@@ -1516,20 +1462,11 @@
                                 </label>
                             </div>
                             <div class="form-group">
-                                <label for="calendar_max_events">Max Events to Show:</label>
-                                <input type="number" class="form-control" id="calendar_max_events" name="calendar_max_events" value="{{ main_config.calendar.max_events }}" min="1" max="10">
-                                <div class="description">Maximum number of events to display</div>
-                            </div>
-                            <div class="form-group">
                                 <label for="calendar_update_interval">Update Interval (seconds):</label>
                                 <input type="number" class="form-control" id="calendar_update_interval" name="calendar_update_interval" value="{{ main_config.calendar.update_interval }}" min="300" max="3600">
                                 <div class="description">How often to update calendar data</div>
                             </div>
-                            <div class="form-group">
-                                <label for="calendar_calendars">Calendars:</label>
-                                <input type="text" class="form-control" id="calendar_calendars" name="calendar_calendars" value="{{ main_config.calendar.calendars|join(', ') }}" placeholder="birthdays, work">
-                                <div class="description">Comma-separated calendar names</div>
-                            </div>
+                            <p class="description">Shows only the next upcoming event. Local Google credential and token files are never displayed here.</p>
                             <button type="submit" class="btn btn-success">Save Calendar Settings</button>
                         </form>
                     </div>
@@ -1544,7 +1481,7 @@
                                 <button type="button" class="btn btn-info" onclick="startOnDemand('news_manager')"><i class="fas fa-bolt"></i> On-Demand</button>
                             </div>
                         </div>
-                        <p>Configure RSS news feeds and scrolling ticker settings</p>
+                        <p>Configure compact 64×64 headline cards. One wrapped headline is shown at a time.</p>
                         
                         <div class="form-group">
                             <label>
@@ -1598,19 +1535,6 @@
                         <h4 style="margin-top:20px;">Advanced Settings</h4>
                         <div class="form-row">
                             <div class="form-group"><label for="news_update_interval">Update Interval (sec)</label><input type="number" id="news_update_interval" class="form-control" value="{{ main_config.news_manager.update_interval }}"></div>
-                            <div class="form-group"><label for="news_scroll_speed">Scroll Speed</label><input type="number" step="0.1" id="news_scroll_speed" class="form-control" value="{{ main_config.news_manager.scroll_speed }}"></div>
-                            <div class="form-group"><label for="news_scroll_delay">Scroll Delay (sec)</label><input type="number" step="0.001" id="news_scroll_delay" class="form-control" value="{{ main_config.news_manager.scroll_delay }}"></div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group"><label for="news_rotation_threshold">Rotation Threshold</label><input type="number" id="news_rotation_threshold" class="form-control" value="{{ main_config.news_manager.rotation_threshold }}"></div>
-                            <div class="form-group"><label><input type="checkbox" id="news_dynamic_duration" {% if main_config.news_manager.dynamic_duration %}checked{% endif %}> Dynamic Duration</label></div>
-                            <div class="form-group"><label for="news_min_duration">Min Duration</label><input type="number" id="news_min_duration" class="form-control" value="{{ main_config.news_manager.min_duration }}"></div>
-                            <div class="form-group"><label for="news_max_duration">Max Duration</label><input type="number" id="news_max_duration" class="form-control" value="{{ main_config.news_manager.max_duration }}"></div>
-                            <div class="form-group"><label for="news_duration_buffer">Duration Buffer</label><input type="number" step="0.01" id="news_duration_buffer" class="form-control" value="{{ main_config.news_manager.duration_buffer }}"></div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group"><label for="news_font_size">Font Size</label><input type="number" id="news_font_size" class="form-control" value="{{ main_config.news_manager.font_size }}"></div>
-                            <div class="form-group"><label for="news_font_path">Font Path</label><input type="text" id="news_font_path" class="form-control" value="{{ main_config.news_manager.font_path }}"></div>
                         </div>
                         <div class="form-row">
                             <div class="form-group"><label for="news_text_color">Text Color</label><input type="color" id="news_text_color" class="form-control" data-rgb='{{ main_config.news_manager.text_color | tojson }}'></div>
@@ -2198,8 +2122,6 @@
             // Load specific data when tabs are opened
             if (tabName === 'news') {
                 loadNewsManagerData();
-            } else if (tabName === 'sports') {
-                refreshSportsConfig();
             } else if (tabName === 'logs') {
                 fetchLogs();
             } else if (tabName === 'raw-json') {
@@ -2600,40 +2522,48 @@
             const form = document.getElementById('stocks-form');
             form.addEventListener('submit', async function(e){
                 e.preventDefault();
-                const symbols = document.getElementById('stocks_symbols').value.split(',').map(s => s.trim()).filter(Boolean);
                 const payload = {
                     stocks: {
                         enabled: document.getElementById('stocks_enabled').checked,
-                        update_interval: parseInt(document.getElementById('stocks_update_interval').value),
-                        scroll_speed: parseFloat(document.getElementById('stocks_scroll_speed').value),
-                        scroll_delay: parseFloat(document.getElementById('stocks_scroll_delay').value),
-                        toggle_chart: document.getElementById('stocks_toggle_chart').checked,
-                        dynamic_duration: document.getElementById('stocks_dynamic_duration').checked,
-                        min_duration: parseInt(document.getElementById('stocks_min_duration').value),
-                        max_duration: parseInt(document.getElementById('stocks_max_duration').value),
-                        duration_buffer: parseFloat(document.getElementById('stocks_duration_buffer').value),
-                        symbols: symbols,
-                        display_format: document.getElementById('stocks_display_format').value
+                        update_interval: parseInt(document.getElementById('stocks_update_interval').value)
+                    },
+                    crypto: {
+                        enabled: document.getElementById('crypto_enabled').checked
                     }
                 };
                 await saveConfigJson(payload);
             });
         })();
 
-        // Crypto form submit
-        (function augmentCryptoForm(){
-            const form = document.getElementById('crypto-form');
+        // Calendar form submit
+        (function augmentCalendarForm(){
+            const form = document.getElementById('calendar-form');
+            if (!form) return;
             form.addEventListener('submit', async function(e){
                 e.preventDefault();
-                const symbols = document.getElementById('crypto_symbols').value.split(',').map(s => s.trim()).filter(Boolean);
                 const payload = {
-                    crypto: {
-                        enabled: document.getElementById('crypto_enabled').checked,
-                        update_interval: parseInt(document.getElementById('crypto_update_interval').value),
-                        symbols: symbols
+                    calendar: {
+                        enabled: document.getElementById('calendar_enabled').checked,
+                        update_interval: parseInt(document.getElementById('calendar_update_interval').value)
                     }
                 };
                 await saveConfigJson(payload);
+            });
+        })();
+
+        // Colorado sports form submit
+        (function augmentColoradoSportsForm(){
+            const form = document.getElementById('colorado-sports-form');
+            if (!form) return;
+            form.addEventListener('submit', async function(e){
+                e.preventDefault();
+                await saveConfigJson({
+                    colorado_sports: {
+                        enabled: document.getElementById('colorado_sports_enabled').checked,
+                        polling_interval: parseInt(document.getElementById('colorado_sports_polling_interval').value),
+                        stale_timeout: parseInt(document.getElementById('colorado_sports_stale_timeout').value)
+                    }
+                });
             });
         })();
 
@@ -2781,15 +2711,6 @@
             const payload = {
                 news_manager: {
                     update_interval: parseInt(document.getElementById('news_update_interval').value),
-                    scroll_speed: parseFloat(document.getElementById('news_scroll_speed').value),
-                    scroll_delay: parseFloat(document.getElementById('news_scroll_delay').value),
-                    rotation_threshold: parseInt(document.getElementById('news_rotation_threshold').value),
-                    dynamic_duration: document.getElementById('news_dynamic_duration').checked,
-                    min_duration: parseInt(document.getElementById('news_min_duration').value),
-                    max_duration: parseInt(document.getElementById('news_max_duration').value),
-                    duration_buffer: parseFloat(document.getElementById('news_duration_buffer').value),
-                    font_size: parseInt(document.getElementById('news_font_size').value),
-                    font_path: document.getElementById('news_font_path').value,
                     text_color: hexToRgbArray(document.getElementById('news_text_color').value),
                     separator_color: hexToRgbArray(document.getElementById('news_separator_color').value)
                 }
@@ -3160,148 +3081,6 @@
             showNotification('News status refreshed', 'success');
         }
 
-        // Sports configuration
-        async function refreshSportsConfig(){
-            try {
-                const res = await fetch('/api/system/status');
-                const stats = await res.json();
-                // Build a minimal sports UI off current config
-                const cfg = currentConfig;
-                const leaguePrefixes = {
-                    'nfl_scoreboard': 'nfl',
-                    'mlb': 'mlb',
-                    'milb': 'milb',
-                    'nhl_scoreboard': 'nhl',
-                    'nba_scoreboard': 'nba',
-                    'ncaa_fb_scoreboard': 'ncaa_fb',
-                    'ncaa_baseball_scoreboard': 'ncaa_baseball',
-                    'ncaam_basketball_scoreboard': 'ncaam_basketball',
-                    'soccer_scoreboard': 'soccer'
-                };
-                const leagues = [
-                    { key: 'nfl_scoreboard', label: 'NFL' },
-                    { key: 'mlb', label: 'MLB' },
-                    { key: 'milb', label: 'MiLB' },
-                    { key: 'nhl_scoreboard', label: 'NHL' },
-                    { key: 'nba_scoreboard', label: 'NBA' },
-                    { key: 'ncaa_fb_scoreboard', label: 'NCAA FB' },
-                    { key: 'ncaa_baseball_scoreboard', label: 'NCAA Baseball' },
-                    { key: 'ncaam_basketball_scoreboard', label: 'NCAAM Basketball' },
-                    { key: 'soccer_scoreboard', label: 'Soccer' }
-                ];
-                const container = document.getElementById('sports-config');
-                const html = leagues.map(l => {
-                    const sec = cfg[l.key] || {};
-                    const p = leaguePrefixes[l.key] || l.key;
-                    const fav = (sec.favorite_teams || []).join(', ');
-                    const recentToShow = sec.recent_games_to_show ?? 1;
-                    const upcomingToShow = sec.upcoming_games_to_show ?? 1;
-                    const liveUpd = sec.live_update_interval ?? 30;
-                    const recentUpd = sec.recent_update_interval ?? 3600;
-                    const upcomingUpd = sec.upcoming_update_interval ?? 3600;
-                    return `
-                        <div style="border:1px solid #ddd; border-radius:6px; padding:12px; margin:10px 0;">
-                            <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom:8px;">
-                                <label style="display:flex; align-items:center; gap:8px; margin:0;">
-                                    <input type="checkbox" data-league="${l.key}" class="sp-enabled" ${sec.enabled ? 'checked' : ''}>
-                                    <strong>${l.label}</strong>
-                                </label>
-                                <div style="display:flex; gap:6px;">
-                                    <button type="button" class="btn btn-info" onclick="startOnDemand('${p}_live')"><i class="fas fa-bolt"></i> Live</button>
-                                    <button type="button" class="btn btn-info" onclick="startOnDemand('${p}_recent')"><i class="fas fa-bolt"></i> Recent</button>
-                                    <button type="button" class="btn btn-info" onclick="startOnDemand('${p}_upcoming')"><i class="fas fa-bolt"></i> Upcoming</button>
-                                    <button type="button" class="btn btn-secondary" onclick="stopOnDemand()"><i class="fas fa-ban"></i> Stop</button>
-                                </div>
-                            </div>
-                            <div class="form-row" style="margin-top:10px;">
-                                <div class="form-group">
-                                    <label>Live Priority</label>
-                                    <input type="checkbox" data-league="${l.key}" class="sp-live-priority" ${sec.live_priority ? 'checked' : ''}>
-                                </div>
-                                <div class="form-group">
-                                    <label>Show Odds</label>
-                                    <input type="checkbox" data-league="${l.key}" class="sp-show-odds" ${sec.show_odds ? 'checked' : ''}>
-                                </div>
-                                <div class="form-group">
-                                    <label>Favorites Only</label>
-                                    <input type="checkbox" data-league="${l.key}" class="sp-favorites-only" ${sec.show_favorite_teams_only ? 'checked' : ''}>
-                                </div>
-                                <div class="form-group">
-                                    <label>Favorite Teams</label>
-                                    <input type="text" data-league="${l.key}" class="form-control sp-favorites" value="${fav}">
-                                    <div class="description">Comma-separated abbreviations</div>
-                                </div>
-                            </div>
-                            <div class="form-row" style="margin-top:10px;">
-                                <div class="form-group">
-                                    <label>Live Update Interval (sec)</label>
-                                    <input type="number" min="10" class="form-control sp-live-update" data-league="${l.key}" value="${liveUpd}">
-                                </div>
-                                <div class="form-group">
-                                    <label>Recent Update Interval (sec)</label>
-                                    <input type="number" min="60" class="form-control sp-recent-update" data-league="${l.key}" value="${recentUpd}">
-                                </div>
-                                <div class="form-group">
-                                    <label>Upcoming Update Interval (sec)</label>
-                                    <input type="number" min="60" class="form-control sp-upcoming-update" data-league="${l.key}" value="${upcomingUpd}">
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>Recent Games to Show</label>
-                                    <input type="number" min="0" class="form-control sp-recent-count" data-league="${l.key}" value="${recentToShow}">
-                                </div>
-                                <div class="form-group">
-                                    <label>Upcoming Games to Show</label>
-                                    <input type="number" min="0" class="form-control sp-upcoming-count" data-league="${l.key}" value="${upcomingToShow}">
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-                container.innerHTML = html || 'No sports configuration found.';
-            } catch (err) {
-                document.getElementById('sports-config').textContent = 'Failed to load sports configuration';
-            }
-        }
-
-        async function saveSportsConfig(){
-            try {
-                const leagues = document.querySelectorAll('.sp-enabled');
-                const fragment = {};
-                leagues.forEach(chk => {
-                    const key = chk.getAttribute('data-league');
-                    const enabled = chk.checked;
-                    const livePriority = document.querySelector(`.sp-live-priority[data-league="${key}"]`)?.checked || false;
-                    const showOdds = document.querySelector(`.sp-show-odds[data-league="${key}"]`)?.checked || false;
-                    const favoritesOnly = document.querySelector(`.sp-favorites-only[data-league="${key}"]`)?.checked || false;
-                    const favs = document.querySelector(`.sp-favorites[data-league="${key}"]`)?.value || '';
-                    const favorite_teams = favs.split(',').map(s => s.trim()).filter(Boolean);
-                    const liveUpd = parseInt(document.querySelector(`.sp-live-update[data-league="${key}"]`)?.value || '30');
-                    const recentUpd = parseInt(document.querySelector(`.sp-recent-update[data-league="${key}"]`)?.value || '3600');
-                    const upcomingUpd = parseInt(document.querySelector(`.sp-upcoming-update[data-league="${key}"]`)?.value || '3600');
-                    const recentCount = parseInt(document.querySelector(`.sp-recent-count[data-league="${key}"]`)?.value || '1');
-                    const upcomingCount = parseInt(document.querySelector(`.sp-upcoming-count[data-league="${key}"]`)?.value || '1');
-                    fragment[key] = {
-                        enabled,
-                        live_priority: livePriority,
-                        show_odds: showOdds,
-                        show_favorite_teams_only: favoritesOnly,
-                        favorite_teams,
-                        live_update_interval: liveUpd,
-                        recent_update_interval: recentUpd,
-                        upcoming_update_interval: upcomingUpd,
-                        recent_games_to_show: recentCount,
-                        upcoming_games_to_show: upcomingCount
-                    };
-                });
-                await saveConfigJson(fragment);
-            } catch (err) {
-                showNotification('Error saving sports configuration: ' + err, 'error');
-                return;
-            }
-            showNotification('Sports configuration saved', 'success');
-        }
     </script>
 </body>
 </html>

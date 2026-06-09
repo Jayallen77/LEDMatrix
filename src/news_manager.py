@@ -1,576 +1,322 @@
-import time
-import logging
-import requests
-import xml.etree.ElementTree as ET
-import json
-import random
-from typing import Dict, Any, List, Tuple, Optional
-from datetime import datetime, timedelta
-import os
-import urllib.parse
-import re
 import html
-from src.config_manager import ConfigManager
-from PIL import Image, ImageDraw, ImageFont
-from src.cache_manager import CacheManager
+import logging
+import re
+import time
+import xml.etree.ElementTree as ET
+from datetime import datetime
+from typing import Any, Dict, List
+
+import requests
+from PIL import Image, ImageDraw
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-# Import the API counter function from web interface
-try:
-    from web_interface_v2 import increment_api_counter
-except ImportError:
-    # Fallback if web interface is not available
-    def increment_api_counter(kind: str, count: int = 1):
-        pass
+from src.cache_manager import CacheManager
+from src.config_manager import ConfigManager
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+
 logger = logging.getLogger(__name__)
 
+
 class NewsManager:
+    """RSS headline cards optimized for a 64x64 square display."""
+
+    CACHE_KEY = "news_cards"
+
     def __init__(self, config: Dict[str, Any], display_manager):
         self.config = config
         self.config_manager = ConfigManager()
         self.display_manager = display_manager
-        self.news_config = config.get('news_manager', {})
-        self.last_update = time.time()  # Initialize to current time
-        self.news_data = {}
-        self.current_headline_index = 0
-        self.scroll_position = 0
-        self.scrolling_image = None  # Pre-rendered image for smooth scrolling
-        self.cached_text = None
-        self.cache_manager = CacheManager()
-        self.current_headlines = []
-        self.headline_start_times = []
-        self.total_scroll_width = 0
-        self.headlines_displayed = set()  # Track displayed headlines for rotation
-        self.dynamic_duration = 60  # Default duration in seconds
-        self.is_fetching = False  # Flag to prevent multiple simultaneous fetches
-        
-        # Default RSS feeds
+        self.news_config = config.get("news_manager", {})
+        self.enabled = self.news_config.get("enabled", False)
+        self.update_interval = int(self.news_config.get("update_interval", 300))
+        self.headlines_per_feed = int(
+            self.news_config.get("headlines_per_feed", 2)
+        )
+        self.enabled_feeds = list(self.news_config.get("enabled_feeds", []))
+        self.custom_feeds = dict(self.news_config.get("custom_feeds", {}))
+        self.rotation_enabled = self.news_config.get("rotation_enabled", True)
+        self.text_color = tuple(
+            self.news_config.get("text_color", [255, 255, 255])
+        )
+        self.header_color = tuple(
+            self.news_config.get("separator_color", [255, 0, 0])
+        )
         self.default_feeds = {
-            'MLB': 'http://espn.com/espn/rss/mlb/news',
-            'NFL': 'http://espn.go.com/espn/rss/nfl/news', 
-            'NCAA FB': 'https://www.espn.com/espn/rss/ncf/news',
-            'NHL': 'https://www.espn.com/espn/rss/nhl/news',
-            'NBA': 'https://www.espn.com/espn/rss/nba/news',
-            'TOP SPORTS': 'https://www.espn.com/espn/rss/news',
-            'BIG10': 'https://www.espn.com/blog/feed?blog=bigten',
-            'NCAA': 'https://www.espn.com/espn/rss/ncaa/news',
-            'Other': 'https://www.coveringthecorner.com/rss/current.xml'
+            "MLB": "http://espn.com/espn/rss/mlb/news",
+            "NFL": "http://espn.go.com/espn/rss/nfl/news",
+            "NCAA FB": "https://www.espn.com/espn/rss/ncf/news",
+            "NHL": "https://www.espn.com/espn/rss/nhl/news",
+            "NBA": "https://www.espn.com/espn/rss/nba/news",
+            "TOP SPORTS": "https://www.espn.com/espn/rss/news",
+            "BIG10": "https://www.espn.com/blog/feed?blog=bigten",
+            "NCAA": "https://www.espn.com/espn/rss/ncaa/news",
+            "Other": "https://www.coveringthecorner.com/rss/current.xml",
         }
-        
-        # Get scroll settings from config
-        self.scroll_speed = self.news_config.get('scroll_speed', 2)
-        self.scroll_delay = self.news_config.get('scroll_delay', 0.01)  # Reduced from 0.02 to 0.01 for smoother scrolling
-        self.update_interval = self.news_config.get('update_interval', 300)  # 5 minutes
-        
-        # Get headline settings from config
-        self.headlines_per_feed = self.news_config.get('headlines_per_feed', 2)
-        self.enabled_feeds = self.news_config.get('enabled_feeds', ['NFL', 'NCAA FB'])
-        self.custom_feeds = self.news_config.get('custom_feeds', {})
-        
-        # Rotation settings
-        self.rotation_enabled = self.news_config.get('rotation_enabled', True)
-        self.rotation_threshold = self.news_config.get('rotation_threshold', 3)  # After 3 full cycles
-        self.rotation_count = 0
-        
-        # Dynamic duration settings
-        self.dynamic_duration_enabled = self.news_config.get('dynamic_duration', True)
-        self.min_duration = self.news_config.get('min_duration', 30)
-        self.max_duration = self.news_config.get('max_duration', 300)
-        self.duration_buffer = self.news_config.get('duration_buffer', 0.1)
-        
-        # Font settings
-        self.font_size = self.news_config.get('font_size', 12)
-        self.font_path = self.news_config.get('font_path', '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf')
-        
-        # Colors
-        self.text_color = tuple(self.news_config.get('text_color', [255, 255, 255]))
-        self.separator_color = tuple(self.news_config.get('separator_color', [255, 0, 0]))
-        
-        # Initialize session with retry strategy
+        self.cache_manager = CacheManager()
+        self.current_headlines: List[Dict[str, Any]] = []
+        self.news_data: Dict[str, List[Dict[str, Any]]] = {}
+        self.current_headline_index = 0
+        self.last_update = 0.0
+        self.is_stale = False
+        self._has_displayed = False
+        self.dynamic_duration = int(
+            config.get("display", {})
+            .get("display_durations", {})
+            .get("news_manager", 60)
+        )
+
         self.session = requests.Session()
         retry_strategy = Retry(
-            total=3,
-            backoff_factor=1,
+            total=2,
+            backoff_factor=0.5,
             status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET"],
+            raise_on_status=False,
         )
         adapter = HTTPAdapter(max_retries=retry_strategy)
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
-        
-        logger.debug(f"NewsManager initialized with feeds: {self.enabled_feeds}")
-        logger.debug(f"Headlines per feed: {self.headlines_per_feed}")
-        logger.debug(f"Scroll settings - Speed: {self.scroll_speed} pixels/frame, Delay: {self.scroll_delay*1000:.2f}ms")
+        self._load_cache()
 
-    def parse_rss_feed(self, url: str, feed_name: str) -> List[Dict[str, Any]]:
-        """Parse RSS feed and return list of headlines"""
-        try:
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
-            
-            response = self.session.get(url, headers=headers, timeout=10)
-            response.raise_for_status()
-            
-            # Increment API counter for news data call
-            increment_api_counter('news', 1)
-            
-            root = ET.fromstring(response.content)
-            headlines = []
-            
-            # Handle different RSS formats
-            items = root.findall('.//item')
-            if not items:
-                items = root.findall('.//entry')  # Atom feed format
-                
-            for item in items[:self.headlines_per_feed * 2]:  # Get extra to allow for filtering
-                title_elem = item.find('title')
-                if title_elem is not None:
-                    title = html.unescape(title_elem.text or '').strip()
-                    
-                    # Clean up title
-                    title = re.sub(r'<[^>]+>', '', title)  # Remove HTML tags
-                    title = re.sub(r'\s+', ' ', title)     # Normalize whitespace
-                    
-                    if title and len(title) > 10:  # Filter out very short titles
-                        pub_date_elem = item.find('pubDate')
-                        if pub_date_elem is None:
-                            pub_date_elem = item.find('published')  # Atom format
-                            
-                        pub_date = pub_date_elem.text if pub_date_elem is not None else None
-                        
-                        headlines.append({
-                            'title': title,
-                            'feed': feed_name,
-                            'pub_date': pub_date,
-                            'timestamp': datetime.now().isoformat()
-                        })
-                        
-            logger.debug(f"Parsed {len(headlines)} headlines from {feed_name}")
-            return headlines[:self.headlines_per_feed]
-            
-        except Exception as e:
-            logger.error(f"Error parsing RSS feed {feed_name} ({url}): {e}")
-            return []
-
-    def fetch_news_data(self):
-        """Fetch news from all enabled feeds"""
-        try:
-            all_headlines = []
-            
-            # Combine default and custom feeds
-            all_feeds = {**self.default_feeds, **self.custom_feeds}
-            
-            for feed_name in self.enabled_feeds:
-                if feed_name in all_feeds:
-                    url = all_feeds[feed_name]
-                    headlines = self.parse_rss_feed(url, feed_name)
-                    all_headlines.extend(headlines)
-                else:
-                    logger.warning(f"Feed '{feed_name}' not found in available feeds")
-            
-            # Store headlines by feed for rotation management
-            self.news_data = {}
-            for headline in all_headlines:
-                feed = headline['feed']
-                if feed not in self.news_data:
-                    self.news_data[feed] = []
-                self.news_data[feed].append(headline)
-            
-            # Prepare current headlines for display
-            self.prepare_headlines_for_display()
-            
-            self.last_update = time.time()
-            logger.debug(f"Fetched {len(all_headlines)} total headlines from {len(self.enabled_feeds)} feeds")
-            
-        except Exception as e:
-            logger.error(f"Error fetching news data: {e}")
-
-    def prepare_headlines_for_display(self):
-        """Prepare headlines for scrolling display with rotation"""
-        if not self.news_data:
+    def _load_cache(self) -> None:
+        cached = self.cache_manager.load_cache(self.CACHE_KEY)
+        if not isinstance(cached, dict):
             return
-            
-        # Get headlines for display, applying rotation if enabled
-        display_headlines = []
-        
-        for feed_name in self.enabled_feeds:
-            if feed_name in self.news_data:
-                feed_headlines = self.news_data[feed_name]
-                
-                if self.rotation_enabled and len(feed_headlines) > self.headlines_per_feed:
-                    # Rotate headlines to show different ones
-                    start_idx = (self.rotation_count * self.headlines_per_feed) % len(feed_headlines)
-                    selected = []
-                    for i in range(self.headlines_per_feed):
-                        idx = (start_idx + i) % len(feed_headlines)
-                        selected.append(feed_headlines[idx])
-                    display_headlines.extend(selected)
-                else:
-                    display_headlines.extend(feed_headlines[:self.headlines_per_feed])
-        
-        # Create scrolling text with separators
-        if display_headlines:
-            text_parts = []
-            for i, headline in enumerate(display_headlines):
-                feed_prefix = f"[{headline['feed']}] "
-                text_parts.append(feed_prefix + headline['title'])
-                
-            # Join with separators and add spacing
-            separator = " • "
-            self.cached_text = separator.join(text_parts) + " • "  # Add separator at end for smooth loop
-            
-            # Calculate text dimensions for perfect scrolling
-            self.calculate_scroll_dimensions()
-            self.create_scrolling_image()
-            
-            self.current_headlines = display_headlines
-            logger.debug(f"Prepared {len(display_headlines)} headlines for display")
+        payload = cached.get("data", cached)
+        headlines = payload.get("headlines", []) if isinstance(payload, dict) else []
+        if isinstance(headlines, list):
+            self.current_headlines = headlines
+            self.is_stale = bool(headlines)
 
-    def create_scrolling_image(self):
-        """Create a pre-rendered image for smooth scrolling."""
-        if not self.cached_text:
-            self.scrolling_image = None
-            return
-
-        try:
-            font = ImageFont.truetype(self.font_path, self.font_size)
-        except Exception as e:
-            logger.warning(f"Failed to load custom font for pre-rendering: {e}. Using default.")
-            font = ImageFont.load_default()
-
-        height = self.display_manager.height
-        width = self.total_scroll_width
-
-        self.scrolling_image = Image.new('RGB', (width, height), (0, 0, 0))
-        draw = ImageDraw.Draw(self.scrolling_image)
-
-        text_height = self.font_size
-        y_pos = (height - text_height) // 2
-        draw.text((0, y_pos), self.cached_text, font=font, fill=self.text_color)
-        logger.debug("Pre-rendered scrolling news image created.")
-
-    def calculate_scroll_dimensions(self):
-        """Calculate exact dimensions needed for smooth scrolling"""
-        if not self.cached_text:
-            return
-            
-        try:
-            # Load font
-            try:
-                font = ImageFont.truetype(self.font_path, self.font_size)
-                logger.debug(f"Successfully loaded custom font: {self.font_path}")
-            except Exception as e:
-                logger.warning(f"Failed to load custom font '{self.font_path}': {e}. Using default font.")
-                font = ImageFont.load_default()
-                
-            # Calculate text width
-            temp_img = Image.new('RGB', (1, 1))
-            temp_draw = ImageDraw.Draw(temp_img)
-            
-            # Get text dimensions
-            bbox = temp_draw.textbbox((0, 0), self.cached_text, font=font)
-            self.total_scroll_width = bbox[2] - bbox[0]
-            
-            # Calculate dynamic display duration
-            self.calculate_dynamic_duration()
-            
-            logger.debug(f"Text width calculated: {self.total_scroll_width} pixels")
-            logger.debug(f"Dynamic duration calculated: {self.dynamic_duration} seconds")
-            
-        except Exception as e:
-            logger.error(f"Error calculating scroll dimensions: {e}")
-            self.total_scroll_width = len(self.cached_text) * 8  # Fallback estimate
-            self.calculate_dynamic_duration()
-
-    def create_scrolling_image(self):
-        """Create a pre-rendered image for smooth scrolling."""
-        if not self.cached_text:
-            self.scrolling_image = None
-            return
-
-        try:
-            font = ImageFont.truetype(self.font_path, self.font_size)
-        except Exception as e:
-            logger.warning(f"Failed to load custom font for pre-rendering: {e}. Using default.")
-            font = ImageFont.load_default()
-
-        height = self.display_manager.height
-        width = self.total_scroll_width
-
-        self.scrolling_image = Image.new('RGB', (width, height), (0, 0, 0))
-        draw = ImageDraw.Draw(self.scrolling_image)
-
-        text_height = self.font_size
-        y_pos = (height - text_height) // 2
-        draw.text((0, y_pos), self.cached_text, font=font, fill=self.text_color)
-        logger.debug("Pre-rendered scrolling news image created.")
-
-    def calculate_dynamic_duration(self):
-        """Calculate the exact time needed to display all headlines"""
-        # If dynamic duration is disabled, use fixed duration from config
-        if not self.dynamic_duration_enabled:
-            self.dynamic_duration = self.news_config.get('fixed_duration', 60)
-            logger.debug(f"Dynamic duration disabled, using fixed duration: {self.dynamic_duration}s")
-            return
-            
-        if not self.total_scroll_width:
-            self.dynamic_duration = self.min_duration  # Use configured minimum
-            return
-            
-        try:
-            # Get display width (assume full width of display)
-            display_width = getattr(self.display_manager, 'width', 128)  # Default to 128 if not available
-            
-            # Calculate total scroll distance needed
-            # Text needs to scroll from right edge to completely off left edge
-            total_scroll_distance = display_width + self.total_scroll_width
-            
-            # Calculate time based on scroll speed and delay
-            # scroll_speed = pixels per frame, scroll_delay = seconds per frame
-            frames_needed = total_scroll_distance / self.scroll_speed
-            total_time = frames_needed * self.scroll_delay
-            
-            # Add buffer time for smooth cycling (configurable %)
-            buffer_time = total_time * self.duration_buffer
-            calculated_duration = int(total_time + buffer_time)
-            
-            # Apply configured min/max limits
-            if calculated_duration < self.min_duration:
-                self.dynamic_duration = self.min_duration
-                logger.debug(f"Duration capped to minimum: {self.min_duration}s")
-            elif calculated_duration > self.max_duration:
-                self.dynamic_duration = self.max_duration
-                logger.debug(f"Duration capped to maximum: {self.max_duration}s")
-            else:
-                self.dynamic_duration = calculated_duration
-                
-            logger.debug(f"Dynamic duration calculation:")
-            logger.debug(f"  Display width: {display_width}px")
-            logger.debug(f"  Text width: {self.total_scroll_width}px")
-            logger.debug(f"  Total scroll distance: {total_scroll_distance}px")
-            logger.debug(f"  Frames needed: {frames_needed:.1f}")
-            logger.debug(f"  Base time: {total_time:.2f}s")
-            logger.debug(f"  Buffer time: {buffer_time:.2f}s ({self.duration_buffer*100}%)")
-            logger.debug(f"  Calculated duration: {calculated_duration}s")
-            logger.debug(f"  Final duration: {self.dynamic_duration}s")
-            
-        except Exception as e:
-            logger.error(f"Error calculating dynamic duration: {e}")
-            self.dynamic_duration = self.min_duration  # Use configured minimum as fallback
-
-    def should_update(self) -> bool:
-        """Check if news data should be updated"""
-        return (time.time() - self.last_update) > self.update_interval
-
-    def get_news_display(self) -> Image.Image:
-        """Generate the scrolling news ticker display by cropping the pre-rendered image."""
-        try:
-            if not self.scrolling_image:
-                logger.debug("No pre-rendered image available, showing loading image.")
-                return self.create_no_news_image()
-
-            width = self.display_manager.width
-            height = self.display_manager.height
-
-            # Use modulo for continuous scrolling
-            self.scroll_position = (self.scroll_position + self.scroll_speed) % self.total_scroll_width
-
-            # Crop the visible part of the image
-            x = self.scroll_position
-            visible_end = x + width
-            
-            if visible_end <= self.total_scroll_width:
-                # No wrap-around needed
-                img = self.scrolling_image.crop((x, 0, visible_end, height))
-            else:
-                # Handle wrap-around
-                img = Image.new('RGB', (width, height))
-                
-                width1 = self.total_scroll_width - x
-                portion1 = self.scrolling_image.crop((x, 0, self.total_scroll_width, height))
-                img.paste(portion1, (0, 0))
-                
-                width2 = width - width1
-                portion2 = self.scrolling_image.crop((0, 0, width2, height))
-                img.paste(portion2, (width1, 0))
-
-            # Check for rotation when scroll completes a cycle
-            if self.scroll_position < self.scroll_speed: # Check if we just wrapped around
-                self.rotation_count += 1
-                if (self.rotation_enabled and 
-                    self.rotation_count >= self.rotation_threshold and 
-                    any(len(headlines) > self.headlines_per_feed for headlines in self.news_data.values())):
-                    logger.info("News rotation threshold reached. Preparing new headlines.")
-                    self.prepare_headlines_for_display()
-                    self.rotation_count = 0
-            
-            return img
-            
-        except Exception as e:
-            logger.error(f"Error generating news display: {e}")
-            return self.create_error_image(str(e))
-
-    def create_no_news_image(self) -> Image.Image:
-        """Create image when no news is available"""
-        width = self.display_manager.width
-        height = self.display_manager.height
-        
-        img = Image.new('RGB', (width, height), (0, 0, 0))
-        draw = ImageDraw.Draw(img)
-        
-        try:
-            font = ImageFont.truetype(self.font_path, self.font_size)
-            logger.debug(f"Successfully loaded custom font: {self.font_path}")
-        except Exception as e:
-            logger.warning(f"Failed to load custom font '{self.font_path}': {e}. Using default font.")
-            font = ImageFont.load_default()
-        
-        text = "Loading news..."
-        bbox = draw.textbbox((0, 0), text, font=font)
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-        
-        x = (width - text_width) // 2
-        y = (height - text_height) // 2
-        
-        draw.text((x, y), text, font=font, fill=self.text_color)
-        return img
-
-    def create_error_image(self, error_msg: str) -> Image.Image:
-        """Create image for error display"""
-        width = self.display_manager.width
-        height = self.display_manager.height
-        
-        img = Image.new('RGB', (width, height), (0, 0, 0))
-        draw = ImageDraw.Draw(img)
-        
-        try:
-            font = ImageFont.truetype(self.font_path, max(8, self.font_size - 2))
-            logger.debug(f"Successfully loaded custom font: {self.font_path}")
-        except Exception as e:
-            logger.warning(f"Failed to load custom font '{self.font_path}': {e}. Using default font.")
-            font = ImageFont.load_default()
-        
-        text = f"News Error: {error_msg[:50]}..."
-        bbox = draw.textbbox((0, 0), text, font=font)
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-        
-        x = max(0, (width - text_width) // 2)
-        y = (height - text_height) // 2
-        
-        draw.text((x, y), text, font=font, fill=(255, 0, 0))
-        return img
-
-    def display_news(self, force_clear: bool = False):
-        """Display method for news ticker - called by display controller"""
-        try:
-            # Only fetch data once when we start displaying
-            if not self.current_headlines and not self.is_fetching:
-                logger.debug("Initializing news display - fetching data")
-                self.is_fetching = True
-                try:
-                    self.fetch_news_data()
-                finally:
-                    self.is_fetching = False
-            
-            # Get the current news display image
-            img = self.get_news_display()
-            
-            # Set the image and update display
-            self.display_manager.image = img
-            self.display_manager.update_display()
-            
-            # Add scroll delay to control speed
-            time.sleep(self.scroll_delay)
-            
-            # Debug: log scroll position
-            if hasattr(self, 'scroll_position') and hasattr(self, 'total_scroll_width'):
-                logger.debug(f"Scroll position: {self.scroll_position}/{self.total_scroll_width}")
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error in news display: {e}")
-            # Create error image
-            error_img = self.create_error_image(str(e))
-            self.display_manager.image = error_img
-            self.display_manager.update_display()
-            return False
-
-    def run_news_display(self):
-        """Standalone method to run news display in its own loop"""
-        try:
-            while True:
-                img = self.get_news_display()
-                self.display_manager.image = img
-                self.display_manager.update_display()
-                time.sleep(self.scroll_delay)
-                
-        except KeyboardInterrupt:
-            logger.debug("News display interrupted by user")
-        except Exception as e:
-            logger.error(f"Error in news display loop: {e}")
-
-    def add_custom_feed(self, name: str, url: str):
-        """Add a custom RSS feed"""
-        if name not in self.custom_feeds:
-            self.custom_feeds[name] = url
-            # Update config
-            if 'news_manager' not in self.config:
-                self.config['news_manager'] = {}
-            self.config['news_manager']['custom_feeds'] = self.custom_feeds
-            self.config_manager.save_config(self.config)
-            logger.debug(f"Added custom feed: {name} -> {url}")
-
-    def remove_custom_feed(self, name: str):
-        """Remove a custom RSS feed"""
-        if name in self.custom_feeds:
-            del self.custom_feeds[name]
-            # Update config
-            self.config['news_manager']['custom_feeds'] = self.custom_feeds
-            self.config_manager.save_config(self.config)
-            logger.debug(f"Removed custom feed: {name}")
-
-    def set_enabled_feeds(self, feeds: List[str]):
-        """Set which feeds are enabled"""
-        self.enabled_feeds = feeds
-        # Update config
-        if 'news_manager' not in self.config:
-            self.config['news_manager'] = {}
-        self.config['news_manager']['enabled_feeds'] = self.enabled_feeds
-        self.config_manager.save_config(self.config)
-        logger.debug(f"Updated enabled feeds: {self.enabled_feeds}")
-        
-        # Refresh headlines
-        self.fetch_news_data()
+    def _save_cache(self) -> None:
+        self.cache_manager.set(
+            self.CACHE_KEY,
+            {
+                "headlines": self.current_headlines,
+                "updated_at": time.time(),
+            },
+        )
 
     def get_available_feeds(self) -> Dict[str, str]:
-        """Get all available feeds (default + custom)"""
         return {**self.default_feeds, **self.custom_feeds}
 
+    def parse_rss_feed(
+        self,
+        url: str,
+        feed_name: str,
+    ) -> List[Dict[str, Any]]:
+        response = self.session.get(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; LEDMatrix/1.0)"},
+            timeout=10,
+        )
+        response.raise_for_status()
+        root = ET.fromstring(response.content)
+        items = root.findall(".//item")
+        if not items:
+            items = root.findall(".//{*}entry")
+
+        headlines = []
+        for item in items:
+            title_element = item.find("title")
+            if title_element is None:
+                title_element = item.find("{*}title")
+            title = html.unescape(title_element.text or "").strip() if title_element is not None else ""
+            title = re.sub(r"<[^>]+>", "", title)
+            title = re.sub(r"\s+", " ", title)
+            if len(title) < 5:
+                continue
+            headlines.append(
+                {
+                    "title": title,
+                    "feed": feed_name,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
+            if len(headlines) >= self.headlines_per_feed:
+                break
+        return headlines
+
+    def fetch_news_data(self) -> bool:
+        if not self.enabled or not self.enabled_feeds:
+            self.current_headlines = []
+            self.news_data = {}
+            return False
+
+        available = self.get_available_feeds()
+        all_headlines: List[Dict[str, Any]] = []
+        attempted = 0
+        failed = False
+        for feed_name in self.enabled_feeds:
+            url = available.get(feed_name)
+            if not url:
+                logger.warning("Configured news feed '%s' has no URL", feed_name)
+                continue
+            attempted += 1
+            try:
+                all_headlines.extend(self.parse_rss_feed(url, feed_name))
+            except Exception as exc:
+                failed = True
+                logger.warning("News feed %s is unavailable: %s", feed_name, exc)
+
+        self.last_update = time.time()
+        if all_headlines:
+            self.current_headlines = all_headlines
+            self.current_headline_index %= len(self.current_headlines)
+            self.news_data = {}
+            for headline in all_headlines:
+                self.news_data.setdefault(headline["feed"], []).append(headline)
+            self.is_stale = failed or attempted == 0
+            self._save_cache()
+            return True
+
+        if failed and self.current_headlines:
+            self.is_stale = True
+            return False
+
+        self.current_headlines = []
+        self.news_data = {}
+        self.is_stale = False
+        return False
+
+    def update(self) -> bool:
+        if not self.enabled:
+            return False
+        if time.time() - self.last_update < self.update_interval:
+            return False
+        return self.fetch_news_data()
+
+    def should_update(self) -> bool:
+        return time.time() - self.last_update >= self.update_interval
+
+    def has_display_content(self) -> bool:
+        return bool(self.enabled and self.enabled_feeds and self.current_headlines)
+
+    def prepare_headlines_for_display(self) -> None:
+        self.current_headline_index %= max(1, len(self.current_headlines))
+
+    def _wrap_text(self, text: str, max_width: int, max_lines: int) -> List[str]:
+        font = getattr(
+            self.display_manager,
+            "extra_small_font",
+            self.display_manager.small_font,
+        )
+        words = text.split()
+        lines: List[str] = []
+        current = ""
+        while words and len(lines) < max_lines:
+            word = words.pop(0)
+            candidate = f"{current} {word}".strip()
+            if self.display_manager.get_text_width(candidate, font) <= max_width:
+                current = candidate
+                continue
+            if current:
+                lines.append(current)
+                current = word
+            else:
+                current = word
+                while (
+                    current
+                    and self.display_manager.get_text_width(
+                        current + "...",
+                        font,
+                    )
+                    > max_width
+                ):
+                    current = current[:-1]
+                lines.append((current + "...") if current else "")
+                current = ""
+        if current and len(lines) < max_lines:
+            lines.append(current)
+        if words and lines:
+            last = lines[-1]
+            while (
+                last
+                and self.display_manager.get_text_width(last + "...", font)
+                > max_width
+            ):
+                last = last[:-1]
+            lines[-1] = last + "..."
+        return lines
+
+    def _render_card(self) -> Image.Image:
+        width = int(getattr(self.display_manager, "width", 64))
+        height = int(getattr(self.display_manager, "height", 64))
+        image = Image.new("RGB", (width, height), (0, 0, 0))
+        draw = ImageDraw.Draw(image)
+        font = getattr(
+            self.display_manager,
+            "extra_small_font",
+            self.display_manager.small_font,
+        )
+        headline = self.current_headlines[self.current_headline_index]
+        feed = str(headline.get("feed", "NEWS")).upper()[:10]
+        header = f"{feed}*" if self.is_stale else feed
+        header_width = self.display_manager.get_text_width(header, font)
+        draw.text(
+            ((width - header_width) // 2, 1),
+            header,
+            font=font,
+            fill=(255, 190, 0) if self.is_stale else self.header_color,
+        )
+        draw.line((2, 9, width - 3, 9), fill=self.header_color)
+        for index, line in enumerate(
+            self._wrap_text(str(headline.get("title", "")), width - 4, 6)
+        ):
+            draw.text((2, 12 + index * 8), line, font=font, fill=self.text_color)
+        return image
+
+    def display_news(self, force_clear: bool = False) -> bool:
+        self.update()
+        if not self.has_display_content():
+            return False
+        if force_clear and self._has_displayed and self.rotation_enabled:
+            self.current_headline_index = (
+                self.current_headline_index + 1
+            ) % len(self.current_headlines)
+        if force_clear:
+            self.display_manager.clear()
+        self.display_manager.image = self._render_card()
+        self.display_manager.draw = ImageDraw.Draw(self.display_manager.image)
+        self.display_manager.update_display()
+        self._has_displayed = True
+        return True
+
+    def get_news_display(self) -> Image.Image:
+        if not self.has_display_content():
+            width = int(getattr(self.display_manager, "width", 64))
+            height = int(getattr(self.display_manager, "height", 64))
+            return Image.new("RGB", (width, height), (0, 0, 0))
+        return self._render_card()
+
+    def add_custom_feed(self, name: str, url: str) -> None:
+        self.custom_feeds[name] = url
+        self.config.setdefault("news_manager", {})["custom_feeds"] = self.custom_feeds
+        self.config_manager.save_config(self.config)
+
+    def remove_custom_feed(self, name: str) -> None:
+        self.custom_feeds.pop(name, None)
+        self.config.setdefault("news_manager", {})["custom_feeds"] = self.custom_feeds
+        self.config_manager.save_config(self.config)
+
+    def set_enabled_feeds(self, feeds: List[str]) -> None:
+        self.enabled_feeds = feeds
+        self.config.setdefault("news_manager", {})["enabled_feeds"] = feeds
+        self.config_manager.save_config(self.config)
+        self.last_update = 0
+
     def get_feed_status(self) -> Dict[str, Any]:
-        """Get status information about feeds"""
-        status = {
-            'enabled_feeds': self.enabled_feeds,
-            'available_feeds': list(self.get_available_feeds().keys()),
-            'headlines_per_feed': self.headlines_per_feed,
-            'last_update': self.last_update,
-            'total_headlines': sum(len(headlines) for headlines in self.news_data.values()),
-            'rotation_enabled': self.rotation_enabled,
-            'rotation_count': self.rotation_count,
-            'dynamic_duration': self.dynamic_duration
+        return {
+            "enabled_feeds": self.enabled_feeds,
+            "available_feeds": list(self.get_available_feeds()),
+            "headlines_per_feed": self.headlines_per_feed,
+            "last_update": self.last_update,
+            "total_headlines": len(self.current_headlines),
+            "rotation_enabled": self.rotation_enabled,
+            "current_headline_index": self.current_headline_index,
+            "stale": self.is_stale,
         }
-        return status
 
     def get_dynamic_duration(self) -> int:
-        """Get the calculated dynamic duration for display"""
-        # For smooth scrolling, use a very short duration so display controller calls us frequently
-        # The scroll_speed controls how many pixels we move per call
-        # Return the current calculated duration without fetching data
-        return self.dynamic_duration  # 0.1 second duration - display controller will call us 10 times per second
-
+        return self.dynamic_duration

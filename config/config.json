@@ -70,7 +70,8 @@
             "ncaam_basketball_upcoming": 30,
             "music": 1000,
             "of_the_day": 40,
-            "news_manager": 60
+            "news_manager": 60,
+            "sports_live": 20
         },
         "use_short_date_format": true
     },
@@ -113,6 +114,11 @@
         ],
         "display_format": "{symbol}: ${price} ({change}%)"
     },
+    "colorado_sports": {
+        "enabled": true,
+        "polling_interval": 30,
+        "stale_timeout": 120
+    },
     "stock_news": {
         "enabled": false,
         "update_interval": 3600,
@@ -150,7 +156,7 @@
         "duration_buffer": 0.1
     },
     "calendar": {
-        "enabled": false,
+        "enabled": true,
         "credentials_file": "credentials.json",
         "token_file": "token.pickle",
         "update_interval": 3600,
@@ -437,7 +443,7 @@
         }
     },
     "news_manager": {
-        "enabled": false,
+        "enabled": true,
         "update_interval": 300,
         "scroll_speed": 1,
         "scroll_delay": 0.01,

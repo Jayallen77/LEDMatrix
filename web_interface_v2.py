@@ -21,6 +21,7 @@ from src.calendar_manager import CalendarManager
 from src.youtube_display import YouTubeDisplay
 from src.text_display import TextDisplay
 from src.news_manager import NewsManager
+from src.colorado_sports_manager import ColoradoSportsManager
 from src.nhl_managers import NHLLiveManager, NHLRecentManager, NHLUpcomingManager
 from src.nba_managers import NBALiveManager, NBARecentManager, NBAUpcomingManager
 from src.mlb_manager import MLBLiveManager, MLBRecentManager, MLBUpcomingManager
@@ -239,6 +240,7 @@ class OnDemandRunner:
         if mode == 'stocks':
             mgr = StockManager(cfg, display_manager)
             self._force_enable(mgr)
+            mgr.stocks_config['enabled'] = True
             return mgr, lambda fc=False: mgr.display_stocks(force_clear=fc), lambda: mgr.update_stock_data(), float(cfg.get('stocks', {}).get('update_interval', 600))
         if mode == 'stock_news':
             mgr = StockNewsManager(cfg, display_manager)
@@ -268,7 +270,13 @@ class OnDemandRunner:
         if mode == 'news_manager':
             mgr = NewsManager(cfg, display_manager)
             self._force_enable(mgr)
-            return mgr, lambda fc=False: mgr.display_news(), None, 0
+            mgr.enabled = True
+            mgr.last_update = 0
+            return mgr, lambda fc=False: mgr.display_news(force_clear=fc), lambda: mgr.update(), float(cfg.get('news_manager', {}).get('update_interval', 300))
+        if mode == 'sports_live':
+            mgr = ColoradoSportsManager(cfg, display_manager)
+            mgr.enabled = True
+            return mgr, lambda fc=False: mgr.display(force_clear=fc), lambda: mgr.update(), float(cfg.get('colorado_sports', {}).get('polling_interval', 30))
 
         # Sports managers mapping helper
         def sport(kind: str, variant: str):
@@ -1159,7 +1167,7 @@ def get_news_manager_status():
             'available_feeds': [
                 'MLB', 'NFL', 'NCAA FB', 'NHL', 'NBA', 'TOP SPORTS', 
                 'BIG10', 'NCAA', 'Other'
-            ],
+            ] + list(news_config.get('custom_feeds', {}).keys()),
             'headlines_per_feed': news_config.get('headlines_per_feed', 2),
             'rotation_enabled': news_config.get('rotation_enabled', True),
             'custom_feeds': news_config.get('custom_feeds', {})

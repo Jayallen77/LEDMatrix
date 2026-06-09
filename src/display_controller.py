@@ -35,6 +35,7 @@ from src.text_display import TextDisplay
 from src.music_manager import MusicManager, MusicSource
 from src.of_the_day_manager import OfTheDayManager
 from src.news_manager import NewsManager
+from src.colorado_sports_manager import ColoradoSportsManager
 
 # Get logger without configuring
 logger = logging.getLogger(__name__)
@@ -65,10 +66,12 @@ class DisplayController:
         self.text_display = TextDisplay(self.display_manager, self.config) if self.config.get('text_display', {}).get('enabled', False) else None
         self.of_the_day = OfTheDayManager(self.display_manager, self.config) if self.config.get('of_the_day', {}).get('enabled', False) else None
         self.news_manager = NewsManager(self.config, self.display_manager) if self.config.get('news_manager', {}).get('enabled', False) else None
+        self.colorado_sports = ColoradoSportsManager(self.config, self.display_manager) if self.config.get('colorado_sports', {}).get('enabled', False) else None
         logger.info(f"Calendar Manager initialized: {'Object' if self.calendar else 'None'}")
         logger.info(f"Text Display initialized: {'Object' if self.text_display else 'None'}")
         logger.info(f"OfTheDay Manager initialized: {'Object' if self.of_the_day else 'None'}")
         logger.info(f"News Manager initialized: {'Object' if self.news_manager else 'None'}")
+        logger.info(f"Colorado Sports Manager initialized: {'Object' if self.colorado_sports else 'None'}")
         logger.info("Display modes initialized in %.3f seconds", time.time() - init_time)
         
         # Initialize Music Manager
@@ -258,13 +261,9 @@ class DisplayController:
         if self.stocks: self.available_modes.append('stocks')
         if self.news: self.available_modes.append('stock_news')
         if self.odds_ticker: self.available_modes.append('odds_ticker')
-        if self.calendar: self.available_modes.append('calendar')
         if self.youtube: self.available_modes.append('youtube')
         if self.text_display: self.available_modes.append('text_display')
         if self.of_the_day: self.available_modes.append('of_the_day')
-        if self.news_manager: self.available_modes.append('news_manager')
-        if self.music_manager:
-            self.available_modes.append('music')
         # Add NHL display modes if enabled
         if nhl_enabled:
             if self.nhl_recent: self.available_modes.append('nhl_recent')
@@ -294,6 +293,9 @@ class DisplayController:
         if ncaam_basketball_enabled:
             if self.ncaam_basketball_recent: self.available_modes.append('ncaam_basketball_recent')
             if self.ncaam_basketball_upcoming: self.available_modes.append('ncaam_basketball_upcoming')
+        self._sync_dynamic_modes()
+        if self.music_manager:
+            self.available_modes.append('music')
         # Add live modes to rotation if live_priority is False and there are live games
         self._update_live_modes_in_rotation()
         
@@ -388,6 +390,7 @@ class DisplayController:
             'ncaa_fb_recent': 15,
             'ncaa_fb_upcoming': 15,
             'music': 20, # Default duration for music, will be overridden by config if present
+            'sports_live': 20,
             'ncaa_baseball_live': 30, # Added NCAA Baseball durations
             'ncaa_baseball_recent': 15,
             'ncaa_baseball_upcoming': 15,
@@ -575,11 +578,15 @@ class DisplayController:
         if self.news: self.news.update_news_data()
         if self.odds_ticker: self.odds_ticker.update()
         if self.calendar: self.calendar.update(time.time())
+        if self.news_manager: self.news_manager.update()
+        if self.colorado_sports: self.colorado_sports.update()
         if self.youtube: self.youtube.update()
         if self.text_display: self.text_display.update()
         if self.of_the_day: self.of_the_day.update(time.time())
         # News manager fetches data when displayed, not during updates
         # if self.news_manager: self.news_manager.fetch_news_data()
+
+        self._sync_dynamic_modes()
         
         # Only update the currently active sport manager to prevent confusing logs
         # and reduce unnecessary API calls
@@ -907,6 +914,61 @@ class DisplayController:
             self.display_manager.clear()
             self.is_display_active = False
 
+    def _sync_dynamic_modes(self):
+        """Keep content-dependent modes in rotation without disturbing stable modes."""
+        dynamic_modes = (
+            ('news_manager', getattr(self, 'news_manager', None)),
+            ('calendar', getattr(self, 'calendar', None)),
+            ('sports_live', getattr(self, 'colorado_sports', None)),
+        )
+        previous_mode = getattr(self, 'current_display_mode', None)
+        previous_index = getattr(self, 'current_mode_index', 0)
+
+        for mode_name, _ in dynamic_modes:
+            while mode_name in self.available_modes:
+                self.available_modes.remove(mode_name)
+
+        music_present = 'music' in self.available_modes
+        if music_present:
+            self.available_modes.remove('music')
+
+        insert_at = (
+            self.available_modes.index('stocks') + 1
+            if 'stocks' in self.available_modes
+            else len(self.available_modes)
+        )
+        for mode_name, manager in dynamic_modes:
+            has_content = False
+            if manager and hasattr(manager, 'has_display_content'):
+                try:
+                    has_content = bool(manager.has_display_content())
+                except Exception as exc:
+                    logger.warning(
+                        "Could not determine eligibility for %s: %s",
+                        mode_name,
+                        exc,
+                    )
+            if has_content:
+                self.available_modes.insert(insert_at, mode_name)
+                insert_at += 1
+
+        if music_present:
+            self.available_modes.append('music')
+
+        if previous_mode and previous_mode in self.available_modes:
+            self.current_mode_index = self.available_modes.index(previous_mode)
+            return
+
+        if previous_mode and self.available_modes:
+            self.current_mode_index = min(previous_index, len(self.available_modes) - 1)
+            fallback_mode = self.available_modes[self.current_mode_index]
+            if fallback_mode == 'music' and not self._is_music_playing():
+                self.current_mode_index = 0
+                fallback_mode = self.available_modes[0]
+            self.current_display_mode = fallback_mode
+            self.force_clear = True
+            self.last_switch = time.time()
+
     def _update_live_modes_in_rotation(self):
         """Add or remove live modes from available_modes based on live_priority and live games."""
         # Helper to add/remove live modes for all sports
@@ -954,6 +1016,7 @@ class DisplayController:
         update_mode('ncaa_fb_live', getattr(self, 'ncaa_fb_live', None), self.ncaa_fb_live_priority, ncaa_fb_enabled)
         update_mode('ncaa_baseball_live', getattr(self, 'ncaa_baseball_live', None), self.ncaa_baseball_live_priority, ncaa_baseball_enabled)
         update_mode('ncaam_basketball_live', getattr(self, 'ncaam_basketball_live', None), self.ncaam_basketball_live_priority, ncaam_basketball_enabled)
+        self._sync_dynamic_modes()
 
     def _is_music_playing(self):
         """Check if music is currently playing."""
@@ -1007,7 +1070,10 @@ class DisplayController:
 
                 # Check for live games and live_priority
                 has_live_games, live_sport_type = self._check_live_games()
-                is_currently_live = self.current_display_mode.endswith('_live')
+                is_currently_live = (
+                    self.current_display_mode.endswith('_live')
+                    and self.current_display_mode != 'sports_live'
+                )
                 
                 # Collect all sports with live_priority=True that have live games
                 live_priority_sports = []
@@ -1151,7 +1217,10 @@ class DisplayController:
                         
                         # No live_priority takeover, regular rotation
                         needs_switch = False
-                        if self.current_display_mode.endswith('_live'):
+                        if (
+                            self.current_display_mode.endswith('_live')
+                            and self.current_display_mode != 'sports_live'
+                        ):
                             # For live modes without live_priority, check if duration has elapsed
                             if current_time - self.last_switch >= self.get_current_duration():
                                 needs_switch = True
@@ -1212,6 +1281,8 @@ class DisplayController:
                                 manager_to_display = self.of_the_day
                             elif self.current_display_mode == 'news_manager' and self.news_manager:
                                 manager_to_display = self.news_manager
+                            elif self.current_display_mode == 'sports_live' and self.colorado_sports:
+                                manager_to_display = self.colorado_sports
                             elif self.current_display_mode == 'nhl_recent' and self.nhl_recent:
                                 manager_to_display = self.nhl_recent
                             elif self.current_display_mode == 'nhl_upcoming' and self.nhl_upcoming:
@@ -1313,7 +1384,9 @@ class DisplayController:
                         elif self.current_display_mode == 'of_the_day':
                              manager_to_display.display(force_clear=self.force_clear)
                         elif self.current_display_mode == 'news_manager':
-                             manager_to_display.display_news()
+                             manager_to_display.display_news(force_clear=self.force_clear)
+                        elif self.current_display_mode == 'sports_live':
+                             manager_to_display.display(force_clear=self.force_clear)
                         elif self.current_display_mode == 'ncaa_fb_upcoming' and self.ncaa_fb_upcoming:
                             self.ncaa_fb_upcoming.display(force_clear=self.force_clear)
                         elif self.current_display_mode == 'ncaam_basketball_recent' and self.ncaam_basketball_recent:
