@@ -88,9 +88,11 @@ class SpotifyClientTests(unittest.TestCase):
         )
 
     def _start_patches(self, patches):
+        started = []
         for current_patch in patches:
-            current_patch.start()
+            started.append(current_patch.start())
             self.addCleanup(current_patch.stop)
+        return started
 
     @staticmethod
     def _auth_manager():
@@ -127,6 +129,31 @@ class SpotifyClientTests(unittest.TestCase):
 
         self.assertEqual(client.get_state(), client.STATE_READY)
         self.assertEqual(auth_manager.get_access_token.call_count, 2)
+
+    def test_spotipy_clients_use_bounded_timeout_without_internal_retries(self):
+        auth_manager = self._auth_manager()
+        spotify_api = Mock()
+        started = self._start_patches(
+            self._client_patches(auth_manager, spotify_api)
+        )
+
+        spotify_client.SpotifyClient()
+
+        oauth_factory = started[2]
+        spotify_factory = started[3]
+        self.assertEqual(
+            oauth_factory.call_args.kwargs["requests_timeout"],
+            spotify_client.SpotifyClient.REQUEST_TIMEOUT_SECONDS,
+        )
+        self.assertEqual(
+            spotify_factory.call_args.kwargs,
+            {
+                "auth_manager": auth_manager,
+                "requests_timeout": 3,
+                "retries": 0,
+                "status_retries": 0,
+            },
+        )
 
     def test_retry_backoff_is_capped_at_sixty_seconds(self):
         client = object.__new__(spotify_client.SpotifyClient)

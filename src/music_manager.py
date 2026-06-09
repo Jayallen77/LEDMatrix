@@ -30,6 +30,11 @@ class MusicSource(Enum):
     YTM = auto()
 
 class MusicManager:
+    SPOTIFY_PLAYING = "playing"
+    SPOTIFY_PAUSED = "paused"
+    SPOTIFY_STOPPED = "stopped"
+    SPOTIFY_PAUSE_GRACE_SECONDS = 3
+
     def __init__(self, display_manager, config, update_callback=None):
         self.display_manager = display_manager
         self.config = config
@@ -38,11 +43,13 @@ class MusicManager:
         self.current_track_info = None
         self.current_source = MusicSource.NONE
         self.update_callback = update_callback
-        self.polling_interval = 2 # Default
+        self.polling_interval = 1 # Default
         self.enabled = False # Default
         self.preferred_source = "spotify" # Default changed from "auto"
         self.stop_event = threading.Event()
         self.track_info_lock = threading.Lock() # Added lock
+        self.spotify_playback_state = self.SPOTIFY_STOPPED
+        self.spotify_paused_at = None
 
         # Display related attributes moved from DisplayController
         self.album_art_image = None
@@ -63,7 +70,7 @@ class MusicManager:
         self.poll_thread = None
 
     def _load_config(self):
-        default_interval = 2
+        default_interval = 1
         # default_preferred_source = "auto" # Removed
         self.enabled = False # Assume disabled until config proves otherwise
 
@@ -351,6 +358,151 @@ class MusicManager:
             logger.error(f"Unexpected error fetching/processing image {url}: {e}")
             return None
 
+    @staticmethod
+    def _track_identity(track_info):
+        if not track_info:
+            return None
+        return (
+            track_info.get("title"),
+            track_info.get("artist"),
+            track_info.get("album"),
+        )
+
+    def _apply_spotify_playback(self, spotify_track, now=None):
+        """Apply a confirmed Spotify response and return callback data."""
+        now = time.time() if now is None else now
+        has_track = bool(spotify_track and spotify_track.get("item"))
+        is_playing = bool(has_track and spotify_track.get("is_playing"))
+
+        if has_track:
+            simplified_info = self.get_simplified_track_info(
+                spotify_track,
+                MusicSource.SPOTIFY,
+            )
+            with self.track_info_lock:
+                previous_info = (
+                    self.current_track_info.copy()
+                    if self.current_track_info
+                    else {}
+                )
+                previous_state = self.spotify_playback_state
+                previous_identity = self._track_identity(previous_info)
+                current_identity = self._track_identity(simplified_info)
+
+                self.current_track_info = simplified_info
+                self.current_source = MusicSource.SPOTIFY
+
+                if is_playing:
+                    self.spotify_playback_state = self.SPOTIFY_PLAYING
+                    self.spotify_paused_at = None
+                    if previous_state == self.SPOTIFY_PAUSED:
+                        logger.info(
+                            "Spotify playback resumed: %s",
+                            simplified_info.get("title", "Unknown"),
+                        )
+                    elif previous_state != self.SPOTIFY_PLAYING:
+                        logger.info(
+                            "Spotify playback started: %s by %s",
+                            simplified_info.get("title", "Unknown"),
+                            simplified_info.get("artist", "Unknown"),
+                        )
+                    elif current_identity != previous_identity:
+                        logger.info(
+                            "Spotify track changed: %s by %s",
+                            simplified_info.get("title", "Unknown"),
+                            simplified_info.get("artist", "Unknown"),
+                        )
+                else:
+                    self.spotify_playback_state = self.SPOTIFY_PAUSED
+                    if (
+                        previous_state != self.SPOTIFY_PAUSED
+                        or previous_identity != current_identity
+                    ):
+                        self.spotify_paused_at = now
+                        logger.info(
+                            "Spotify playback paused: %s; holding music display for %s seconds",
+                            simplified_info.get("title", "Unknown"),
+                            self.SPOTIFY_PAUSE_GRACE_SECONDS,
+                        )
+
+                old_album_art_url = previous_info.get("album_art_url")
+                new_album_art_url = simplified_info.get("album_art_url")
+                if new_album_art_url != old_album_art_url:
+                    self.album_art_image = None
+                    self.last_album_art_url = new_album_art_url
+
+                meaningful_change = (
+                    previous_state != self.spotify_playback_state
+                    or current_identity != previous_identity
+                    or new_album_art_url != old_album_art_url
+                )
+                if meaningful_change and is_playing:
+                    self._needs_immediate_full_refresh = True
+
+            return (
+                simplified_info.copy() if meaningful_change else None,
+                meaningful_change,
+            )
+
+        with self.track_info_lock:
+            was_active = (
+                self.current_source == MusicSource.SPOTIFY
+                or self.spotify_playback_state != self.SPOTIFY_STOPPED
+            )
+            if not was_active:
+                return None, False
+
+            logger.info("Spotify playback stopped or no active playback remains.")
+            stopped_info = self.get_simplified_track_info(
+                None,
+                MusicSource.NONE,
+            )
+            self.current_track_info = stopped_info
+            self.current_source = MusicSource.NONE
+            self.spotify_playback_state = self.SPOTIFY_STOPPED
+            self.spotify_paused_at = None
+            self._needs_immediate_full_refresh = False
+            self.album_art_image = None
+            self.last_album_art_url = None
+        return stopped_info.copy(), True
+
+    def _poll_spotify_once(self, now=None):
+        """Poll Spotify once without changing display modes or drawing."""
+        spotify_track = self.spotify.get_current_track()
+        if spotify_track is None and self.spotify.should_retry():
+            logger.debug(
+                "Spotify request is retryable; preserving the last valid playback frame."
+            )
+            return None, False
+
+        callback_info, significant_change = self._apply_spotify_playback(
+            spotify_track,
+            now=now,
+        )
+        if significant_change and self.update_callback and callback_info:
+            try:
+                self.update_callback(callback_info, True)
+            except Exception as exc:
+                logger.error(
+                    "Error executing Spotify playback update callback: %s",
+                    exc,
+                )
+        return callback_info, significant_change
+
+    def get_playback_state(self, now=None):
+        """Return the effective playback state, including pause grace expiry."""
+        now = time.time() if now is None else now
+        with self.track_info_lock:
+            state = self.spotify_playback_state
+            paused_at = self.spotify_paused_at
+        if (
+            state == self.SPOTIFY_PAUSED
+            and paused_at is not None
+            and now - paused_at >= self.SPOTIFY_PAUSE_GRACE_SECONDS
+        ):
+            return self.SPOTIFY_STOPPED
+        return state
+
     def _poll_music_data(self):
         """Continuously polls music sources for updates, respecting preferences."""
         if not self.enabled:
@@ -358,7 +510,6 @@ class MusicManager:
              return
 
         while not self.stop_event.is_set():
-            polled_track_info_data = None
             source_for_callback = MusicSource.NONE # Used to determine if callback is needed
             significant_change_for_callback = False
             simplified_info_for_callback = None
@@ -369,62 +520,7 @@ class MusicManager:
                 and self.spotify.get_state() != SpotifyClient.STATE_REAUTH_REQUIRED
             ):
                 try:
-                    spotify_track = self.spotify.get_current_track()
-                    if spotify_track and spotify_track.get('is_playing'):
-                        polled_track_info_data = spotify_track
-                        source_for_callback = MusicSource.SPOTIFY
-                        simplified_info_poll = self.get_simplified_track_info(polled_track_info_data, MusicSource.SPOTIFY)
-
-                        with self.track_info_lock:
-                            previous_info = self.current_track_info.copy() if self.current_track_info else {}
-                            # Always update the live snapshot so progress can advance smoothly
-                            self.current_track_info = simplified_info_poll
-                            self.current_source = MusicSource.SPOTIFY
-
-                            # Determine if a meaningful change occurred (ignore progress/duration)
-                            meaningful_fields = ["title", "artist", "album_art_url", "is_playing"]
-                            meaningful_change = any(
-                                previous_info.get(field) != simplified_info_poll.get(field)
-                                for field in meaningful_fields
-                            ) or (self.current_source != MusicSource.SPOTIFY)
-
-                            if meaningful_change:
-                                significant_change_for_callback = True
-                                simplified_info_for_callback = simplified_info_poll.copy()
-                                self._needs_immediate_full_refresh = True
-                                logger.info(f"Polling Spotify: Meaningful change detected - {spotify_track.get('item', {}).get('name', 'Unknown')}, is_playing: {simplified_info_poll.get('is_playing')}")
-                            else:
-                                logger.debug("Polling Spotify: Only minor changes (e.g., progress). No full refresh.")
-
-                            # Handle album art cache only when the URL actually changes
-                            old_album_art_url = previous_info.get('album_art_url')
-                            new_album_art_url = simplified_info_poll.get('album_art_url')
-                            if new_album_art_url != old_album_art_url:
-                                self.album_art_image = None
-                                self.last_album_art_url = new_album_art_url
-                            # Track previous art url for next comparison if needed
-                            self.current_track_info['album_art_url_prev_spotify'] = new_album_art_url
-
-                    else:
-                        logger.debug("Polling Spotify: No active track or player paused.")
-                        if self.spotify.should_retry():
-                            logger.debug(
-                                "Spotify is retryable; preserving the last known playback state."
-                            )
-                        else:
-                            # If Spotify was playing and now it is not
-                            with self.track_info_lock:
-                                if self.current_source == MusicSource.SPOTIFY:
-                                    simplified_info_for_callback = self.get_simplified_track_info(None, MusicSource.NONE)
-                                    self.current_track_info = simplified_info_for_callback
-                                    self.current_source = MusicSource.NONE
-                                    significant_change_for_callback = True
-                                    self._needs_immediate_full_refresh = True # Reset display state
-                                    self.album_art_image = None # Clear art
-                                    self.last_album_art_url = None
-                                    logger.info("Polling Spotify: Player stopped. Updating to Nothing Playing.")
-
-
+                    self._poll_spotify_once()
                 except Exception as e:
                     logging.error(f"Error polling Spotify: {e}")
                     if "token" in str(e).lower():
@@ -478,7 +574,7 @@ class MusicManager:
                 except Exception as e:
                     logger.error(f"Error executing update callback from poll ({source_for_callback.name}): {e}")
             
-            time.sleep(self.polling_interval)
+            self.stop_event.wait(self.polling_interval)
 
     # Modified to accept data and source, making it more testable/reusable
     def get_simplified_track_info(self, track_data, source):
@@ -500,7 +596,7 @@ class MusicManager:
             item = track_data.get('item', {})
             is_playing_spotify = track_data.get('is_playing', False)
 
-            if not item or not is_playing_spotify:
+            if not item:
                 return nothing_playing_info.copy()
 
             return {
@@ -511,7 +607,7 @@ class MusicManager:
                 'album_art_url': item.get('album', {}).get('images', [{}])[0].get('url') if item.get('album', {}).get('images') else None,
                 'duration_ms': item.get('duration_ms'),
                 'progress_ms': track_data.get('progress_ms'),
-                'is_playing': is_playing_spotify, # Should be true here
+                'is_playing': is_playing_spotify,
             }
         elif source == MusicSource.YTM and track_data:
             video_info = track_data.get('video', {})
@@ -612,6 +708,15 @@ class MusicManager:
 
     # Method moved from DisplayController and renamed
     def display(self, force_clear: bool = False):
+        if (
+            self.preferred_source == "spotify"
+            and self.get_playback_state() == self.SPOTIFY_STOPPED
+        ):
+            logger.debug(
+                "Skipping inactive Spotify frame; controller will restore normal rotation."
+            )
+            return False
+
         perform_full_refresh_this_cycle = force_clear
         art_url_currently_in_cache = None # Initialize to None
         image_currently_in_cache = None   # Initialize to None
@@ -676,6 +781,11 @@ class MusicManager:
         
         # --- Original Nothing Playing Logic ---
         if not current_track_info_snapshot or current_track_info_snapshot.get('title') == 'Nothing Playing':
+            if self.preferred_source == "spotify":
+                logger.debug(
+                    "Skipping Spotify Nothing Playing frame; controller will restore normal rotation."
+                )
+                return False
             if not hasattr(self, '_last_nothing_playing_log_time') or time.time() - getattr(self, '_last_nothing_playing_log_time', 0) > 30:
                 logger.debug("Music Screen (MusicManager): Nothing playing or info explicitly 'Nothing Playing'.")
                 self._last_nothing_playing_log_time = time.time()

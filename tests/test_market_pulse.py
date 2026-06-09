@@ -20,6 +20,7 @@ class FakeDraw:
     def __init__(self, image):
         self.image = image
         self.operations = []
+        image.draw_operations = self.operations
 
     def text(self, position, text, **kwargs):
         self.operations.append(("text", position, text, kwargs))
@@ -124,6 +125,22 @@ class MarketPulseTests(unittest.TestCase):
         ):
             return stock_manager.StockManager(config, FakeDisplay())
 
+    @staticmethod
+    def render(manager):
+        with (
+            patch.object(
+                stock_manager.Image,
+                "new",
+                side_effect=lambda mode, size, color=None: FakeImage(size),
+            ),
+            patch.object(
+                stock_manager.ImageDraw,
+                "Draw",
+                side_effect=FakeDraw,
+            ),
+        ):
+            return manager._render_market_pulse()
+
     def test_formats_market_rows_and_renders_64_square(self):
         manager = self.make_manager()
         manager.market_data = {
@@ -134,15 +151,83 @@ class MarketPulseTests(unittest.TestCase):
             "vix": {"price": 18.4, "change_percent": 3.0},
         }
 
-        image = manager._render_market_pulse()
+        image = self.render(manager)
 
         self.assertEqual(image.size, (64, 64))
         self.assertEqual(manager._format_row("sp500", "S&P")[0], "S&P +0.6%")
         self.assertEqual(manager._format_row("btc", "BTC")[0], "BTC $104K")
         self.assertEqual(
             manager._format_row("vix", "VIX")[1],
-            (255, 40, 40),
+            manager.NEGATIVE_COLOR,
         )
+        text_operations = [
+            operation
+            for operation in image.draw_operations
+            if operation[0] == "text"
+        ]
+        labels = {
+            operation[2]: operation[3]["fill"]
+            for operation in text_operations
+            if operation[2] in {"MARKET", "S&P", "NAS", "DOW", "BTC", "VIX"}
+        }
+        self.assertEqual(labels["MARKET"], manager.LABEL_COLOR)
+        self.assertEqual(labels["S&P"], manager.LABEL_COLOR)
+        self.assertEqual(labels["NAS"], manager.LABEL_COLOR)
+        self.assertEqual(labels["DOW"], manager.LABEL_COLOR)
+        self.assertEqual(labels["BTC"], manager.LABEL_COLOR)
+        self.assertEqual(labels["VIX"], manager.LABEL_COLOR)
+        values = {
+            operation[2]: operation[3]["fill"]
+            for operation in text_operations
+            if operation[2] in {"+0.6%", "+1.1%", "-0.2%", "$104K", "18.4"}
+        }
+        self.assertEqual(values["+0.6%"], manager.POSITIVE_COLOR)
+        self.assertEqual(values["-0.2%"], manager.NEGATIVE_COLOR)
+        self.assertEqual(values["18.4"], manager.NEGATIVE_COLOR)
+        line_operations = [
+            operation
+            for operation in image.draw_operations
+            if operation[0] == "line"
+        ]
+        self.assertGreaterEqual(len(line_operations), 16)
+
+    def test_vix_uses_actual_arrow_direction_with_inverse_color(self):
+        manager = self.make_manager()
+        manager.market_data = {
+            "vix": {"price": 17.5, "change_percent": -2.0},
+        }
+
+        value, color, direction = manager._format_value("vix")
+
+        self.assertEqual(value, "17.5")
+        self.assertEqual(direction, -1)
+        self.assertEqual(color, manager.POSITIVE_COLOR)
+
+    def test_stale_header_marker_is_subtle_and_within_bounds(self):
+        manager = self.make_manager()
+        manager.market_data = {
+            "sp500": {"price": 6000, "change_percent": 0.0},
+        }
+        manager.is_stale = True
+
+        image = self.render(manager)
+
+        marker = next(
+            operation
+            for operation in image.draw_operations
+            if operation[0] == "text" and operation[2] == "*"
+        )
+        self.assertEqual(marker[3]["fill"], manager.STALE_COLOR)
+        for operation in image.draw_operations:
+            if operation[0] == "text":
+                x, y = operation[1]
+                self.assertGreaterEqual(x, 0)
+                self.assertGreaterEqual(y, 0)
+                self.assertLess(x, 64)
+                self.assertLess(y, 64)
+            elif operation[0] == "line":
+                points = operation[1]
+                self.assertTrue(all(0 <= coordinate < 64 for coordinate in points))
 
     def test_partial_refresh_merges_cached_rows(self):
         manager = self.make_manager()
@@ -180,6 +265,7 @@ class MarketPulseTests(unittest.TestCase):
     def test_no_data_renders_unavailable_rows_instead_of_blank_frame(self):
         manager = self.make_manager()
         manager.market_data = {}
+        manager.next_retry_at = float("inf")
 
         self.assertTrue(manager.display_stocks(force_clear=True))
         self.assertEqual(manager.display_manager.image.size, (64, 64))

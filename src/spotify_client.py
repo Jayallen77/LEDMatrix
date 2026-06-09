@@ -40,6 +40,7 @@ class SpotifyClient:
 
     INITIAL_RETRY_DELAY_SECONDS = 2
     MAX_RETRY_DELAY_SECONDS = 60
+    REQUEST_TIMEOUT_SECONDS = 3
 
     def __init__(self):
         self.client_id = None
@@ -97,6 +98,7 @@ class SpotifyClient:
                 redirect_uri=self.redirect_uri,
                 scope=self.scope,
                 cache_path=SPOTIFY_AUTH_CACHE_PATH,
+                requests_timeout=self.REQUEST_TIMEOUT_SECONDS,
                 open_browser=False
             )
 
@@ -113,7 +115,12 @@ class SpotifyClient:
             self._get_access_token()
             ensure_spotify_cache_access(SPOTIFY_AUTH_CACHE_PATH, logger=logger)
             log_spotify_cache_diagnostics(SPOTIFY_AUTH_CACHE_PATH, logger=logger)
-            self.sp = spotipy.Spotify(auth_manager=self.auth_manager)
+            self.sp = spotipy.Spotify(
+                auth_manager=self.auth_manager,
+                requests_timeout=self.REQUEST_TIMEOUT_SECONDS,
+                retries=0,
+                status_retries=0,
+            )
             self._mark_ready()
             logger.info("Spotify client initialized and authenticated using cached token.")
         except Exception as exc:

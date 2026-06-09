@@ -12,7 +12,9 @@ if str(PROJECT_ROOT) not in sys.path:
 
 def install_controller_stubs():
     class Dummy:
-        pass
+        SPOTIFY_PLAYING = "playing"
+        SPOTIFY_PAUSED = "paused"
+        SPOTIFY_STOPPED = "stopped"
 
     modules = {
         "src.clock": {"Clock": Dummy},
@@ -122,6 +124,11 @@ class DynamicDisplayModeTests(unittest.TestCase):
         controller.calendar = ContentManager(False)
         controller.colorado_sports = ContentManager(True)
         controller.music_manager = Mock(enabled=True)
+        controller.music_manager.preferred_source = "spotify"
+        controller.music_manager.spotify_playback_state = "stopped"
+        controller.music_return_mode = None
+        controller.music_return_index = None
+        controller.display_manager = Mock()
         controller.force_clear = False
         controller.last_switch = 0
         return controller
@@ -160,6 +167,74 @@ class DynamicDisplayModeTests(unittest.TestCase):
         self.assertEqual(controller.current_display_mode, "clock")
         self.assertEqual(controller.current_mode_index, 0)
         self.assertTrue(controller.force_clear)
+
+    def test_disabled_or_empty_news_never_enters_rotation(self):
+        controller = self.make_controller()
+        controller.news_manager = None
+
+        controller._sync_dynamic_modes()
+
+        self.assertNotIn("news_manager", controller.available_modes)
+
+        controller.news_manager = ContentManager(False)
+        controller.available_modes.insert(4, "news_manager")
+        controller._sync_dynamic_modes()
+
+        self.assertNotIn("news_manager", controller.available_modes)
+
+    def test_poll_callback_never_changes_or_clears_display(self):
+        controller = self.make_controller()
+
+        controller._handle_music_update(
+            {"title": "Track", "is_playing": True},
+            significant_change=True,
+        )
+
+        self.assertEqual(controller.current_display_mode, "weather_current")
+        controller.display_manager.clear.assert_not_called()
+
+    def test_music_returns_to_interrupted_mode_after_stop(self):
+        controller = self.make_controller()
+
+        self.assertTrue(controller._enter_music_mode(10))
+        self.assertEqual(controller.current_display_mode, "music")
+        self.assertEqual(controller.music_return_mode, "weather_current")
+        controller.display_manager.clear.assert_not_called()
+
+        self.assertTrue(controller._return_from_music(20, "playback stopped"))
+
+        self.assertEqual(controller.current_display_mode, "weather_current")
+        self.assertEqual(controller.current_mode_index, 1)
+        self.assertTrue(controller.force_clear)
+        controller.music_manager.deactivate_music_display.assert_called_once()
+
+    def test_music_uses_next_normal_mode_if_interrupted_mode_is_gone(self):
+        controller = self.make_controller()
+        controller._enter_music_mode(10)
+        controller.available_modes.remove("weather_current")
+
+        controller._return_from_music(20, "playback stopped")
+
+        self.assertEqual(controller.current_display_mode, "weather_daily")
+        self.assertNotEqual(controller.current_display_mode, "music")
+
+    def test_playing_and_pause_grace_hold_music_outside_normal_rotation(self):
+        controller = self.make_controller()
+        controller.current_display_mode = "music"
+
+        self.assertTrue(controller._music_holds_display("playing"))
+        self.assertTrue(controller._music_holds_display("paused"))
+        self.assertFalse(controller._music_holds_display("stopped"))
+
+    def test_non_spotify_source_keeps_legacy_playback_detection(self):
+        controller = self.make_controller()
+        controller.music_manager.preferred_source = "ytm"
+        controller._is_music_playing = Mock(return_value=True)
+
+        self.assertEqual(
+            controller._get_music_playback_state(10),
+            "playing",
+        )
 
 
 if __name__ == "__main__":

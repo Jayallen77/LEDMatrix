@@ -77,6 +77,8 @@ class DisplayController:
         # Initialize Music Manager
         music_init_time = time.time()
         self.music_manager = None
+        self.music_return_mode = None
+        self.music_return_index = None
         
         if hasattr(self, 'config'):
             music_config_main = self.config.get('music', {})
@@ -434,70 +436,105 @@ class DisplayController:
         self._load_config() # Initial load of schedule
 
     def _handle_music_update(self, track_info: Dict[str, Any], significant_change: bool = False):
-        """Callback for when music track info changes."""
-        # MusicManager now handles its own display state (album art, etc.)
-        # This callback might still be useful if DisplayController needs to react to music changes
-        # for reasons other than directly re-drawing the music screen (e.g., logging, global state).
-        # For now, we'll keep it simple. If the music screen is active, it will redraw on its own.
+        """Receive poll-thread updates without changing display modes."""
         if track_info:
-            logger.debug(f"DisplayController received music update (via callback): Title - {track_info.get('title')}, Playing - {track_info.get('is_playing')}")
+            logger.debug(
+                "Playback update received: title=%s playing=%s significant=%s",
+                track_info.get('title'),
+                track_info.get('is_playing'),
+                significant_change,
+            )
         else:
-            logger.debug("DisplayController received music update (via callback): Track is None or not playing.")
+            logger.debug("Playback update received with no track data.")
 
-        # Check if we need to auto-switch to music mode when music starts playing
-        if (track_info and
-            track_info.get('is_playing', False) and
-            self.current_display_mode != 'music' and
-            self.music_manager and
-            self.music_manager.enabled):
+    def _get_music_playback_state(self, current_time=None):
+        if not self.music_manager or not self.music_manager.enabled:
+            return MusicManager.SPOTIFY_STOPPED
+        if getattr(self.music_manager, 'preferred_source', 'spotify') != 'spotify':
+            return (
+                MusicManager.SPOTIFY_PLAYING
+                if self._is_music_playing()
+                else MusicManager.SPOTIFY_STOPPED
+            )
+        if hasattr(self.music_manager, 'get_playback_state'):
+            return self.music_manager.get_playback_state(now=current_time)
+        return (
+            MusicManager.SPOTIFY_PLAYING
+            if self._is_music_playing()
+            else MusicManager.SPOTIFY_STOPPED
+        )
 
-            logger.info(f"Music started playing (callback) - auto-switching to music mode from {self.current_display_mode}")
-            logger.info(f"Track: {track_info.get('title', 'Unknown')} by {track_info.get('artist', 'Unknown')}")
-            # Explicitly clear the display before switching to music to prevent overlay
-            self.display_manager.clear()
-            if self.music_manager:
-                self.music_manager.activate_music_display()
-            self.current_display_mode = 'music'
-            self.force_clear = True
-            self.last_switch = time.time()
-            # Reset logged duration when mode changes
-            if hasattr(self, '_last_logged_duration'):
-                delattr(self, '_last_logged_duration')
-            return
+    def _music_holds_display(self, playback_state):
+        return (
+            self.current_display_mode == 'music'
+            and playback_state in (
+                MusicManager.SPOTIFY_PLAYING,
+                MusicManager.SPOTIFY_PAUSED,
+            )
+        )
 
-        # Check if we need to auto-switch back to regular rotation when music stops
-        if (not track_info or
-            not track_info.get('is_playing', False)) and \
-            self.current_display_mode == 'music' and \
-            self.music_manager and \
-            self.music_manager.enabled:
+    def _enter_music_mode(self, current_time):
+        if self.current_display_mode == 'music':
+            return False
+        self.music_return_mode = self.current_display_mode
+        self.music_return_index = self.current_mode_index
+        logger.info(
+            "Music started; taking over from %s.",
+            self.music_return_mode,
+        )
+        if self.music_manager:
+            self.music_manager.activate_music_display()
+        self.current_display_mode = 'music'
+        if 'music' in self.available_modes:
+            self.current_mode_index = self.available_modes.index('music')
+        self.force_clear = True
+        self.last_switch = current_time
+        if hasattr(self, '_last_logged_duration'):
+            delattr(self, '_last_logged_duration')
+        return True
 
-            logger.info("Music stopped playing (callback) - auto-switching to regular rotation")
-            # Explicitly clear the display before switching away from music to prevent overlay
-            self.display_manager.clear()
-            if self.music_manager:
-                self.music_manager.deactivate_music_display()
-            # Switch to next mode in rotation
-            self.current_mode_index = self._get_next_mode_index(self.current_mode_index)
-            self.current_display_mode = self.available_modes[self.current_mode_index]
-            self.force_clear = True
-            self.last_switch = time.time()
-            # Reset logged duration when mode changes
-            if hasattr(self, '_last_logged_duration'):
-                delattr(self, '_last_logged_duration')
-            return
+    def _resolve_music_return_mode(self):
+        if (
+            self.music_return_mode
+            and self.music_return_mode != 'music'
+            and self.music_return_mode in self.available_modes
+        ):
+            return self.music_return_mode
 
-        if self.current_display_mode == 'music' and self.music_manager:
-            if significant_change:
-                logger.info("Music is current display mode and SIGNIFICANT track updated. Signaling immediate refresh.")
-                self.force_clear = True # Tell the display method to clear before drawing
-            else:
-                logger.debug("Music is current display mode and received a MINOR update (e.g. progress). No force_clear.")
-                # self.force_clear = False # Ensure it's false if not significant, or let run loop manage
-        # If the current display mode is music, the MusicManager's display method will be called
-        # in the main loop and will use its own updated internal state. No explicit action needed here
-        # to force a redraw of the music screen itself, unless DisplayController wants to switch TO music mode.
-        # Example: if self.current_display_mode == 'music': self.force_clear = True (but MusicManager.display handles this)
+        if not self.available_modes:
+            return None
+        start_index = self.music_return_index or 0
+        for offset in range(len(self.available_modes)):
+            mode = self.available_modes[
+                (start_index + offset) % len(self.available_modes)
+            ]
+            if mode != 'music':
+                return mode
+        return None
+
+    def _return_from_music(self, current_time, reason):
+        if self.current_display_mode != 'music':
+            return False
+        target_mode = self._resolve_music_return_mode()
+        if not target_mode:
+            logger.warning("Music ended, but no normal display mode is available.")
+            return False
+        if self.music_manager:
+            self.music_manager.deactivate_music_display()
+        self.current_display_mode = target_mode
+        self.current_mode_index = self.available_modes.index(target_mode)
+        self.force_clear = True
+        self.last_switch = current_time
+        logger.info(
+            "Music %s; returning to normal rotation at %s.",
+            reason,
+            target_mode,
+        )
+        self.music_return_mode = None
+        self.music_return_index = None
+        if hasattr(self, '_last_logged_duration'):
+            delattr(self, '_last_logged_duration')
+        return True
 
     def get_current_duration(self) -> int:
         """Get the duration for the current display mode."""
@@ -1170,54 +1207,48 @@ class DisplayController:
                             logger.warning(f"[DisplayController] Live priority takeover attempted for {new_mode} but manager has no live games, skipping takeover")
                             live_priority_takeover = False
                     else:
-                        # Check for Spotify playing before regular rotation
-                        spotify_is_playing = False
-                        if self.music_manager and self.music_manager.enabled:
-                            with self.music_manager.track_info_lock:
-                                current_track = self.music_manager.current_track_info
-                                if (current_track and 
-                                    current_track.get('is_playing', False) and 
-                                    self.music_manager.current_source != MusicSource.NONE):
-                                    spotify_is_playing = True
-                        
-                        # If Spotify is playing and we're not already in music mode, switch to music
-                        if spotify_is_playing and self.current_display_mode != 'music':
-                            logger.info(f"Spotify is playing - switching to music from {self.current_display_mode}")
-                            # Explicitly clear the display before switching to music to prevent overlay
-                            self.display_manager.clear()
-                            if self.music_manager:
-                                self.music_manager.activate_music_display()
-                            self.current_display_mode = 'music'
-                            self.force_clear = True
-                            self.last_switch = current_time
-                            # Reset logged duration when mode changes
-                            if hasattr(self, '_last_logged_duration'):
-                                delattr(self, '_last_logged_duration')
-                        # If Spotify stopped playing and we're in music mode, switch back to regular rotation
-                        elif not spotify_is_playing and self.current_display_mode == 'music':
-                            logger.info("Spotify stopped playing - switching to regular rotation")
-                            # Explicitly clear the display before switching away from music to prevent overlay
-                            self.display_manager.clear()
-                            if self.music_manager:
-                                self.music_manager.deactivate_music_display()
-                            # Switch to next mode in rotation
-                            self.current_mode_index = self._get_next_mode_index(self.current_mode_index)
-                            self.current_display_mode = self.available_modes[self.current_mode_index]
-                            self.force_clear = True
-                            self.last_switch = current_time
-                            # Reset logged duration when mode changes
-                            if hasattr(self, '_last_logged_duration'):
-                                delattr(self, '_last_logged_duration')
-                        else:
-                            # Log current state for debugging
-                            if spotify_is_playing and self.current_display_mode == 'music':
-                                logger.debug("Spotify is playing and already in music mode")
-                            elif not spotify_is_playing and self.current_display_mode != 'music':
-                                logger.debug("Spotify is not playing and not in music mode")
+                        music_transitioned = False
+                        playback_state = self._get_music_playback_state(
+                            current_time
+                        )
+                        if (
+                            playback_state == MusicManager.SPOTIFY_PLAYING
+                            and self.current_display_mode != 'music'
+                        ):
+                            music_transitioned = self._enter_music_mode(
+                                current_time
+                            )
+                        elif (
+                            playback_state == MusicManager.SPOTIFY_PAUSED
+                            and self.current_display_mode == 'music'
+                        ):
+                            logger.debug(
+                                "Spotify is paused within the grace period; retaining music frame."
+                            )
+                        elif (
+                            playback_state == MusicManager.SPOTIFY_STOPPED
+                            and self.current_display_mode == 'music'
+                        ):
+                            internal_state = getattr(
+                                self.music_manager,
+                                'spotify_playback_state',
+                                MusicManager.SPOTIFY_STOPPED,
+                            )
+                            reason = (
+                                "pause grace expired"
+                                if internal_state == MusicManager.SPOTIFY_PAUSED
+                                else "playback stopped"
+                            )
+                            music_transitioned = self._return_from_music(
+                                current_time,
+                                reason,
+                            )
                         
                         # No live_priority takeover, regular rotation
                         needs_switch = False
-                        if (
+                        if self._music_holds_display(playback_state):
+                            needs_switch = False
+                        elif (
                             self.current_display_mode.endswith('_live')
                             and self.current_display_mode != 'sports_live'
                         ):
@@ -1255,7 +1286,7 @@ class DisplayController:
                         if needs_switch:
                             self.force_clear = True
                             self.last_switch = current_time
-                        else:
+                        elif not music_transitioned:
                             self.force_clear = False
                         # Only set manager_to_display if it hasn't been set by live priority logic
                         if manager_to_display is None:

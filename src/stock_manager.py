@@ -18,6 +18,13 @@ class StockManager:
     """Display a compact broad-market summary behind the legacy stocks mode."""
 
     CACHE_KEY = "market_pulse"
+    LABEL_COLOR = (255, 255, 255)
+    POSITIVE_COLOR = (0, 255, 70)
+    NEGATIVE_COLOR = (255, 45, 45)
+    NEUTRAL_COLOR = (255, 210, 0)
+    UNAVAILABLE_COLOR = (115, 115, 115)
+    ACCENT_COLOR = (40, 150, 255)
+    STALE_COLOR = (255, 180, 0)
     INSTRUMENTS = (
         ("sp500", "S&P", "^GSPC"),
         ("nasdaq", "NAS", "^IXIC"),
@@ -214,11 +221,15 @@ class StockManager:
     @staticmethod
     def _movement_color(change: float, invert: bool = False) -> Tuple[int, int, int]:
         if change == 0:
-            return (255, 220, 0)
+            return StockManager.NEUTRAL_COLOR
         positive = change > 0
         if invert:
             positive = not positive
-        return (0, 255, 0) if positive else (255, 40, 40)
+        return (
+            StockManager.POSITIVE_COLOR
+            if positive
+            else StockManager.NEGATIVE_COLOR
+        )
 
     @staticmethod
     def _compact_price(value: float) -> str:
@@ -233,14 +244,13 @@ class StockManager:
             return f"${value:,.0f}"
         return f"${value:.0f}"
 
-    def _format_row(
+    def _format_value(
         self,
         key: str,
-        label: str,
-    ) -> Tuple[str, Tuple[int, int, int]]:
+    ) -> Tuple[str, Tuple[int, int, int], Optional[int]]:
         row = self.market_data.get(key)
         if not row:
-            return f"{label:<3} --", (120, 120, 120)
+            return "--", self.UNAVAILABLE_COLOR, None
         change = float(row.get("change_percent", 0))
         if key == "btc":
             value = self._compact_price(float(row.get("price", 0)))
@@ -251,7 +261,36 @@ class StockManager:
         else:
             value = f"{change:+.1f}%"
             color = self._movement_color(change)
-        return f"{label:<3} {value}", color
+        direction = 1 if change > 0 else -1 if change < 0 else 0
+        return value, color, direction
+
+    def _format_row(
+        self,
+        key: str,
+        label: str,
+    ) -> Tuple[str, Tuple[int, int, int]]:
+        value, color, _ = self._format_value(key)
+        return f"{label} {value}", color
+
+    @staticmethod
+    def _draw_direction_indicator(
+        draw,
+        x: int,
+        y: int,
+        direction: Optional[int],
+        color: Tuple[int, int, int],
+    ) -> None:
+        if direction is None or direction == 0:
+            draw.line((x, y + 2, x + 4, y + 2), fill=color)
+            return
+        if direction > 0:
+            draw.line((x + 2, y, x, y + 2), fill=color)
+            draw.line((x + 2, y, x + 4, y + 2), fill=color)
+            draw.line((x + 2, y, x + 2, y + 5), fill=color)
+            return
+        draw.line((x, y + 2, x + 2, y + 4), fill=color)
+        draw.line((x + 4, y + 2, x + 2, y + 4), fill=color)
+        draw.line((x + 2, y, x + 2, y + 4), fill=color)
 
     def _render_market_pulse(self) -> Image.Image:
         width = int(getattr(self.display_manager, "width", 64))
@@ -265,25 +304,48 @@ class StockManager:
         )
 
         unavailable = not self.market_data
-        header = "MARKET*" if self.is_stale else "MARKET?" if unavailable else "MARKET"
-        header_color = (
-            (255, 190, 0)
-            if self.is_stale or unavailable
-            else (80, 180, 255)
-        )
+        header = "MARKET"
         header_width = self.display_manager.get_text_width(header, font)
+        marker = "*" if self.is_stale else "?" if unavailable else ""
+        marker_width = self.display_manager.get_text_width(marker, font)
+        total_header_width = header_width + (1 + marker_width if marker else 0)
+        header_x = (width - total_header_width) // 2
         draw.text(
-            ((width - header_width) // 2, 1),
+            (header_x, 0),
             header,
             font=font,
-            fill=header_color,
+            fill=self.LABEL_COLOR,
         )
+        if marker:
+            draw.text(
+                (header_x + header_width + 1, 0),
+                marker,
+                font=font,
+                fill=self.STALE_COLOR,
+            )
+        draw.line((5, 8, width - 6, 8), fill=self.ACCENT_COLOR)
 
         rows = [item for item in self.INSTRUMENTS if item[0] != "btc" or self.include_btc]
         y_positions = (12, 22, 32, 42, 52)
+        arrow_x = width - 6
+        value_right = arrow_x - 2
         for (key, label, _), y in zip(rows, y_positions):
-            text, color = self._format_row(key, label)
-            draw.text((2, y), text, font=font, fill=color)
+            value, color, direction = self._format_value(key)
+            draw.text((2, y), label, font=font, fill=self.LABEL_COLOR)
+            value_width = self.display_manager.get_text_width(value, font)
+            draw.text(
+                (max(20, value_right - value_width), y),
+                value,
+                font=font,
+                fill=color,
+            )
+            self._draw_direction_indicator(
+                draw,
+                arrow_x,
+                y,
+                direction,
+                color,
+            )
         return image
 
     def display_stocks(self, force_clear: bool = False) -> bool:

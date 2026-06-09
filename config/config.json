@@ -418,7 +418,7 @@
         "enabled": true,
         "preferred_source": "spotify",
         "YTM_COMPANION_URL": "http://192.168.86.12:9863",
-        "POLLING_INTERVAL_SECONDS": 2
+        "POLLING_INTERVAL_SECONDS": 1
     },
     "of_the_day": {
         "enabled": false,
@@ -443,7 +443,7 @@
         }
     },
     "news_manager": {
-        "enabled": true,
+        "enabled": false,
         "update_interval": 300,
         "scroll_speed": 1,
         "scroll_delay": 0.01,
