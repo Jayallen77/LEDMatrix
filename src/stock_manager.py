@@ -522,7 +522,7 @@ class StockManager:
 
         rows = [item for item in self.INSTRUMENTS if item[0] != "btc" or self.include_btc]
         y_positions = (12, 22, 32, 42, 52)
-        trend_x = 16
+        trend_x = 19
         arrow_x = width - 5
         value_right = arrow_x - 2
         for (key, label, _), y in zip(rows, y_positions):

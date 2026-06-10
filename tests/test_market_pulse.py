@@ -200,6 +200,10 @@ class MarketPulseTests(unittest.TestCase):
             if operation[0] == "rectangle"
         ]
         self.assertEqual(len(trend_operations), 20)
+        self.assertEqual(
+            [operation[1][0] for operation in trend_operations[:4]],
+            [19, 23, 27, 31],
+        )
 
     def test_vix_uses_actual_arrow_direction_with_inverse_color(self):
         manager = self.make_manager()
