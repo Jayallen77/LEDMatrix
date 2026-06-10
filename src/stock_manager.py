@@ -522,7 +522,7 @@ class StockManager:
         marker = "*" if self.is_stale else "?" if unavailable else ""
         marker_width = self.display_manager.get_text_width(marker, header_font)
         total_header_width = header_width + (1 + marker_width if marker else 0)
-        header_x = ((width - total_header_width) // 2) - 1
+        header_x = (width - total_header_width) // 2
         draw.text(
             (header_x, 2),
             header,
@@ -536,7 +536,7 @@ class StockManager:
                 font=header_font,
                 fill=self.STALE_COLOR,
             )
-        draw.line((4, 10, width - 7, 10), fill=self.ACCENT_COLOR)
+        draw.line((5, 10, width - 6, 10), fill=self.ACCENT_COLOR)
 
         rows = [item for item in self.INSTRUMENTS if item[0] != "btc" or self.include_btc]
         y_positions = (14, 24, 34, 44, 54)

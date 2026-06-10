@@ -200,7 +200,7 @@ class MarketPulseTests(unittest.TestCase):
             for operation in text_operations
             if operation[2] in {"MARKETS", "S&P", "NAS", "DOW", "BTC", "VIX"}
         }
-        self.assertEqual(positions["MARKETS"], (17, 2))
+        self.assertEqual(positions["MARKETS"], (18, 2))
         self.assertEqual(
             [positions[label][1] for label in ("S&P", "NAS", "DOW", "BTC", "VIX")],
             [14, 24, 34, 44, 54],
@@ -215,7 +215,7 @@ class MarketPulseTests(unittest.TestCase):
         ]
         self.assertGreaterEqual(len(line_operations), 16)
         self.assertIn(
-            ("line", (4, 10, 57, 10), {"fill": manager.ACCENT_COLOR}),
+            ("line", (5, 10, 58, 10), {"fill": manager.ACCENT_COLOR}),
             line_operations,
         )
         self.assertIn(

@@ -572,7 +572,7 @@ class WeatherManager:
                         temp_x + high_width + 2,
                         y + 3,
                     ),
-                    fill=(190, 150, 45),
+                    fill=(255, 255, 255),
                 )
                 draw.text(
                     (temp_x + high_width + separator_width, y),

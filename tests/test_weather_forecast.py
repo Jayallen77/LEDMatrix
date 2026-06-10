@@ -195,7 +195,7 @@ class WeatherForecastTests(unittest.TestCase):
         self.assertEqual(separator[1], (51, 10, 52, 10))
         self.assertEqual(low[1], (54, 7))
         self.assertEqual(high[3]["fill"], (255, 90, 35))
-        self.assertEqual(separator[2]["fill"], (190, 150, 45))
+        self.assertEqual(separator[2]["fill"], (255, 255, 255))
         self.assertEqual(low[3]["fill"], (60, 150, 255))
 
     def test_current_weather_places_high_left_and_low_right(self):
