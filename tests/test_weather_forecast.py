@@ -24,6 +24,9 @@ class FakeDraw:
     def text(self, position, text, **kwargs):
         self.operations.append(("text", position, text, kwargs))
 
+    def point(self, position, **kwargs):
+        self.operations.append(("point", position, kwargs))
+
     @staticmethod
     def textbbox(position, text, **kwargs):
         del position, kwargs
@@ -155,7 +158,10 @@ class WeatherForecastTests(unittest.TestCase):
         day_operations = [
             operation
             for operation in text_operations
-            if operation[2] in {"Mon", "Tue", "Wed", "Thu"}
+            if (
+                operation[0] == "text"
+                and operation[2] in {"Mon", "Tue", "Wed", "Thu"}
+            )
         ]
         self.assertEqual(
             [operation[1] for operation in day_operations],
@@ -168,15 +174,19 @@ class WeatherForecastTests(unittest.TestCase):
             )
         )
 
-        low = next(operation for operation in text_operations if operation[2] == "41")
-        slash = next(operation for operation in text_operations if operation[2] == "/")
         high = next(operation for operation in text_operations if operation[2] == "68")
-        self.assertEqual(low[1], (42, 7))
-        self.assertEqual(slash[1], (50, 7))
-        self.assertEqual(high[1], (54, 7))
-        self.assertEqual(low[3]["fill"], (60, 150, 255))
-        self.assertEqual(slash[3]["fill"], (190, 150, 45))
+        low = next(operation for operation in text_operations if operation[2] == "41")
+        separator = next(
+            operation
+            for operation in text_operations
+            if operation[0] == "point"
+        )
+        self.assertEqual(high[1], (42, 7))
+        self.assertEqual(separator[1], (51, 10))
+        self.assertEqual(low[1], (54, 7))
         self.assertEqual(high[3]["fill"], (255, 90, 35))
+        self.assertEqual(separator[2]["fill"], (190, 150, 45))
+        self.assertEqual(low[3]["fill"], (60, 150, 255))
 
 
 if __name__ == "__main__":
