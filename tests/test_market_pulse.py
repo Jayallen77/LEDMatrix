@@ -162,7 +162,7 @@ class MarketPulseTests(unittest.TestCase):
         self.assertEqual(manager._format_row("btc", "BTC")[0], "BTC $104K")
         self.assertEqual(
             manager._format_row("vix", "VIX")[1],
-            manager.NEGATIVE_COLOR,
+            manager.VIX_NORMAL_COLOR,
         )
         text_operations = [
             operation
@@ -187,35 +187,85 @@ class MarketPulseTests(unittest.TestCase):
         }
         self.assertEqual(values["+0.6%"], manager.POSITIVE_COLOR)
         self.assertEqual(values["-0.2%"], manager.NEGATIVE_COLOR)
-        self.assertEqual(values["18.4"], manager.NEGATIVE_COLOR)
+        self.assertEqual(values["18.4"], manager.VIX_NORMAL_COLOR)
+        positions = {
+            operation[2]: operation[1]
+            for operation in text_operations
+            if operation[2] in {"MARKET", "S&P", "NAS", "DOW", "BTC", "VIX"}
+        }
+        self.assertEqual(positions["MARKET"][1], 2)
+        self.assertEqual(
+            [positions[label][1] for label in ("S&P", "NAS", "DOW", "BTC", "VIX")],
+            [14, 24, 34, 44, 54],
+        )
         line_operations = [
             operation
             for operation in image.draw_operations
             if operation[0] == "line"
         ]
         self.assertGreaterEqual(len(line_operations), 16)
+        self.assertIn(
+            ("line", (5, 10, 58, 10), {"fill": manager.ACCENT_COLOR}),
+            line_operations,
+        )
         trend_operations = [
             operation
             for operation in image.draw_operations
             if operation[0] == "rectangle"
         ]
-        self.assertEqual(len(trend_operations), 20)
+        self.assertEqual(len(trend_operations), 35)
         self.assertEqual(
-            [operation[1][0] for operation in trend_operations[:4]],
-            [19, 23, 27, 31],
+            [operation[1][0] for operation in trend_operations[:7]],
+            [19, 21, 23, 25, 27, 29, 31],
+        )
+        self.assertTrue(
+            all(operation[1][0] == operation[1][2] for operation in trend_operations)
+        )
+        self.assertTrue(
+            all(
+                operation[2]["fill"] == manager.VIX_NORMAL_COLOR
+                for operation in trend_operations[-7:]
+            )
+        )
+        self.assertTrue(
+            all(
+                operation[2]["fill"] == manager.VIX_NORMAL_COLOR
+                for operation in line_operations[-3:]
+            )
         )
 
-    def test_vix_uses_actual_arrow_direction_with_inverse_color(self):
+    def test_vix_uses_risk_level_color_and_actual_direction(self):
         manager = self.make_manager()
-        manager.market_data = {
-            "vix": {"price": 17.5, "change_percent": -2.0},
-        }
+        cases = (
+            (18.4, 2.0, "18.4", manager.VIX_NORMAL_COLOR, 1),
+            (32.0, -2.0, "32.0", manager.VIX_HIGH_COLOR, -1),
+            (45.0, 3.0, "45.0", manager.VIX_PANIC_COLOR, 1),
+        )
+        for level, change, value, expected_color, expected_direction in cases:
+            manager.market_data = {
+                "vix": {"price": level, "change_percent": change},
+            }
 
-        value, color, direction = manager._format_value("vix")
+            formatted, color, direction = manager._format_value("vix")
 
-        self.assertEqual(value, "17.5")
-        self.assertEqual(direction, -1)
-        self.assertEqual(color, manager.POSITIVE_COLOR)
+            self.assertEqual(formatted, value)
+            self.assertEqual(color, expected_color)
+            self.assertEqual(direction, expected_direction)
+
+    def test_vix_risk_color_boundaries(self):
+        manager = self.make_manager()
+        self.assertEqual(manager._vix_risk_color(12.9), manager.VIX_CALM_COLOR)
+        self.assertEqual(manager._vix_risk_color(13), manager.VIX_NORMAL_COLOR)
+        self.assertEqual(manager._vix_risk_color(20), manager.VIX_ELEVATED_COLOR)
+        self.assertEqual(manager._vix_risk_color(30), manager.VIX_HIGH_COLOR)
+        self.assertEqual(manager._vix_risk_color(40), manager.VIX_PANIC_COLOR)
+
+    def test_cached_and_fallback_trends_render_seven_bars(self):
+        manager = self.make_manager()
+        self.assertEqual(len(manager._sample_trend([1, 2, 3, 4])), 7)
+        self.assertEqual(manager._fallback_trend(1), [1, 2, 3, 4, 5, 6, 7])
+        self.assertEqual(manager._fallback_trend(-1), [7, 6, 5, 4, 3, 2, 1])
+        self.assertEqual(manager._fallback_trend(0), [4, 4, 4, 4, 4, 4, 4])
 
     def test_stale_header_marker_is_subtle_and_within_bounds(self):
         manager = self.make_manager()
@@ -231,6 +281,7 @@ class MarketPulseTests(unittest.TestCase):
             for operation in image.draw_operations
             if operation[0] == "text" and operation[2] == "*"
         )
+        self.assertEqual(marker[1][1], 2)
         self.assertEqual(marker[3]["fill"], manager.STALE_COLOR)
         for operation in image.draw_operations:
             if operation[0] == "text":
@@ -275,7 +326,9 @@ class MarketPulseTests(unittest.TestCase):
 
         self.assertEqual(open_row["session_state"], "open")
         self.assertAlmostEqual(open_row["change_percent"], 3.0)
-        self.assertEqual(open_row["trend"], [100.5, 101.0, 102.0, 103.0])
+        self.assertEqual(len(open_row["trend"]), 7)
+        self.assertEqual(open_row["trend"][0], 100.5)
+        self.assertEqual(open_row["trend"][-1], 103.0)
 
         with patch.object(
             stock_manager.time,
@@ -318,7 +371,7 @@ class MarketPulseTests(unittest.TestCase):
 
         self.assertEqual(row["session_state"], "previous")
         self.assertAlmostEqual(row["change_percent"], -1.0)
-        self.assertEqual(len(row["trend"]), 4)
+        self.assertEqual(len(row["trend"]), 7)
 
     def test_previous_session_rows_mark_market_data_stale(self):
         manager = self.make_manager()

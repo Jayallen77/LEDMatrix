@@ -28,6 +28,11 @@ class StockManager:
     ACCENT_COLOR = (40, 150, 255)
     STALE_COLOR = (255, 180, 0)
     TREND_COLOR = (90, 170, 255)
+    VIX_CALM_COLOR = (0, 190, 255)
+    VIX_NORMAL_COLOR = (0, 255, 70)
+    VIX_ELEVATED_COLOR = (255, 190, 0)
+    VIX_HIGH_COLOR = (255, 95, 35)
+    VIX_PANIC_COLOR = (255, 30, 110)
     INSTRUMENTS = (
         ("sp500", "S&P", "^GSPC"),
         ("nasdaq", "NAS", "^IXIC"),
@@ -186,7 +191,7 @@ class StockManager:
         ), None
 
     @staticmethod
-    def _sample_trend(values, sample_count: int = 4):
+    def _sample_trend(values, sample_count: int = 7):
         cleaned = [float(value) for value in values if value is not None]
         if not cleaned:
             return []
@@ -399,6 +404,18 @@ class StockManager:
             return f"${value:,.0f}"
         return f"${value:.0f}"
 
+    @staticmethod
+    def _vix_risk_color(level: float) -> Tuple[int, int, int]:
+        if level < 13:
+            return StockManager.VIX_CALM_COLOR
+        if level < 20:
+            return StockManager.VIX_NORMAL_COLOR
+        if level < 30:
+            return StockManager.VIX_ELEVATED_COLOR
+        if level < 40:
+            return StockManager.VIX_HIGH_COLOR
+        return StockManager.VIX_PANIC_COLOR
+
     def _format_value(
         self,
         key: str,
@@ -411,8 +428,9 @@ class StockManager:
             value = self._compact_price(float(row.get("price", 0)))
             color = self._movement_color(change)
         elif key == "vix":
-            value = f"{float(row.get('price', 0)):.1f}"
-            color = self._movement_color(change, invert=True)
+            level = float(row.get("price", 0))
+            value = f"{level:.1f}"
+            color = self._vix_risk_color(level)
         else:
             value = f"{change:+.1f}%"
             color = self._movement_color(change)
@@ -452,10 +470,10 @@ class StockManager:
         if direction is None:
             return []
         if direction > 0:
-            return [1, 2, 4, 6]
+            return [1, 2, 3, 4, 5, 6, 7]
         if direction < 0:
-            return [6, 4, 2, 1]
-        return [3, 3, 3, 3]
+            return [7, 6, 5, 4, 3, 2, 1]
+        return [4, 4, 4, 4, 4, 4, 4]
 
     def _draw_trend(
         self,
@@ -474,15 +492,15 @@ class StockManager:
         minimum = min(samples)
         maximum = max(samples)
         span = maximum - minimum
-        for index, sample in enumerate(samples[:4]):
+        for index, sample in enumerate(samples[:7]):
             height = (
                 3
                 if span == 0
                 else 1 + round(((sample - minimum) / span) * 5)
             )
-            left = x + (index * 4)
+            left = x + (index * 2)
             draw.rectangle(
-                (left, y + 6 - height, left + 1, y + 6),
+                (left, y + 6 - height, left, y + 6),
                 fill=color,
             )
 
@@ -506,22 +524,22 @@ class StockManager:
         total_header_width = header_width + (1 + marker_width if marker else 0)
         header_x = (width - total_header_width) // 2
         draw.text(
-            (header_x, 0),
+            (header_x, 2),
             header,
             font=header_font,
             fill=self.LABEL_COLOR,
         )
         if marker:
             draw.text(
-                (header_x + header_width + 1, 0),
+                (header_x + header_width + 1, 2),
                 marker,
                 font=header_font,
                 fill=self.STALE_COLOR,
             )
-        draw.line((5, 8, width - 6, 8), fill=self.ACCENT_COLOR)
+        draw.line((5, 10, width - 6, 10), fill=self.ACCENT_COLOR)
 
         rows = [item for item in self.INSTRUMENTS if item[0] != "btc" or self.include_btc]
-        y_positions = (12, 22, 32, 42, 52)
+        y_positions = (14, 24, 34, 44, 54)
         trend_x = 19
         arrow_x = width - 5
         value_right = arrow_x - 2
