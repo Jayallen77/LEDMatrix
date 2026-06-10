@@ -390,13 +390,27 @@ class WeatherManager:
                 
                 icon_size = 4  # 30% smaller geometric icons (6 * 0.7 ≈ 4)
                 
-                # Low temperature section (left side) with down arrow shape
-                low_section_x = (width // 2) - 18
+                # High temperature section (left side) with up arrow shape
+                high_section_x = (width // 2) - 18
+
+                # Draw a small up arrow for high temp
+                arrow_img_up = PILImage.new('RGBA', (icon_size, icon_size), (0, 0, 0, 0))
+                arrow_draw_up = PILImageDraw.Draw(arrow_img_up)
+                arrow_draw_up.polygon([(icon_size//2, 0), (0, icon_size-1), (icon_size-1, icon_size-1)],
+                                    fill=(255, 100, 100, 255))
+                image.paste(arrow_img_up, (high_section_x, hl_y), arrow_img_up)
+
+                # High temperature text
+                high_text_x = high_section_x + icon_size + 2
+                draw.text((high_text_x, hl_y), f"{temp_max}",
+                         font=hl_font, fill=(255, 100, 100))
+
+                # Low temperature section (right side) with down arrow shape
+                low_section_x = (width // 2) + 6
 
                 # Draw a small down arrow for low temp
                 arrow_img = PILImage.new('RGBA', (icon_size, icon_size), (0, 0, 0, 0))
                 arrow_draw = PILImageDraw.Draw(arrow_img)
-                # Draw down arrow: triangle pointing down
                 arrow_draw.polygon([(icon_size//2, icon_size-1), (0, 0), (icon_size-1, 0)],
                                  fill=(100, 150, 255, 255))
                 image.paste(arrow_img, (low_section_x, hl_y), arrow_img)
@@ -405,42 +419,26 @@ class WeatherManager:
                 low_text_x = low_section_x + icon_size + 2
                 draw.text((low_text_x, hl_y), f"{temp_min}",
                          font=hl_font, fill=(100, 150, 255))
-
-                # High temperature section (right side) with up arrow shape
-                high_section_x = (width // 2) + 6
-                
-                # Draw a small up arrow for high temp
-                arrow_img_up = PILImage.new('RGBA', (icon_size, icon_size), (0, 0, 0, 0))
-                arrow_draw_up = PILImageDraw.Draw(arrow_img_up)
-                # Draw up arrow: triangle pointing up
-                arrow_draw_up.polygon([(icon_size//2, 0), (0, icon_size-1), (icon_size-1, icon_size-1)], 
-                                    fill=(255, 100, 100, 255))
-                image.paste(arrow_img_up, (high_section_x, hl_y), arrow_img_up)
-                
-                # High temperature text
-                high_text_x = high_section_x + icon_size + 2
-                draw.text((high_text_x, hl_y), f"{temp_max}",
-                         font=hl_font, fill=(255, 100, 100))
                 
             except Exception as e:
                 # Simple fallback with basic characters
-                low_full = f"L {temp_min}"
                 high_full = f"H {temp_max}"
+                low_full = f"L {temp_min}"
                 
-                low_bbox = draw.textbbox((0, 0), low_full, font=hl_font)
                 high_bbox = draw.textbbox((0, 0), high_full, font=hl_font)
-                low_width = low_bbox[2] - low_bbox[0]
+                low_bbox = draw.textbbox((0, 0), low_full, font=hl_font)
                 high_width = high_bbox[2] - high_bbox[0]
+                low_width = low_bbox[2] - low_bbox[0]
                 
                 spacing = 12
-                total_width = low_width + spacing + high_width
+                total_width = high_width + spacing + low_width
                 start_x = (width - total_width) // 2
                 
                 # Draw with simple L/H indicators
-                draw.text((start_x, hl_y), low_full,
-                         font=hl_font, fill=(100, 150, 255))
-                draw.text((start_x + low_width + spacing, hl_y), high_full,
+                draw.text((start_x, hl_y), high_full,
                          font=hl_font, fill=(255, 100, 100))
+                draw.text((start_x + high_width + spacing, hl_y), low_full,
+                         font=hl_font, fill=(100, 150, 255))
 
             # === BOTTOM SECTION: Additional Info with Labels ===
             bottom_font = self.display_manager.extra_small_font

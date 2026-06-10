@@ -14,6 +14,10 @@ class FakeImage:
     def __init__(self, size):
         self.size = size
         self.width, self.height = size
+        self.paste_operations = []
+
+    def paste(self, image, position, mask=None):
+        self.paste_operations.append((image, position, mask))
 
 
 class FakeDraw:
@@ -26,6 +30,9 @@ class FakeDraw:
 
     def point(self, position, **kwargs):
         self.operations.append(("point", position, kwargs))
+
+    def polygon(self, points, **kwargs):
+        self.operations.append(("polygon", points, kwargs))
 
     @staticmethod
     def textbbox(position, text, **kwargs):
@@ -187,6 +194,43 @@ class WeatherForecastTests(unittest.TestCase):
         self.assertEqual(high[3]["fill"], (255, 90, 35))
         self.assertEqual(separator[2]["fill"], (190, 150, 45))
         self.assertEqual(low[3]["fill"], (60, 150, 255))
+
+    def test_current_weather_places_high_left_and_low_right(self):
+        manager = self.make_manager()
+        manager.weather_data = {
+            "main": {
+                "temp": 76,
+                "temp_max": 85,
+                "temp_min": 70,
+                "humidity": 35,
+                "uvi": 3,
+            },
+            "weather": [{"main": "Clear", "icon": "01d"}],
+        }
+        manager.get_weather = Mock(return_value=manager.weather_data)
+        manager.last_weather_state = None
+        runtime_pil = types.ModuleType("PIL")
+        runtime_pil.Image = sys.modules["src.weather_manager"].Image
+        runtime_pil.ImageDraw = sys.modules["src.weather_manager"].ImageDraw
+
+        with unittest.mock.patch.dict(sys.modules, {"PIL": runtime_pil}):
+            manager.display_weather(force_clear=True)
+
+        text_operations = [
+            operation
+            for operation in manager.display_manager.image.draw_operations
+            if operation[0] == "text"
+        ]
+        high = next(operation for operation in text_operations if operation[2] == "85")
+        low = next(operation for operation in text_operations if operation[2] == "70")
+        self.assertEqual(high[1], (20, 44))
+        self.assertEqual(low[1], (44, 44))
+        self.assertEqual(high[3]["fill"], (255, 100, 100))
+        self.assertEqual(low[3]["fill"], (100, 150, 255))
+        self.assertEqual(
+            [operation[1] for operation in manager.display_manager.image.paste_operations],
+            [(14, 44), (38, 44)],
+        )
 
 
 if __name__ == "__main__":
