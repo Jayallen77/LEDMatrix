@@ -543,13 +543,44 @@ class WeatherManager:
                 icon_y = y - 10  # Adjusted for new y_start to center icon, moved up 2 pixels
                 WeatherIcons.draw_weather_icon(image, day_data['icon'], icon_x, icon_y, size=24)  # 20% larger (20 * 1.2 = 24)
 
-                # High/Low temps (right) - moved down 3 pixels
-                temp_text = f"{day_data['temp_low']}/{day_data['temp_high']}"
+                # High/Low temps (right) - preserve the existing combined layout
+                low_text = str(day_data['temp_low'])
+                separator_text = "/"
+                high_text = str(day_data['temp_high'])
+                temp_text = f"{low_text}{separator_text}{high_text}"
                 temp_bbox = draw.textbbox((0, 0), temp_text, font=self.display_manager.extra_small_font)
                 temp_width = temp_bbox[2] - temp_bbox[0]
                 temp_x = width - temp_width - 2
-                draw.text((temp_x, y), temp_text, font=self.display_manager.extra_small_font,
-                         fill=self.COLORS['highlight'])
+                low_bbox = draw.textbbox(
+                    (0, 0),
+                    low_text,
+                    font=self.display_manager.extra_small_font,
+                )
+                separator_bbox = draw.textbbox(
+                    (0, 0),
+                    separator_text,
+                    font=self.display_manager.extra_small_font,
+                )
+                low_width = low_bbox[2] - low_bbox[0]
+                separator_width = separator_bbox[2] - separator_bbox[0]
+                draw.text(
+                    (temp_x, y),
+                    low_text,
+                    font=self.display_manager.extra_small_font,
+                    fill=(60, 150, 255),
+                )
+                draw.text(
+                    (temp_x + low_width, y),
+                    separator_text,
+                    font=self.display_manager.extra_small_font,
+                    fill=(190, 150, 45),
+                )
+                draw.text(
+                    (temp_x + low_width + separator_width, y),
+                    high_text,
+                    font=self.display_manager.extra_small_font,
+                    fill=(255, 90, 35),
+                )
 
             # Update the display
             self.display_manager.image = image

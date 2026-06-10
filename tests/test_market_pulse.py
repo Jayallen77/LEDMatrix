@@ -1,6 +1,7 @@
 import sys
 import types
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -27,6 +28,9 @@ class FakeDraw:
 
     def line(self, points, **kwargs):
         self.operations.append(("line", points, kwargs))
+
+    def rectangle(self, points, **kwargs):
+        self.operations.append(("rectangle", points, kwargs))
 
 
 def install_dependency_stubs():
@@ -190,6 +194,12 @@ class MarketPulseTests(unittest.TestCase):
             if operation[0] == "line"
         ]
         self.assertGreaterEqual(len(line_operations), 16)
+        trend_operations = [
+            operation
+            for operation in image.draw_operations
+            if operation[0] == "rectangle"
+        ]
+        self.assertEqual(len(trend_operations), 20)
 
     def test_vix_uses_actual_arrow_direction_with_inverse_color(self):
         manager = self.make_manager()
@@ -228,6 +238,151 @@ class MarketPulseTests(unittest.TestCase):
             elif operation[0] == "line":
                 points = operation[1]
                 self.assertTrue(all(0 <= coordinate < 64 for coordinate in points))
+            elif operation[0] == "rectangle":
+                points = operation[1]
+                self.assertTrue(all(0 <= coordinate < 64 for coordinate in points))
+
+    def test_regular_session_change_uses_open_latest_and_session_state(self):
+        manager = self.make_manager()
+        session_date = datetime(2026, 6, 10, tzinfo=timezone.utc)
+        start = session_date.replace(hour=14, minute=30).timestamp()
+        end = session_date.replace(hour=21).timestamp()
+        points = [
+            (int(start), 100.0, 100.5),
+            (int(start + 3600), 100.5, 101.0),
+            (int(start + 7200), 101.0, 102.0),
+            (int(start + 10800), 102.0, 103.0),
+        ]
+        meta = {
+            "exchangeTimezoneName": "UTC",
+            "currentTradingPeriod": {
+                "regular": {"start": start, "end": end}
+            },
+        }
+
+        with patch.object(
+            stock_manager.time,
+            "time",
+            return_value=start + 12000,
+        ):
+            open_row = manager._build_regular_session_row(
+                "sp500", "S&P", "^GSPC", meta, points
+            )
+
+        self.assertEqual(open_row["session_state"], "open")
+        self.assertAlmostEqual(open_row["change_percent"], 3.0)
+        self.assertEqual(open_row["trend"], [100.5, 101.0, 102.0, 103.0])
+
+        with patch.object(
+            stock_manager.time,
+            "time",
+            return_value=end + 60,
+        ):
+            closed_row = manager._build_regular_session_row(
+                "sp500", "S&P", "^GSPC", meta, points
+            )
+
+        self.assertEqual(closed_row["session_state"], "closed")
+        self.assertAlmostEqual(closed_row["change_percent"], 3.0)
+
+    def test_before_open_uses_previous_completed_session(self):
+        manager = self.make_manager()
+        previous_date = datetime(2026, 6, 9, tzinfo=timezone.utc)
+        current_date = datetime(2026, 6, 10, tzinfo=timezone.utc)
+        previous_start = previous_date.replace(hour=14, minute=30).timestamp()
+        current_start = current_date.replace(hour=14, minute=30).timestamp()
+        current_end = current_date.replace(hour=21).timestamp()
+        points = [
+            (int(previous_start), 200.0, 201.0),
+            (int(previous_start + 3600), 201.0, 198.0),
+        ]
+        meta = {
+            "exchangeTimezoneName": "UTC",
+            "currentTradingPeriod": {
+                "regular": {"start": current_start, "end": current_end}
+            },
+        }
+
+        with patch.object(
+            stock_manager.time,
+            "time",
+            return_value=current_start - 3600,
+        ):
+            row = manager._build_regular_session_row(
+                "dow", "DOW", "^DJI", meta, points
+            )
+
+        self.assertEqual(row["session_state"], "previous")
+        self.assertAlmostEqual(row["change_percent"], -1.0)
+        self.assertEqual(len(row["trend"]), 4)
+
+    def test_previous_session_rows_mark_market_data_stale(self):
+        manager = self.make_manager()
+        manager.last_update = 0
+        manager._fetch_instrument = Mock(
+            side_effect=[
+                ({
+                    "price": 100,
+                    "change_percent": 1,
+                    "trend": [1, 2, 3, 4],
+                    "session_state": "previous",
+                }, None)
+                for _ in manager.INSTRUMENTS
+            ]
+        )
+
+        self.assertTrue(manager.update_stock_data())
+        self.assertTrue(manager.is_stale)
+
+    def test_fetch_requests_five_days_without_premarket(self):
+        manager = self.make_manager()
+        start = datetime(
+            2026, 6, 10, 14, 30, tzinfo=timezone.utc
+        ).timestamp()
+        response = Mock(status_code=200)
+        response.json.return_value = {
+            "chart": {
+                "result": [{
+                    "meta": {
+                        "exchangeTimezoneName": "UTC",
+                        "currentTradingPeriod": {
+                            "regular": {
+                                "start": start,
+                                "end": start + 23400,
+                            }
+                        },
+                    },
+                    "timestamp": [int(start), int(start + 300)],
+                    "indicators": {
+                        "quote": [{
+                            "open": [100.0, None],
+                            "close": [100.5, 101.0],
+                        }]
+                    },
+                }]
+            }
+        }
+        manager.session.get = Mock(return_value=response)
+
+        with patch.object(
+            stock_manager.time,
+            "time",
+            return_value=start + 600,
+        ):
+            row, status = manager._fetch_instrument(
+                "sp500", "S&P", "^GSPC"
+            )
+
+        self.assertIsNone(status)
+        self.assertEqual(row["session_state"], "open")
+        self.assertEqual(
+            manager.session.get.call_args.kwargs["params"],
+            {
+                "interval": "5m",
+                "range": "5d",
+                "includePrePost": "false",
+            },
+        )
 
     def test_partial_refresh_merges_cached_rows(self):
         manager = self.make_manager()

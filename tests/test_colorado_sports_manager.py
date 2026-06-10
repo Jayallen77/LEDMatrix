@@ -14,14 +14,29 @@ class FakeImage:
     def __init__(self, size):
         self.size = size
         self.width, self.height = size
+        self.pastes = []
+
+    def paste(self, image, position, mask=None):
+        self.pastes.append((image, position, mask))
 
 
 class FakeDraw:
     def __init__(self, image):
         self.image = image
+        self.operations = []
+        image.draw_operations = self.operations
 
-    def text(self, *args, **kwargs):
-        pass
+    def text(self, position, text, **kwargs):
+        self.operations.append(("text", position, text, kwargs))
+
+    def line(self, points, **kwargs):
+        self.operations.append(("line", points, kwargs))
+
+    def rectangle(self, points, **kwargs):
+        self.operations.append(("rectangle", points, kwargs))
+
+    def ellipse(self, points, **kwargs):
+        self.operations.append(("ellipse", points, kwargs))
 
 
 def install_dependency_stubs():
@@ -108,18 +123,27 @@ class ColoradoSportsManagerTests(unittest.TestCase):
             )
 
     @staticmethod
-    def event(state="in", home="COL", away="VGK"):
+    def event(
+        state="in",
+        home="COL",
+        away="VGK",
+        short_detail="2nd 10:00",
+        period=2,
+        clock="10:00",
+        situation=None,
+    ):
         return {
             "id": "game-1",
             "competitions": [{
                 "status": {
                     "type": {
                         "state": state,
-                        "shortDetail": "2nd 10:00",
+                        "shortDetail": short_detail,
                     },
-                    "displayClock": "10:00",
-                    "period": 2,
+                    "displayClock": clock,
+                    "period": period,
                 },
+                "situation": situation or {},
                 "competitors": [
                     {
                         "homeAway": "home",
@@ -135,6 +159,22 @@ class ColoradoSportsManagerTests(unittest.TestCase):
             }],
         }
 
+    @staticmethod
+    def render(manager, game):
+        with (
+            patch.object(
+                colorado_sports_manager.Image,
+                "new",
+                side_effect=lambda mode, size, color=None: FakeImage(size),
+            ),
+            patch.object(
+                colorado_sports_manager.ImageDraw,
+                "Draw",
+                side_effect=FakeDraw,
+            ),
+        ):
+            return manager._render_game(game)
+
     def test_filters_to_live_colorado_team(self):
         manager = self.make_manager()
         team = manager.TEAMS[0]
@@ -147,16 +187,180 @@ class ColoradoSportsManagerTests(unittest.TestCase):
         )
 
         self.assertEqual(live["league"], "NHL")
+        self.assertTrue(live["home"]["is_colorado"])
+        self.assertFalse(live["away"]["is_colorado"])
         self.assertIsNone(final)
         self.assertIsNone(unrelated)
 
-    def test_rendered_score_card_is_64_square(self):
+    def test_rendered_score_card_is_64_square_and_emphasizes_colorado(self):
         manager = self.make_manager()
         game = manager._parse_event(self.event(), manager.TEAMS[0])
+        manager._load_team_logo = Mock(return_value=None)
 
-        image = manager._render_game(game)
+        image = self.render(manager, game)
 
         self.assertEqual(image.size, (64, 64))
+        text_operations = [
+            operation
+            for operation in image.draw_operations
+            if operation[0] == "text"
+        ]
+        header = next(
+            operation for operation in text_operations
+            if operation[2] == "NHL"
+        )
+        colorado = next(
+            operation for operation in text_operations
+            if operation[2] == "COL"
+        )
+        self.assertEqual(header[3]["fill"], (255, 255, 255))
+        self.assertEqual(
+            colorado[3]["fill"],
+            manager.COLORADO_COLOR,
+        )
+        self.assertEqual(
+            len([
+                operation for operation in image.draw_operations
+                if operation[0] == "rectangle"
+            ]),
+            2,
+        )
+
+    def test_local_logos_are_cached_and_pasted_when_available(self):
+        manager = self.make_manager()
+
+        class FakeLogo:
+            def __init__(self):
+                self.size = (20, 20)
+                self.thumbnail_size = None
+
+            def thumbnail(self, size, resampling):
+                del resampling
+                self.thumbnail_size = size
+                self.size = size
+
+            def copy(self):
+                return self
+
+        class FakeSource:
+            def __init__(self, logo):
+                self.logo = logo
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, traceback):
+                del exc_type, exc, traceback
+
+            def convert(self, mode):
+                self.mode = mode
+                return self.logo
+
+        logo = FakeLogo()
+        with (
+            patch.object(
+                colorado_sports_manager.os.path,
+                "isfile",
+                return_value=True,
+            ),
+            patch.object(
+                colorado_sports_manager.Image,
+                "open",
+                return_value=FakeSource(logo),
+            ) as image_open,
+        ):
+            first = manager._load_team_logo("NHL", "COL")
+            second = manager._load_team_logo("NHL", "COL")
+
+        self.assertIs(first, logo)
+        self.assertIs(second, logo)
+        self.assertEqual(logo.thumbnail_size, (11, 11))
+        image_open.assert_called_once()
+
+        game = manager._parse_event(self.event(), manager.TEAMS[0])
+        manager._load_team_logo = Mock(return_value=logo)
+        image = self.render(manager, game)
+        self.assertEqual(len(image.pastes), 2)
+
+    def test_mlb_outs_and_league_states_are_compact(self):
+        manager = self.make_manager()
+        mlb_game = manager._parse_event(
+            self.event(
+                home="COL",
+                away="CHC",
+                short_detail="Bot 5th",
+                period=5,
+                clock="",
+                situation={"outs": 1},
+            ),
+            manager.TEAMS[3],
+        )
+
+        self.assertEqual(mlb_game["outs"], 1)
+        self.assertEqual(
+            manager._format_game_state(mlb_game),
+            ("BOT 5", "1 OUT"),
+        )
+        self.assertEqual(
+            manager._format_game_state({
+                "league": "NBA",
+                "period": 3,
+                "clock": "4:22",
+                "status": "Q3 4:22",
+            }),
+            ("Q3 4:22", None),
+        )
+        self.assertEqual(
+            manager._format_game_state({
+                "league": "NFL",
+                "period": 3,
+                "clock": "4:22",
+                "status": "3rd Quarter",
+            }),
+            ("Q3 4:22", None),
+        )
+        self.assertEqual(
+            manager._format_game_state({
+                "league": "NHL",
+                "period": 2,
+                "clock": "08:14",
+                "status": "2nd 08:14",
+            }),
+            ("2nd 08:14", None),
+        )
+        self.assertEqual(
+            manager._format_game_state({
+                "league": "MLS",
+                "period": 1,
+                "clock": "45:00",
+                "status": "Halftime",
+            }),
+            ("HT", None),
+        )
+
+    def test_stale_marker_and_geometry_stay_inside_64_square(self):
+        manager = self.make_manager()
+        game = manager._parse_event(self.event(), manager.TEAMS[0])
+        manager.is_stale = True
+        manager._load_team_logo = Mock(return_value=None)
+
+        image = self.render(manager, game)
+
+        marker = next(
+            operation
+            for operation in image.draw_operations
+            if operation[0] == "text" and operation[2] == "*"
+        )
+        self.assertEqual(marker[3]["fill"], (255, 180, 0))
+        for operation in image.draw_operations:
+            if operation[0] == "text":
+                x, y = operation[1]
+                self.assertTrue(0 <= x < 64)
+                self.assertTrue(0 <= y < 64)
+            elif operation[0] in {"line", "rectangle", "ellipse"}:
+                self.assertTrue(
+                    all(0 <= coordinate < 64 for coordinate in operation[1])
+                )
 
     def test_network_failure_expires_old_live_game(self):
         manager = self.make_manager()

@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 from typing import Any, Dict, List, Optional
 
@@ -17,6 +18,21 @@ class ColoradoSportsManager:
     """Aggregate live score cards for Colorado professional teams."""
 
     CACHE_KEY = "colorado_sports_live"
+    LOGO_DIRS = {
+        "NHL": "assets/sports/nhl_logos",
+        "NBA": "assets/sports/nba_logos",
+        "NFL": "assets/sports/nfl_logos",
+        "MLB": "assets/sports/mlb_logos",
+        "MLS": "assets/sports/soccer_logos",
+    }
+    LEAGUE_COLORS = {
+        "NHL": (80, 170, 255),
+        "NBA": (255, 120, 35),
+        "NFL": (255, 130, 30),
+        "MLB": (90, 150, 255),
+        "MLS": (60, 210, 120),
+    }
+    COLORADO_COLOR = (255, 210, 35)
     TEAMS = (
         {
             "league": "NHL",
@@ -68,6 +84,7 @@ class ColoradoSportsManager:
         self.is_stale = False
         self.current_game_index = 0
         self.last_game_switch = 0.0
+        self._logo_cache: Dict[Any, Optional[Image.Image]] = {}
 
         self.session = requests.Session()
         retry_strategy = Retry(
@@ -136,6 +153,7 @@ class ColoradoSportsManager:
                 parsed[side] = {
                     "abbr": abbr,
                     "score": str(competitor.get("score", "0")),
+                    "is_colorado": abbr == team["abbr"],
                 }
         if not contains_colorado or "home" not in parsed or "away" not in parsed:
             return None
@@ -151,6 +169,11 @@ class ColoradoSportsManager:
             "status": status_type.get(
                 "shortDetail",
                 status_type.get("detail", "LIVE"),
+            ),
+            "outs": (
+                competition.get("situation", {}).get("outs")
+                if team["league"] == "MLB"
+                else None
             ),
             "observed_at": time.time(),
         }
@@ -239,6 +262,134 @@ class ColoradoSportsManager:
     def has_display_content(self) -> bool:
         return bool(self.enabled and self.live_games)
 
+    def _load_team_logo(
+        self,
+        league: str,
+        abbreviation: str,
+    ) -> Optional[Image.Image]:
+        cache_key = (league, abbreviation)
+        if cache_key in self._logo_cache:
+            return self._logo_cache[cache_key]
+        logo_directory = self.LOGO_DIRS.get(league)
+        if not logo_directory:
+            self._logo_cache[cache_key] = None
+            return None
+        logo_path = os.path.abspath(
+            os.path.join(
+                os.path.dirname(__file__),
+                "..",
+                logo_directory,
+                f"{abbreviation}.png",
+            )
+        )
+        try:
+            if not os.path.isfile(logo_path):
+                self._logo_cache[cache_key] = None
+                return None
+            with Image.open(logo_path) as source:
+                logo = source.convert("RGBA")
+                resampling = getattr(
+                    getattr(Image, "Resampling", Image),
+                    "LANCZOS",
+                    getattr(Image, "LANCZOS", 1),
+                )
+                logo.thumbnail((11, 11), resampling)
+                logo = logo.copy()
+            self._logo_cache[cache_key] = logo
+            return logo
+        except Exception as exc:
+            logger.debug(
+                "Could not render %s %s logo: %s",
+                league,
+                abbreviation,
+                exc,
+            )
+            self._logo_cache[cache_key] = None
+            return None
+
+    def _is_colorado_team(
+        self,
+        game: Dict[str, Any],
+        team: Dict[str, Any],
+    ) -> bool:
+        if "is_colorado" in team:
+            return bool(team["is_colorado"])
+        league = game.get("league")
+        return any(
+            configured["league"] == league
+            and configured["abbr"] == team.get("abbr")
+            for configured in self.TEAMS
+        )
+
+    def _draw_team_badge(
+        self,
+        draw,
+        team: Dict[str, Any],
+        game: Dict[str, Any],
+        x: int,
+        y: int,
+        font,
+    ) -> None:
+        is_colorado = self._is_colorado_team(game, team)
+        color = (
+            self.COLORADO_COLOR
+            if is_colorado
+            else self.LEAGUE_COLORS.get(game.get("league"), (130, 130, 130))
+        )
+        draw.rectangle((x, y, x + 9, y + 9), outline=color)
+        initial = str(team.get("abbr", "?"))[:1]
+        draw.text((x + 3, y + 1), initial, font=font, fill=color)
+
+    @staticmethod
+    def _draw_sport_icon(draw, league: str, x: int, y: int, color) -> None:
+        if league == "NHL":
+            draw.line((x, y, x + 4, y + 5), fill=color)
+            draw.line((x + 3, y + 5, x + 6, y + 5), fill=color)
+            draw.ellipse((x, y + 5, x + 3, y + 7), outline=color)
+        elif league in {"NBA", "MLS"}:
+            draw.ellipse((x, y, x + 7, y + 7), outline=color)
+            draw.line((x, y + 3, x + 7, y + 3), fill=color)
+            draw.line((x + 3, y, x + 3, y + 7), fill=color)
+        elif league == "NFL":
+            draw.ellipse((x, y + 1, x + 7, y + 6), outline=color)
+            draw.line((x + 2, y + 3, x + 5, y + 3), fill=color)
+        else:
+            draw.ellipse((x + 1, y, x + 6, y + 7), outline=color)
+            draw.line((x + 2, y + 2, x + 5, y + 1), fill=color)
+            draw.line((x + 2, y + 5, x + 5, y + 6), fill=color)
+
+    @staticmethod
+    def _format_game_state(game: Dict[str, Any]):
+        league = str(game.get("league", ""))
+        status = str(game.get("status") or "LIVE").strip()
+        status_upper = status.upper()
+        clock = str(game.get("clock") or "").strip()
+        period = game.get("period")
+        if "HALF" in status_upper or status_upper == "HT":
+            return "HT", None
+        if league == "MLB":
+            half = "BOT" if "BOT" in status_upper else "TOP"
+            inning = str(period or "").strip()
+            primary = f"{half} {inning}".strip()
+            outs = game.get("outs")
+            secondary = (
+                f"{int(outs)} OUT"
+                if outs not in (None, 0, "0")
+                else None
+            )
+            return primary, secondary
+        if league in {"NBA", "NFL"} and period:
+            primary = f"Q{period}"
+            return f"{primary} {clock}".strip(), None
+        if league == "NHL" and period:
+            try:
+                period_number = int(period)
+            except (TypeError, ValueError):
+                period_number = 0
+            ordinal = {1: "1st", 2: "2nd", 3: "3rd"}.get(period_number, "OT")
+            return f"{ordinal} {clock}".strip(), None
+        return (status[:12] or clock or "LIVE"), None
+
     def _render_game(self, game: Dict[str, Any]) -> Image.Image:
         width = int(getattr(self.display_manager, "width", 64))
         height = int(getattr(self.display_manager, "height", 64))
@@ -249,50 +400,81 @@ class ColoradoSportsManager:
             "extra_small_font",
             self.display_manager.small_font,
         )
-        header = f"{game['league']} LIVE"
-        if self.is_stale:
-            header += "*"
+        league = game["league"]
+        header = league
+        marker = "*" if self.is_stale else ""
         header_width = self.display_manager.get_text_width(header, font)
+        marker_width = self.display_manager.get_text_width(marker, font)
+        icon_width = 8
+        total_header_width = icon_width + 2 + header_width + marker_width
+        header_x = (width - total_header_width) // 2
+        league_color = self.LEAGUE_COLORS.get(league, (80, 180, 255))
+        self._draw_sport_icon(draw, league, header_x, 0, league_color)
         draw.text(
-            ((width - header_width) // 2, 1),
+            (header_x + icon_width + 2, 0),
             header,
             font=font,
-            fill=(255, 190, 0) if self.is_stale else (255, 50, 50),
+            fill=(255, 255, 255),
         )
-
-        status = str(game.get("status") or "LIVE")[:12]
-        status_width = self.display_manager.get_text_width(status, font)
-        draw.text(
-            ((width - status_width) // 2, 12),
-            status,
-            font=font,
-            fill=(180, 180, 180),
-        )
+        if marker:
+            draw.text(
+                (header_x + icon_width + 2 + header_width, 0),
+                marker,
+                font=font,
+                fill=(255, 180, 0),
+            )
+        draw.line((4, 9, width - 5, 9), fill=league_color)
 
         away = game["away"]
         home = game["home"]
+        for team, y in ((away, 15), (home, 31)):
+            logo = self._load_team_logo(league, team.get("abbr", ""))
+            if logo:
+                image.paste(logo, (2, y - 1), logo)
+            else:
+                self._draw_team_badge(draw, team, game, 2, y, font)
+            is_colorado = self._is_colorado_team(game, team)
+            team_color = (
+                self.COLORADO_COLOR
+                if is_colorado
+                else (255, 255, 255)
+            )
+            if is_colorado:
+                draw.line((14, y, 14, y + 7), fill=self.COLORADO_COLOR)
+            draw.text(
+                (17, y),
+                str(team.get("abbr", ""))[:3],
+                font=font,
+                fill=team_color,
+            )
+            score = str(team.get("score", "0"))
+            score_width = self.display_manager.get_text_width(score, font)
+            draw.text(
+                (width - score_width - 3, y),
+                score,
+                font=font,
+                fill=team_color,
+            )
+
+        primary_state, secondary_state = self._format_game_state(game)
+        primary_width = self.display_manager.get_text_width(primary_state, font)
         draw.text(
-            (4, 27),
-            f"{away['abbr']:<3} {away['score']:>3}",
+            ((width - primary_width) // 2, 48),
+            primary_state,
             font=font,
-            fill=(255, 255, 255),
+            fill=league_color,
         )
-        draw.text(
-            (4, 39),
-            f"{home['abbr']:<3} {home['score']:>3}",
-            font=font,
-            fill=(255, 255, 255),
-        )
-        clock = str(game.get("clock") or "")
-        period = game.get("period")
-        detail = f"P{period} {clock}".strip() if period else clock
-        detail_width = self.display_manager.get_text_width(detail, font)
-        draw.text(
-            ((width - detail_width) // 2, 54),
-            detail,
-            font=font,
-            fill=(80, 180, 255),
-        )
+        if secondary_state:
+            secondary_width = self.display_manager.get_text_width(
+                secondary_state,
+                font,
+            )
+            draw.text(
+                ((width - secondary_width) // 2, 56),
+                secondary_state,
+                font=font,
+                fill=(210, 210, 210),
+            )
         return image
 
     def display(self, force_clear: bool = False) -> bool:

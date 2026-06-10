@@ -1,7 +1,9 @@
 import logging
 import time
 import urllib.parse
+from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
+from zoneinfo import ZoneInfo
 
 import requests
 from PIL import Image, ImageDraw
@@ -25,6 +27,7 @@ class StockManager:
     UNAVAILABLE_COLOR = (115, 115, 115)
     ACCENT_COLOR = (40, 150, 255)
     STALE_COLOR = (255, 180, 0)
+    TREND_COLOR = (90, 170, 255)
     INSTRUMENTS = (
         ("sp500", "S&P", "^GSPC"),
         ("nasdaq", "NAS", "^IXIC"),
@@ -131,7 +134,11 @@ class StockManager:
         response = self.session.get(
             url,
             headers=self.headers,
-            params={"interval": "5m", "range": "1d"},
+            params={
+                "interval": "5m",
+                "range": "5d",
+                "includePrePost": "false",
+            },
             timeout=8,
         )
         if response.status_code != 200:
@@ -146,12 +153,149 @@ class StockManager:
         results = payload.get("chart", {}).get("result") or []
         if not results:
             raise ValueError(f"No chart result for {symbol}")
-        meta = results[0].get("meta", {})
+        chart = results[0]
+        meta = chart.get("meta", {})
+        timestamps = chart.get("timestamp") or []
+        quote = (
+            chart.get("indicators", {})
+            .get("quote", [{}])[0]
+        )
+        closes = quote.get("close") or []
+        opens = quote.get("open") or []
+        points = []
+        for index, timestamp in enumerate(timestamps):
+            close_value = closes[index] if index < len(closes) else None
+            if close_value is None:
+                continue
+            open_value = opens[index] if index < len(opens) else None
+            points.append((int(timestamp), open_value, close_value))
+        if key == "btc":
+            return self._build_crypto_row(
+                key,
+                label,
+                symbol,
+                meta,
+                points,
+            ), None
+        return self._build_regular_session_row(
+            key,
+            label,
+            symbol,
+            meta,
+            points,
+        ), None
+
+    @staticmethod
+    def _sample_trend(values, sample_count: int = 4):
+        cleaned = [float(value) for value in values if value is not None]
+        if not cleaned:
+            return []
+        last_index = len(cleaned) - 1
+        return [
+            cleaned[round(index * last_index / (sample_count - 1))]
+            for index in range(sample_count)
+        ]
+
+    @staticmethod
+    def _exchange_timezone(meta: Dict[str, Any]):
+        timezone_name = meta.get("exchangeTimezoneName")
+        try:
+            return ZoneInfo(timezone_name) if timezone_name else ZoneInfo("UTC")
+        except Exception:
+            return ZoneInfo("UTC")
+
+    def _build_regular_session_row(
+        self,
+        key: str,
+        label: str,
+        symbol: str,
+        meta: Dict[str, Any],
+        points,
+    ) -> Dict[str, Any]:
+        if not points:
+            raise ValueError(f"No regular-session chart points for {symbol}")
+        exchange_timezone = self._exchange_timezone(meta)
+        sessions: Dict[Any, list] = {}
+        for timestamp, open_value, close_value in points:
+            session_date = datetime.fromtimestamp(
+                timestamp,
+                exchange_timezone,
+            ).date()
+            sessions.setdefault(session_date, []).append(
+                (timestamp, open_value, float(close_value))
+            )
+
+        now = time.time()
+        trading_period = meta.get("currentTradingPeriod", {}).get("regular", {})
+        regular_start = float(trading_period.get("start", 0) or 0)
+        regular_end = float(trading_period.get("end", 0) or 0)
+        today = datetime.fromtimestamp(now, exchange_timezone).date()
+        if regular_start <= now < regular_end:
+            target_date = datetime.fromtimestamp(
+                regular_start,
+                exchange_timezone,
+            ).date()
+            session_state = "open"
+        elif now >= regular_end and today in sessions:
+            target_date = today
+            session_state = "closed"
+        else:
+            prior_dates = [session_date for session_date in sessions if session_date < today]
+            target_date = max(prior_dates) if prior_dates else max(sessions)
+            session_state = "previous"
+
+        session_points = sessions.get(target_date)
+        if not session_points:
+            target_date = max(sessions)
+            session_points = sessions[target_date]
+            session_state = "previous"
+        session_points.sort(key=lambda point: point[0])
+        opening_price = next(
+            (
+                float(open_value)
+                for _, open_value, _ in session_points
+                if open_value not in (None, 0)
+            ),
+            session_points[0][2],
+        )
+        current = session_points[-1][2]
+        if opening_price == 0:
+            raise ValueError(f"Invalid regular-session open for {symbol}")
+        return {
+            "key": key,
+            "label": label,
+            "symbol": symbol,
+            "price": current,
+            "change_percent": ((current - opening_price) / opening_price) * 100,
+            "trend": self._sample_trend(
+                [point[2] for point in session_points]
+            ),
+            "session_state": session_state,
+            "updated_at": time.time(),
+        }
+
+    def _build_crypto_row(
+        self,
+        key: str,
+        label: str,
+        symbol: str,
+        meta: Dict[str, Any],
+        points,
+    ) -> Dict[str, Any]:
         current = meta.get("regularMarketPrice")
+        if current is None and points:
+            current = points[-1][2]
         previous = meta.get("previousClose", meta.get("chartPreviousClose"))
         if current is None or previous in (None, 0):
             raise ValueError(f"Incomplete quote metadata for {symbol}")
-
+        cutoff = time.time() - (24 * 60 * 60)
+        recent_closes = [
+            float(close_value)
+            for timestamp, _, close_value in points
+            if timestamp >= cutoff
+        ]
+        if not recent_closes:
+            recent_closes = [float(point[2]) for point in points]
         current = float(current)
         previous = float(previous)
         return {
@@ -160,8 +304,10 @@ class StockManager:
             "symbol": symbol,
             "price": current,
             "change_percent": ((current - previous) / previous) * 100,
+            "trend": self._sample_trend(recent_closes),
+            "session_state": "continuous",
             "updated_at": time.time(),
-        }, None
+        }
 
     def update_stock_data(self) -> bool:
         """Refresh Market Pulse data while preserving last-known-good rows."""
@@ -203,7 +349,16 @@ class StockManager:
             self.market_data = merged
             self.stock_data = self.market_data
             self.data_timestamp = now
-            self.is_stale = failed or len(fresh_rows) < attempted
+            uses_previous_session = any(
+                row.get("session_state") == "previous"
+                for key, row in fresh_rows.items()
+                if key != "btc"
+            )
+            self.is_stale = (
+                failed
+                or len(fresh_rows) < attempted
+                or uses_previous_session
+            )
             self.retry_attempts = 0
             self.next_retry_at = 0.0
             self._cache_current_data()
@@ -292,6 +447,45 @@ class StockManager:
         draw.line((x + 4, y + 2, x + 2, y + 4), fill=color)
         draw.line((x + 2, y, x + 2, y + 4), fill=color)
 
+    @staticmethod
+    def _fallback_trend(direction: Optional[int]):
+        if direction is None:
+            return []
+        if direction > 0:
+            return [1, 2, 4, 6]
+        if direction < 0:
+            return [6, 4, 2, 1]
+        return [3, 3, 3, 3]
+
+    def _draw_trend(
+        self,
+        draw,
+        x: int,
+        y: int,
+        values,
+        direction: Optional[int],
+        color: Tuple[int, int, int],
+    ) -> None:
+        samples = self._sample_trend(values)
+        if not samples:
+            samples = self._fallback_trend(direction)
+        if not samples:
+            return
+        minimum = min(samples)
+        maximum = max(samples)
+        span = maximum - minimum
+        for index, sample in enumerate(samples[:4]):
+            height = (
+                3
+                if span == 0
+                else 1 + round(((sample - minimum) / span) * 5)
+            )
+            left = x + (index * 4)
+            draw.rectangle(
+                (left, y + 6 - height, left + 1, y + 6),
+                fill=color,
+            )
+
     def _render_market_pulse(self) -> Image.Image:
         width = int(getattr(self.display_manager, "width", 64))
         height = int(getattr(self.display_manager, "height", 64))
@@ -302,39 +496,50 @@ class StockManager:
             "extra_small_font",
             self.display_manager.small_font,
         )
+        header_font = getattr(self.display_manager, "small_font", font)
 
         unavailable = not self.market_data
         header = "MARKET"
-        header_width = self.display_manager.get_text_width(header, font)
+        header_width = self.display_manager.get_text_width(header, header_font)
         marker = "*" if self.is_stale else "?" if unavailable else ""
-        marker_width = self.display_manager.get_text_width(marker, font)
+        marker_width = self.display_manager.get_text_width(marker, header_font)
         total_header_width = header_width + (1 + marker_width if marker else 0)
         header_x = (width - total_header_width) // 2
         draw.text(
             (header_x, 0),
             header,
-            font=font,
+            font=header_font,
             fill=self.LABEL_COLOR,
         )
         if marker:
             draw.text(
                 (header_x + header_width + 1, 0),
                 marker,
-                font=font,
+                font=header_font,
                 fill=self.STALE_COLOR,
             )
         draw.line((5, 8, width - 6, 8), fill=self.ACCENT_COLOR)
 
         rows = [item for item in self.INSTRUMENTS if item[0] != "btc" or self.include_btc]
         y_positions = (12, 22, 32, 42, 52)
-        arrow_x = width - 6
+        trend_x = 16
+        arrow_x = width - 5
         value_right = arrow_x - 2
         for (key, label, _), y in zip(rows, y_positions):
             value, color, direction = self._format_value(key)
             draw.text((2, y), label, font=font, fill=self.LABEL_COLOR)
+            row = self.market_data.get(key, {})
+            self._draw_trend(
+                draw,
+                trend_x,
+                y,
+                row.get("trend", []),
+                direction,
+                color if row else self.UNAVAILABLE_COLOR,
+            )
             value_width = self.display_manager.get_text_width(value, font)
             draw.text(
-                (max(20, value_right - value_width), y),
+                (max(33, value_right - value_width), y),
                 value,
                 font=font,
                 fill=color,
