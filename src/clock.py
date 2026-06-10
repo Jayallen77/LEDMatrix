@@ -414,7 +414,7 @@ class Clock:
 
             # Center horizontally in bottom 1/3
             x = (self.width - text_width) // 2
-            y = self.time_section_height + (self.date_section_height - text_height) // 2 - 9
+            y = self.time_section_height + (self.date_section_height - text_height) // 2 - 11
 
             # Draw the date
             draw.text((x, y), date_str, font=self.date_font, fill=self.date_color)
