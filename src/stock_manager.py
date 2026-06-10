@@ -517,12 +517,12 @@ class StockManager:
         header_font = getattr(self.display_manager, "small_font", font)
 
         unavailable = not self.market_data
-        header = "MARKET"
+        header = "MARKETS"
         header_width = self.display_manager.get_text_width(header, header_font)
         marker = "*" if self.is_stale else "?" if unavailable else ""
         marker_width = self.display_manager.get_text_width(marker, header_font)
         total_header_width = header_width + (1 + marker_width if marker else 0)
-        header_x = (width - total_header_width) // 2
+        header_x = ((width - total_header_width) // 2) - 1
         draw.text(
             (header_x, 2),
             header,
@@ -536,16 +536,16 @@ class StockManager:
                 font=header_font,
                 fill=self.STALE_COLOR,
             )
-        draw.line((5, 10, width - 6, 10), fill=self.ACCENT_COLOR)
+        draw.line((4, 10, width - 7, 10), fill=self.ACCENT_COLOR)
 
         rows = [item for item in self.INSTRUMENTS if item[0] != "btc" or self.include_btc]
         y_positions = (14, 24, 34, 44, 54)
-        trend_x = 19
-        arrow_x = width - 5
+        trend_x = 18
+        arrow_x = width - 6
         value_right = arrow_x - 2
         for (key, label, _), y in zip(rows, y_positions):
             value, color, direction = self._format_value(key)
-            draw.text((2, y), label, font=font, fill=self.LABEL_COLOR)
+            draw.text((1, y), label, font=font, fill=self.LABEL_COLOR)
             row = self.market_data.get(key, {})
             self._draw_trend(
                 draw,
@@ -557,7 +557,7 @@ class StockManager:
             )
             value_width = self.display_manager.get_text_width(value, font)
             draw.text(
-                (max(33, value_right - value_width), y),
+                (max(32, value_right - value_width), y),
                 value,
                 font=font,
                 fill=color,

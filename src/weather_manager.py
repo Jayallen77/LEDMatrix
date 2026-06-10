@@ -346,10 +346,10 @@ class WeatherManager:
             humidity = weather_data['main']['humidity']
 
             # === TOP SECTION: Weather Icon + Condition ===
-            # Weather icon (top-left corner) - slightly reduced without moving it
-            icon_size = 35
-            icon_x = -4  # Move 4 pixels left from edge (was -7, now -4)
-            icon_y = -7  # Move up 7 pixels total (was -11, now -7)
+            # Weather icon (top-left corner) - slightly smaller and repositioned
+            icon_size = 33
+            icon_x = -3
+            icon_y = -5
             WeatherIcons.draw_weather_icon(image, icon_code, icon_x, icon_y, size=icon_size)
 
             # Condition text (right side, top) - Made smaller font, fine-tuned position
@@ -543,16 +543,11 @@ class WeatherManager:
 
                 # High/Low temps (right) - preserve the existing combined layout
                 high_text = str(day_data['temp_high'])
-                separator_text = "/"
                 low_text = str(day_data['temp_low'])
+                separator_width = 4
                 high_bbox = draw.textbbox(
                     (0, 0),
                     high_text,
-                    font=self.display_manager.extra_small_font,
-                )
-                separator_bbox = draw.textbbox(
-                    (0, 0),
-                    separator_text,
                     font=self.display_manager.extra_small_font,
                 )
                 low_bbox = draw.textbbox(
@@ -561,7 +556,6 @@ class WeatherManager:
                     font=self.display_manager.extra_small_font,
                 )
                 high_width = high_bbox[2] - high_bbox[0]
-                separator_width = separator_bbox[2] - separator_bbox[0]
                 low_width = low_bbox[2] - low_bbox[0]
                 temp_width = high_width + separator_width + low_width
                 temp_x = width - temp_width - 2
@@ -571,10 +565,13 @@ class WeatherManager:
                     font=self.display_manager.extra_small_font,
                     fill=(255, 90, 35),
                 )
-                draw.text(
-                    (temp_x + high_width, y),
-                    separator_text,
-                    font=self.display_manager.extra_small_font,
+                draw.line(
+                    (
+                        temp_x + high_width + 1,
+                        y + 3,
+                        temp_x + high_width + 2,
+                        y + 3,
+                    ),
                     fill=(190, 150, 45),
                 )
                 draw.text(

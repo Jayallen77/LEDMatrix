@@ -263,7 +263,7 @@ class ClockTests(unittest.TestCase):
         temperature_operation = self.operation(image, "72°")
         self.assertEqual(time_operation[1], (12, 11))
         self.assertEqual(date_operation[1], (17, 36))
-        self.assertEqual(temperature_operation[1], (24, 53))
+        self.assertEqual(temperature_operation[1], (26, 53))
         self.assertEqual(temperature_operation[1][1] + 8, 61)
         self.assertEqual(time_operation[3]["fill"], (220, 240, 255))
         self.assertEqual(date_operation[3]["fill"], (190, 225, 255))

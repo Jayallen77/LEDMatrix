@@ -31,6 +31,9 @@ class FakeDraw:
     def point(self, position, **kwargs):
         self.operations.append(("point", position, kwargs))
 
+    def line(self, points, **kwargs):
+        self.operations.append(("line", points, kwargs))
+
     def polygon(self, points, **kwargs):
         self.operations.append(("polygon", points, kwargs))
 
@@ -183,12 +186,16 @@ class WeatherForecastTests(unittest.TestCase):
 
         high = next(operation for operation in text_operations if operation[2] == "68")
         low = next(operation for operation in text_operations if operation[2] == "41")
-        separator = next(operation for operation in text_operations if operation[2] == "/")
+        separator = next(
+            operation
+            for operation in text_operations
+            if operation[0] == "line"
+        )
         self.assertEqual(high[1], (42, 7))
-        self.assertEqual(separator[1], (50, 7))
+        self.assertEqual(separator[1], (51, 10, 52, 10))
         self.assertEqual(low[1], (54, 7))
         self.assertEqual(high[3]["fill"], (255, 90, 35))
-        self.assertEqual(separator[3]["fill"], (190, 150, 45))
+        self.assertEqual(separator[2]["fill"], (190, 150, 45))
         self.assertEqual(low[3]["fill"], (60, 150, 255))
 
     def test_current_weather_places_high_left_and_low_right(self):
@@ -227,7 +234,7 @@ class WeatherForecastTests(unittest.TestCase):
             [operation[1] for operation in manager.display_manager.image.paste_operations],
             [(14, 44), (38, 44)],
         )
-        self.assertEqual(StubWeatherIcons.calls[-1][2:], (-4, -7, 35))
+        self.assertEqual(StubWeatherIcons.calls[-1][2:], (-3, -5, 33))
 
 
 if __name__ == "__main__":
