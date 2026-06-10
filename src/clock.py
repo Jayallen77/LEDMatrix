@@ -437,7 +437,7 @@ class Clock:
             )
             text_width = bbox[2] - bbox[0]
             x = (self.width - text_width) // 2
-            y = self.height - 2 - bbox[3]
+            y = self.height - 4 - bbox[3]
             draw.text(
                 (x, y),
                 temperature_text,
