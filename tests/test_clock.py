@@ -229,7 +229,6 @@ class ClockTests(unittest.TestCase):
         clock.height = 64
         clock.time_section_height = 42
         clock.date_section_height = 22
-        clock.temperature_y = 52
         clock.time_font = FakeFont("time")
         clock.date_font = FakeFont("date")
         clock.temperature_font = FakeFont("temperature")
@@ -264,9 +263,22 @@ class ClockTests(unittest.TestCase):
         temperature_operation = self.operation(image, "72°")
         self.assertEqual(time_operation[1], (12, 11))
         self.assertEqual(date_operation[1], (17, 38))
-        self.assertEqual(temperature_operation[1], (24, 52))
-        self.assertEqual(time_operation[3]["fill"], (255, 255, 255))
+        self.assertEqual(temperature_operation[1], (24, 54))
+        self.assertEqual(temperature_operation[1][1] + 8, 62)
+        self.assertEqual(time_operation[3]["fill"], (220, 240, 255))
         self.assertEqual(date_operation[3]["fill"], (190, 225, 255))
+
+    def test_phase_colors_keep_time_and_date_in_matching_palettes(self):
+        expected = {
+            "sunrise": ((255, 235, 165), (255, 210, 95)),
+            "day": ((220, 240, 255), (190, 225, 255)),
+            "sunset": ((255, 145, 45), (190, 105, 225)),
+            "night": ((70, 110, 180), (55, 85, 145)),
+            "late_night": ((135, 50, 35), (130, 75, 25)),
+        }
+
+        self.assertEqual(Clock.PHASE_COLORS, expected)
+        self.assertNotEqual(Clock.PHASE_COLORS["day"][0], (255, 255, 255))
 
     def test_missing_temperature_hides_temperature_line(self):
         clock = self.make_clock()

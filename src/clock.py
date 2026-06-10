@@ -25,11 +25,11 @@ class Clock:
     """
 
     PHASE_COLORS = {
-        "sunrise": ((255, 245, 215), (255, 205, 70)),
-        "day": ((255, 255, 255), (190, 225, 255)),
+        "sunrise": ((255, 235, 165), (255, 210, 95)),
+        "day": ((220, 240, 255), (190, 225, 255)),
         "sunset": ((255, 145, 45), (190, 105, 225)),
         "night": ((70, 110, 180), (55, 85, 145)),
-        "late_night": ((135, 60, 25), (105, 45, 20)),
+        "late_night": ((135, 50, 35), (130, 75, 25)),
     }
     TEMPERATURE_ANCHORS = (
         (32.0, (45, 100, 255)),
@@ -77,7 +77,6 @@ class Clock:
             # Layout constants
             self.time_section_height = int(self.height * 2 / 3)  # Top 2/3 for time
             self.date_section_height = self.height - self.time_section_height  # Bottom 1/3 for date
-            self.temperature_y = 52
 
             logger.info(f"Clock setup complete. Display: {self.width}x{self.height}")
 
@@ -438,8 +437,9 @@ class Clock:
             )
             text_width = bbox[2] - bbox[0]
             x = (self.width - text_width) // 2
+            y = self.height - 2 - bbox[3]
             draw.text(
-                (x, self.temperature_y),
+                (x, y),
                 temperature_text,
                 font=self.temperature_font,
                 fill=color,
