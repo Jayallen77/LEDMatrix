@@ -58,6 +58,7 @@ class DisplayController:
         init_time = time.time()
         self.clock = Clock(self.display_manager) if self.config.get('clock', {}).get('enabled', True) else None
         self.weather = WeatherManager(self.config, self.display_manager, self.cache_manager) if self.config.get('weather', {}).get('enabled', False) else None
+        self._attach_clock_weather()
         self.stocks = StockManager(self.config, self.display_manager) if self.config.get('stocks', {}).get('enabled', False) else None
         self.news = StockNewsManager(self.config, self.display_manager) if self.config.get('stock_news', {}).get('enabled', False) else None
         self.odds_ticker = OddsTickerManager(self.config, self.display_manager) if self.config.get('odds_ticker', {}).get('enabled', False) else None
@@ -434,6 +435,11 @@ class DisplayController:
         self.last_config_check = 0
         self.is_display_active = True
         self._load_config() # Initial load of schedule
+
+    def _attach_clock_weather(self):
+        """Share existing weather state with the clock without fetching."""
+        if self.clock and self.weather:
+            self.clock.set_weather_provider(self.weather)
 
     def _handle_music_update(self, track_info: Dict[str, Any], significant_change: bool = False):
         """Receive poll-thread updates without changing display modes."""
