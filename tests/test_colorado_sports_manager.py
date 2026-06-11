@@ -331,6 +331,51 @@ class ColoradoSportsManagerTests(unittest.TestCase):
             [(23, 13), (23, 33)],
         )
 
+    def test_rockies_logo_gets_contrast_circle_without_changing_opponent(self):
+        manager = self.make_manager()
+
+        class FakeLogo:
+            size = (17, 17)
+
+        game = {
+            "league": "MLB",
+            "away": {
+                "abbr": "CHC",
+                "score": "0",
+                "is_colorado": False,
+            },
+            "home": {
+                "abbr": "COL",
+                "score": "0",
+                "is_colorado": True,
+            },
+            "period": 1,
+            "clock": "",
+            "status": "Bot 1st",
+            "outs": 0,
+        }
+        manager._load_team_logo = Mock(return_value=FakeLogo())
+
+        image = self.render(manager, game)
+
+        ellipses = [
+            operation
+            for operation in image.draw_operations
+            if operation[0] == "ellipse"
+        ]
+        self.assertEqual(
+            ellipses,
+            [(
+                "ellipse",
+                (23, 33, 39, 49),
+                {"fill": manager.ROCKIES_LOGO_BACKDROP},
+            )],
+        )
+        self.assertEqual(
+            [operation[1] for operation in image.pastes],
+            [(23, 13), (23, 33)],
+        )
+
     def test_mlb_outs_and_league_states_are_compact(self):
         manager = self.make_manager()
         mlb_game = manager._parse_event(

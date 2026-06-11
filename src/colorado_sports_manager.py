@@ -34,6 +34,7 @@ class ColoradoSportsManager:
     }
     COLORADO_COLOR = (255, 210, 35)
     DIVIDER_COLOR = (40, 150, 255)
+    ROCKIES_LOGO_BACKDROP = (215, 215, 220)
     CARD_LOGO_SIZE = 17
     TEAMS = (
         {
@@ -454,6 +455,19 @@ class ColoradoSportsManager:
                 logo_width, logo_height = logo.size
                 paste_x = logo_x + ((logo_size - logo_width) // 2)
                 paste_y = logo_y + ((logo_size - logo_height) // 2)
+                if (
+                    league == "MLB"
+                    and str(team.get("abbr", "")).upper() == "COL"
+                ):
+                    draw.ellipse(
+                        (
+                            logo_x,
+                            logo_y,
+                            logo_x + logo_size - 1,
+                            logo_y + logo_size - 1,
+                        ),
+                        fill=self.ROCKIES_LOGO_BACKDROP,
+                    )
                 image.paste(logo, (paste_x, paste_y), logo)
             else:
                 self._draw_team_badge(
