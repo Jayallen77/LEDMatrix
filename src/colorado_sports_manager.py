@@ -400,7 +400,7 @@ class ColoradoSportsManager:
         primary, secondary = self._format_game_state(game)
         if not secondary:
             return primary
-        combined = f"{primary} {secondary}"
+        combined = f"{primary} - {secondary}"
         if self.display_manager.get_text_width(combined, font) <= width - 4:
             return combined
         return primary
@@ -495,7 +495,7 @@ class ColoradoSportsManager:
                 - team_bbox[1]
             )
             draw.text(
-                (2, text_y),
+                (4, text_y),
                 abbreviation,
                 font=font,
                 fill=team_color,
@@ -509,8 +509,14 @@ class ColoradoSportsManager:
                 + ((logo_size - score_height) // 2)
                 - score_bbox[1]
             )
+            score_region_left = logo_x + logo_size
+            score_region_width = width - score_region_left
+            score_x = (
+                score_region_left
+                + ((score_region_width - score_width) // 2)
+            )
             draw.text(
-                (width - score_width - 2, score_y),
+                (score_x, score_y),
                 score,
                 font=font,
                 fill=team_color,
@@ -520,12 +526,44 @@ class ColoradoSportsManager:
         state_width = self.display_manager.get_text_width(state, font)
         state_bbox = draw.textbbox((0, 0), state, font=font)
         state_y = height - 1 - state_bbox[3]
-        draw.text(
-            ((width - state_width) // 2, state_y),
-            state,
-            font=font,
-            fill=league_color,
-        )
+        state_x = (width - state_width) // 2
+        if " - " in state:
+            primary, secondary = state.split(" - ", 1)
+            primary_text = f"{primary} "
+            dash_text = "- "
+            draw.text(
+                (state_x, state_y),
+                primary_text,
+                font=font,
+                fill=league_color,
+            )
+            dash_x = state_x + self.display_manager.get_text_width(
+                primary_text,
+                font,
+            )
+            draw.text(
+                (dash_x, state_y),
+                dash_text,
+                font=font,
+                fill=(255, 255, 255),
+            )
+            secondary_x = dash_x + self.display_manager.get_text_width(
+                dash_text,
+                font,
+            )
+            draw.text(
+                (secondary_x, state_y),
+                secondary,
+                font=font,
+                fill=league_color,
+            )
+        else:
+            draw.text(
+                (state_x, state_y),
+                state,
+                font=font,
+                fill=league_color,
+            )
         return image
 
     def display(self, force_clear: bool = False) -> bool:

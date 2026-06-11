@@ -216,11 +216,11 @@ class ColoradoSportsManagerTests(unittest.TestCase):
         )
         colorado = next(
             operation for operation in text_operations
-            if operation[2] == "COL" and operation[1][0] == 2
+            if operation[2] == "COL" and operation[1][0] == 4
         )
         colorado_badge = next(
             operation for operation in text_operations
-            if operation[2] == "COL" and operation[1][0] != 2
+            if operation[2] == "COL" and operation[1][0] != 4
         )
         colorado_score = next(
             operation for operation in text_operations
@@ -232,7 +232,7 @@ class ColoradoSportsManagerTests(unittest.TestCase):
             colorado[3]["fill"],
             manager.COLORADO_COLOR,
         )
-        self.assertEqual(colorado[1], (2, 38))
+        self.assertEqual(colorado[1], (4, 38))
         self.assertEqual(
             colorado_badge[3]["fill"],
             manager.COLORADO_COLOR,
@@ -456,7 +456,7 @@ class ColoradoSportsManagerTests(unittest.TestCase):
                 manager.display_manager.extra_small_font,
                 64,
             ),
-            "BOT 5 1 OUT",
+            "BOT 5 - 1 OUT",
         )
         self.assertEqual(
             manager._format_game_state({
@@ -514,7 +514,7 @@ class ColoradoSportsManagerTests(unittest.TestCase):
         }
         manager.display_manager.get_text_width = Mock(
             side_effect=lambda text, font: (
-                64 if text == "BOT 12 2 OUT" else len(text) * 4
+                64 if text == "BOT 12 - 2 OUT" else len(text) * 4
             )
         )
 
@@ -565,12 +565,58 @@ class ColoradoSportsManagerTests(unittest.TestCase):
                 for operation in text_operations
             }
             self.assertEqual(positions[league][1], 1)
-            self.assertEqual(positions["AWY"], (2, 18))
-            self.assertEqual(positions["COL"], (2, 38))
-            self.assertEqual(positions["1"], (58, 18))
-            self.assertEqual(positions["2"], (58, 38))
+            self.assertEqual(positions["AWY"], (4, 18))
+            self.assertEqual(positions["COL"], (4, 38))
+            self.assertEqual(positions["1"], (50, 18))
+            self.assertEqual(positions["2"], (50, 38))
             status_text = self._expected_status(league)
             self.assertEqual(positions[status_text][1], 56)
+
+    def test_mlb_status_draws_a_white_dash_between_inning_and_outs(self):
+        manager = self.make_manager()
+        manager._load_team_logo = Mock(return_value=None)
+        game = {
+            "league": "MLB",
+            "away": {
+                "abbr": "CHC",
+                "score": "0",
+                "is_colorado": False,
+            },
+            "home": {
+                "abbr": "COL",
+                "score": "0",
+                "is_colorado": True,
+            },
+            "period": 3,
+            "clock": "",
+            "status": "Top 3rd",
+            "outs": 2,
+        }
+
+        image = self.render(manager, game)
+        status_operations = [
+            operation
+            for operation in image.draw_operations
+            if operation[0] == "text" and operation[2] in {
+                "TOP 3 ",
+                "- ",
+                "2 OUT",
+            }
+        ]
+
+        self.assertEqual(
+            [operation[2] for operation in status_operations],
+            ["TOP 3 ", "- ", "2 OUT"],
+        )
+        self.assertEqual(status_operations[1][3]["fill"], (255, 255, 255))
+        self.assertEqual(
+            status_operations[0][3]["fill"],
+            manager.LEAGUE_COLORS["MLB"],
+        )
+        self.assertEqual(
+            status_operations[2][3]["fill"],
+            manager.LEAGUE_COLORS["MLB"],
+        )
 
     @staticmethod
     def _expected_status(league):
