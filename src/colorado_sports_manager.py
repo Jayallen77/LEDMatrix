@@ -426,14 +426,14 @@ class ColoradoSportsManager:
         header_x = (width - header_width) // 2
         league_color = self.LEAGUE_COLORS.get(league, (80, 180, 255))
         draw.text(
-            (header_x, 1),
+            (header_x, 2),
             header,
             font=header_font,
             fill=(255, 255, 255),
         )
         if marker:
             draw.text(
-                (header_x + header_width + 1, 1),
+                (header_x + header_width + 1, 2),
                 marker,
                 font=font,
                 fill=(255, 180, 0),
@@ -525,7 +525,7 @@ class ColoradoSportsManager:
         state = self._compose_game_state(game, font, width)
         state_width = self.display_manager.get_text_width(state, font)
         state_bbox = draw.textbbox((0, 0), state, font=font)
-        state_y = height - 1 - state_bbox[3]
+        state_y = height - 3 - state_bbox[3]
         state_x = (width - state_width) // 2
         if " - " in state:
             primary, secondary = state.split(" - ", 1)

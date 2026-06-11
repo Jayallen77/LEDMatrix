@@ -227,7 +227,7 @@ class ColoradoSportsManagerTests(unittest.TestCase):
             if operation[2] == "3"
         )
         self.assertEqual(header[3]["fill"], (255, 255, 255))
-        self.assertEqual(header[1], (26, 1))
+        self.assertEqual(header[1], (26, 2))
         self.assertEqual(
             colorado[3]["fill"],
             manager.COLORADO_COLOR,
@@ -564,13 +564,13 @@ class ColoradoSportsManagerTests(unittest.TestCase):
                 operation[2]: operation[1]
                 for operation in text_operations
             }
-            self.assertEqual(positions[league][1], 1)
+            self.assertEqual(positions[league][1], 2)
             self.assertEqual(positions["AWY"], (4, 18))
             self.assertEqual(positions["COL"], (4, 38))
             self.assertEqual(positions["1"], (50, 18))
             self.assertEqual(positions["2"], (50, 38))
             status_text = self._expected_status(league)
-            self.assertEqual(positions[status_text][1], 56)
+            self.assertEqual(positions[status_text][1], 54)
 
     def test_mlb_status_draws_a_white_dash_between_inning_and_outs(self):
         manager = self.make_manager()
@@ -646,7 +646,7 @@ class ColoradoSportsManagerTests(unittest.TestCase):
             for operation in image.draw_operations
             if operation[0] == "text" and operation[2] == "NHL"
         )
-        self.assertEqual(header[1], (26, 1))
+        self.assertEqual(header[1], (26, 2))
         self.assertEqual(marker[3]["fill"], (255, 180, 0))
         for operation in image.draw_operations:
             if operation[0] == "text":
