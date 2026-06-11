@@ -38,6 +38,11 @@ class FakeDraw:
     def ellipse(self, points, **kwargs):
         self.operations.append(("ellipse", points, kwargs))
 
+    @staticmethod
+    def textbbox(position, text, **kwargs):
+        del position, kwargs
+        return (0, 0, len(text) * 4, 7)
+
 
 def install_dependency_stubs():
     if "PIL" not in sys.modules:
@@ -211,11 +216,29 @@ class ColoradoSportsManagerTests(unittest.TestCase):
         )
         colorado = next(
             operation for operation in text_operations
-            if operation[2] == "COL"
+            if operation[2] == "COL" and operation[1][0] == 2
+        )
+        colorado_badge = next(
+            operation for operation in text_operations
+            if operation[2] == "COL" and operation[1][0] != 2
+        )
+        colorado_score = next(
+            operation for operation in text_operations
+            if operation[2] == "3"
         )
         self.assertEqual(header[3]["fill"], (255, 255, 255))
+        self.assertEqual(header[1], (26, 1))
         self.assertEqual(
             colorado[3]["fill"],
+            manager.COLORADO_COLOR,
+        )
+        self.assertEqual(colorado[1], (2, 38))
+        self.assertEqual(
+            colorado_badge[3]["fill"],
+            manager.COLORADO_COLOR,
+        )
+        self.assertEqual(
+            colorado_score[3]["fill"],
             manager.COLORADO_COLOR,
         )
         self.assertEqual(
@@ -224,6 +247,28 @@ class ColoradoSportsManagerTests(unittest.TestCase):
                 if operation[0] == "rectangle"
             ]),
             2,
+        )
+        rectangles = [
+            operation[1]
+            for operation in image.draw_operations
+            if operation[0] == "rectangle"
+        ]
+        self.assertEqual(
+            rectangles,
+            [(23, 13, 39, 29), (23, 33, 39, 49)],
+        )
+        lines = [
+            operation
+            for operation in image.draw_operations
+            if operation[0] == "line"
+        ]
+        self.assertIn(
+            ("line", (4, 10, 59, 10), {"fill": manager.DIVIDER_COLOR}),
+            lines,
+        )
+        self.assertIn(
+            ("line", (4, 52, 59, 52), {"fill": manager.DIVIDER_COLOR}),
+            lines,
         )
 
     def test_local_logos_are_cached_and_pasted_when_available(self):
@@ -274,13 +319,17 @@ class ColoradoSportsManagerTests(unittest.TestCase):
 
         self.assertIs(first, logo)
         self.assertIs(second, logo)
-        self.assertEqual(logo.thumbnail_size, (11, 11))
+        self.assertEqual(logo.thumbnail_size, (17, 17))
         image_open.assert_called_once()
 
         game = manager._parse_event(self.event(), manager.TEAMS[0])
         manager._load_team_logo = Mock(return_value=logo)
         image = self.render(manager, game)
         self.assertEqual(len(image.pastes), 2)
+        self.assertEqual(
+            [operation[1] for operation in image.pastes],
+            [(23, 13), (23, 33)],
+        )
 
     def test_mlb_outs_and_league_states_are_compact(self):
         manager = self.make_manager()
@@ -300,6 +349,14 @@ class ColoradoSportsManagerTests(unittest.TestCase):
         self.assertEqual(
             manager._format_game_state(mlb_game),
             ("BOT 5", "1 OUT"),
+        )
+        self.assertEqual(
+            manager._compose_game_state(
+                mlb_game,
+                manager.display_manager.extra_small_font,
+                64,
+            ),
+            "BOT 5 1 OUT",
         )
         self.assertEqual(
             manager._format_game_state({
@@ -337,6 +394,93 @@ class ColoradoSportsManagerTests(unittest.TestCase):
             }),
             ("HT", None),
         )
+        self.assertEqual(
+            manager._format_game_state({
+                "league": "MLS",
+                "period": 2,
+                "clock": "67:00",
+                "status": "67'",
+            }),
+            ("67'", None),
+        )
+
+    def test_mlb_outs_are_omitted_when_combined_status_does_not_fit(self):
+        manager = self.make_manager()
+        game = {
+            "league": "MLB",
+            "period": 12,
+            "status": "BOT 12",
+            "outs": 2,
+        }
+        manager.display_manager.get_text_width = Mock(
+            side_effect=lambda text, font: (
+                64 if text == "BOT 12 2 OUT" else len(text) * 4
+            )
+        )
+
+        self.assertEqual(
+            manager._compose_game_state(
+                game,
+                manager.display_manager.extra_small_font,
+                64,
+            ),
+            "BOT 12",
+        )
+
+    def test_all_leagues_share_the_same_card_geometry(self):
+        manager = self.make_manager()
+        manager._load_team_logo = Mock(return_value=None)
+        statuses = {
+            "MLB": {"period": 1, "clock": "", "status": "Bot 1st"},
+            "NBA": {"period": 3, "clock": "4:22", "status": "Q3 4:22"},
+            "NFL": {"period": 2, "clock": "8:14", "status": "Q2 8:14"},
+            "NHL": {"period": 2, "clock": "08:14", "status": "2nd 08:14"},
+            "MLS": {"period": 2, "clock": "67:00", "status": "67'"},
+        }
+
+        for league, state in statuses.items():
+            game = {
+                "league": league,
+                "away": {
+                    "abbr": "AWY",
+                    "score": "1",
+                    "is_colorado": False,
+                },
+                "home": {
+                    "abbr": "COL",
+                    "score": "2",
+                    "is_colorado": True,
+                },
+                **state,
+            }
+
+            image = self.render(manager, game)
+            text_operations = [
+                operation
+                for operation in image.draw_operations
+                if operation[0] == "text"
+            ]
+            positions = {
+                operation[2]: operation[1]
+                for operation in text_operations
+            }
+            self.assertEqual(positions[league][1], 1)
+            self.assertEqual(positions["AWY"], (2, 18))
+            self.assertEqual(positions["COL"], (2, 38))
+            self.assertEqual(positions["1"], (58, 18))
+            self.assertEqual(positions["2"], (58, 38))
+            status_text = self._expected_status(league)
+            self.assertEqual(positions[status_text][1], 56)
+
+    @staticmethod
+    def _expected_status(league):
+        return {
+            "MLB": "BOT 1",
+            "NBA": "Q3 4:22",
+            "NFL": "Q2 8:14",
+            "NHL": "2nd 08:14",
+            "MLS": "67'",
+        }[league]
 
     def test_stale_marker_and_geometry_stay_inside_64_square(self):
         manager = self.make_manager()
@@ -351,6 +495,12 @@ class ColoradoSportsManagerTests(unittest.TestCase):
             for operation in image.draw_operations
             if operation[0] == "text" and operation[2] == "*"
         )
+        header = next(
+            operation
+            for operation in image.draw_operations
+            if operation[0] == "text" and operation[2] == "NHL"
+        )
+        self.assertEqual(header[1], (26, 1))
         self.assertEqual(marker[3]["fill"], (255, 180, 0))
         for operation in image.draw_operations:
             if operation[0] == "text":

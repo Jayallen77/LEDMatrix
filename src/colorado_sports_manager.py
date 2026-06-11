@@ -33,6 +33,8 @@ class ColoradoSportsManager:
         "MLS": (60, 210, 120),
     }
     COLORADO_COLOR = (255, 210, 35)
+    DIVIDER_COLOR = (40, 150, 255)
+    CARD_LOGO_SIZE = 17
     TEAMS = (
         {
             "league": "NHL",
@@ -293,7 +295,10 @@ class ColoradoSportsManager:
                     "LANCZOS",
                     getattr(Image, "LANCZOS", 1),
                 )
-                logo.thumbnail((11, 11), resampling)
+                logo.thumbnail(
+                    (self.CARD_LOGO_SIZE, self.CARD_LOGO_SIZE),
+                    resampling,
+                )
                 logo = logo.copy()
             self._logo_cache[cache_key] = logo
             return logo
@@ -336,27 +341,20 @@ class ColoradoSportsManager:
             if is_colorado
             else self.LEAGUE_COLORS.get(game.get("league"), (130, 130, 130))
         )
-        draw.rectangle((x, y, x + 9, y + 9), outline=color)
-        initial = str(team.get("abbr", "?"))[:1]
-        draw.text((x + 3, y + 1), initial, font=font, fill=color)
-
-    @staticmethod
-    def _draw_sport_icon(draw, league: str, x: int, y: int, color) -> None:
-        if league == "NHL":
-            draw.line((x, y, x + 4, y + 5), fill=color)
-            draw.line((x + 3, y + 5, x + 6, y + 5), fill=color)
-            draw.ellipse((x, y + 5, x + 3, y + 7), outline=color)
-        elif league in {"NBA", "MLS"}:
-            draw.ellipse((x, y, x + 7, y + 7), outline=color)
-            draw.line((x, y + 3, x + 7, y + 3), fill=color)
-            draw.line((x + 3, y, x + 3, y + 7), fill=color)
-        elif league == "NFL":
-            draw.ellipse((x, y + 1, x + 7, y + 6), outline=color)
-            draw.line((x + 2, y + 3, x + 5, y + 3), fill=color)
-        else:
-            draw.ellipse((x + 1, y, x + 6, y + 7), outline=color)
-            draw.line((x + 2, y + 2, x + 5, y + 1), fill=color)
-            draw.line((x + 2, y + 5, x + 5, y + 6), fill=color)
+        size = self.CARD_LOGO_SIZE
+        draw.rectangle((x, y, x + size - 1, y + size - 1), outline=color)
+        abbreviation = str(team.get("abbr", "?"))[:3]
+        bbox = draw.textbbox((0, 0), abbreviation, font=font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+        text_x = x + ((size - text_width) // 2) - bbox[0]
+        text_y = y + ((size - text_height) // 2) - bbox[1]
+        draw.text(
+            (text_x, text_y),
+            abbreviation,
+            font=font,
+            fill=color,
+        )
 
     @staticmethod
     def _format_game_state(game: Dict[str, Any]):
@@ -390,6 +388,20 @@ class ColoradoSportsManager:
             return f"{ordinal} {clock}".strip(), None
         return (status[:12] or clock or "LIVE"), None
 
+    def _compose_game_state(
+        self,
+        game: Dict[str, Any],
+        font,
+        width: int,
+    ) -> str:
+        primary, secondary = self._format_game_state(game)
+        if not secondary:
+            return primary
+        combined = f"{primary} {secondary}"
+        if self.display_manager.get_text_width(combined, font) <= width - 4:
+            return combined
+        return primary
+
     def _render_game(self, game: Dict[str, Any]) -> Image.Image:
         width = int(getattr(self.display_manager, "width", 64))
         height = int(getattr(self.display_manager, "height", 64))
@@ -400,81 +412,104 @@ class ColoradoSportsManager:
             "extra_small_font",
             self.display_manager.small_font,
         )
+        header_font = getattr(self.display_manager, "small_font", font)
         league = game["league"]
         header = league
         marker = "*" if self.is_stale else ""
-        header_width = self.display_manager.get_text_width(header, font)
-        marker_width = self.display_manager.get_text_width(marker, font)
-        icon_width = 8
-        total_header_width = icon_width + 2 + header_width + marker_width
-        header_x = (width - total_header_width) // 2
-        league_color = self.LEAGUE_COLORS.get(league, (80, 180, 255))
-        self._draw_sport_icon(draw, league, header_x, 0, league_color)
-        draw.text(
-            (header_x + icon_width + 2, 0),
+        header_width = self.display_manager.get_text_width(
             header,
-            font=font,
+            header_font,
+        )
+        header_x = (width - header_width) // 2
+        league_color = self.LEAGUE_COLORS.get(league, (80, 180, 255))
+        draw.text(
+            (header_x, 1),
+            header,
+            font=header_font,
             fill=(255, 255, 255),
         )
         if marker:
             draw.text(
-                (header_x + icon_width + 2 + header_width, 0),
+                (header_x + header_width + 1, 1),
                 marker,
                 font=font,
                 fill=(255, 180, 0),
             )
-        draw.line((4, 9, width - 5, 9), fill=league_color)
+        draw.line(
+            (4, 10, width - 5, 10),
+            fill=self.DIVIDER_COLOR,
+        )
+        draw.line(
+            (4, 52, width - 5, 52),
+            fill=self.DIVIDER_COLOR,
+        )
 
         away = game["away"]
         home = game["home"]
-        for team, y in ((away, 15), (home, 31)):
+        logo_size = self.CARD_LOGO_SIZE
+        logo_x = (width - logo_size) // 2
+        for team, logo_y in ((away, 13), (home, 33)):
             logo = self._load_team_logo(league, team.get("abbr", ""))
             if logo:
-                image.paste(logo, (2, y - 1), logo)
+                logo_width, logo_height = logo.size
+                paste_x = logo_x + ((logo_size - logo_width) // 2)
+                paste_y = logo_y + ((logo_size - logo_height) // 2)
+                image.paste(logo, (paste_x, paste_y), logo)
             else:
-                self._draw_team_badge(draw, team, game, 2, y, font)
+                self._draw_team_badge(
+                    draw,
+                    team,
+                    game,
+                    logo_x,
+                    logo_y,
+                    font,
+                )
             is_colorado = self._is_colorado_team(game, team)
             team_color = (
                 self.COLORADO_COLOR
                 if is_colorado
                 else (255, 255, 255)
             )
-            if is_colorado:
-                draw.line((14, y, 14, y + 7), fill=self.COLORADO_COLOR)
+            abbreviation = str(team.get("abbr", ""))[:3]
+            team_bbox = draw.textbbox((0, 0), abbreviation, font=font)
+            team_height = team_bbox[3] - team_bbox[1]
+            text_y = (
+                logo_y
+                + ((logo_size - team_height) // 2)
+                - team_bbox[1]
+            )
             draw.text(
-                (17, y),
-                str(team.get("abbr", ""))[:3],
+                (2, text_y),
+                abbreviation,
                 font=font,
                 fill=team_color,
             )
             score = str(team.get("score", "0"))
             score_width = self.display_manager.get_text_width(score, font)
+            score_bbox = draw.textbbox((0, 0), score, font=font)
+            score_height = score_bbox[3] - score_bbox[1]
+            score_y = (
+                logo_y
+                + ((logo_size - score_height) // 2)
+                - score_bbox[1]
+            )
             draw.text(
-                (width - score_width - 3, y),
+                (width - score_width - 2, score_y),
                 score,
                 font=font,
                 fill=team_color,
             )
 
-        primary_state, secondary_state = self._format_game_state(game)
-        primary_width = self.display_manager.get_text_width(primary_state, font)
+        state = self._compose_game_state(game, font, width)
+        state_width = self.display_manager.get_text_width(state, font)
+        state_bbox = draw.textbbox((0, 0), state, font=font)
+        state_y = height - 1 - state_bbox[3]
         draw.text(
-            ((width - primary_width) // 2, 48),
-            primary_state,
+            ((width - state_width) // 2, state_y),
+            state,
             font=font,
             fill=league_color,
         )
-        if secondary_state:
-            secondary_width = self.display_manager.get_text_width(
-                secondary_state,
-                font,
-            )
-            draw.text(
-                ((width - secondary_width) // 2, 56),
-                secondary_state,
-                font=font,
-                fill=(210, 210, 210),
-            )
         return image
 
     def display(self, force_clear: bool = False) -> bool:
