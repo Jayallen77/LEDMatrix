@@ -34,7 +34,7 @@ class ColoradoSportsManager:
     }
     COLORADO_COLOR = (255, 210, 35)
     DIVIDER_COLOR = (40, 150, 255)
-    ROCKIES_LOGO_BACKDROP = (215, 215, 220)
+    ROCKIES_LOGO_BACKDROP = (255, 255, 255)
     CARD_LOGO_SIZE = 17
     TEAMS = (
         {
@@ -296,10 +296,12 @@ class ColoradoSportsManager:
                     "LANCZOS",
                     getattr(Image, "LANCZOS", 1),
                 )
-                logo.thumbnail(
-                    (self.CARD_LOGO_SIZE, self.CARD_LOGO_SIZE),
-                    resampling,
+                logo_size = (
+                    self.CARD_LOGO_SIZE - 2
+                    if league == "MLB" and abbreviation.upper() == "COL"
+                    else self.CARD_LOGO_SIZE
                 )
+                logo.thumbnail((logo_size, logo_size), resampling)
                 logo = logo.copy()
             self._logo_cache[cache_key] = logo
             return logo

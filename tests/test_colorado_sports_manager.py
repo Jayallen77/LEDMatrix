@@ -335,7 +335,8 @@ class ColoradoSportsManagerTests(unittest.TestCase):
         manager = self.make_manager()
 
         class FakeLogo:
-            size = (17, 17)
+            def __init__(self, size):
+                self.size = size
 
         game = {
             "league": "MLB",
@@ -354,7 +355,13 @@ class ColoradoSportsManagerTests(unittest.TestCase):
             "status": "Bot 1st",
             "outs": 0,
         }
-        manager._load_team_logo = Mock(return_value=FakeLogo())
+        manager._load_team_logo = Mock(
+            side_effect=lambda league, abbreviation: (
+                FakeLogo((15, 15))
+                if league == "MLB" and abbreviation == "COL"
+                else FakeLogo((17, 17))
+            )
+        )
 
         image = self.render(manager, game)
 
@@ -373,8 +380,56 @@ class ColoradoSportsManagerTests(unittest.TestCase):
         )
         self.assertEqual(
             [operation[1] for operation in image.pastes],
-            [(23, 13), (23, 33)],
+            [(23, 13), (24, 34)],
         )
+
+    def test_rockies_logo_loads_smaller_than_other_team_logos(self):
+        manager = self.make_manager()
+
+        class FakeLogo:
+            def __init__(self):
+                self.size = (480, 480)
+                self.thumbnail_size = None
+
+            def thumbnail(self, size, resampling):
+                del resampling
+                self.thumbnail_size = size
+                self.size = size
+
+            def copy(self):
+                return self
+
+        class FakeSource:
+            def __init__(self, logo):
+                self.logo = logo
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, traceback):
+                del exc_type, exc, traceback
+
+            def convert(self, mode):
+                del mode
+                return self.logo
+
+        rockies_logo = FakeLogo()
+        with (
+            patch.object(
+                colorado_sports_manager.os.path,
+                "isfile",
+                return_value=True,
+            ),
+            patch.object(
+                colorado_sports_manager.Image,
+                "open",
+                return_value=FakeSource(rockies_logo),
+            ),
+        ):
+            loaded = manager._load_team_logo("MLB", "COL")
+
+        self.assertIs(loaded, rockies_logo)
+        self.assertEqual(rockies_logo.thumbnail_size, (15, 15))
 
     def test_mlb_outs_and_league_states_are_compact(self):
         manager = self.make_manager()
