@@ -27,6 +27,10 @@ class StockManager:
     UNAVAILABLE_COLOR = (115, 115, 115)
     ACCENT_COLOR = (40, 150, 255)
     STALE_COLOR = (255, 180, 0)
+    STATUS_OPEN_COLOR = (0, 255, 70)
+    STATUS_CLOSED_COLOR = (255, 210, 0)
+    STATUS_ERROR_COLOR = (255, 45, 45)
+    STATUS_NO_DATA_COLOR = (115, 115, 115)
     TREND_COLOR = (90, 170, 255)
     VIX_CALM_COLOR = (0, 190, 255)
     VIX_NORMAL_COLOR = (0, 255, 70)
@@ -56,6 +60,7 @@ class StockManager:
         self.last_update = 0.0
         self.data_timestamp = 0.0
         self.is_stale = False
+        self.refresh_error = False
         self.retry_attempts = 0
         self.next_retry_at = 0.0
         self.dynamic_duration = int(
@@ -123,6 +128,7 @@ class StockManager:
         delay = min(30 * (2 ** (self.retry_attempts - 1)), 300)
         self.next_retry_at = time.time() + delay
         self.is_stale = bool(self.market_data)
+        self.refresh_error = True
         logger.warning("%s Retrying Market Pulse in %d seconds.", message, delay)
 
     def _fetch_instrument(
@@ -364,6 +370,7 @@ class StockManager:
                 or len(fresh_rows) < attempted
                 or uses_previous_session
             )
+            self.refresh_error = failed or len(fresh_rows) < attempted
             self.retry_attempts = 0
             self.next_retry_at = 0.0
             self._cache_current_data()
@@ -377,6 +384,23 @@ class StockManager:
 
         self._mark_retryable("Market Pulse data is temporarily unavailable.")
         return False
+
+    def _status_dot_color(self) -> Tuple[int, int, int]:
+        if not self.market_data:
+            return self.STATUS_NO_DATA_COLOR
+        if self.refresh_error:
+            return self.STATUS_ERROR_COLOR
+
+        session_states = {
+            row.get("session_state")
+            for key, row in self.market_data.items()
+            if key != "btc" and isinstance(row, dict)
+        }
+        if session_states.intersection({"closed", "previous"}):
+            return self.STATUS_CLOSED_COLOR
+        if self.is_stale:
+            return self.STATUS_ERROR_COLOR
+        return self.STATUS_OPEN_COLOR
 
     @staticmethod
     def _movement_color(change: float, invert: bool = False) -> Tuple[int, int, int]:
@@ -516,26 +540,19 @@ class StockManager:
         )
         header_font = getattr(self.display_manager, "small_font", font)
 
-        unavailable = not self.market_data
         header = "MARKETS"
         header_width = self.display_manager.get_text_width(header, header_font)
-        marker = "*" if self.is_stale else "?" if unavailable else ""
-        marker_width = self.display_manager.get_text_width(marker, header_font)
-        total_header_width = header_width + (1 + marker_width if marker else 0)
-        header_x = (width - total_header_width) // 2
+        header_x = (width - header_width) // 2
         draw.text(
             (header_x, 2),
             header,
             font=header_font,
             fill=self.LABEL_COLOR,
         )
-        if marker:
-            draw.text(
-                (header_x + header_width + 1, 2),
-                marker,
-                font=header_font,
-                fill=self.STALE_COLOR,
-            )
+        dot_x = header_x + header_width + 2
+        dot_color = self._status_dot_color()
+        draw.line((dot_x, 4, dot_x + 1, 4), fill=dot_color)
+        draw.line((dot_x, 5, dot_x + 1, 5), fill=dot_color)
         draw.line((5, 10, width - 6, 10), fill=self.ACCENT_COLOR)
 
         rows = [item for item in self.INSTRUMENTS if item[0] != "btc" or self.include_btc]

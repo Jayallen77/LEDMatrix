@@ -226,14 +226,13 @@ class MarketPulseTests(unittest.TestCase):
             operation
             for operation in image.draw_operations
             if operation[0] == "rectangle"
+            and operation[1][0] == operation[1][2]
+            and 18 <= operation[1][0] <= 30
         ]
         self.assertEqual(len(trend_operations), 35)
         self.assertEqual(
             [operation[1][0] for operation in trend_operations[:7]],
             [18, 20, 22, 24, 26, 28, 30],
-        )
-        self.assertTrue(
-            all(operation[1][0] == operation[1][2] for operation in trend_operations)
         )
         self.assertTrue(
             all(
@@ -281,7 +280,7 @@ class MarketPulseTests(unittest.TestCase):
         self.assertEqual(manager._fallback_trend(-1), [7, 6, 5, 4, 3, 2, 1])
         self.assertEqual(manager._fallback_trend(0), [4, 4, 4, 4, 4, 4, 4])
 
-    def test_stale_header_marker_is_subtle_and_within_bounds(self):
+    def test_status_dot_is_spaced_from_centered_header_and_within_bounds(self):
         manager = self.make_manager()
         manager.market_data = {
             "sp500": {"price": 6000, "change_percent": 0.0},
@@ -290,13 +289,25 @@ class MarketPulseTests(unittest.TestCase):
 
         image = self.render(manager)
 
-        marker = next(
+        header = next(
             operation
             for operation in image.draw_operations
-            if operation[0] == "text" and operation[2] == "*"
+            if operation[0] == "text" and operation[2] == "MARKETS"
         )
-        self.assertEqual(marker[1][1], 2)
-        self.assertEqual(marker[3]["fill"], manager.STALE_COLOR)
+        dot_lines = [
+            operation
+            for operation in image.draw_operations
+            if operation[0] == "line"
+            and operation[1] in {(48, 4, 49, 4), (48, 5, 49, 5)}
+        ]
+        self.assertEqual(header[1], (18, 2))
+        self.assertEqual(len(dot_lines), 2)
+        self.assertTrue(
+            all(
+                operation[2]["fill"] == manager.STATUS_ERROR_COLOR
+                for operation in dot_lines
+            )
+        )
         for operation in image.draw_operations:
             if operation[0] == "text":
                 x, y = operation[1]
@@ -310,6 +321,45 @@ class MarketPulseTests(unittest.TestCase):
             elif operation[0] == "rectangle":
                 points = operation[1]
                 self.assertTrue(all(0 <= coordinate < 64 for coordinate in points))
+
+    def test_status_dot_colors_describe_market_and_refresh_state(self):
+        manager = self.make_manager()
+
+        manager.market_data = {
+            "sp500": {"session_state": "open"},
+            "btc": {"session_state": "continuous"},
+        }
+        manager.is_stale = False
+        manager.refresh_error = False
+        self.assertEqual(
+            manager._status_dot_color(),
+            manager.STATUS_OPEN_COLOR,
+        )
+
+        manager.market_data["sp500"]["session_state"] = "closed"
+        self.assertEqual(
+            manager._status_dot_color(),
+            manager.STATUS_CLOSED_COLOR,
+        )
+
+        manager.market_data["sp500"]["session_state"] = "previous"
+        manager.is_stale = True
+        self.assertEqual(
+            manager._status_dot_color(),
+            manager.STATUS_CLOSED_COLOR,
+        )
+
+        manager.refresh_error = True
+        self.assertEqual(
+            manager._status_dot_color(),
+            manager.STATUS_ERROR_COLOR,
+        )
+
+        manager.market_data = {}
+        self.assertEqual(
+            manager._status_dot_color(),
+            manager.STATUS_NO_DATA_COLOR,
+        )
 
     def test_regular_session_change_uses_open_latest_and_session_state(self):
         manager = self.make_manager()
@@ -472,6 +522,7 @@ class MarketPulseTests(unittest.TestCase):
         self.assertIn("sp500", manager.market_data)
         self.assertIn("dow", manager.market_data)
         self.assertTrue(manager.is_stale)
+        self.assertTrue(manager.refresh_error)
 
     def test_rate_limit_keeps_cached_data_and_sets_bounded_retry(self):
         manager = self.make_manager()
@@ -487,6 +538,7 @@ class MarketPulseTests(unittest.TestCase):
         self.assertEqual(manager.market_data["sp500"]["price"], 6000)
         self.assertEqual(manager.next_retry_at, 130.0)
         self.assertTrue(manager.is_stale)
+        self.assertTrue(manager.refresh_error)
 
     def test_no_data_renders_unavailable_rows_instead_of_blank_frame(self):
         manager = self.make_manager()
