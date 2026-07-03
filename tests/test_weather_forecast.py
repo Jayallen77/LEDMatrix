@@ -171,6 +171,32 @@ class WeatherForecastTests(unittest.TestCase):
             },
         }
 
+    @staticmethod
+    def live_weather_payload(temp=75):
+        return {
+            "current": {
+                "temperature_2m": temp,
+                "relative_humidity_2m": 35,
+                "pressure_msl": 1012,
+                "uv_index": 4,
+                "weather_code": 0,
+                "wind_speed_10m": 8,
+                "wind_direction_10m": 270,
+            },
+            "daily": {
+                "time": ["2026-07-02", "2026-07-03"],
+                "temperature_2m_max": [82, 83],
+                "temperature_2m_min": [55, 56],
+                "weather_code": [0, 1],
+            },
+        }
+
+    @staticmethod
+    def response(payload):
+        response = Mock()
+        response.json.return_value = payload
+        return response
+
     def test_startup_loads_cache_without_calling_weather_api(self):
         cache = Mock()
         cache.load_cache.return_value = self.cached_weather_record()
@@ -238,6 +264,145 @@ class WeatherForecastTests(unittest.TestCase):
         self.assertFalse(manager.has_daily_forecast())
         release.set()
         manager._update_thread.join(1)
+
+    def test_customer_timeout_falls_back_to_standard_endpoint_and_updates_cache(self):
+        cache = Mock()
+        cache.load_cache.return_value = self.cached_weather_record()
+        requests_module = WeatherManager._fetch_weather.__globals__["requests"]
+        customer = "https://customer-api-eu02.open-meteo.com/v1/forecast"
+        config = {
+            "weather": {
+                "enabled": True,
+                "units": "imperial",
+                "forecast_endpoint": customer,
+            },
+            "location": {"city": "Denver", "state": "CO", "country": "US"},
+        }
+        manager = WeatherManager(config, FakeDisplay(), cache)
+        geo_response = self.response({
+            "results": [{"latitude": 39.7, "longitude": -104.9}],
+        })
+        weather_response = self.response(self.live_weather_payload())
+
+        with (
+            patch.object(
+                requests_module,
+                "get",
+                side_effect=[
+                    geo_response,
+                    requests_module.Timeout("customer timed out"),
+                    weather_response,
+                ],
+            ) as request_get,
+            self.assertLogs("src.weather_manager", level="INFO") as logs,
+        ):
+            manager._fetch_weather()
+
+        attempted_urls = [call.args[0] for call in request_get.call_args_list]
+        self.assertEqual(
+            attempted_urls,
+            [
+                manager.GEOCODING_ENDPOINT,
+                customer,
+                manager.STANDARD_FORECAST_ENDPOINT,
+            ],
+        )
+        self.assertEqual(
+            request_get.call_args_list[1].kwargs["params"],
+            request_get.call_args_list[2].kwargs["params"],
+        )
+        self.assertTrue(
+            all(
+                call.kwargs["timeout"] == manager.REQUEST_TIMEOUT
+                for call in request_get.call_args_list
+            )
+        )
+        cache.update_cache.assert_called_once()
+        self.assertEqual(manager.weather_data["main"]["temp"], 75)
+        self.assertIn(
+            "Weather data updated successfully.",
+            "\n".join(logs.output),
+        )
+
+    def test_all_forecast_endpoints_fail_and_cached_weather_remains(self):
+        cache = Mock()
+        cache.load_cache.return_value = self.cached_weather_record()
+        requests_module = WeatherManager._fetch_weather.__globals__["requests"]
+        customer = "https://customer-api-eu02.open-meteo.com/v1/forecast"
+        config = {
+            "weather": {
+                "enabled": True,
+                "units": "imperial",
+                "forecast_endpoint": customer,
+            },
+            "location": {"city": "Denver", "state": "CO", "country": "US"},
+        }
+        manager = WeatherManager(config, FakeDisplay(), cache)
+        geo_response = self.response({
+            "results": [{"latitude": 39.7, "longitude": -104.9}],
+        })
+
+        with (
+            patch.object(
+                requests_module,
+                "get",
+                side_effect=[
+                    geo_response,
+                    requests_module.Timeout("customer timed out"),
+                    requests_module.RequestException("standard unavailable"),
+                ],
+            ),
+            self.assertLogs("src.weather_manager", level="WARNING") as logs,
+        ):
+            manager._fetch_weather()
+
+        self.assertEqual(manager.weather_data["main"]["temp"], 72)
+        self.assertTrue(manager.has_daily_forecast())
+        cache.update_cache.assert_not_called()
+        self.assertIn(
+            "Weather refresh failed; continuing with cached data.",
+            "\n".join(logs.output),
+        )
+
+    def test_cached_startup_schedules_immediate_then_interval_refreshes(self):
+        cache = Mock()
+        cache.load_cache.return_value = self.cached_weather_record()
+        requests_module = WeatherManager._fetch_weather.__globals__["requests"]
+        config = {
+            "weather": {
+                "enabled": True,
+                "units": "imperial",
+                "update_interval": 300,
+            },
+            "location": {"city": "Denver", "state": "CO", "country": "US"},
+        }
+        manager = WeatherManager(config, FakeDisplay(), cache)
+        geo_response = self.response({
+            "results": [{"latitude": 39.7, "longitude": -104.9}],
+        })
+        weather_response = self.response(self.live_weather_payload())
+
+        with patch.object(
+            requests_module,
+            "get",
+            side_effect=[
+                geo_response,
+                weather_response,
+                geo_response,
+                weather_response,
+            ],
+        ) as request_get:
+            self.assertEqual(manager.last_attempt, 0)
+            self.assertTrue(manager.request_update())
+            manager._update_thread.join(1)
+            self.assertFalse(manager.request_update())
+
+            manager.last_attempt -= 301
+            self.assertTrue(manager.request_update())
+            manager._update_thread.join(1)
+
+        self.assertEqual(request_get.call_count, 4)
+        self.assertEqual(cache.update_cache.call_count, 2)
 
     def test_forecast_preserves_geometry_and_splits_temperature_colors(self):
         manager = self.make_manager()

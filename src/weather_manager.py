@@ -25,6 +25,8 @@ except ImportError:
 class WeatherManager:
 
     REQUEST_TIMEOUT = (3.05, 5)
+    STANDARD_FORECAST_ENDPOINT = "https://api.open-meteo.com/v1/forecast"
+    GEOCODING_ENDPOINT = "https://geocoding-api.open-meteo.com/v1/search"
 
     def __init__(self, config: Dict[str, Any], display_manager, cache_manager=None):
         self.config = config
@@ -32,6 +34,8 @@ class WeatherManager:
         self.weather_config = config.get('weather', {})
         self.location = config.get('location', {})
         self.last_update = 0
+        self.last_attempt = 0
+        self.cache_timestamp = 0
         self.weather_data = None
         self.forecast_data = None
         self.daily_forecast = None
@@ -94,9 +98,9 @@ class WeatherManager:
         self.forecast_data = forecast
         self._process_forecast_data(forecast)
         try:
-            self.last_update = float(cached_record.get('timestamp', 0) or 0)
+            self.cache_timestamp = float(cached_record.get('timestamp', 0) or 0)
         except (TypeError, ValueError):
-            self.last_update = 0
+            self.cache_timestamp = 0
         return True
 
     def has_current_weather(self) -> bool:
@@ -105,22 +109,61 @@ class WeatherManager:
     def has_daily_forecast(self) -> bool:
         return bool(self.daily_forecast)
 
+    @staticmethod
+    def _normalize_forecast_endpoint(endpoint: str) -> str:
+        endpoint = str(endpoint or "").strip().rstrip('/')
+        if not endpoint:
+            return ""
+        if not endpoint.endswith('/v1/forecast'):
+            endpoint = f"{endpoint}/v1/forecast"
+        return endpoint
+
+    def _forecast_endpoints(self) -> List[str]:
+        configured = next(
+            (
+                self.weather_config.get(key)
+                for key in (
+                    'forecast_endpoint',
+                    'api_endpoint',
+                    'endpoint',
+                    'base_url',
+                )
+                if self.weather_config.get(key)
+            ),
+            None,
+        )
+        endpoints = []
+        configured_endpoint = self._normalize_forecast_endpoint(configured)
+        if configured_endpoint:
+            endpoints.append(configured_endpoint)
+        if self.STANDARD_FORECAST_ENDPOINT not in endpoints:
+            endpoints.append(self.STANDARD_FORECAST_ENDPOINT)
+        return endpoints
+
+    @staticmethod
+    def _forecast_params(lat, lon, units: str) -> Dict[str, Any]:
+        return {
+            'latitude': lat,
+            'longitude': lon,
+            'current': (
+                'temperature_2m,relative_humidity_2m,apparent_temperature,'
+                'precipitation,rain,showers,snowfall,weather_code,pressure_msl,'
+                'cloud_cover,wind_speed_10m,wind_direction_10m,uv_index'
+            ),
+            'daily': (
+                'weather_code,temperature_2m_max,temperature_2m_min,'
+                'precipitation_sum,rain_sum,showers_sum,snowfall_sum,uv_index_max'
+            ),
+            'temperature_unit': 'fahrenheit' if units == 'imperial' else 'celsius',
+            'wind_speed_unit': 'mph' if units == 'imperial' else 'kmh',
+            'timezone': 'auto',
+        }
+
     def _fetch_weather(self) -> None:
         """Fetch current weather and forecast data from Open-Meteo API."""
         current_time = time.time()
-        
-        # Check if we're in error backoff period
-        if self.consecutive_errors >= self.max_consecutive_errors:
-            if current_time - self.last_error_time < self.error_backoff_time:
-                # Still in backoff period, don't attempt fetch
-                if current_time - self.last_error_log_time > self.error_log_throttle:
-                    print(f"Weather API disabled due to {self.consecutive_errors} consecutive errors. Retrying in {self.error_backoff_time - (current_time - self.last_error_time):.0f} seconds")
-                    self.last_error_log_time = current_time
-                return
-            else:
-                # Backoff period expired, reset error count and try again
-                self.consecutive_errors = 0
-                self.error_backoff_time = 60  # Reset to initial backoff
+        self.last_attempt = current_time
+        logger.info("Weather live refresh attempt started.")
         
         # Open-Meteo doesn't require an API key
 
@@ -128,16 +171,20 @@ class WeatherManager:
         has_cached_data = self._load_cached_weather()
 
         city = self.location['city']
-        state = self.location['state']
-        country = self.location['country']
         units = self.weather_config.get('units', 'imperial')
 
-        # Open-Meteo API calls (no API key required)
         try:
-            # First get coordinates using Open-Meteo geocoding
-            geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={city}&count=1&language=en&format=json"
-
-            response = requests.get(geo_url, timeout=self.REQUEST_TIMEOUT)
+            logger.info("Trying weather endpoint: %s", self.GEOCODING_ENDPOINT)
+            response = requests.get(
+                self.GEOCODING_ENDPOINT,
+                params={
+                    'name': city,
+                    'count': 1,
+                    'language': 'en',
+                    'format': 'json',
+                },
+                timeout=self.REQUEST_TIMEOUT,
+            )
             response.raise_for_status()
             geo_data = response.json()
 
@@ -154,21 +201,55 @@ class WeatherManager:
 
             lat = geo_data['results'][0]['latitude']
             lon = geo_data['results'][0]['longitude']
+        except (requests.Timeout, requests.RequestException) as e:
+            self._handle_fetch_failure(
+                current_time,
+                f"Weather geocoding endpoint failed: {e}",
+                has_cached_data,
+            )
+            return
+        except Exception as e:
+            self._handle_fetch_failure(
+                current_time,
+                f"Weather geocoding failed: {e}",
+                has_cached_data,
+            )
+            return
 
-            # Get weather data using Open-Meteo weather API
-            # Convert units: imperial = fahrenheit, metric = celsius
-            temperature_unit = "fahrenheit" if units == "imperial" else "celsius"
-            wind_speed_unit = "mph" if units == "imperial" else "kmh"
+        weather_data = None
+        endpoint_errors = []
+        params = self._forecast_params(lat, lon, units)
+        for endpoint in self._forecast_endpoints():
+            logger.info("Trying weather endpoint: %s", endpoint)
+            try:
+                response = requests.get(
+                    endpoint,
+                    params=params,
+                    timeout=self.REQUEST_TIMEOUT,
+                )
+                response.raise_for_status()
+                candidate = response.json()
+                if not candidate.get('current') or not candidate.get('daily'):
+                    raise ValueError("response omitted current or daily weather data")
+                weather_data = candidate
+                increment_api_counter('weather', 1)
+                break
+            except (requests.Timeout, requests.RequestException, ValueError) as e:
+                endpoint_errors.append(f"{endpoint}: {e}")
+                logger.warning("Weather endpoint failed: %s (%s)", endpoint, e)
+            except Exception as e:
+                endpoint_errors.append(f"{endpoint}: {e}")
+                logger.warning("Weather endpoint returned invalid data: %s (%s)", endpoint, e)
 
-            weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,pressure_msl,cloud_cover,wind_speed_10m,wind_direction_10m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,rain_sum,showers_sum,snowfall_sum,uv_index_max&temperature_unit={temperature_unit}&wind_speed_unit={wind_speed_unit}&timezone=auto"
+        if weather_data is None:
+            self._handle_fetch_failure(
+                current_time,
+                "; ".join(endpoint_errors) or "No weather endpoint succeeded",
+                has_cached_data,
+            )
+            return
 
-            response = requests.get(weather_url, timeout=self.REQUEST_TIMEOUT)
-            response.raise_for_status()
-            weather_data = response.json()
-
-            # Increment API counter for weather data call
-            increment_api_counter('weather', 1)
-            
+        try:
             # Store current weather data (Open-Meteo format)
             current = weather_data['current']
             daily = weather_data['daily']
@@ -213,23 +294,10 @@ class WeatherManager:
             # Reset error count on successful fetch
             self.consecutive_errors = 0
             logger.info("Weather data updated successfully.")
-
-        except requests.Timeout as e:
-            self._handle_fetch_failure(
-                current_time,
-                f"Weather API timed out after bounded connect/read limits: {e}",
-                has_cached_data,
-            )
-        except requests.RequestException as e:
-            self._handle_fetch_failure(
-                current_time,
-                f"Weather API request failed: {e}",
-                has_cached_data,
-            )
         except Exception as e:
             self._handle_fetch_failure(
                 current_time,
-                f"Weather refresh failed: {e}",
+                f"Weather response processing failed: {e}",
                 has_cached_data,
             )
 
@@ -241,7 +309,6 @@ class WeatherManager:
     ) -> None:
         self.consecutive_errors += 1
         self.last_error_time = current_time
-        self.error_backoff_time = min(self.error_backoff_time * 2, 3600)
 
         if current_time - self.last_error_log_time > self.error_log_throttle:
             logger.warning(
@@ -250,15 +317,10 @@ class WeatherManager:
                 self.consecutive_errors,
                 self.max_consecutive_errors,
             )
-            if self.consecutive_errors >= self.max_consecutive_errors:
-                logger.warning(
-                    "Weather API paused for %d seconds after repeated failures.",
-                    self.error_backoff_time,
-                )
             self.last_error_log_time = current_time
 
         if has_cached_data:
-            logger.warning("Using cached weather data after refresh failure.")
+            logger.warning("Weather refresh failed; continuing with cached data.")
         else:
             self.weather_data = None
             self.forecast_data = None
@@ -271,12 +333,7 @@ class WeatherManager:
         """Start one background refresh when due without blocking display work."""
         current_time = time.time()
         update_interval = self.weather_config.get('update_interval', 300)
-        if self.last_update and current_time - self.last_update <= update_interval:
-            return False
-        if (
-            self.consecutive_errors
-            and current_time - self.last_error_time < self.error_backoff_time
-        ):
+        if self.last_attempt and current_time - self.last_attempt < update_interval:
             return False
         with self._update_lock:
             if self._update_thread and self._update_thread.is_alive():
