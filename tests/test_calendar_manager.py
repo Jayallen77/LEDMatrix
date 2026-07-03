@@ -111,6 +111,21 @@ class CalendarManagerTests(unittest.TestCase):
         self.assertIsNone(manager.service)
         self.assertFalse(manager.has_display_content())
 
+    def test_startup_defers_calendar_authentication_and_network(self):
+        with (
+            patch.object(calendar_manager.os.path, "exists", return_value=True),
+            patch.object(
+                calendar_manager.CalendarManager,
+                "authenticate",
+                return_value=True,
+            ) as authenticate,
+        ):
+            manager = self.make_manager(enabled=True)
+
+        authenticate.assert_not_called()
+        self.assertIsNone(manager.service)
+        self.assertFalse(manager.has_display_content())
+
     def test_renders_only_next_event_as_64_square(self):
         manager = self.make_manager()
         manager.enabled = True

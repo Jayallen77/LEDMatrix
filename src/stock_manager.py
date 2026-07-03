@@ -1,4 +1,5 @@
 import logging
+import threading
 import time
 import urllib.parse
 from datetime import datetime
@@ -20,6 +21,7 @@ class StockManager:
     """Display a compact broad-market summary behind the legacy stocks mode."""
 
     CACHE_KEY = "market_pulse"
+    REQUEST_TIMEOUT = (3.05, 5)
     LABEL_COLOR = (255, 255, 255)
     POSITIVE_COLOR = (0, 255, 70)
     NEGATIVE_COLOR = (255, 45, 45)
@@ -63,6 +65,8 @@ class StockManager:
         self.refresh_error = False
         self.retry_attempts = 0
         self.next_retry_at = 0.0
+        self._update_lock = threading.Lock()
+        self._update_thread = None
         self.dynamic_duration = int(
             config.get("display", {})
             .get("display_durations", {})
@@ -88,7 +92,6 @@ class StockManager:
         }
 
         self._load_cached_data()
-        self.update_stock_data()
 
     @property
     def include_btc(self) -> bool:
@@ -150,7 +153,7 @@ class StockManager:
                 "range": "5d",
                 "includePrePost": "false",
             },
-            timeout=8,
+            timeout=self.REQUEST_TIMEOUT,
         )
         if response.status_code != 200:
             logger.warning(
@@ -385,6 +388,31 @@ class StockManager:
         self._mark_retryable("Market Pulse data is temporarily unavailable.")
         return False
 
+    def request_update(self) -> bool:
+        """Refresh Market Pulse on one daemon worker without blocking display."""
+        now = time.time()
+        update_interval = int(self.stocks_config.get("update_interval", 600))
+        if now < self.next_retry_at:
+            return False
+        if self.last_update and now - self.last_update < update_interval:
+            return False
+        with self._update_lock:
+            if self._update_thread and self._update_thread.is_alive():
+                return False
+            self._update_thread = threading.Thread(
+                target=self._run_background_update,
+                name="market-pulse-refresh",
+                daemon=True,
+            )
+            self._update_thread.start()
+        return True
+
+    def _run_background_update(self) -> None:
+        try:
+            self.update_stock_data()
+        except Exception:
+            logger.exception("Unexpected error in background Market Pulse refresh.")
+
     def _status_dot_color(self) -> Tuple[int, int, int]:
         if not self.market_data:
             return self.STATUS_NO_DATA_COLOR
@@ -591,7 +619,7 @@ class StockManager:
     def display_stocks(self, force_clear: bool = False) -> bool:
         if not self.stocks_config.get("enabled", False):
             return False
-        self.update_stock_data()
+        self.request_update()
         if force_clear:
             self.display_manager.clear()
         self.display_manager.image = self._render_market_pulse()

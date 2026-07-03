@@ -504,6 +504,27 @@ class MarketPulseTests(unittest.TestCase):
                 "includePrePost": "false",
             },
         )
+        self.assertEqual(
+            manager.session.get.call_args.kwargs["timeout"],
+            manager.REQUEST_TIMEOUT,
+        )
+
+    def test_constructor_does_not_fetch_market_data(self):
+        config = {
+            "stocks": {"enabled": True, "update_interval": 600},
+            "crypto": {"enabled": True},
+        }
+        with (
+            patch.object(stock_manager, "CacheManager", return_value=MemoryCache()),
+            patch.object(
+                stock_manager.StockManager,
+                "update_stock_data",
+                return_value=False,
+            ) as update,
+        ):
+            stock_manager.StockManager(config, FakeDisplay())
+
+        update.assert_not_called()
 
     def test_partial_refresh_merges_cached_rows(self):
         manager = self.make_manager()

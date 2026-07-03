@@ -1,6 +1,7 @@
 import logging
 import os
 import pickle
+import threading
 import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -18,6 +19,7 @@ class CalendarManager:
     """Read-only next-event display for a 64x64 matrix."""
 
     SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
+    REQUEST_TIMEOUT_SECONDS = 5
 
     def __init__(self, display_manager, config: Dict[str, Any]):
         self.display_manager = display_manager
@@ -40,10 +42,15 @@ class CalendarManager:
         self.service = None
         self.auth_status = "disabled" if not self.enabled else "unavailable"
         self.current_event_index = 0
+        self._update_lock = threading.Lock()
+        self._update_thread = None
 
-        if self.enabled:
-            self.authenticate()
-            self.update(time.time())
+        if self.enabled and not os.path.exists(self.token_file):
+            self.auth_status = "token_missing"
+            logger.info(
+                "Calendar token is unavailable; calendar will remain out of "
+                "rotation until authorization is configured."
+            )
 
     @staticmethod
     def _load_timezone(name: str):
@@ -75,7 +82,13 @@ class CalendarManager:
         try:
             if not credentials.valid:
                 if credentials.expired and credentials.refresh_token:
-                    credentials.refresh(Request())
+                    auth_request = Request()
+
+                    def bounded_auth_request(*args, **kwargs):
+                        kwargs["timeout"] = self.REQUEST_TIMEOUT_SECONDS
+                        return auth_request(*args, **kwargs)
+
+                    credentials.refresh(bounded_auth_request)
                     with open(self.token_file, "wb") as token_handle:
                         pickle.dump(credentials, token_handle)
                 else:
@@ -84,12 +97,31 @@ class CalendarManager:
                         "Calendar authorization requires manual renewal."
                     )
                     return False
-            self.service = build(
-                "calendar",
-                "v3",
-                credentials=credentials,
-                cache_discovery=False,
-            )
+            try:
+                import httplib2
+                from google_auth_httplib2 import AuthorizedHttp
+
+                authorized_http = AuthorizedHttp(
+                    credentials,
+                    http=httplib2.Http(timeout=self.REQUEST_TIMEOUT_SECONDS),
+                )
+                self.service = build(
+                    "calendar",
+                    "v3",
+                    http=authorized_http,
+                    cache_discovery=False,
+                )
+            except ImportError:
+                logger.warning(
+                    "Bounded Calendar HTTP transport is unavailable; calendar "
+                    "refresh remains isolated on its background worker."
+                )
+                self.service = build(
+                    "calendar",
+                    "v3",
+                    credentials=credentials,
+                    cache_discovery=False,
+                )
             self.auth_status = "ready"
             return True
         except Exception as exc:
@@ -132,6 +164,28 @@ class CalendarManager:
         self.current_event_index = 0
         self.last_update = now
         return bool(self.events)
+
+    def request_update(self) -> bool:
+        """Authenticate and refresh on one background worker when due."""
+        now = time.time()
+        if self.last_update and now - self.last_update < self.update_interval:
+            return False
+        with self._update_lock:
+            if self._update_thread and self._update_thread.is_alive():
+                return False
+            self._update_thread = threading.Thread(
+                target=self._run_background_update,
+                name="calendar-refresh",
+                daemon=True,
+            )
+            self._update_thread.start()
+        return True
+
+    def _run_background_update(self) -> None:
+        try:
+            self.update(time.time())
+        except Exception:
+            logger.exception("Unexpected error in background Calendar refresh.")
 
     def has_display_content(self) -> bool:
         return bool(self.enabled and self.service and self.events)

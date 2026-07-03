@@ -260,7 +260,10 @@ class DisplayController:
         # List of available display modes (adjust order as desired)
         self.available_modes = []
         if self.clock: self.available_modes.append('clock')
-        if self.weather: self.available_modes.extend(['weather_current', 'weather_daily'])
+        if self.weather and self.weather.has_current_weather():
+            self.available_modes.append('weather_current')
+        if self.weather and self.weather.has_daily_forecast():
+            self.available_modes.append('weather_daily')
         if self.stocks: self.available_modes.append('stocks')
         if self.news: self.available_modes.append('stock_news')
         if self.odds_ticker: self.available_modes.append('odds_ticker')
@@ -614,15 +617,28 @@ class DisplayController:
         
         return self.display_durations.get(mode_key, 15)
 
+    @staticmethod
+    def _request_background_update(name, manager):
+        if not manager:
+            return False
+        try:
+            return bool(manager.request_update())
+        except Exception as exc:
+            logger.warning("Could not schedule %s refresh: %s", name, exc)
+            return False
+
     def _update_modules(self):
         """Call update methods on active managers."""
-        if self.weather: self.weather.get_weather()
-        if self.stocks: self.stocks.update_stock_data()
+        self._request_background_update('weather', self.weather)
+        self._request_background_update('Market Pulse', self.stocks)
         if self.news: self.news.update_news_data()
         if self.odds_ticker: self.odds_ticker.update()
-        if self.calendar: self.calendar.update(time.time())
+        self._request_background_update('Calendar', self.calendar)
         if self.news_manager: self.news_manager.update()
-        if self.colorado_sports: self.colorado_sports.update()
+        self._request_background_update(
+            'Colorado sports',
+            self.colorado_sports,
+        )
         if self.youtube: self.youtube.update()
         if self.text_display: self.text_display.update()
         if self.of_the_day: self.of_the_day.update(time.time())
@@ -966,6 +982,21 @@ class DisplayController:
         )
         previous_mode = getattr(self, 'current_display_mode', None)
         previous_index = getattr(self, 'current_mode_index', 0)
+
+        if hasattr(self, 'weather'):
+            for mode_name in ('weather_current', 'weather_daily'):
+                while mode_name in self.available_modes:
+                    self.available_modes.remove(mode_name)
+            weather_insert_at = (
+                self.available_modes.index('clock') + 1
+                if 'clock' in self.available_modes
+                else 0
+            )
+            if self.weather and self.weather.has_current_weather():
+                self.available_modes.insert(weather_insert_at, 'weather_current')
+                weather_insert_at += 1
+            if self.weather and self.weather.has_daily_forecast():
+                self.available_modes.insert(weather_insert_at, 'weather_daily')
 
         for mode_name, _ in dynamic_modes:
             while mode_name in self.available_modes:

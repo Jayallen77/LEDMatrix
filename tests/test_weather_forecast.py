@@ -1,8 +1,10 @@
 import sys
+import threading
+import time
 import types
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -69,6 +71,8 @@ def install_weather_stubs():
     web_module.increment_api_counter = Mock()
     requests_module = types.ModuleType("requests")
     requests_module.get = Mock()
+    requests_module.Timeout = type("Timeout", (Exception,), {})
+    requests_module.RequestException = type("RequestException", (Exception,), {})
 
     modules = {
         "PIL": pil_module,
@@ -146,6 +150,94 @@ class WeatherForecastTests(unittest.TestCase):
         manager.last_daily_state = None
         StubWeatherIcons.calls = []
         return manager
+
+    @staticmethod
+    def cached_weather_record():
+        return {
+            "timestamp": 1,
+            "data": {
+                "current": {
+                    "main": {"temp": 72},
+                    "weather": [{"main": "Clear", "icon": "01d"}],
+                },
+                "forecast": {
+                    "daily": {
+                        "time": ["2026-07-02", "2026-07-03"],
+                        "temperature_2m_max": [80, 81],
+                        "temperature_2m_min": [55, 56],
+                        "weather_code": [0, 0],
+                    }
+                },
+            },
+        }
+
+    def test_startup_loads_cache_without_calling_weather_api(self):
+        cache = Mock()
+        cache.load_cache.return_value = self.cached_weather_record()
+        requests_module = WeatherManager._fetch_weather.__globals__["requests"]
+        config = {
+            "weather": {"enabled": True, "units": "imperial"},
+            "location": {"city": "Denver", "state": "CO", "country": "US"},
+        }
+
+        with patch.object(requests_module, "get") as request_get:
+            manager = WeatherManager(config, FakeDisplay(), cache)
+
+        request_get.assert_not_called()
+        self.assertTrue(manager.has_current_weather())
+        self.assertTrue(manager.has_daily_forecast())
+
+    def test_weather_timeout_keeps_stale_cache_and_uses_hard_timeout(self):
+        cache = Mock()
+        cache.load_cache.return_value = self.cached_weather_record()
+        requests_module = WeatherManager._fetch_weather.__globals__["requests"]
+        config = {
+            "weather": {"enabled": True, "units": "imperial"},
+            "location": {"city": "Denver", "state": "CO", "country": "US"},
+        }
+        manager = WeatherManager(config, FakeDisplay(), cache)
+
+        with patch.object(
+            requests_module,
+            "get",
+            side_effect=requests_module.Timeout("read timed out"),
+        ) as request_get:
+            manager._fetch_weather()
+
+        request_get.assert_called_once()
+        self.assertEqual(
+            request_get.call_args.kwargs["timeout"],
+            manager.REQUEST_TIMEOUT,
+        )
+        self.assertTrue(manager.has_current_weather())
+        self.assertTrue(manager.has_daily_forecast())
+
+    def test_no_cache_skips_weather_and_background_refresh_does_not_block(self):
+        cache = Mock()
+        cache.load_cache.return_value = None
+        config = {
+            "weather": {"enabled": True, "units": "imperial"},
+            "location": {"city": "Denver", "state": "CO", "country": "US"},
+        }
+        manager = WeatherManager(config, FakeDisplay(), cache)
+        started = threading.Event()
+        release = threading.Event()
+
+        def slow_refresh():
+            started.set()
+            release.wait(1)
+
+        manager._fetch_weather = slow_refresh
+        start = time.monotonic()
+        self.assertTrue(manager.request_update())
+        elapsed = time.monotonic() - start
+
+        self.assertTrue(started.wait(0.2))
+        self.assertLess(elapsed, 0.1)
+        self.assertFalse(manager.has_current_weather())
+        self.assertFalse(manager.has_daily_forecast())
+        release.set()
+        manager._update_thread.join(1)
 
     def test_forecast_preserves_geometry_and_splits_temperature_colors(self):
         manager = self.make_manager()

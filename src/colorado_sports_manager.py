@@ -1,5 +1,6 @@
 import logging
 import os
+import threading
 import time
 from typing import Any, Dict, List, Optional
 
@@ -18,6 +19,7 @@ class ColoradoSportsManager:
     """Aggregate live score cards for Colorado professional teams."""
 
     CACHE_KEY = "colorado_sports_live"
+    REQUEST_TIMEOUT = (3.05, 5)
     LOGO_DIRS = {
         "NHL": "assets/sports/nhl_logos",
         "NBA": "assets/sports/nba_logos",
@@ -88,6 +90,8 @@ class ColoradoSportsManager:
         self.current_game_index = 0
         self.last_game_switch = 0.0
         self._logo_cache: Dict[Any, Optional[Image.Image]] = {}
+        self._update_lock = threading.Lock()
+        self._update_thread = None
 
         self.session = requests.Session()
         retry_strategy = Retry(
@@ -185,7 +189,7 @@ class ColoradoSportsManager:
         response = self.session.get(
             team["url"],
             headers={"User-Agent": "Mozilla/5.0 (compatible; LEDMatrix/1.0)"},
-            timeout=8,
+            timeout=self.REQUEST_TIMEOUT,
         )
         response.raise_for_status()
         payload = response.json()
@@ -261,6 +265,28 @@ class ColoradoSportsManager:
         self.live_games = []
         self.is_stale = False
         return False
+
+    def request_update(self) -> bool:
+        """Refresh live games in the background when polling is due."""
+        now = time.time()
+        if self.last_update and now - self.last_update < self.update_interval:
+            return False
+        with self._update_lock:
+            if self._update_thread and self._update_thread.is_alive():
+                return False
+            self._update_thread = threading.Thread(
+                target=self._run_background_update,
+                name="colorado-sports-refresh",
+                daemon=True,
+            )
+            self._update_thread.start()
+        return True
+
+    def _run_background_update(self) -> None:
+        try:
+            self.update()
+        except Exception:
+            logger.exception("Unexpected error in background sports refresh.")
 
     def has_display_content(self) -> bool:
         return bool(self.enabled and self.live_games)
@@ -567,7 +593,7 @@ class ColoradoSportsManager:
         return image
 
     def display(self, force_clear: bool = False) -> bool:
-        self.update()
+        self.request_update()
         if not self.has_display_content():
             return False
         now = time.time()

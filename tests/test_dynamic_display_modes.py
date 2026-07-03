@@ -108,6 +108,18 @@ class ContentManager:
         return self.available
 
 
+class WeatherContentManager:
+    def __init__(self, current=False, daily=False):
+        self.current = current
+        self.daily = daily
+
+    def has_current_weather(self):
+        return self.current
+
+    def has_daily_forecast(self):
+        return self.daily
+
+
 class DynamicDisplayModeTests(unittest.TestCase):
     def make_controller(self):
         controller = object.__new__(DisplayController)
@@ -181,6 +193,28 @@ class DynamicDisplayModeTests(unittest.TestCase):
         controller._sync_dynamic_modes()
 
         self.assertNotIn("news_manager", controller.available_modes)
+
+    def test_weather_without_cache_is_skipped_while_clock_remains_available(self):
+        controller = self.make_controller()
+        controller.weather = WeatherContentManager()
+        controller.current_display_mode = "clock"
+        controller.current_mode_index = 0
+        controller._is_music_playing = Mock(return_value=False)
+
+        controller._sync_dynamic_modes()
+
+        self.assertNotIn("weather_current", controller.available_modes)
+        self.assertNotIn("weather_daily", controller.available_modes)
+        self.assertIn("clock", controller.available_modes)
+        self.assertEqual(controller.current_display_mode, "clock")
+
+        controller.weather.current = True
+        controller.weather.daily = True
+        controller._sync_dynamic_modes()
+        self.assertEqual(
+            controller.available_modes[:4],
+            ["clock", "weather_current", "weather_daily", "stocks"],
+        )
 
     def test_poll_callback_never_changes_or_clears_display(self):
         controller = self.make_controller()

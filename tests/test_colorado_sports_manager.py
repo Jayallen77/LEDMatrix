@@ -197,6 +197,19 @@ class ColoradoSportsManagerTests(unittest.TestCase):
         self.assertIsNone(final)
         self.assertIsNone(unrelated)
 
+    def test_score_fetch_uses_bounded_connect_and_read_timeout(self):
+        manager = self.make_manager()
+        response = Mock()
+        response.json.return_value = {"events": []}
+        manager.session.get = Mock(return_value=response)
+
+        manager._fetch_league(manager.TEAMS[0])
+
+        self.assertEqual(
+            manager.session.get.call_args.kwargs["timeout"],
+            manager.REQUEST_TIMEOUT,
+        )
+
     def test_rendered_score_card_is_64_square_and_emphasizes_colorado(self):
         manager = self.make_manager()
         game = manager._parse_event(self.event(), manager.TEAMS[0])

@@ -3,6 +3,7 @@ import time
 import json
 import os
 import logging
+import threading
 from datetime import datetime
 from typing import Dict, Any, List
 from PIL import Image, ImageDraw
@@ -23,6 +24,8 @@ except ImportError:
 
 class WeatherManager:
 
+    REQUEST_TIMEOUT = (3.05, 5)
+
     def __init__(self, config: Dict[str, Any], display_manager, cache_manager=None):
         self.config = config
         self.display_manager = display_manager
@@ -34,6 +37,8 @@ class WeatherManager:
         self.daily_forecast = None
         self.last_draw_time = 0
         self.cache_manager = cache_manager or CacheManager()
+        self._update_lock = threading.Lock()
+        self._update_thread = None
 
         # Load secrets file (not needed for Open-Meteo but kept for compatibility)
         self.secrets = {}
@@ -65,8 +70,40 @@ class WeatherManager:
         self.last_weather_state = None
         self.last_daily_state = None
         
-        # Initialize with first update
-        self.update_weather()
+        if self._load_cached_weather():
+            logger.info("Loaded cached weather data for startup.")
+        else:
+            logger.info(
+                "No cached weather data is available; weather modes will remain "
+                "out of rotation until a bounded refresh succeeds."
+            )
+
+    def _load_cached_weather(self) -> bool:
+        """Load persistent weather data regardless of age for offline fallback."""
+        cached_record = self.cache_manager.load_cache('weather')
+        if not isinstance(cached_record, dict):
+            return False
+        cached_data = cached_record.get('data', cached_record)
+        if not isinstance(cached_data, dict):
+            return False
+        current = cached_data.get('current')
+        forecast = cached_data.get('forecast')
+        if not current or not forecast:
+            return False
+        self.weather_data = current
+        self.forecast_data = forecast
+        self._process_forecast_data(forecast)
+        try:
+            self.last_update = float(cached_record.get('timestamp', 0) or 0)
+        except (TypeError, ValueError):
+            self.last_update = 0
+        return True
+
+    def has_current_weather(self) -> bool:
+        return bool(self.weather_data)
+
+    def has_daily_forecast(self) -> bool:
+        return bool(self.daily_forecast)
 
     def _fetch_weather(self) -> None:
         """Fetch current weather and forecast data from Open-Meteo API."""
@@ -87,13 +124,8 @@ class WeatherManager:
         
         # Open-Meteo doesn't require an API key
 
-        # Try to get cached data first
-        cached_data = self.cache_manager.get('weather')
-        if cached_data:
-            self.weather_data = cached_data.get('current')
-            self.forecast_data = cached_data.get('forecast')
-            if self.weather_data and self.forecast_data:
-                self._process_forecast_data(self.forecast_data)
+        # Keep persistent data available while the bounded refresh is attempted.
+        has_cached_data = self._load_cached_weather()
 
         city = self.location['city']
         state = self.location['state']
@@ -105,7 +137,7 @@ class WeatherManager:
             # First get coordinates using Open-Meteo geocoding
             geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={city}&count=1&language=en&format=json"
 
-            response = requests.get(geo_url)
+            response = requests.get(geo_url, timeout=self.REQUEST_TIMEOUT)
             response.raise_for_status()
             geo_data = response.json()
 
@@ -113,7 +145,11 @@ class WeatherManager:
             increment_api_counter('weather', 1)
 
             if not geo_data.get('results'):
-                print(f"Could not find coordinates for {city}")
+                self._handle_fetch_failure(
+                    current_time,
+                    f"Weather geocoding returned no coordinates for {city}",
+                    has_cached_data,
+                )
                 return
 
             lat = geo_data['results'][0]['latitude']
@@ -126,7 +162,7 @@ class WeatherManager:
 
             weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,pressure_msl,cloud_cover,wind_speed_10m,wind_direction_10m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,rain_sum,showers_sum,snowfall_sum,uv_index_max&temperature_unit={temperature_unit}&wind_speed_unit={wind_speed_unit}&timezone=auto"
 
-            response = requests.get(weather_url)
+            response = requests.get(weather_url, timeout=self.REQUEST_TIMEOUT)
             response.raise_for_status()
             weather_data = response.json()
 
@@ -176,32 +212,88 @@ class WeatherManager:
             self.last_update = time.time()
             # Reset error count on successful fetch
             self.consecutive_errors = 0
-            print("Weather data updated successfully")
+            logger.info("Weather data updated successfully.")
 
+        except requests.Timeout as e:
+            self._handle_fetch_failure(
+                current_time,
+                f"Weather API timed out after bounded connect/read limits: {e}",
+                has_cached_data,
+            )
+        except requests.RequestException as e:
+            self._handle_fetch_failure(
+                current_time,
+                f"Weather API request failed: {e}",
+                has_cached_data,
+            )
         except Exception as e:
-            self.consecutive_errors += 1
-            self.last_error_time = current_time
-            
-            # Exponential backoff: double the backoff time (max 1 hour)
-            self.error_backoff_time = min(self.error_backoff_time * 2, 3600)
-            
-            # Only log errors periodically to avoid spam
-            if current_time - self.last_error_log_time > self.error_log_throttle:
-                print(f"Error fetching weather data (attempt {self.consecutive_errors}/{self.max_consecutive_errors}): {e}")
-                if self.consecutive_errors >= self.max_consecutive_errors:
-                    print(f"Weather API disabled for {self.error_backoff_time} seconds due to repeated failures")
-                self.last_error_log_time = current_time
-            
-            # If we have cached data, use it as fallback
-            if cached_data:
-                self.weather_data = cached_data.get('current')
-                self.forecast_data = cached_data.get('forecast')
-                if self.weather_data and self.forecast_data:
-                    self._process_forecast_data(self.forecast_data)
-                    print("Using cached weather data as fallback")
-            else:
-                self.weather_data = None
-                self.forecast_data = None
+            self._handle_fetch_failure(
+                current_time,
+                f"Weather refresh failed: {e}",
+                has_cached_data,
+            )
+
+    def _handle_fetch_failure(
+        self,
+        current_time: float,
+        message: str,
+        has_cached_data: bool,
+    ) -> None:
+        self.consecutive_errors += 1
+        self.last_error_time = current_time
+        self.error_backoff_time = min(self.error_backoff_time * 2, 3600)
+
+        if current_time - self.last_error_log_time > self.error_log_throttle:
+            logger.warning(
+                "%s (attempt %d/%d)",
+                message,
+                self.consecutive_errors,
+                self.max_consecutive_errors,
+            )
+            if self.consecutive_errors >= self.max_consecutive_errors:
+                logger.warning(
+                    "Weather API paused for %d seconds after repeated failures.",
+                    self.error_backoff_time,
+                )
+            self.last_error_log_time = current_time
+
+        if has_cached_data:
+            logger.warning("Using cached weather data after refresh failure.")
+        else:
+            self.weather_data = None
+            self.forecast_data = None
+            self.daily_forecast = None
+            logger.warning(
+                "Weather refresh failed with no cache; weather modes remain skipped."
+            )
+
+    def request_update(self) -> bool:
+        """Start one background refresh when due without blocking display work."""
+        current_time = time.time()
+        update_interval = self.weather_config.get('update_interval', 300)
+        if self.last_update and current_time - self.last_update <= update_interval:
+            return False
+        if (
+            self.consecutive_errors
+            and current_time - self.last_error_time < self.error_backoff_time
+        ):
+            return False
+        with self._update_lock:
+            if self._update_thread and self._update_thread.is_alive():
+                return False
+            self._update_thread = threading.Thread(
+                target=self._run_background_update,
+                name="weather-refresh",
+                daemon=True,
+            )
+            self._update_thread.start()
+        return True
+
+    def _run_background_update(self) -> None:
+        try:
+            self._fetch_weather()
+        except Exception:
+            logger.exception("Unexpected error in background weather refresh.")
 
     def _process_forecast_data(self, forecast_data: Dict[str, Any]) -> None:
         """Process forecast data into daily forecasts (Open-Meteo format)."""
@@ -269,17 +361,8 @@ class WeatherManager:
         return weather_codes.get(weather_code, {'main': 'Unknown', 'description': 'Unknown', 'icon': '01d'})
 
     def get_weather(self) -> Dict[str, Any]:
-        """Get current weather data, fetching new data if needed."""
-        current_time = time.time()
-        update_interval = self.weather_config.get('update_interval', 300)
-        # Add a throttle for log spam
-        log_throttle_interval = 600  # 10 minutes
-        if not hasattr(self, '_last_weather_log_time'):
-            self._last_weather_log_time = 0
-        # Check if we need to update based on time or if we have no data
-        if (not self.weather_data or
-            current_time - self.last_update > update_interval):
-            self._fetch_weather()
+        """Return available data immediately and refresh it in the background."""
+        self.request_update()
         return self.weather_data
 
     def _get_weather_state(self) -> Dict[str, Any]:
@@ -590,5 +673,5 @@ class WeatherManager:
             print(f"Error displaying daily forecast: {e}")
 
     def update_weather(self):
-        """Update weather data."""
-        self._fetch_weather()
+        """Request a non-blocking weather update."""
+        return self.request_update()
