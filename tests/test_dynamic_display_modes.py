@@ -1,6 +1,7 @@
 import sys
 import types
 import unittest
+from datetime import datetime, time, timezone
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -115,6 +116,20 @@ class WeatherContentManager:
 
 
 class DynamicDisplayModeTests(unittest.TestCase):
+    def test_scheduled_shutdown_publishes_black_preview_once(self):
+        controller = self.make_controller()
+        controller.schedule_enabled = True
+        controller.schedule_timezone = timezone.utc
+        controller.start_time = time(7)
+        controller.end_time = time(22)
+        controller.is_display_active = True
+        with patch("src.display_controller.datetime") as clock:
+            clock.now.return_value = datetime(2026, 10, 10, 23, tzinfo=timezone.utc)
+            controller._check_schedule()
+            controller._check_schedule()
+        self.assertFalse(controller.is_display_active)
+        controller.display_manager.clear.assert_called_once_with(publish_preview=True)
+
     def make_controller(self):
         controller = object.__new__(DisplayController)
         controller.available_modes = [

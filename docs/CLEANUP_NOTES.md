@@ -22,6 +22,7 @@ Private credentials are not cleaned or deleted. A former YouTube credential in a
 - Optional web sudo permission is limited to display restart. The web installer writes paths for the actual project owner instead of copying a hardcoded ledpi/root service.
 - Dashboard service generation uses an unquoted WorkingDirectory path and validates the generated unit with systemd-analyze before installation. This corrects a service-file rejection encountered during the first Pi dashboard setup.
 - Health publishing runs on a separate one-second worker, so status writes do not run in the drawing thread. A report older than five seconds is not treated as a running display.
+- Dashboard preview capture skips temporary clearing frames and captures the next completed screen immediately. Previously, the clearing frame could consume the capture budget and leave static clock/weather previews black while the physical display worked normally. Scheduled shutdowns still publish black; subsequent animated captures remain limited to about five per second.
 
 ## Deliberately retained limitations
 

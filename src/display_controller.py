@@ -934,7 +934,7 @@ class DisplayController:
             self.force_clear = True # Force a redraw
         elif not should_be_active and self.is_display_active:
             logger.info("Outside of scheduled time. Deactivating display.")
-            self.display_manager.clear()
+            self.display_manager.clear(publish_preview=True)
             self.is_display_active = False
 
     def _sync_dynamic_modes(self):

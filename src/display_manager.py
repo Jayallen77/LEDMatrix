@@ -32,6 +32,7 @@ class DisplayManager:
         self._snapshot_path = "/tmp/led_matrix_preview.png"
         self._snapshot_min_interval_sec = 0.2  # max ~5 fps
         self._last_snapshot_ts = 0.0
+        self._snapshot_force_next = False
 
         font_time = time.time()
         self._load_fonts()
@@ -201,14 +202,15 @@ class DisplayManager:
         except Exception as e:
             logger.error(f"Error drawing test pattern: {e}", exc_info=True)
 
-    def update_display(self):
+    def update_display(self, publish_preview: bool = True):
         """Update the display using double buffering with proper sync."""
         try:
             if self.matrix is None:
                 # Fallback mode - no actual hardware to update
                 logger.debug("Update display called in fallback mode (no hardware)")
                 # Still write a snapshot so the web UI can preview
-                self._write_snapshot_if_due()
+                if publish_preview:
+                    self._write_snapshot_if_due()
                 return
                 
             # Copy the current image to the offscreen canvas   
@@ -221,18 +223,27 @@ class DisplayManager:
             self.offscreen_canvas, self.current_canvas = self.current_canvas, self.offscreen_canvas
 
             # Write a snapshot for the web preview (throttled)
-            self._write_snapshot_if_due()
+            if publish_preview:
+                self._write_snapshot_if_due()
         except Exception as e:
             logger.error(f"Error updating display: {e}")
 
-    def clear(self):
-        """Clear the display completely."""
+    def clear(self, publish_preview: bool = False):
+        """Clear hardware buffers; normally capture the next completed frame.
+
+        Screen renderers clear before drawing, so publishing that intermediate
+        black image would consume the snapshot budget and hide static screens.
+        Intentional shutdowns explicitly publish the cleared frame instead.
+        """
         try:
+            self._snapshot_force_next = True
             if self.matrix is None:
                 # Fallback mode - just clear the image
                 self.image = Image.new('RGB', (self.image.width, self.image.height))
                 self.draw = ImageDraw.Draw(self.image)
                 logger.debug("Cleared display in fallback mode")
+                if publish_preview:
+                    self._write_snapshot_if_due()
                 return
                 
             # Create a new black image
@@ -255,9 +266,11 @@ class DisplayManager:
                 pass
             
             # Update the display to show the clear. Swap twice to flush any latent frame.
-            self.update_display()
+            self.update_display(publish_preview=False)
             time.sleep(0.01)
-            self.update_display()
+            self.update_display(publish_preview=False)
+            if publish_preview:
+                self._write_snapshot_if_due()
         except Exception as e:
             logger.error(f"Error clearing display: {e}")
 
@@ -656,7 +669,8 @@ class DisplayManager:
         """Write the current image to a PNG snapshot file at a limited frequency."""
         try:
             now = time.time()
-            if (now - self._last_snapshot_ts) < self._snapshot_min_interval_sec:
+            if (not self._snapshot_force_next
+                    and (now - self._last_snapshot_ts) < self._snapshot_min_interval_sec):
                 return
             # Ensure directory exists
             snapshot_dir = os.path.dirname(self._snapshot_path)
@@ -676,6 +690,7 @@ class DisplayManager:
             except Exception:
                 pass
             self._last_snapshot_ts = now
+            self._snapshot_force_next = False
         except Exception as e:
             # Snapshot failures should never break display; log at debug to avoid noise
             logger.debug(f"Snapshot write skipped: {e}")
