@@ -11,7 +11,7 @@ if [ "$DASHBOARD_USER" = root ]; then
     echo "Run this installer with sudo from the account that owns the project."
     exit 1
 fi
-UNIT_TMP="$(mktemp)"
+UNIT_TMP="$(mktemp --suffix=.service)"
 trap 'rm -f "$UNIT_TMP"' EXIT
 cat > "$UNIT_TMP" <<EOF
 [Unit]
@@ -21,7 +21,7 @@ After=network.target
 [Service]
 Type=simple
 User=$DASHBOARD_USER
-WorkingDirectory="$PROJECT_DIR"
+WorkingDirectory=$PROJECT_DIR
 ExecStart=/usr/bin/python3 "$PROJECT_DIR/start_web_conditionally.py"
 Restart=on-failure
 RestartSec=10
@@ -29,6 +29,8 @@ RestartSec=10
 [Install]
 WantedBy=multi-user.target
 EOF
+# Validate with the Pi's actual systemd parser before replacing a service file.
+systemd-analyze verify "$UNIT_TMP"
 install -m 644 "$UNIT_TMP" /etc/systemd/system/ledmatrix-web.service
 systemctl daemon-reload
 systemctl enable ledmatrix-web.service

@@ -20,6 +20,7 @@ Private credentials are not cleaned or deleted. A former YouTube credential in a
 - ConfigManager refuses a merged-config save if it cannot safely strip secrets, instead of risking writing credentials into the main file.
 - The dashboard has one hardware owner, no credential editing, no package installation during startup, loopback binding, Host/Origin checks, a CSRF token, explicit Save/Apply, and revision conflict checks.
 - Optional web sudo permission is limited to display restart. The web installer writes paths for the actual project owner instead of copying a hardcoded ledpi/root service.
+- Dashboard service generation uses an unquoted WorkingDirectory path and validates the generated unit with systemd-analyze before installation. This corrects a service-file rejection encountered during the first Pi dashboard setup.
 - Health publishing runs on a separate one-second worker, so status writes do not run in the drawing thread. A report older than five seconds is not treated as a running display.
 
 ## Deliberately retained limitations
