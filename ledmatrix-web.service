@@ -1,13 +1,12 @@
 [Unit]
-Description=LED Matrix Web Interface Service
+Description=LED Matrix Local Settings Dashboard
 After=network.target
 
 [Service]
 Type=simple
-User=root
-WorkingDirectory=/home/ledpi/LEDMatrix
-Environment=USE_THREADING=1
-ExecStart=/usr/bin/python3 /home/ledpi/LEDMatrix/start_web_conditionally.py
+User=__USER__
+WorkingDirectory=__PROJECT_ROOT_DIR__
+ExecStart=/usr/bin/python3 __PROJECT_ROOT_DIR__/start_web_conditionally.py
 Restart=on-failure
 RestartSec=10
 StandardOutput=syslog

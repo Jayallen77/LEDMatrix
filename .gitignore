@@ -27,3 +27,7 @@ cache/
 credentials.json
 config/spotify_auth.json
 config/config.json
+
+# Local settings rollback copy
+config/config.dashboard-backup.json
+.deployment-backups/

@@ -1,6 +1,7 @@
 import json
 import os
 from typing import Dict, Any, Optional
+from src.runtime_state import atomic_write_json
 
 class ConfigManager:
     def __init__(self, config_path: str = None, secrets_path: str = None):
@@ -73,17 +74,12 @@ class ConfigManager:
                 with open(self.secrets_path, 'r') as f_secrets:
                     secrets_content = json.load(f_secrets)
             except Exception as e:
-                print(f"Warning: Could not load secrets file {self.secrets_path} during save: {e}")
-                # Continue without stripping if secrets can't be loaded, or handle as critical error
-                # For now, we'll proceed cautiously and save the full new_config_data if secrets are unreadable
-                # to prevent accidental data loss if the secrets file is temporarily corrupt.
-                # A more robust approach might be to fail the save or use a cached version of secrets.
+                raise ValueError("Cannot safely save settings while the secrets definition is unreadable.") from e
 
         config_to_write = self._strip_secrets_recursive(new_config_data, secrets_content)
 
         try:
-            with open(self.config_path, 'w') as f:
-                json.dump(config_to_write, f, indent=4)
+            atomic_write_json(self.config_path, config_to_write, default_mode=0o644)
             
             # Update the in-memory config to the new state (which includes secrets for runtime)
             self.config = new_config_data 
@@ -170,8 +166,7 @@ class ConfigManager:
         try:
             # Create directory if it doesn't exist, especially for config/
             os.makedirs(os.path.dirname(path_to_save), exist_ok=True)
-            with open(path_to_save, 'w') as f:
-                json.dump(data, f, indent=4)
+            atomic_write_json(path_to_save, data, default_mode=0o600 if file_type == 'secrets' else 0o644)
             print(f"{file_type.capitalize()} configuration successfully saved to {os.path.abspath(path_to_save)}")
             
             # If we just saved the main config or secrets, the merged self.config might be stale.
@@ -184,4 +179,4 @@ class ConfigManager:
             raise
         except Exception as e:
             print(f"An unexpected error occurred while saving {file_type} configuration: {str(e)}")
-            raise 
+            raise

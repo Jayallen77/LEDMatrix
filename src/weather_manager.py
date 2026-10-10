@@ -1,7 +1,5 @@
 import requests
 import time
-import json
-import os
 import logging
 import threading
 from datetime import datetime
@@ -44,21 +42,9 @@ class WeatherManager:
         self._update_lock = threading.Lock()
         self._update_thread = None
 
-        # Load secrets file (not needed for Open-Meteo but kept for compatibility)
-        self.secrets = {}
-        try:
-            secrets_path = os.path.join('config', 'config_secrets.json')
-            with open(secrets_path, 'r') as f:
-                self.secrets = json.load(f)
-        except Exception as e:
-            logger.error(f"Error loading secrets file: {e}")
-            self.secrets = {}
-        
         # Error handling and throttling
         self.consecutive_errors = 0
         self.last_error_time = 0
-        self.error_backoff_time = 60  # Start with 1 minute backoff
-        self.max_consecutive_errors = 5  # Stop trying after 5 consecutive errors
         self.error_log_throttle = 300  # Only log errors every 5 minutes
         self.last_error_log_time = 0
         
@@ -178,8 +164,9 @@ class WeatherManager:
             response = requests.get(
                 self.GEOCODING_ENDPOINT,
                 params={
-                    'name': city,
-                    'count': 1,
+                    'name': f"{city}, {self.location['state']}" if self.location.get('state') else city,
+                    'count': 10,
+                    'countryCode': self.location.get('country', '').upper(),
                     'language': 'en',
                     'format': 'json',
                 },
@@ -199,8 +186,17 @@ class WeatherManager:
                 )
                 return
 
-            lat = geo_data['results'][0]['latitude']
-            lon = geo_data['results'][0]['longitude']
+            country = self.location.get('country', '').casefold()
+            state = self.location.get('state', '').casefold()
+            matches = [result for result in geo_data['results']
+                       if (not country or not result.get('country_code')
+                           or result['country_code'].casefold() == country)
+                       and (not state or len(state) <= 3 or not result.get('admin1')
+                            or result['admin1'].casefold() == state)]
+            if not matches:
+                raise ValueError(f'No location matches {city}, {state}, {country}. Use the full state/region name.')
+            lat = matches[0]['latitude']
+            lon = matches[0]['longitude']
         except (requests.Timeout, requests.RequestException) as e:
             self._handle_fetch_failure(
                 current_time,
@@ -312,10 +308,9 @@ class WeatherManager:
 
         if current_time - self.last_error_log_time > self.error_log_throttle:
             logger.warning(
-                "%s (attempt %d/%d)",
+                "%s (%d consecutive failed attempts)",
                 message,
                 self.consecutive_errors,
-                self.max_consecutive_errors,
             )
             self.last_error_log_time = current_time
 
@@ -333,6 +328,8 @@ class WeatherManager:
         """Start one background refresh when due without blocking display work."""
         current_time = time.time()
         update_interval = self.weather_config.get('update_interval', 300)
+        if self.consecutive_errors:
+            update_interval = min(30 * (2 ** min(self.consecutive_errors - 1, 4)), 300)
         if self.last_attempt and current_time - self.last_attempt < update_interval:
             return False
         with self._update_lock:

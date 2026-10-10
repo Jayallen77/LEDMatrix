@@ -2,7 +2,7 @@ import sys
 import types
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -22,8 +22,6 @@ def install_controller_stubs():
         "src.display_manager": {"DisplayManager": Dummy},
         "src.cache_manager": {"CacheManager": Dummy},
         "src.stock_manager": {"StockManager": Dummy},
-        "src.stock_news_manager": {"StockNewsManager": Dummy},
-        "src.odds_ticker_manager": {"OddsTickerManager": Dummy},
         "src.nhl_managers": {
             "NHLLiveManager": Dummy,
             "NHLRecentManager": Dummy,
@@ -69,15 +67,11 @@ def install_controller_stubs():
             "NCAAMBasketballRecentManager": Dummy,
             "NCAAMBasketballUpcomingManager": Dummy,
         },
-        "src.youtube_display": {"YouTubeDisplay": Dummy},
         "src.calendar_manager": {"CalendarManager": Dummy},
-        "src.text_display": {"TextDisplay": Dummy},
         "src.music_manager": {
             "MusicManager": Dummy,
             "MusicSource": types.SimpleNamespace(NONE="none"),
         },
-        "src.of_the_day_manager": {"OfTheDayManager": Dummy},
-        "src.news_manager": {"NewsManager": Dummy},
         "src.colorado_sports_manager": {"ColoradoSportsManager": Dummy},
     }
     saved_modules = {}
@@ -132,8 +126,7 @@ class DynamicDisplayModeTests(unittest.TestCase):
         ]
         controller.current_display_mode = "weather_current"
         controller.current_mode_index = 1
-        controller.news_manager = ContentManager(True)
-        controller.calendar = ContentManager(False)
+        controller.calendar = ContentManager(True)
         controller.colorado_sports = ContentManager(True)
         controller.music_manager = Mock(enabled=True)
         controller.music_manager.preferred_source = "spotify"
@@ -157,7 +150,7 @@ class DynamicDisplayModeTests(unittest.TestCase):
                 "weather_current",
                 "weather_daily",
                 "stocks",
-                "news_manager",
+                "calendar",
                 "sports_live",
                 "music",
             ],
@@ -167,10 +160,10 @@ class DynamicDisplayModeTests(unittest.TestCase):
 
     def test_removes_empty_current_mode_without_selecting_idle_music(self):
         controller = self.make_controller()
-        controller.available_modes.insert(4, "news_manager")
-        controller.current_display_mode = "news_manager"
+        controller.available_modes.insert(4, "calendar")
+        controller.current_display_mode = "calendar"
         controller.current_mode_index = 4
-        controller.news_manager.available = False
+        controller.calendar.available = False
         controller.colorado_sports.available = False
         controller._is_music_playing = Mock(return_value=False)
 
@@ -180,19 +173,19 @@ class DynamicDisplayModeTests(unittest.TestCase):
         self.assertEqual(controller.current_mode_index, 0)
         self.assertTrue(controller.force_clear)
 
-    def test_disabled_or_empty_news_never_enters_rotation(self):
+    def test_disabled_or_empty_calendar_never_enters_rotation(self):
         controller = self.make_controller()
-        controller.news_manager = None
+        controller.calendar = None
 
         controller._sync_dynamic_modes()
 
-        self.assertNotIn("news_manager", controller.available_modes)
+        self.assertNotIn("calendar", controller.available_modes)
 
-        controller.news_manager = ContentManager(False)
-        controller.available_modes.insert(4, "news_manager")
+        controller.calendar = ContentManager(False)
+        controller.available_modes.insert(4, "calendar")
         controller._sync_dynamic_modes()
 
-        self.assertNotIn("news_manager", controller.available_modes)
+        self.assertNotIn("calendar", controller.available_modes)
 
     def test_weather_without_cache_is_skipped_while_clock_remains_available(self):
         controller = self.make_controller()
@@ -269,6 +262,30 @@ class DynamicDisplayModeTests(unittest.TestCase):
             controller._get_music_playback_state(10),
             "playing",
         )
+
+
+    def test_non_music_frames_are_paced_but_music_is_not(self):
+        controller = self.make_controller()
+        controller.update_interval = 0.05
+        with patch('src.display_controller.time.monotonic', return_value=1.01), patch('src.display_controller.time.sleep') as sleep:
+            controller._wait_between_frames(1)
+            self.assertAlmostEqual(sleep.call_args.args[0], 0.04)
+            sleep.reset_mock()
+            controller.current_display_mode = 'music'
+            controller._wait_between_frames(1)
+            sleep.assert_not_called()
+
+    def test_critical_run_error_propagates_for_systemd_recovery(self):
+        controller = self.make_controller()
+        controller.runtime_reporter = Mock()
+        controller.last_config_check = 0
+        controller.config_check_interval = 30
+        controller._load_config = Mock(side_effect=ValueError('unexpected critical failure'))
+        with patch('src.display_controller.time.time', return_value=100):
+            with self.assertRaises(ValueError):
+                controller.run()
+        controller.display_manager.cleanup.assert_called_once()
+        controller.runtime_reporter.stop.assert_called_once()
 
 
 if __name__ == "__main__":

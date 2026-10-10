@@ -3,6 +3,7 @@ import logging
 import sys
 from typing import Dict, Any, List
 from datetime import datetime, time as time_obj
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 # Configure logging
 logging.basicConfig(
@@ -18,8 +19,6 @@ from src.display_manager import DisplayManager
 from src.config_manager import ConfigManager
 from src.cache_manager import CacheManager
 from src.stock_manager import StockManager
-from src.stock_news_manager import StockNewsManager
-from src.odds_ticker_manager import OddsTickerManager
 from src.nhl_managers import NHLLiveManager, NHLRecentManager, NHLUpcomingManager
 from src.nba_managers import NBALiveManager, NBARecentManager, NBAUpcomingManager
 from src.mlb_manager import MLBLiveManager, MLBRecentManager, MLBUpcomingManager
@@ -29,13 +28,10 @@ from src.nfl_managers import NFLLiveManager, NFLRecentManager, NFLUpcomingManage
 from src.ncaa_fb_managers import NCAAFBLiveManager, NCAAFBRecentManager, NCAAFBUpcomingManager
 from src.ncaa_baseball_managers import NCAABaseballLiveManager, NCAABaseballRecentManager, NCAABaseballUpcomingManager
 from src.ncaam_basketball_managers import NCAAMBasketballLiveManager, NCAAMBasketballRecentManager, NCAAMBasketballUpcomingManager
-from src.youtube_display import YouTubeDisplay
 from src.calendar_manager import CalendarManager
-from src.text_display import TextDisplay
 from src.music_manager import MusicManager, MusicSource
-from src.of_the_day_manager import OfTheDayManager
-from src.news_manager import NewsManager
 from src.colorado_sports_manager import ColoradoSportsManager
+from src.runtime_state import RuntimeReporter, config_revision
 
 # Get logger without configuring
 logger = logging.getLogger(__name__)
@@ -60,18 +56,9 @@ class DisplayController:
         self.weather = WeatherManager(self.config, self.display_manager, self.cache_manager) if self.config.get('weather', {}).get('enabled', False) else None
         self._attach_clock_weather()
         self.stocks = StockManager(self.config, self.display_manager) if self.config.get('stocks', {}).get('enabled', False) else None
-        self.news = StockNewsManager(self.config, self.display_manager) if self.config.get('stock_news', {}).get('enabled', False) else None
-        self.odds_ticker = OddsTickerManager(self.config, self.display_manager) if self.config.get('odds_ticker', {}).get('enabled', False) else None
         self.calendar = CalendarManager(self.display_manager, self.config) if self.config.get('calendar', {}).get('enabled', False) else None
-        self.youtube = YouTubeDisplay(self.display_manager, self.config) if self.config.get('youtube', {}).get('enabled', False) else None
-        self.text_display = TextDisplay(self.display_manager, self.config) if self.config.get('text_display', {}).get('enabled', False) else None
-        self.of_the_day = OfTheDayManager(self.display_manager, self.config) if self.config.get('of_the_day', {}).get('enabled', False) else None
-        self.news_manager = NewsManager(self.config, self.display_manager) if self.config.get('news_manager', {}).get('enabled', False) else None
         self.colorado_sports = ColoradoSportsManager(self.config, self.display_manager) if self.config.get('colorado_sports', {}).get('enabled', False) else None
         logger.info(f"Calendar Manager initialized: {'Object' if self.calendar else 'None'}")
-        logger.info(f"Text Display initialized: {'Object' if self.text_display else 'None'}")
-        logger.info(f"OfTheDay Manager initialized: {'Object' if self.of_the_day else 'None'}")
-        logger.info(f"News Manager initialized: {'Object' if self.news_manager else 'None'}")
         logger.info(f"Colorado Sports Manager initialized: {'Object' if self.colorado_sports else 'None'}")
         logger.info("Display modes initialized in %.3f seconds", time.time() - init_time)
         
@@ -265,11 +252,6 @@ class DisplayController:
         if self.weather and self.weather.has_daily_forecast():
             self.available_modes.append('weather_daily')
         if self.stocks: self.available_modes.append('stocks')
-        if self.news: self.available_modes.append('stock_news')
-        if self.odds_ticker: self.available_modes.append('odds_ticker')
-        if self.youtube: self.available_modes.append('youtube')
-        if self.text_display: self.available_modes.append('text_display')
-        if self.of_the_day: self.available_modes.append('of_the_day')
         # Add NHL display modes if enabled
         if nhl_enabled:
             if self.nhl_recent: self.available_modes.append('nhl_recent')
@@ -313,7 +295,9 @@ class DisplayController:
             delattr(self, '_last_logged_duration')
         self.last_switch = time.time()
         self.force_clear = True
-        self.update_interval = 0.01  # Reduced from 0.1 to 0.01 for smoother scrolling
+        self.update_interval = 0.05  # Cap non-music work at 20 checks/frames per second.
+        self.applied_config_revision = config_revision(self.config_manager.get_config_path())
+        self.runtime_reporter = RuntimeReporter(self._runtime_snapshot)
         
         # Track team-based rotation states (Add Soccer)
         self.nhl_current_team_index = 0
@@ -371,9 +355,7 @@ class DisplayController:
             'weather_current': 15,
             'weather_daily': 15,
             'stocks': 45,
-            'stock_news': 30,
             'calendar': 30,
-            'youtube': 30,
             'nhl_live': 30,
             'nhl_recent': 20,
             'nhl_upcoming': 20,
@@ -549,19 +531,6 @@ class DisplayController:
         """Get the duration for the current display mode."""
         mode_key = self.current_display_mode
 
-        # Handle dynamic duration for news manager
-        if mode_key == 'news_manager' and self.news_manager:
-            try:
-                dynamic_duration = self.news_manager.get_dynamic_duration()
-                # Only log if duration has changed or we haven't logged this duration yet
-                if not hasattr(self, '_last_logged_duration') or self._last_logged_duration != dynamic_duration:
-                    logger.info(f"Using dynamic duration for news_manager: {dynamic_duration} seconds")
-                    self._last_logged_duration = dynamic_duration
-                return dynamic_duration
-            except Exception as e:
-                logger.error(f"Error getting dynamic duration for news_manager: {e}")
-                # Fall back to configured duration
-                return self.display_durations.get(mode_key, 60)
 
         # Handle dynamic duration for stocks
         if mode_key == 'stocks' and self.stocks:
@@ -577,33 +546,7 @@ class DisplayController:
                 # Fall back to configured duration
                 return self.display_durations.get(mode_key, 60)
 
-        # Handle dynamic duration for stock_news
-        if mode_key == 'stock_news' and self.news:
-            try:
-                dynamic_duration = self.news.get_dynamic_duration()
-                # Only log if duration has changed or we haven't logged this duration yet
-                if not hasattr(self, '_last_logged_duration') or self._last_logged_duration != dynamic_duration:
-                    logger.info(f"Using dynamic duration for stock_news: {dynamic_duration} seconds")
-                    self._last_logged_duration = dynamic_duration
-                return dynamic_duration
-            except Exception as e:
-                logger.error(f"Error getting dynamic duration for stock_news: {e}")
-                # Fall back to configured duration
-                return self.display_durations.get(mode_key, 60)
 
-        # Handle dynamic duration for odds_ticker
-        if mode_key == 'odds_ticker' and self.odds_ticker:
-            try:
-                dynamic_duration = self.odds_ticker.get_dynamic_duration()
-                # Only log if duration has changed or we haven't logged this duration yet
-                if not hasattr(self, '_last_logged_duration') or self._last_logged_duration != dynamic_duration:
-                    logger.info(f"Using dynamic duration for odds_ticker: {dynamic_duration} seconds")
-                    self._last_logged_duration = dynamic_duration
-                return dynamic_duration
-            except Exception as e:
-                logger.error(f"Error getting dynamic duration for odds_ticker: {e}")
-                # Fall back to configured duration
-                return self.display_durations.get(mode_key, 60)
 
         # Simplify weather key handling
         if mode_key.startswith('weather_'):
@@ -631,19 +574,11 @@ class DisplayController:
         """Call update methods on active managers."""
         self._request_background_update('weather', self.weather)
         self._request_background_update('Market Pulse', self.stocks)
-        if self.news: self.news.update_news_data()
-        if self.odds_ticker: self.odds_ticker.update()
         self._request_background_update('Calendar', self.calendar)
-        if self.news_manager: self.news_manager.update()
         self._request_background_update(
             'Colorado sports',
             self.colorado_sports,
         )
-        if self.youtube: self.youtube.update()
-        if self.text_display: self.text_display.update()
-        if self.of_the_day: self.of_the_day.update(time.time())
-        # News manager fetches data when displayed, not during updates
-        # if self.news_manager: self.news_manager.fetch_news_data()
 
         self._sync_dynamic_modes()
         
@@ -935,9 +870,38 @@ class DisplayController:
                 self.ncaa_fb_showing_recent = True # Reset to recent for the new team
 
     # --- SCHEDULING METHODS ---
+    def _runtime_snapshot(self):
+        spotify = getattr(self.music_manager, 'spotify', None)
+        return {
+            'mode': self.current_display_mode,
+            'active': self.is_display_active,
+            'available_modes': list(self.available_modes),
+            'applied_revision': self.applied_config_revision,
+            'spotify': getattr(spotify, 'state', 'disabled'),
+            'calendar': getattr(self.calendar, 'auth_status', 'disabled'),
+            'markets_refresh_error': bool(self.stocks and self.stocks.refresh_error),
+            'markets_updated_at': self.stocks.data_timestamp if self.stocks else 0,
+        }
+
+    def _wait_between_frames(self, started):
+        # Preserve the existing frame-driven music scrolling exactly.
+        if self.current_display_mode != 'music':
+            remaining = self.update_interval - (time.monotonic() - started)
+            if remaining > 0:
+                time.sleep(remaining)
+
     def _load_config(self):
         """Load configuration from the config manager and parse schedule settings."""
-        self.config = self.config_manager.load_config()
+        try:
+            config = self.config_manager.load_config()
+        except (OSError, ValueError) as exc:
+            logger.warning("Configuration reload failed; retaining working settings: %s", exc)
+            return
+        self.config = config
+        try:
+            self.schedule_timezone = ZoneInfo(self.config.get('timezone', 'UTC'))
+        except (ZoneInfoNotFoundError, ValueError):
+            self.schedule_timezone = ZoneInfo('UTC')
         schedule_config = self.config.get('schedule', {})
         self.schedule_enabled = schedule_config.get('enabled', False)
         try:
@@ -956,7 +920,7 @@ class DisplayController:
                 self.is_display_active = True
             return
 
-        now_time = datetime.now().time()
+        now_time = datetime.now(self.schedule_timezone).time()
         
         # Handle overnight schedules
         if self.start_time <= self.end_time:
@@ -976,7 +940,6 @@ class DisplayController:
     def _sync_dynamic_modes(self):
         """Keep content-dependent modes in rotation without disturbing stable modes."""
         dynamic_modes = (
-            ('news_manager', getattr(self, 'news_manager', None)),
             ('calendar', getattr(self, 'calendar', None)),
             ('sports_live', getattr(self, 'colorado_sports', None)),
         )
@@ -1122,7 +1085,9 @@ class DisplayController:
             return
              
         try:
+            self.runtime_reporter.start()
             while True:
+                frame_started = time.monotonic()
                 current_time = time.time()
 
                 # Periodically check for config changes
@@ -1305,8 +1270,6 @@ class DisplayController:
                         elif current_time - self.last_switch >= self.get_current_duration():
                             if self.current_display_mode == 'calendar' and self.calendar:
                                 self.calendar.advance_event()
-                            elif self.current_display_mode == 'of_the_day' and self.of_the_day:
-                                self.of_the_day.advance_item()
                             needs_switch = True
                             self.current_mode_index = self._get_next_mode_index(self.current_mode_index)
                             new_mode_after_timer = self.available_modes[self.current_mode_index]
@@ -1335,20 +1298,8 @@ class DisplayController:
                                 manager_to_display = self.weather
                             elif self.current_display_mode == 'stocks' and self.stocks:
                                 manager_to_display = self.stocks
-                            elif self.current_display_mode == 'stock_news' and self.news:
-                                manager_to_display = self.news
-                            elif self.current_display_mode == 'odds_ticker' and self.odds_ticker:
-                                manager_to_display = self.odds_ticker
                             elif self.current_display_mode == 'calendar' and self.calendar:
                                 manager_to_display = self.calendar
-                            elif self.current_display_mode == 'youtube' and self.youtube:
-                                manager_to_display = self.youtube
-                            elif self.current_display_mode == 'text_display' and self.text_display:
-                                manager_to_display = self.text_display
-                            elif self.current_display_mode == 'of_the_day' and self.of_the_day:
-                                manager_to_display = self.of_the_day
-                            elif self.current_display_mode == 'news_manager' and self.news_manager:
-                                manager_to_display = self.news_manager
                             elif self.current_display_mode == 'sports_live' and self.colorado_sports:
                                 manager_to_display = self.colorado_sports
                             elif self.current_display_mode == 'nhl_recent' and self.nhl_recent:
@@ -1439,20 +1390,8 @@ class DisplayController:
                             manager_to_display.display_daily_forecast(force_clear=self.force_clear)
                         elif self.current_display_mode == 'stocks':
                             manager_to_display.display_stocks(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'stock_news':
-                             manager_to_display.display_news() # Assumes internal clearing
-                        elif self.current_display_mode == 'odds_ticker':
-                             manager_to_display.display(force_clear=self.force_clear)
                         elif self.current_display_mode == 'calendar':
                              manager_to_display.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'youtube':
-                             manager_to_display.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'text_display':
-                             manager_to_display.display() # Assumes internal clearing
-                        elif self.current_display_mode == 'of_the_day':
-                             manager_to_display.display(force_clear=self.force_clear)
-                        elif self.current_display_mode == 'news_manager':
-                             manager_to_display.display_news(force_clear=self.force_clear)
                         elif self.current_display_mode == 'sports_live':
                              manager_to_display.display(force_clear=self.force_clear)
                         elif self.current_display_mode == 'ncaa_fb_upcoming' and self.ncaa_fb_upcoming:
@@ -1493,8 +1432,7 @@ class DisplayController:
                         
                         # Reset force_clear *after* a successful display call that used it
                         # Important: Only reset if the display method *might* have used it.
-                        # Internal clearing methods (news, text) don't necessitate resetting it here.
-                        if self.force_clear and self.current_display_mode not in ['stock_news', 'text_display']:
+                        if self.force_clear:
                             self.force_clear = False 
                     elif self.current_display_mode != 'none':
                          logger.warning(f"No manager found or selected for display mode: {self.current_display_mode}")
@@ -1511,14 +1449,15 @@ class DisplayController:
                     # Force clear on the next iteration after an error to be safe
                     self.force_clear = True 
 
-                # Add a short sleep to prevent high CPU usage but ruin scrolling text
-                # time.sleep(0.1)
+                self._wait_between_frames(frame_started)
 
         except KeyboardInterrupt:
             logger.info("Display controller stopped by user")
         except Exception as e:
             logger.error(f"Critical error in display controller run loop: {e}", exc_info=True)
+            raise  # A nonzero exit lets systemd's Restart=on-failure recover.
         finally:
+            self.runtime_reporter.stop()
             logger.info("Cleaning up display manager...")
             self.display_manager.cleanup()
             if self.music_manager: # Check if music_manager object exists

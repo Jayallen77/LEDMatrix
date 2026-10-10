@@ -36,8 +36,6 @@
             "weather": 15,
             "stocks": 30,
             "daily_forecast": 10,
-            "stock_news": 20,
-            "odds_ticker": 60,
             "nhl_live": 30,
             "nhl_recent": 30,
             "nhl_upcoming": 30,
@@ -54,14 +52,12 @@
             "ncaa_baseball_recent": 30,
             "ncaa_baseball_upcoming": 30,
             "calendar": 30,
-            "youtube": 30,
             "mlb_live": 30,
             "mlb_recent": 30,
             "mlb_upcoming": 30,
             "milb_live": 30,
             "milb_recent": 30,
             "milb_upcoming": 30,
-            "text_display": 10,
             "soccer_live": 30,
             "soccer_recent": 30,
             "soccer_upcoming": 30,
@@ -69,8 +65,6 @@
             "ncaam_basketball_recent": 30,
             "ncaam_basketball_upcoming": 30,
             "music": 1000,
-            "of_the_day": 40,
-            "news_manager": 60,
             "sports_live": 20
         },
         "use_short_date_format": true
@@ -88,72 +82,15 @@
     },
     "stocks": {
         "enabled": true,
-        "update_interval": 600,
-        "scroll_speed": 0.60,
-        "scroll_delay": 0.0125,
-        "toggle_chart": true,
-        "dynamic_duration": true,
-        "min_duration": 30,
-        "max_duration": 300,
-        "duration_buffer": 0.1,
-        "symbols": [
-            "AAPL",
-            "AMZN",
-            "GOOGL",
-            "TSLA",
-            "NVDA"
-        ],
-        "display_format": "{symbol}: ${price} ({change}%)"
+        "update_interval": 600
     },
     "crypto": {
-        "enabled": true,
-        "update_interval": 600,
-        "symbols": [
-            "BTC-USD",
-            "ETH-USD"
-        ],
-        "display_format": "{symbol}: ${price} ({change}%)"
+        "enabled": true
     },
     "colorado_sports": {
         "enabled": true,
         "polling_interval": 30,
         "stale_timeout": 120
-    },
-    "stock_news": {
-        "enabled": false,
-        "update_interval": 3600,
-        "scroll_speed": 1,
-        "scroll_delay": 0.01,
-        "max_headlines_per_symbol": 1,
-        "headlines_per_rotation": 2,
-        "dynamic_duration": true,
-        "min_duration": 30,
-        "max_duration": 300,
-        "duration_buffer": 0.1
-    },
-    "odds_ticker": {
-        "enabled": false,
-        "show_favorite_teams_only": true,
-        "games_per_favorite_team": 1,
-        "max_games_per_league": 5,
-        "show_odds_only": false,
-        "sort_order": "soonest",
-        "enabled_leagues": [
-            "nfl",
-            "mlb",
-            "ncaa_fb",
-            "milb"
-        ],
-        "update_interval": 3600,
-        "scroll_speed": 1,
-        "scroll_delay": 0.01,
-        "loop": true,
-        "future_fetch_days": 50,
-        "show_channel_logos": true,
-        "dynamic_duration": true,
-        "min_duration": 30,
-        "max_duration": 300,
-        "duration_buffer": 0.1
     },
     "calendar": {
         "enabled": true,
@@ -262,7 +199,7 @@
         "show_records": true,
         "display_modes": {
             "ncaa_fb_live": true,
-            "ncaa_fb_recent": true ,
+            "ncaa_fb_recent": true,
             "ncaa_fb_upcoming": true
         }
     },
@@ -314,10 +251,6 @@
             "ncaam_basketball_upcoming": true
         }
     },
-    "youtube": {
-        "enabled": false,
-        "update_interval": 3600
-    },
     "mlb": {
         "enabled": false,
         "live_priority": false,
@@ -368,25 +301,6 @@
             "milb_upcoming": true
         }
     },
-    "text_display": {
-        "enabled": false,
-        "text": "Subscribe to ChuckBuilds",
-        "font_path": "assets/fonts/press-start-2p.ttf",
-        "font_size": 8,
-        "scroll": true,
-        "scroll_speed": 40,
-        "text_color": [
-            255,
-            0,
-            0
-        ],
-        "background_color": [
-            0,
-            0,
-            0
-        ],
-        "scroll_gap_width": 32
-    },
     "soccer_scoreboard": {
         "enabled": false,
         "live_priority": true,
@@ -419,62 +333,5 @@
         "preferred_source": "spotify",
         "YTM_COMPANION_URL": "http://192.168.86.12:9863",
         "POLLING_INTERVAL_SECONDS": 1
-    },
-    "of_the_day": {
-        "enabled": false,
-        "display_rotate_interval": 20,
-        "update_interval": 3600,
-        "subtitle_rotate_interval": 10,
-        "category_order": [
-            "word_of_the_day",
-            "slovenian_word_of_the_day"
-        ],
-        "categories": {
-            "word_of_the_day": {
-                "enabled": true,
-                "data_file": "of_the_day/word_of_the_day.json",
-                "display_name": "Word of the Day"
-            },
-            "slovenian_word_of_the_day": {
-                "enabled": true,
-                "data_file": "of_the_day/slovenian_word_of_the_day.json",
-                "display_name": "Slovenian Word of the Day"
-            }
-        }
-    },
-    "news_manager": {
-        "enabled": false,
-        "update_interval": 300,
-        "scroll_speed": 1,
-        "scroll_delay": 0.01,
-        "headlines_per_feed": 2,
-        "enabled_feeds": [
-            "NFL",
-            "NCAA FB",
-            "F1",
-            "BBC F1"
-        ],
-        "custom_feeds": {
-            "F1": "https://www.espn.com/espn/rss/rpm/news",
-            "BBC F1": "http://feeds.bbci.co.uk/sport/formula1/rss.xml"
-        },
-        "rotation_enabled": true,
-        "rotation_threshold": 3,
-        "dynamic_duration": true,
-        "min_duration": 30,
-        "max_duration": 300,
-        "duration_buffer": 0.1,
-        "font_size": 8,
-        "font_path": "assets/fonts/PressStart2P-Regular.ttf",
-        "text_color": [
-            255,
-            255,
-            255
-        ],
-        "separator_color": [
-            255,
-            0,
-            0
-        ]
     }
 }

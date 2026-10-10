@@ -52,10 +52,6 @@ class StockManager:
         self.display_manager = display_manager
         self.stocks_config = config.get("stocks", {})
         self.crypto_config = config.get("crypto", {})
-        self.toggle_chart = bool(self.stocks_config.get("toggle_chart", False))
-        self.scroll_speed = self.stocks_config.get("scroll_speed", 1)
-        self.scroll_delay = self.stocks_config.get("scroll_delay", 0.01)
-        self.cached_text_image = None
         self.cache_manager = CacheManager()
         self.market_data: Dict[str, Dict[str, Any]] = {}
         self.stock_data = self.market_data  # Backward-compatible attribute.
@@ -329,7 +325,7 @@ class StockManager:
         update_interval = int(self.stocks_config.get("update_interval", 600))
         if now < self.next_retry_at:
             return False
-        if self.last_update and now - self.last_update < update_interval:
+        if not self.refresh_error and self.last_update and now - self.last_update < update_interval:
             return False
 
         fresh_rows: Dict[str, Dict[str, Any]] = {}
@@ -374,8 +370,11 @@ class StockManager:
                 or uses_previous_session
             )
             self.refresh_error = failed or len(fresh_rows) < attempted
-            self.retry_attempts = 0
-            self.next_retry_at = 0.0
+            if self.refresh_error:
+                self._mark_retryable("Market Pulse refresh was incomplete.")
+            else:
+                self.retry_attempts = 0
+                self.next_retry_at = 0.0
             self._cache_current_data()
             logger.info(
                 "Market Pulse refreshed %d/%d rows%s",
@@ -394,7 +393,7 @@ class StockManager:
         update_interval = int(self.stocks_config.get("update_interval", 600))
         if now < self.next_retry_at:
             return False
-        if self.last_update and now - self.last_update < update_interval:
+        if not self.refresh_error and self.last_update and now - self.last_update < update_interval:
             return False
         with self._update_lock:
             if self._update_thread and self._update_thread.is_alive():
@@ -467,6 +466,19 @@ class StockManager:
         if level < 40:
             return StockManager.VIX_HIGH_COLOR
         return StockManager.VIX_PANIC_COLOR
+
+    @staticmethod
+    def _vix_label(level: float) -> str:
+        """Short labels fit the existing trend area without moving other rows."""
+        if level < 13:
+            return "CALM"
+        if level < 20:
+            return "NORM"
+        if level < 30:
+            return "HIGH"
+        if level < 40:
+            return "VERY"
+        return "EXT"
 
     def _format_value(
         self,
@@ -592,14 +604,18 @@ class StockManager:
             value, color, direction = self._format_value(key)
             draw.text((1, y), label, font=font, fill=self.LABEL_COLOR)
             row = self.market_data.get(key, {})
-            self._draw_trend(
-                draw,
-                trend_x,
-                y,
-                row.get("trend", []),
-                direction,
-                color if row else self.UNAVAILABLE_COLOR,
-            )
+            if key == "vix":
+                draw.text(
+                    (trend_x, y),
+                    self._vix_label(float(row["price"])) if row else "--",
+                    font=font,
+                    fill=color,
+                )
+            else:
+                self._draw_trend(
+                    draw, trend_x, y, row.get("trend", []), direction,
+                    color if row else self.UNAVAILABLE_COLOR,
+                )
             value_width = self.display_manager.get_text_width(value, font)
             draw.text(
                 (max(32, value_right - value_width), y),
@@ -607,13 +623,8 @@ class StockManager:
                 font=font,
                 fill=color,
             )
-            self._draw_direction_indicator(
-                draw,
-                arrow_x,
-                y,
-                direction,
-                color,
-            )
+            if key != "vix":
+                self._draw_direction_indicator(draw, arrow_x, y, direction, color)
         return image
 
     def display_stocks(self, force_clear: bool = False) -> bool:
@@ -629,24 +640,3 @@ class StockManager:
 
     def get_dynamic_duration(self) -> int:
         return self.dynamic_duration
-
-    def set_toggle_chart(self, enabled: bool) -> None:
-        self.toggle_chart = bool(enabled)
-        self.stocks_config["toggle_chart"] = self.toggle_chart
-        self.cached_text_image = None
-
-    def set_scroll_speed(self, speed: int) -> None:
-        self.scroll_speed = speed
-        self.stocks_config["scroll_speed"] = speed
-
-    def set_scroll_delay(self, delay: float) -> None:
-        self.scroll_delay = delay
-        self.stocks_config["scroll_delay"] = delay
-
-    def _reload_config(self) -> None:
-        self.stocks_config = self.config.get("stocks", {})
-        self.crypto_config = self.config.get("crypto", {})
-        self.toggle_chart = bool(self.stocks_config.get("toggle_chart", False))
-        self.scroll_speed = self.stocks_config.get("scroll_speed", 1)
-        self.scroll_delay = self.stocks_config.get("scroll_delay", 0.01)
-        self.cached_text_image = None

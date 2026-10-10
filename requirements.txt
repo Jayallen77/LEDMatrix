@@ -8,9 +8,6 @@ google-auth-httplib2==0.1.0
 google-api-python-client==2.86.0 
 freetype-py==2.5.1
 spotipy>=2.25.2,<2.26
-Flask
-unidecode
-icalevents
 python-socketio
 python-engineio
 websockets

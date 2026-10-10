@@ -316,8 +316,6 @@ class CacheManager:
             return self._has_weather_changed(cached_data, new_data)
         elif data_type == 'stocks':
             return self._has_stocks_changed(cached_data, new_data)
-        elif data_type == 'stock_news':
-            return self._has_news_changed(cached_data, new_data)
         elif data_type == 'nhl':
             return self._has_nhl_changed(cached_data, new_data)
         elif data_type == 'mlb':
@@ -351,25 +349,6 @@ class CacheManager:
             return False
         return cached.get('price') != new.get('price')
 
-    def _has_news_changed(self, cached: Dict[str, Any], new: Dict[str, Any]) -> bool:
-        """Check if news data has changed."""
-        # Handle both dictionary and list formats
-        if isinstance(new, list):
-            # If new data is a list, cached data should also be a list
-            if not isinstance(cached, list):
-                return True
-            # Compare lengths and content
-            if len(cached) != len(new):
-                return True
-            # Compare titles since they're unique enough for our purposes
-            cached_titles = set(item.get('title', '') for item in cached)
-            new_titles = set(item.get('title', '') for item in new)
-            return cached_titles != new_titles
-        else:
-            # Original dictionary format handling
-            cached_headlines = set(h.get('id') for h in cached.get('headlines', []))
-            new_headlines = set(h.get('id') for h in new.get('headlines', []))
-            return not cached_headlines.issuperset(new_headlines)
 
     def _has_nhl_changed(self, cached: Dict[str, Any], new: Dict[str, Any]) -> bool:
         """Check if NHL data has changed."""

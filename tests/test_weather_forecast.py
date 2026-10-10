@@ -494,5 +494,33 @@ class WeatherForecastTests(unittest.TestCase):
         self.assertEqual(StubWeatherIcons.calls[-1][2:], (-3, -5, 33))
 
 
+    def test_failed_weather_refresh_retries_before_half_hour_interval(self):
+        cache = Mock(); cache.load_cache.return_value = None
+        manager = WeatherManager({'weather': {'enabled': True, 'update_interval': 1800}, 'location': {'city': 'Denver'}}, FakeDisplay(), cache)
+        manager.last_attempt = 100
+        manager.consecutive_errors = 1
+        with patch('src.weather_manager.threading.Thread') as thread:
+            with patch('src.weather_manager.time.time', return_value=129):
+                self.assertFalse(manager.request_update())
+            with patch('src.weather_manager.time.time', return_value=131):
+                self.assertTrue(manager.request_update())
+            thread.return_value.start.assert_called_once()
+
+    def test_geocoding_selects_configured_region_instead_of_first_city(self):
+        cache = Mock(); cache.load_cache.return_value = None
+        manager = WeatherManager({'weather': {'enabled': True}, 'location': {'city': 'Denver', 'state': 'Colorado', 'country': 'US'}}, FakeDisplay(), cache)
+        requests_module = WeatherManager._fetch_weather.__globals__['requests']
+        geo = self.response({'results': [
+            {'latitude': 10, 'longitude': 20, 'admin1': 'Wrong state', 'country_code': 'US'},
+            {'latitude': 39.7, 'longitude': -104.9, 'admin1': 'Colorado', 'country_code': 'US'},
+        ]})
+        with patch.object(requests_module, 'get', side_effect=[geo, self.response(self.live_weather_payload())]) as get:
+            manager._fetch_weather()
+        self.assertEqual(get.call_args_list[0].kwargs['params']['name'], 'Denver, Colorado')
+        self.assertEqual(get.call_args_list[0].kwargs['params']['countryCode'], 'US')
+        self.assertEqual(get.call_args_list[1].kwargs['params']['latitude'], 39.7)
+        self.assertTrue(manager.has_current_weather())
+
+
 if __name__ == "__main__":
     unittest.main()

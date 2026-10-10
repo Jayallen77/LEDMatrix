@@ -1,49 +1,36 @@
 #!/bin/bash
-
-# LED Matrix Web Interface Service Installer
-# This script installs and enables the web interface systemd service
-
-set -e
-
-echo "Installing LED Matrix Web Interface Service..."
-
-# Get the directory where this script is located
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
-
-# Check if running as root
+# Install only the dashboard service; do not reinstall display dependencies.
+set -euo pipefail
+PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if [ "$EUID" -ne 0 ]; then
-    echo "Please run as root (use sudo)"
+    echo "Run sudo bash install_web_service.sh"
     exit 1
 fi
+DASHBOARD_USER="${SUDO_USER:-$(stat -c '%U' "$PROJECT_DIR/config/config.json")}"
+if [ "$DASHBOARD_USER" = root ]; then
+    echo "Run this installer with sudo from the account that owns the project."
+    exit 1
+fi
+UNIT_TMP="$(mktemp)"
+trap 'rm -f "$UNIT_TMP"' EXIT
+cat > "$UNIT_TMP" <<EOF
+[Unit]
+Description=LED Matrix Local Settings Dashboard
+After=network.target
 
-# Copy the service file to systemd directory
-echo "Copying service file to /etc/systemd/system/"
-cp ledmatrix-web.service /etc/systemd/system/
+[Service]
+Type=simple
+User=$DASHBOARD_USER
+WorkingDirectory="$PROJECT_DIR"
+ExecStart=/usr/bin/python3 "$PROJECT_DIR/start_web_conditionally.py"
+Restart=on-failure
+RestartSec=10
 
-# Reload systemd to recognize the new service
-echo "Reloading systemd..."
+[Install]
+WantedBy=multi-user.target
+EOF
+install -m 644 "$UNIT_TMP" /etc/systemd/system/ledmatrix-web.service
 systemctl daemon-reload
-
-# Enable the service to start on boot
-echo "Enabling ledmatrix-web.service..."
 systemctl enable ledmatrix-web.service
-
-# Start the service
-echo "Starting ledmatrix-web.service..."
-systemctl start ledmatrix-web.service
-
-# Check service status
-echo "Checking service status..."
+systemctl restart ledmatrix-web.service
 systemctl status ledmatrix-web.service --no-pager
-
-echo ""
-echo "Web interface service installed and started!"
-echo "The web interface will now start automatically when:"
-echo "1. The system boots"
-echo "2. The 'web_display_autostart' setting is true in config/config.json"
-echo ""
-echo "To check the service status: systemctl status ledmatrix-web.service"
-echo "To view logs: journalctl -u ledmatrix-web.service -f"
-echo "To stop the service: systemctl stop ledmatrix-web.service"
-echo "To disable autostart: systemctl disable ledmatrix-web.service"

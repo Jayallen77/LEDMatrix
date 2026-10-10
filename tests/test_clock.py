@@ -123,8 +123,6 @@ def install_controller_stubs():
         "src.config_manager": {"ConfigManager": Dummy},
         "src.cache_manager": {"CacheManager": Dummy},
         "src.stock_manager": {"StockManager": Dummy},
-        "src.stock_news_manager": {"StockNewsManager": Dummy},
-        "src.odds_ticker_manager": {"OddsTickerManager": Dummy},
         "src.nhl_managers": {
             "NHLLiveManager": Dummy,
             "NHLRecentManager": Dummy,
@@ -170,15 +168,11 @@ def install_controller_stubs():
             "NCAAMBasketballRecentManager": Dummy,
             "NCAAMBasketballUpcomingManager": Dummy,
         },
-        "src.youtube_display": {"YouTubeDisplay": Dummy},
         "src.calendar_manager": {"CalendarManager": Dummy},
-        "src.text_display": {"TextDisplay": Dummy},
         "src.music_manager": {
             "MusicManager": Dummy,
             "MusicSource": types.SimpleNamespace(NONE="none"),
         },
-        "src.of_the_day_manager": {"OfTheDayManager": Dummy},
-        "src.news_manager": {"NewsManager": Dummy},
         "src.colorado_sports_manager": {"ColoradoSportsManager": Dummy},
     }
     saved = {}

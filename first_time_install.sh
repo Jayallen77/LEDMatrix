@@ -424,17 +424,7 @@ cat > /tmp/ledmatrix_web_sudoers << EOF
 # This allows the web interface user to run specific commands without a password
 
 # Allow $ACTUAL_USER to run specific commands without a password for the LED Matrix web interface
-$ACTUAL_USER ALL=(ALL) NOPASSWD: $REBOOT_PATH
-$ACTUAL_USER ALL=(ALL) NOPASSWD: $POWEROFF_PATH
-$ACTUAL_USER ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH start ledmatrix.service
-$ACTUAL_USER ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH stop ledmatrix.service
-$ACTUAL_USER ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH restart ledmatrix.service
-$ACTUAL_USER ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH enable ledmatrix.service
-$ACTUAL_USER ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH disable ledmatrix.service
-$ACTUAL_USER ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH status ledmatrix.service
-$ACTUAL_USER ALL=(ALL) NOPASSWD: $PYTHON_PATH $PROJECT_ROOT_DIR/display_controller.py
-$ACTUAL_USER ALL=(ALL) NOPASSWD: $BASH_PATH $PROJECT_ROOT_DIR/start_display.sh
-$ACTUAL_USER ALL=(ALL) NOPASSWD: $BASH_PATH $PROJECT_ROOT_DIR/stop_display.sh
+$ACTUAL_USER ALL=(root) NOPASSWD: $SYSTEMCTL_PATH restart ledmatrix.service
 EOF
 
 if [ -f "$SUDOERS_FILE" ] && cmp -s /tmp/ledmatrix_web_sudoers "$SUDOERS_FILE"; then
@@ -442,6 +432,7 @@ if [ -f "$SUDOERS_FILE" ] && cmp -s /tmp/ledmatrix_web_sudoers "$SUDOERS_FILE"; 
     rm /tmp/ledmatrix_web_sudoers
 else
     echo "Installing/updating sudoers configuration..."
+    visudo -cf /tmp/ledmatrix_web_sudoers
     cp /tmp/ledmatrix_web_sudoers "$SUDOERS_FILE"
     chmod 440 "$SUDOERS_FILE"
     rm /tmp/ledmatrix_web_sudoers

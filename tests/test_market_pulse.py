@@ -213,7 +213,7 @@ class MarketPulseTests(unittest.TestCase):
             for operation in image.draw_operations
             if operation[0] == "line"
         ]
-        self.assertGreaterEqual(len(line_operations), 16)
+        self.assertGreaterEqual(len(line_operations), 15)
         self.assertIn(
             ("line", (5, 10, 58, 10), {"fill": manager.ACCENT_COLOR}),
             line_operations,
@@ -229,23 +229,42 @@ class MarketPulseTests(unittest.TestCase):
             and operation[1][0] == operation[1][2]
             and 18 <= operation[1][0] <= 30
         ]
-        self.assertEqual(len(trend_operations), 35)
+        self.assertEqual(len(trend_operations), 28)
         self.assertEqual(
             [operation[1][0] for operation in trend_operations[:7]],
             [18, 20, 22, 24, 26, 28, 30],
         )
-        self.assertTrue(
-            all(
-                operation[2]["fill"] == manager.VIX_NORMAL_COLOR
-                for operation in trend_operations[-7:]
-            )
-        )
-        self.assertTrue(
-            all(
-                operation[2]["fill"] == manager.VIX_NORMAL_COLOR
-                for operation in line_operations[-3:]
-            )
-        )
+        self.assertIn(('text', (18, 54), 'NORM', {'font': manager.display_manager.extra_small_font, 'fill': manager.VIX_NORMAL_COLOR}), text_operations)
+        self.assertFalse(any(operation[1][1] == 54 for operation in line_operations))
+
+    def test_failed_refresh_retries_after_backoff_before_normal_interval(self):
+        manager = self.make_manager()
+        manager._fetch_instrument = Mock(return_value=(None, 429))
+        with patch.object(stock_manager.time, 'time', return_value=100):
+            manager.update_stock_data()
+        manager._fetch_instrument.reset_mock()
+        with patch.object(stock_manager.time, 'time', return_value=129):
+            manager.update_stock_data()
+        manager._fetch_instrument.assert_not_called()
+        with patch.object(stock_manager.time, 'time', return_value=131):
+            manager.update_stock_data()
+        manager._fetch_instrument.assert_called_once()
+
+    def test_background_refresh_obeys_retry_deadline(self):
+        manager = self.make_manager()
+        manager.last_update = 100
+        manager.refresh_error = True
+        manager.next_retry_at = 130
+        with patch.object(stock_manager.threading, 'Thread') as thread:
+            with patch.object(stock_manager.time, 'time', return_value=129):
+                self.assertFalse(manager.request_update())
+            with patch.object(stock_manager.time, 'time', return_value=131):
+                self.assertTrue(manager.request_update())
+            thread.return_value.start.assert_called_once()
+
+    def test_vix_labels_match_existing_level_thresholds(self):
+        for value, label in ((12, 'CALM'), (13, 'NORM'), (20, 'HIGH'), (30, 'VERY'), (40, 'EXT')):
+            self.assertEqual(stock_manager.StockManager._vix_label(value), label)
 
     def test_vix_uses_risk_level_color_and_actual_direction(self):
         manager = self.make_manager()
